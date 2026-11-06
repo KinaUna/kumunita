@@ -43,85 +43,90 @@ public class GroupsControllerInvitationLinkTests
     public async Task AcceptInvitationLink_HappyPath_RedirectsToDetail_AndAccepts()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetPendingInvitationsForUserAsync("subj-invitee").Returns(new List<GroupInvitation>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetPendingInvitationsForUserAsync("subj-invitee").Returns(new List<GroupInvitation>
         {
             new() { Id = "inv-1", GroupId = GroupId, Status = InvitationStatus.Pending },
         });
 
-        var controller = Build(userInfo, subjectId: "subj-invitee");
+        var controller = Build(userInfo, groupService, subjectId: "subj-invitee");
 
         var result = await controller.AcceptInvitationLink(GroupId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(GroupsController.Detail), redirect.ActionName);
         Assert.Equal(GroupId, redirect.RouteValues?["id"]);
-        await userInfo.Received(1).AcceptGroupInvitationAsync(GroupId, "subj-invitee");
+        await groupService.Received(1).AcceptGroupInvitationAsync(GroupId, "subj-invitee");
     }
 
     [Fact]
     public async Task DeclineInvitationLink_HappyPath_RedirectsToIndex_AndDeclines()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetPendingInvitationsForUserAsync("subj-invitee").Returns(new List<GroupInvitation>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetPendingInvitationsForUserAsync("subj-invitee").Returns(new List<GroupInvitation>
         {
             new() { Id = "inv-1", GroupId = GroupId, Status = InvitationStatus.Pending },
         });
 
-        var controller = Build(userInfo, subjectId: "subj-invitee");
+        var controller = Build(userInfo, groupService, subjectId: "subj-invitee");
 
         var result = await controller.DeclineInvitationLink(GroupId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(GroupsController.Index), redirect.ActionName);
-        await userInfo.Received(1).DeclineGroupInvitationAsync(GroupId, "subj-invitee");
+        await groupService.Received(1).DeclineGroupInvitationAsync(GroupId, "subj-invitee");
     }
 
     [Fact]
     public async Task AcceptInvitationLink_NotInMyPendingList_NotFound_NoSeamCall()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var groupService = Substitute.For<IGroupService>();
         // In the pending list for a DIFFERENT group — the self-lane gate fails.
-        userInfo.GetPendingInvitationsForUserAsync("subj-other").Returns(new List<GroupInvitation>
+        groupService.GetPendingInvitationsForUserAsync("subj-other").Returns(new List<GroupInvitation>
         {
             new() { Id = "inv-2", GroupId = "grp-other", Status = InvitationStatus.Pending },
         });
 
-        var controller = Build(userInfo, subjectId: "subj-other");
+        var controller = Build(userInfo, groupService, subjectId: "subj-other");
 
         var result = await controller.AcceptInvitationLink(GroupId);
 
         Assert.IsType<NotFoundResult>(result);
-        await userInfo.DidNotReceiveWithAnyArgs().AcceptGroupInvitationAsync(GroupId, "subj-other");
+        await groupService.DidNotReceiveWithAnyArgs().AcceptGroupInvitationAsync(GroupId, "subj-other");
     }
 
     [Fact]
     public async Task DeclineInvitationLink_EmptyPendingList_NotFound_NoSeamCall()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetPendingInvitationsForUserAsync("subj-none").Returns(new List<GroupInvitation>());
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetPendingInvitationsForUserAsync("subj-none").Returns(new List<GroupInvitation>());
 
-        var controller = Build(userInfo, subjectId: "subj-none");
+        var controller = Build(userInfo, groupService, subjectId: "subj-none");
 
         var result = await controller.DeclineInvitationLink(GroupId);
 
         Assert.IsType<NotFoundResult>(result);
-        await userInfo.DidNotReceiveWithAnyArgs().DeclineGroupInvitationAsync(GroupId, "subj-none");
+        await groupService.DidNotReceiveWithAnyArgs().DeclineGroupInvitationAsync(GroupId, "subj-none");
     }
 
     [Fact]
     public async Task AcceptInvitationLink_ResolvedInGap_MapsToError_AndRedirectsToIndex()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetPendingInvitationsForUserAsync("subj-invitee").Returns(new List<GroupInvitation>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetPendingInvitationsForUserAsync("subj-invitee").Returns(new List<GroupInvitation>
         {
             new() { Id = "inv-1", GroupId = GroupId, Status = InvitationStatus.Pending },
         });
         // The row was resolved in the gap between the gate and the commit —
         // the Core's C-M2b·3 invalid-transition wall.
-        userInfo.AcceptGroupInvitationAsync(GroupId, "subj-invitee")
+        groupService.AcceptGroupInvitationAsync(GroupId, "subj-invitee")
             .Returns(Task.FromException(new InvalidOperationException("resolved")));
 
-        var controller = Build(userInfo, subjectId: "subj-invitee");
+        var controller = Build(userInfo, groupService, subjectId: "subj-invitee");
 
         var result = await controller.AcceptInvitationLink(GroupId);
 
@@ -134,14 +139,15 @@ public class GroupsControllerInvitationLinkTests
     public async Task DeclineInvitationLink_ResolvedInGap_MapsToError_AndRedirectsToIndex()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetPendingInvitationsForUserAsync("subj-invitee").Returns(new List<GroupInvitation>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetPendingInvitationsForUserAsync("subj-invitee").Returns(new List<GroupInvitation>
         {
             new() { Id = "inv-1", GroupId = GroupId, Status = InvitationStatus.Pending },
         });
-        userInfo.DeclineGroupInvitationAsync(GroupId, "subj-invitee")
+        groupService.DeclineGroupInvitationAsync(GroupId, "subj-invitee")
             .Returns(Task.FromException(new InvalidOperationException("resolved")));
 
-        var controller = Build(userInfo, subjectId: "subj-invitee");
+        var controller = Build(userInfo, groupService, subjectId: "subj-invitee");
 
         var result = await controller.DeclineInvitationLink(GroupId);
 
@@ -154,18 +160,20 @@ public class GroupsControllerInvitationLinkTests
     public async Task AcceptInvitationLink_Unauthenticated_Unauthorized()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        var controller = Build(userInfo, subjectId: null);
+        var groupService = Substitute.For<IGroupService>();
+        var controller = Build(userInfo, groupService, subjectId: null);
 
         var result = await controller.AcceptInvitationLink(GroupId);
 
         Assert.IsType<UnauthorizedResult>(result);
-        await userInfo.DidNotReceiveWithAnyArgs().AcceptGroupInvitationAsync(GroupId, "subj-x");
+        await groupService.DidNotReceiveWithAnyArgs().AcceptGroupInvitationAsync(GroupId, "subj-x");
     }
 
     // ── Harness (mirrors GroupsControllerDeleteTests.Build) ────────────────
 
     private static GroupsController Build(
         IUserInfoService? userInfo = null,
+        IGroupService? groupService = null,
         string[]? roles = null,
         bool IsAuthenticated = false,
         string? subjectId = null)
@@ -182,7 +190,7 @@ public class GroupsControllerInvitationLinkTests
 
         var events = Substitute.For<Kumunita.Core.Events.IEventService>();
 
-        var controller = new GroupsController(userInfoImpl, posts, localization, store, events);
+        var controller = new GroupsController(userInfoImpl, groupService ?? Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), posts, localization, store, events);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 

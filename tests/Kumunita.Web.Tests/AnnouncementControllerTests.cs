@@ -127,8 +127,9 @@ public class AnnouncementControllerTests
         }, HasMore: false));
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         userInfo.GetProfileAsync(author).Returns((Profile?)null);
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(announcements, userInfo, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
 
@@ -229,12 +230,13 @@ public class AnnouncementControllerTests
         }, HasMore: false));
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         userInfo.GetProfileAsync(author).Returns(new Profile
         {
             SubjectId = author,
             DisplayName = display,
         });
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(announcements, userInfo, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
 
@@ -327,11 +329,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(
-            announcements,
-            Substitute.For<IUserInfoService>(),
-            DefaultLocalization(),
-            store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext(),
@@ -366,11 +364,7 @@ public class AnnouncementControllerTests
         readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(null));
         store.QuerySession().Returns(readSession);
 
-        var controller = new AnnouncementController(
-            Substitute.For<IAnnouncementService>(),
-            Substitute.For<IUserInfoService>(),
-            DefaultLocalization(),
-            store);
+        var controller = new AnnouncementController(Substitute.For<IAnnouncementService>(), Substitute.For<IUserInfoService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var result = await controller.Edit(id);
@@ -400,11 +394,7 @@ public class AnnouncementControllerTests
         readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
         store.QuerySession().Returns(readSession);
 
-        var controller = new AnnouncementController(
-            Substitute.For<IAnnouncementService>(),
-            Substitute.For<IUserInfoService>(),
-            DefaultLocalization(),
-            store);
+        var controller = new AnnouncementController(Substitute.For<IAnnouncementService>(), Substitute.For<IUserInfoService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
@@ -459,11 +449,7 @@ public class AnnouncementControllerTests
         readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
         store.QuerySession().Returns(readSession);
 
-        var controller = new AnnouncementController(
-            Substitute.For<IAnnouncementService>(),
-            Substitute.For<IUserInfoService>(),
-            DefaultLocalization(),
-            store);
+        var controller = new AnnouncementController(Substitute.For<IAnnouncementService>(), Substitute.For<IUserInfoService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -507,11 +493,7 @@ public class AnnouncementControllerTests
         readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
         store.QuerySession().Returns(readSession);
 
-        var controller = new AnnouncementController(
-            Substitute.For<IAnnouncementService>(),
-            Substitute.For<IUserInfoService>(),
-            DefaultLocalization(),
-            store);
+        var controller = new AnnouncementController(Substitute.For<IAnnouncementService>(), Substitute.For<IUserInfoService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -551,11 +533,7 @@ public class AnnouncementControllerTests
         readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
         store.QuerySession().Returns(readSession);
 
-        var controller = new AnnouncementController(
-            Substitute.For<IAnnouncementService>(),
-            Substitute.For<IUserInfoService>(),
-            DefaultLocalization(),
-            store);
+        var controller = new AnnouncementController(Substitute.For<IAnnouncementService>(), Substitute.For<IUserInfoService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
@@ -612,7 +590,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), DefaultLocalization(), store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -660,7 +638,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), DefaultLocalization(), store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -699,7 +677,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), DefaultLocalization(), store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -751,12 +729,13 @@ public class AnnouncementControllerTests
             public async Task New_When_Moderator_TargetCommunities_OnlyTheirs()
             {
                 var userInfo = Substitute.For<IUserInfoService>();
-                userInfo.GetComponentsAsync(true).Returns(new List<Component>
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+                profileSettings.GetComponentsAsync(true).Returns(new List<Component>
                 {
                     new() { Id = "community-A", Name = "Community A" },
                     new() { Id = "community-B", Name = "Community B" },
                 });
-                var controller = Build(Substitute.For<IAnnouncementService>(), userInfo: userInfo,
+                var controller = Build(Substitute.For<IAnnouncementService>(), userInfo: userInfo, profileSettings: profileSettings,
                     roles: new[] { Roles.Moderator, Roles.ModeratorComponent("community-A") },
                     IsAuthenticated: true, subjectId: "subj-mod-001");
 
@@ -775,12 +754,13 @@ public class AnnouncementControllerTests
             public async Task New_When_GlobalAdmin_TargetCommunities_All()
             {
                 var userInfo = Substitute.For<IUserInfoService>();
-                userInfo.GetComponentsAsync(true).Returns(new List<Component>
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+                profileSettings.GetComponentsAsync(true).Returns(new List<Component>
                 {
                     new() { Id = "community-A", Name = "Community A" },
                     new() { Id = "community-B", Name = "Community B" },
                 });
-                var controller = Build(Substitute.For<IAnnouncementService>(), userInfo: userInfo,
+                var controller = Build(Substitute.For<IAnnouncementService>(), userInfo: userInfo, profileSettings: profileSettings,
                     roles: new[] { Roles.GlobalAdmin },
                     IsAuthenticated: true, subjectId: "subj-admin-001");
 
@@ -817,13 +797,14 @@ public class AnnouncementControllerTests
                         HasMore: false));
 
                 var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
                 userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Community Moderator" });
-                userInfo.GetComponentsAsync(true).Returns(new List<Component>
+                profileSettings.GetComponentsAsync(true).Returns(new List<Component>
                 {
                     new() { Id = "community-A", Name = "Community A" },
                 });
 
-                var controller = Build(announcements, userInfo, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
+                var controller = Build(announcements, userInfo, profileSettings: profileSettings, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
 
                 var result = (await controller.Index()) as ViewResult;
 
@@ -876,13 +857,14 @@ public class AnnouncementControllerTests
                     });
 
                 var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
                 userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Admin" });
-                userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+                profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
                 var store = Substitute.For<IDocumentStore>();
                 var provider = Substitute.For<ITranslationProvider>();
                 provider.ResolveEffectiveLanguageAsync("da").Returns("da"); // the cookie branch resolves "da" → "da"
-                var controller = new AnnouncementController(announcements, userInfo, DefaultLocalization(), store, provider);
+                var controller = new AnnouncementController(announcements, userInfo, Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store, provider);
 
                 var httpContext = new DefaultHttpContext();
                 httpContext.Request.Headers.Cookie = "kumunita.locale=da"; // the viewer's explicit preference (M·5)
@@ -925,6 +907,7 @@ public class AnnouncementControllerTests
                     });
 
                 var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
                 userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Site Admin" });
 
                 var controller = Build(announcements, userInfo, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
@@ -978,6 +961,7 @@ public class AnnouncementControllerTests
                         AuthorId = "subj-admin-001", Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
                     });
                 var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
                 userInfo.GetProfileAsync("subj-admin-001").Returns((Profile?)null); // missing profile → subject-id fallback
                 var controller = Build(announcements, userInfo, IsAuthenticated: false);
 
@@ -1585,6 +1569,7 @@ public class AnnouncementControllerTests
                 Created = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero),
             });
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Author" });
 
         var controller = Build(announcements, userInfo, roles: new[] { Roles.Member },
@@ -1648,7 +1633,8 @@ public class AnnouncementControllerTests
             });
 
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
             IsAuthenticated: true, subjectId: author);
@@ -1690,7 +1676,8 @@ public class AnnouncementControllerTests
             });
 
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
             IsAuthenticated: true, subjectId: author);
@@ -1738,7 +1725,8 @@ public class AnnouncementControllerTests
             });
 
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
             IsAuthenticated: true, subjectId: author);
@@ -1798,7 +1786,8 @@ public class AnnouncementControllerTests
             });
 
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
             IsAuthenticated: true, subjectId: author);
@@ -2005,17 +1994,19 @@ public class AnnouncementControllerTests
     private static AnnouncementController Build(
         IAnnouncementService announcements,
         IUserInfoService? userInfo = null,
+        IProfileSettingsService? profileSettings = null,
         string[]? roles = null,
         bool IsAuthenticated = false,
         string? subjectId = null)
     {
         var userInfoImpl = userInfo ?? Substitute.For<IUserInfoService>();
-        // The compose shape seeds the target-community picker from the UserInfo
+        var profileSettingsImpl = profileSettings ?? Substitute.For<IProfileSettingsService>();
+        // The compose shape seeds the target-community picker from the profile
         // seam (an empty candidate set is a valid shape — the view renders an
         // "all residents"-only picker for a plain Moderator). Only defaulted
         // here for a caller-provided substitute its own setup wins.
-        if (userInfo is null)
-            userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
+        if (profileSettings is null)
+            profileSettingsImpl.GetComponentsAsync(true).Returns(new List<Component>());
 
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
@@ -2024,7 +2015,7 @@ public class AnnouncementControllerTests
         // instance default through the HTTP-free ILocalizationService seam.
         var localization = DefaultLocalization();
 
-        var controller = new AnnouncementController(announcements, userInfoImpl, localization, store);
+        var controller = new AnnouncementController(announcements, userInfoImpl, profileSettingsImpl, localization, store);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext
         {

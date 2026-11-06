@@ -11,15 +11,21 @@
 # whole thing is driven non-interactively by the command above — which is
 # exactly the shape AGENTS.md prescribes for multi-line PowerShell.
 #
-# The gates (a–f from the U00 "Do" section of plan-improve.md; g added by U07):
-#   (a) .cs in src/ over 2 000 lines
+# The gates (b, c, d, g remain; a, e, f retired by IMPROVE-CODE C00):
+#   (a) RETIRED (IMPROVE-CODE C00) — was: .cs in src/ over 2 000 lines. The
+#       code-size ceiling now lives in tools/code/code-check.ps1 (the
+#       Roslyn-measured ratchet in tools/code/code-baseline.json, which is
+#       finer than a single file-line ceiling and covers .cs/.ts/.cshtml).
 #   (b) docs/adr/README.md index rows != docs/adr/0*.md file count
 #   (c) AGENTS.md and .github/copilot-instructions.md share a "## " heading
 #       with different content
 #   (d) any *-handoff-notes.md under docs/archive/lanes/ over 600
 #       lines without a "TL;DR" in the first 20 lines
-#   (e) first-party .ts under src/Kumunita.Web/client/ over 800 lines
-#   (f) any .cshtml view over 800 lines
+#   (e) RETIRED (IMPROVE-CODE C00) — was: first-party .ts under
+#       src/Kumunita.Web/client/ over 800 lines (now the ts_file ceiling in
+#       tools/code/code-check.ps1).
+#   (f) RETIRED (IMPROVE-CODE C00) — was: any .cshtml view over 800 lines
+#       (now the cshtml ceiling in tools/code/code-check.ps1).
 #   (g) any docs/design/*.md over 400 lines without an "Abstract" in its first
 #       15 lines after the front-matter (added by U07, 2026-10-08 — the
 #       design-doc tier of the 10-second "is this the right read" gate; the
@@ -28,14 +34,17 @@
 #
 # Baseline grandfathering (the plan's own words: "the gate allows the
 # current baseline (it does not force an immediate fix); it prevents the
-# baseline from growing"). Each gate's BASELINE_* list is the *set of files
-# already over the ceiling at U00 time* (collected 2026-10-08). A *new* file
-# crossing the ceiling — or a *baseline* file growing *past its own size* —
-# fails the close. When a U-unit retires a baseline entry, remove it from the
-# list in the same commit. Gates (d) and (g) are **baseline-free** as of
+# baseline from growing"). Gates (b) and (c) each carry a grandfathered
+# baseline set (U01's ADR rows, U03's shared headings): a violation *beyond*
+# that set fails the close; a violation inside it is the in-flight work the
+# baseline exists to allow. Gates (d) and (g) are **baseline-free** as of
 # IMPROVE-DOCS D14 (2026-11-02) — the docs they measure have all been fixed,
-# so they fail on *any* violation with no grandfathering (the "retire the
-# baselines, don't grandfather them" close work).
+# so they fail on *any* violation (the "retire the baselines, don't
+# grandfather them" close work). Gates (a), (e) and (f) were retired by
+# IMPROVE-CODE C00; the code-size ratchet they enforced now lives in
+# tools/code/code-check.ps1 (a Roslyn-measured, shrink-only baseline that is
+# strictly finer than these file-line ceilings and additionally covers .ts
+# and .cshtml).
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -107,218 +116,6 @@ function Check([string]$gate, [string]$message, [bool]$cond) {
   }
 }
 
-# =============================================================================
-# Gate (a) — src/*.cs ceiling 2 000 lines (baseline grandfathered)
-# =============================================================================
-$aCeiling = 2000
-$aBaseline = @(
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs',
-  'src/Kumunita.Web/Controllers/ProjectsController.cs',
-  'src/Kumunita.Core/Projects/ProjectService.cs',
-  'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs',
-  'src/Kumunita.Core/UserInfo/UserInfoService.cs',
-  'src/Kumunita.Web/Controllers/GroupsController.cs',
-  'src/Kumunita.Core/Events/EventService.cs',
-  'src/Kumunita.Web/Controllers/EventController.cs',
-  'src/Kumunita.Web/Controllers/PostsController.cs',
-  'src/Kumunita.Core/Posts/PostService.cs',
-  'src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs'
-)
-#aBaselineSizes = the *exact* sizes at U00 time (baseline may not grow either).
-# Re-baselined at the M29 close (2026-10-08): two baseline files legitimately
-# grew from M29's feature work — FirstBootSeeder.cs from U04's
-# `SeedSurfaceLabelsAsync` step (the `SurfaceLabels` all-null seeder row,
-# ADR 0152) and KnownTranslationKeys.cs from U08's `labels.*` admin-form keys
-# (× en/de/fr/da). Both are the milestone's *shipped* additions, not growth
-# the IMPROVE reduction was meant to prevent — the gate's ceiling now starts
-# from the M29 baseline, and the next reduction lane will measure against it.
-# Re-baselined again 2026-10-25 (the prod-hardening close, the same mechanism):
-# since the 2026-10-08 baseline the M30-M37 / ESC / SITE / SITE-2 / FDW lanes +
-# the prod-hardening lane (F1-F22) shipped — each adding seeder steps, kw-l
-# keys, service seams, and controller actions to these files, plus EventController.cs
-# crossing the ceiling outright (the recurring-events lane's surface). The
-# ceiling now starts from the 2026-10-25 baseline; the next reduction lane
-# measures against it (the M29 precedent, applied once more).
-# Re-baselined again 2026-10-25 (987086ea, the ADR 0167 amendment): the ten
-# new page-* note kinds added 10 pn.list.kind.page-* keys x en/de/fr/da to
-# KnownTranslationKeys.cs (10970 -> 11020) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 11020 now.
-# Re-baselined again 2026-10-27 (the ADR 0191 inventory lane close): two new
-# inventory keys x en/de/fr/da added to KnownTranslationKeys.cs (11020 ->
-# 11106) — the same shipped-additions mechanism as above; the gate's ceiling
-# starts from 11106 now.
-# Re-baselined again 2026-10-27 (the ADR 0193 portability import-modes lane
-# close): two new portability.import.keep_existing* keys x en/de/fr/da added
-# to KnownTranslationKeys.cs (11106 -> 11114) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 11114 now.
-# Re-baselined again 2026-10-29 (the ADR 0251 post edit/new localization
-# close): since the ADR 0193 baseline the documents / announcements lanes
-# (ADR 0242 delete_confirm, ADR 0248 comment count) and this lane (ADR 0251,
-# eleven posts.* keys x en/de/fr/da) added keys to KnownTranslationKeys.cs
-# (11114 -> 11527); the board card edit modal (ADR 0195) grew
-# ProjectsController.cs (5257 -> 5358); the feed-footer reply-count / bookmark
-# lanes (the ADR 0175 / ADR 0226 / ADR 0227 TODOs) grew GroupsController.cs
-# (3032 -> 3035) and PostService.cs (2281 -> 2315); the ADR 0130
-# warm-backfill fix grew SampleDataSeeder.cs (2105 -> 2110) — the same
-# shipped-additions mechanism as above; the gate's ceiling now starts from
-# the 2026-10-29 baseline.
-# Re-baselined again 2026-10-29 (the ADR 0257 groups-pages localization
-# close): since the ADR 0251 baseline the pages-form lane (ADR 0254,
-# 19 pages.form.* keys) and the groups lane (ADR 0257, 20 keys) added
-# keys to KnownTranslationKeys.cs (11527 -> 11835); the ADR 0253
-# everyone-audience seeds grew ProjectsController.cs (5358 -> 5370) — the
-# same shipped-additions mechanism as above; the gate's ceiling now starts
-# from the 2026-10-29 baseline (again).
-# Re-baselined again 2026-10-29 (the ADR 0258 shared-close/tooltips close):
-# the three new tooltip keys (pages.draft_tooltip, pages.scoped_tooltip,
-# announcements.pinned_tooltip) x en/de/fr/da added to KnownTranslationKeys.cs
-# (11835 -> 11859) — the same shipped-additions mechanism as above; the
-# gate's ceiling starts from 11859 now.
-# Re-baselined again 2026-10-29 (the ADR 0259 kiosk-settings/signup
-# localization close): the twenty-nine new kiosk.settings.* / account.signup_*
-# keys x en/de/fr/da added to KnownTranslationKeys.cs (11859 -> 12091) — the
-# same shipped-additions mechanism as above; the gate's ceiling starts from
-# 12091 now.
-# Re-baselined again 2026-10-29 (the ADR 0260 guardian-rsvp-rows close): the
-# three new guardian.eventrsvp.desired_with / requested_at / attended_at keys
-# x en/de/fr/da added to KnownTranslationKeys.cs (12091 -> 12103) — the same
-# shipped-additions mechanism as above; the gate's ceiling starts from 12103 now.
-# Re-baselined again 2026-10-29 (the ADR 0261 shared-flash-extension close): the
-# forty-nine new flash.* / announcements.flash_* / events.flash_* /
-# guardian.flash_* keys x en/de/fr/da added to KnownTranslationKeys.cs
-# (12103 -> 12299) — the same shipped-additions mechanism as above; the gate's
-# ceiling starts from 12299 now.
-# Re-baselined again 2026-10-29 (the ADR 0262 posts-flash close): the nine new
-# posts.flash_* / flash.report_submitted keys x en/de/fr/da added to
-# KnownTranslationKeys.cs (12299 -> 12335) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 12335 now.
-# Re-baselined again 2026-10-29 (the ADR 0263 page-flash close): the eight new
-# pages.flash_* keys x en/de/fr/da added to KnownTranslationKeys.cs
-# (12335 -> 12367) — the same shipped-additions mechanism as above; the gate's
-# ceiling starts from 12367 now.
-# Re-baselined again 2026-10-29 (the ADR 0264 community-flash close): the nine
-# new communities.flash_* / flash.translation_needs_name_or_description keys
-# x en/de/fr/da added to KnownTranslationKeys.cs (12367 -> 12403) — the same
-# shipped-additions mechanism as above; the gate's ceiling starts from 12403 now.
-# Re-baselined again 2026-10-29 (the ADR 0265 projects-flash close): the 46 new
-# projects.flash_* / flash.translation_needs_title_or_text / projects.dir_* keys
-# x en/de/fr/da added to KnownTranslationKeys.cs (12403 -> 12587) — the same
-# shipped-additions mechanism as above; the gate's ceiling starts from 12587 now.
-# Re-baselined again 2026-10-29 (the ADR 0266 groups-flash close): the 22 new
-# groups.flash_* keys x en/de/fr/da added to KnownTranslationKeys.cs
-# (12587 -> 12675) — the same shipped-additions mechanism as above; the gate's
-# ceiling starts from 12675 now.
-# Re-baselined again 2026-10-29 (the ADR 0267 admin-flash close): the 41 new
-# admin.flash_* / flash.translation_gone_add / flash.translation_gone /
-# flash.choose_language_remove keys x en/de/fr/da added to
-# KnownTranslationKeys.cs (12675 -> 12839) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 12839 now.
-# Re-baselined again 2026-10-29 (the ADR 0268 remaining-flash close): the 34 new
-# account.flash_* / inventory.flash_* / kiosk.flash_* / languages.flash_* /
-# settings.profile_unavailable / messaging.flash_* / moderation.flash_* /
-# security.flash_* / tags.flash_* keys x en/de/fr/da added to
-# KnownTranslationKeys.cs (12839 -> 12975) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 12975 now.
-# Re-baselined again 2026-10-29 (the ADR 0269 ModelState close): the 63 new
-# validation.* keys x en/de/fr/da added to KnownTranslationKeys.cs
-# (12975 -> 13227) — the same shipped-additions mechanism as above.
-# Re-baselined again 2026-10-29 (the ADR 0270 BadRequest-bodies close): the
-# 4 new validation.* keys (validation.folder_name_required / choose_image /
-# choose_file / document_id_required) x en/de/fr/da added to
-# KnownTranslationKeys.cs (13227 -> 13243) — the same shipped-additions
-# mechanism as above.
-# Re-baselined again 2026-10-29 (the ADR 0271 Admin-hub-views close): the
-# 84 new admin.hub.* / admin.platform.* / admin.communities.* /
-# admin.accounts.* / admin.manage.* / admin.security.* / admin.audit.* /
-# admin.errorreport.* / admin.breakglass.* / admin.escalation.* / common.* keys
-# x en/de/fr/da added to KnownTranslationKeys.cs (13243 -> 13575) — the same
-# shipped-additions mechanism as above.
-# Re-baselined again 2026-10-29 (the ADR 0272 AdminSite + settings-views close):
-# the 100 new admin.site.* / admin.storage.* / admin.labels.* / admin.help.* /
-# admin.guests.* / admin.storagemetrics.* / admin.setup.* / admin.quiet.* /
-# admin.portability.* / admin.breakglass.explainer / admin.security.audit_desc
-# keys x en/de/fr/da added to KnownTranslationKeys.cs (13575 -> 13975) — the
-# same shipped-additions mechanism as above; the gate's ceiling starts from
-# 13975 now.
-# Re-baselined again 2026-10-30 (the ADR 0273 security-settings/leftovers/
-# page-titles close): the 178 new settings.mfa.* / settings.sessions.* /
-# account.delete_confirm_dialog / myportability.* / blog.draft_title /
-# inv.detail.note_placeholder / kiosk.exit / moderation.unlock_header /
-# moderation.unlock_desc / moderation.resolve_desc / pages.sibling_nav /
-# posts.mandatory_title / posts.no_feeds / profile.preview_visible_sentence /
-# profile.preview_hidden_sentence / sort.aria_label / about.cta.* / title.*
-# keys x en/de/fr/da added to KnownTranslationKeys.cs (13975 -> 14687) — the
-# same shipped-additions mechanism as above; the gate's ceiling starts from
-# 14687 now.
-# Re-baselined again 2026-10-30 (the ADR 0277 directory sort/filter lane close):
-# the directory's search/verified/clear labels (directory.search /
-# directory.verified_only / directory.no_results / directory.clear) + the
-# a11y.find_directory aria-label, x en/de/fr/da, added to
-# KnownTranslationKeys.cs (14687 -> 14707) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 14707 now.
-# Re-baselined again 2026-10-30 (the group-messaging lane close): the 15
-# group_message.* UI keys + the 8 group-messaging notification.* keys
-# (kind badge + preference label + subject + body for the two new kinds
-# group.message.new / group.message.mention) x en/de/fr/da added to
-# KnownTranslationKeys.cs (14707 -> 14815) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 14815 now.
-# Re-baselined again 2026-10-30 (the group-title + messages-tab amendment
-# to the group-messaging lane, ADR 0278): the two group_message.new.name*
-# keys (the new-group name field's label + placeholder) x en/de/fr/da added
-# to KnownTranslationKeys.cs (14815 -> 14823) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 14823 now.
-# Re-baselined again (the group-messaging invitation flow, ADR 0278
-# amendment): the seven new group_message.* UI keys (members / pending /
-# invite_sent / invite_accepted / invite_declined / invite_not_pending) +
-# the three notification.* group.message.invite keys x en/de/fr/da added to
-# KnownTranslationKeys.cs (14823 -> 14863) — the same shipped-additions
-# mechanism as above; the gate's ceiling starts from 14863 now.
-# Re-baselined again 2026-10-31 (the SEC L3 U24 verify confirm step): two new
-# account.verify_confirm_* keys x en/de/fr/da added to KnownTranslationKeys.cs
-# (14863 -> 14885) — the same shipped-additions mechanism as above.
-# Re-baselined again 2026-11-01 (the sessions lane U9 i18n close): five new
-# settings.sessions.* keys (list_heading / list_desc / current_badge /
-# revoke_button / revoke_confirm) x en/de/fr/da added to KnownTranslationKeys.cs
-# (14885 -> 14905) — the same shipped-additions mechanism as above. ADR
-# annotation: ADR 0281 (the sessions lane ADR) does not yet exist — it lands in
-# the sessions lane's U12 close; the ADR that drives this re-baseline will be
-# annotated there. Do not loosen the gate (the pin is the point).
-# Re-baselined again 2026-11-01 (the ADR 0285 kiosk lane — patches 1/4, 2/4
-# and 3/4): the new kiosk.settings.* / board list-view / per-entry kiosk keys
-# x en/de/fr/da added to KnownTranslationKeys.cs (14905 -> 15157); the board
-# list view (?view=list, ADR 0285 D6) handlers added to
-# ProjectsController.cs (5370 -> 5373) — the same shipped-additions
-# mechanism as above. ADR 0285 annotated in its Consequences.
-$aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 15157
-  'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 5373
-  'src/Kumunita.Core/Projects/ProjectService.cs'           = 5015
-  'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 6926
-  'src/Kumunita.Core/UserInfo/UserInfoService.cs'          = 4286
-  'src/Kumunita.Web/Controllers/GroupsController.cs'       = 3035
-  'src/Kumunita.Core/Events/EventService.cs'               = 2226
-  'src/Kumunita.Web/Controllers/EventController.cs'        = 2172
-  'src/Kumunita.Web/Controllers/PostsController.cs'        = 2165
-  'src/Kumunita.Core/Posts/PostService.cs'                 = 2315
-  'src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs'        = 2110
-}
-$aViolations = [System.Collections.Generic.List[string]]::new()
-$csFiles = Get-ChildItem -Path (Join-Path $repo 'src') -Recurse -Filter '*.cs' -File |
-  Where-Object { $_.FullName -notmatch '\\(obj|bin)\\' }
-foreach ($f in $csFiles) {
-  $rel = Rel $f.FullName
-  $n = Lines $f.FullName
-  if ($n -le $aCeiling) { continue }
-  if ($aBaselineSizes.ContainsKey($rel)) {
-    if ($n -gt $aBaselineSizes[$rel]) {
-      $aViolations.Add("$rel = $n lines (baseline was $($aBaselineSizes[$rel]); baseline file grew)")
-    }
-    continue
-  }
-  $aViolations.Add("$rel = $n lines (new file over the $aCeiling ceiling)")
-}
-Check "a" "src/*.cs over 2000 lines (new or grown past its U00 baseline): $($aViolations.Count)" ($aViolations.Count -eq 0)
-foreach ($v in $aViolations) { Write-Host "       - $v" }
 
 # =============================================================================
 # Gate (b) — ADR index drift
@@ -399,95 +196,7 @@ if (Test-Path $dDir) {
 Check "d" "handoff notes >600 lines without TL;DR/Abstract (no baseline): $($dViolations.Count)" ($dViolations.Count -eq 0)
 foreach ($v in $dViolations) { Write-Host "       - $v" }
 
-# =============================================================================
-# Gate (e) — first-party .ts under client/ over 800 lines
-# =============================================================================
-$eCeiling = 800
-$eDir = Join-Path $repo 'src/Kumunita.Web/client'
-$eViolations = [System.Collections.Generic.List[string]]::new()
-if (Test-Path $eDir) {
-  $tsFiles = Get-ChildItem -Path $eDir -Recurse -Filter '*.ts' -File |
-    Where-Object { $_.FullName -notmatch '\\node_modules\\' }
-  foreach ($f in $tsFiles) {
-    $n = Lines $f.FullName
-    if ($n -le $eCeiling) { continue }
-    $eViolations.Add((Rel $f.FullName) + " = $n lines")
-  }
-}
-# Baseline (U00 time): one file, rich-editor.ts at 1 634 lines.
-$eBaselineSizes = @{
-  'src/Kumunita.Web/client/lib/rich-editor.ts' = 1634
-}
-$eNew = [System.Collections.Generic.List[string]]::new()
-foreach ($v in $eViolations) {
-  $rel = ($v -split ' = ')[0]
-  if ($eBaselineSizes.ContainsKey($rel)) {
-    $n = [int]((($v -split ' = ')[1]) -replace ' lines','')
-    if ($n -gt $eBaselineSizes[$rel]) { $eNew.Add("$rel = $n (baseline was $($eBaselineSizes[$rel]))") }
-  } else {
-    $eNew.Add($v)
-  }
-}
-Check "e" "client/*.ts over 800 lines (new or grown past its U00 baseline): $($eNew.Count)" ($eNew.Count -eq 0)
-foreach ($v in $eNew) { Write-Host "       - $v" }
 
-# =============================================================================
-# Gate (f) — .cshtml views over 800 lines
-# =============================================================================
-$fCeiling = 800
-$fViolations = [System.Collections.Generic.List[string]]::new()
-$cshtmlFiles = Get-ChildItem -Path (Join-Path $repo 'src') -Recurse -Filter '*.cshtml' -File
-foreach ($f in $cshtmlFiles) {
-  $n = Lines $f.FullName
-  if ($n -le $fCeiling) { continue }
-  $fViolations.Add((Rel $f.FullName) + " = $n lines")
-}
-$fBaselineSizes = @{
-  'src/Kumunita.Web/Views/Projects/BoardDetail.cshtml' = 1431
-  'src/Kumunita.Web/Views/Posts/Detail.cshtml'         = 1015
-  # Re-baselined 2026-10-25 (the prod-hardening close): TodoDetail grew from
-  # the M36 mention link pass + the M37 _NoteButton partial + the M14 linked
-  # to-do / project chips (the lane's shipped additions, the M29 precedent).
-  'src/Kumunita.Web/Views/Projects/TodoDetail.cshtml'  = 1154
-  # Re-baselined 2026-10-27 (the ADR 0176 / 0189 lane close): _Layout crossed
-  # the 800 ceiling from the ADR 0176 single-notice-strip pass (the
-  # `notice-strip.js` surface + the what's-new inline notice, shipped
-  # additions) and TodoDetail grew from the ADR 0189 to-do restyle (status
-  # chip / assignee meta line / overdue marker / detail+comment cards) — the
-  # same shipped-additions mechanism as above (the M29 precedent).
-  # Re-baselined again 2026-10-29 (the ADR 0251 post edit/new localization
-  # close): _Layout crossed its 816 baseline from the ADR 0231 tab-strip
-  # phone audit (sub-nav strip scroll + edge fades, shipped additions), and
-  # Groups/Detail crossed the 800 ceiling outright from the feed-footer
-  # bookmark toggle lane (the ADR 0226 / ADR 0227 TODO, 814 lines) — the same
-  # shipped-additions mechanism as above (the M29 precedent).
-  # Re-baselined again 2026-10-30 (the ADR 0273 security-settings / page-titles
-  # localization close): _Layout crossed its 833 baseline from the ADR 0273
-  # central page-title map (Security/PageTitleKeys lookup + effective-language
-  # resolution + English fallback in the <title> pass, 21 insertions / 1
-  # deletion) — the same shipped-additions mechanism as above (the M29
-  # precedent).
-  # Re-baselined again 2026-10-31 (the ADR 0279 hand-drawn icon-sprite close):
-  # _Layout crossed its 853 baseline by one line from the new
-  # _IconSprite partial render right after <body> (the 28 inline 16-grid
-  # copies were replaced by <use> references in place, so the only net
-  # addition is the partial line) — the same shipped-additions mechanism as
-  # above (the M29 precedent).
-  'src/Kumunita.Web/Views/Shared/_Layout.cshtml'       = 854
-  'src/Kumunita.Web/Views/Groups/Detail.cshtml'        = 814
-}
-$fNew = [System.Collections.Generic.List[string]]::new()
-foreach ($v in $fViolations) {
-  $rel = ($v -split ' = ')[0]
-  if ($fBaselineSizes.ContainsKey($rel)) {
-    $n = [int]((($v -split ' = ')[1]) -replace ' lines','')
-    if ($n -gt $fBaselineSizes[$rel]) { $fNew.Add("$rel = $n (baseline was $($fBaselineSizes[$rel]))") }
-  } else {
-    $fNew.Add($v)
-  }
-}
-Check "f" "views .cshtml over 800 lines (new or grown past its U00 baseline): $($fNew.Count)" ($fNew.Count -eq 0)
-foreach ($v in $fNew) { Write-Host "       - $v" }
 
 # =============================================================================
 # Gate (g) — design docs over 400 lines without an Abstract (U07, added 2026-10-08)

@@ -1,0 +1,12 @@
+{
+  "analytics.trend.title": "Tendance",
+  "analytics.trend.window.7": "7 jours",
+  "analytics.trend.window.30": "30 jours",
+  "analytics.trend.window.90": "90 jours",
+  "analytics.trend.window.180": "180 jours",
+  "analytics.trend.window.365": "365 jours",
+  "analytics.trend.col.date": "Date",
+  "analytics.trend.col.total": "Requ\u00EAtes totales",
+  "analytics.trend.legend.total": "Requ\u00EAtes totales par jour",
+  "analytics.trend.empty": "Aucune utilisation enregistr\u00E9e dans cette fen\u00EAtre pour le moment."
+}

@@ -540,7 +540,7 @@ public class SearchControllerTests
     /// <summary>
     /// A <c>surface=projects</c> request (single-surface paged view) is
     /// accepted by the controller — the service is called with
-    /// <see cref="SearchService.ProjectsSurface"/> and the returned view
+    /// <see cref="SearchKeys.ProjectsSurface"/> and the returned view
     /// model carries the surface name in the pager's
     /// <see cref="PagedViewModel.FilterParams"/> for the pager's links.
     /// </summary>
@@ -548,7 +548,7 @@ public class SearchControllerTests
     public async Task Search_Surface_Projects_Accepted()
     {
         var search = Substitute.For<ISearchService>();
-        search.SearchSurfaceAsync( SearchService.ProjectsSurface, "proj", SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+        search.SearchSurfaceAsync( SearchKeys.ProjectsSurface, "proj", SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new SearchSurfacePage(
                 "projects",
                 new List<SearchHit>
@@ -567,7 +567,7 @@ public class SearchControllerTests
         Assert.Equal("projects", model.Pager!.FilterParams["surface"]);
         Assert.Equal("proj", model.Pager.FilterParams["q"]);
 
-        await search.Received(1).SearchSurfaceAsync( SearchService.ProjectsSurface, "proj", SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
+        await search.Received(1).SearchSurfaceAsync( SearchKeys.ProjectsSurface, "proj", SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     /// <summary>

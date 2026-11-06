@@ -70,9 +70,11 @@ public class ProfileAvatarUploadTests
     public async Task Upload_OwnerValidRaster_SetsAvatarAndServes()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
         var media = Substitute.For<IMediaStore>();
-        var controller = Build(userInfo, authz, media, new MediaOptions(), Owner);
+        var controller = Build(userInfo, authz, media, new MediaOptions(), Owner, profileSettings: profileSettings);
 
         var mediaObject = new MediaObject
         {
@@ -92,7 +94,7 @@ public class ProfileAvatarUploadTests
         Assert.Equal("Edit", redirect.ActionName);
         // Store-first, then set — the ordering pin (C-MED·4/·7):
         await media.Received(1).PutAsync(Arg.Is<byte[]>(b => b.SequenceEqual(Png)), "pixel.png", "image/png", Owner, Arg.Any<CancellationToken>());
-        await userInfo.Received(1).SetProfileAvatarAsync(Owner, MediaId, Owner);
+        await profileSettings.Received(1).SetProfileAvatarAsync(Owner, MediaId, Owner);
     }
 
     /// <summary>U7b — oversize: 413, and <em>no file written</em> — the guard fires before <c>PutAsync</c>.</summary>
@@ -100,6 +102,8 @@ public class ProfileAvatarUploadTests
     public async Task Upload_Oversize_Returns413_NoFileWritten()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
         var media = Substitute.For<IMediaStore>();
         // Configure the limit deliberately low so the test payload is "oversize":
@@ -110,7 +114,7 @@ public class ProfileAvatarUploadTests
 
         AssertRejectedForm(result, StatusCodes.Status413RequestEntityTooLarge, "too large");
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
+        await profileSettings.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
 
     /// <summary>U7c — wrong type: 415, and no file written.</summary>
@@ -118,6 +122,8 @@ public class ProfileAvatarUploadTests
     public async Task Upload_WrongType_Returns415_NoFileWritten()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
         var media = Substitute.For<IMediaStore>();
         var controller = Build(userInfo, authz, media, new MediaOptions(), Owner);
@@ -127,7 +133,7 @@ public class ProfileAvatarUploadTests
 
         AssertRejectedForm(result, StatusCodes.Status415UnsupportedMediaType, "not allowed");
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
+        await profileSettings.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
 
     /// <summary>
@@ -142,6 +148,8 @@ public class ProfileAvatarUploadTests
     public async Task Avatar_MismatchedBytes_Rejected()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
         var media = Substitute.For<IMediaStore>();
         var controller = Build(userInfo, authz, media, new MediaOptions(), Owner);
@@ -160,7 +168,7 @@ public class ProfileAvatarUploadTests
         AssertRejectedForm(result, StatusCodes.Status415UnsupportedMediaType, "not allowed");
         // C-UP·2 / guards-before-write: no byte written on the Mismatch guard.
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
+        await profileSettings.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
 
     /// <summary>
@@ -176,6 +184,8 @@ public class ProfileAvatarUploadTests
     public async Task AvatarUpload_Oversize_413()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
         var media = Substitute.For<IMediaStore>();
         // Oversize: small per-file cap (32-byte payload > 16) + a large quota
@@ -189,7 +199,7 @@ public class ProfileAvatarUploadTests
         AssertRejectedForm(result, StatusCodes.Status413RequestEntityTooLarge, "too large");
         // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
+        await profileSettings.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
 
     /// <summary>
@@ -206,6 +216,8 @@ public class ProfileAvatarUploadTests
     public async Task AvatarUpload_OverQuota_413()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
         var media = Substitute.For<IMediaStore>();
         // Over-quota: large per-file cap (not oversize) + a small quota the
@@ -220,7 +232,7 @@ public class ProfileAvatarUploadTests
         AssertRejectedForm(result, StatusCodes.Status413RequestEntityTooLarge, "too large");
         // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
+        await profileSettings.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
 
     /// <summary>U7a defensive — empty upload: 400, and no file written.</summary>
@@ -228,6 +240,8 @@ public class ProfileAvatarUploadTests
     public async Task Upload_Empty_Returns400()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
         var media = Substitute.For<IMediaStore>();
         var controller = Build(userInfo, authz, media, new MediaOptions(), Owner);
@@ -239,7 +253,7 @@ public class ProfileAvatarUploadTests
         // "choose an image" message (it was a bare BadRequest string before).
         AssertRejectedForm(result, StatusCodes.Status400BadRequest, "Choose an image");
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
+        await profileSettings.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
 
     // ── fixtures
@@ -333,16 +347,15 @@ public class ProfileAvatarUploadTests
         MediaOptions mediaOptions,
         string principalSubjectId,
         Kumunita.Core.Usage.CommunityStorageSettings? settings = null,
-        long currentUsageBytes = 0)
+        long currentUsageBytes = 0,
+        IProfileSettingsService? profileSettings = null)
     {
+        profileSettings ??= Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         // The reject re-render seeds the editor (ADR 0237): empty option lists suffice.
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
-        var controller = new ProfileController(
-            userInfo,
-            new DirectoryService(userInfo, authz),
-            media,
-            Options.Create(mediaOptions));
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
+        var controller = new ProfileController(userInfo, groupService, profileSettings, new DirectoryService(userInfo, profileSettings, authz), media, Options.Create(mediaOptions));
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(

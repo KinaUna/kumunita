@@ -265,7 +265,7 @@ public sealed class GuardianTimeLimitSurfaceTests(PostgresFixture fixture) : ICl
         // time-limit seams are on IUserInfoService, not IIdentityService).
         var identity = Substitute.For<IIdentityService>();
 
-        var controller = new GuardianController(userInfo, identity, store);
+        var controller = new GuardianController(userInfo, Substitute.For<IGroupService>(), new GuardianService(store), Substitute.For<IProfileSettingsService>(), identity, store);
 
         // The ClaimsPrincipal — the actor's subject id via the Kumunita.Sub
         // claim (KumunitaPrincipal.SubjectId reads this).

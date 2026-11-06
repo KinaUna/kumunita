@@ -72,6 +72,11 @@ This repo uses **Marten and Wolverine** on **.NET 10**. The idiomatic patterns i
 - Keep `Milestones.cs` and the roadmap docs together — `Milestones.cs` is the
   **canonical list** (it renders the home page); [`docs/product/roadmap.md`](docs/product/roadmap.md) +
   [`docs/STATUS.md`](docs/STATUS.md) point at it rather than restating it.
+- The code-shape rules — the **ratchet** (the baseline only goes down; raising
+  a number needs an `adr:` reason), the **part-vs-whole test** for new types,
+  and the **comment rule** (what/when/throws + ADR number) — live in
+  [`docs/philosophy/in-code.md`](docs/philosophy/in-code.md#the-ratchet-the-split-the-comment)
+  and are enforced by [`tools/code/code-check.ps1`](tools/code/code-check.ps1).
 
 ## Don't pause mid-task to check in
 

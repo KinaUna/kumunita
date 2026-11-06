@@ -146,8 +146,9 @@ public class TimeLimitMiddlewareTests
             : new ClaimsPrincipal(new ClaimsIdentity("anon"));   // IsAuthenticated == false
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var guardianService = Substitute.For<IGuardianService>();
         // The enforcement read the middleware calls.
-        userInfo.GetActiveTimeLimitAsync(Arg.Any<string>())
+        guardianService.GetActiveTimeLimitAsync(Arg.Any<string>())
             .Returns(Task.FromResult(schedule));
         // The profile read the EffectiveTimezoneResolver uses for the ADR 0019
         // zone: the override is stubbed to "UTC" so the effective zone is the
@@ -172,6 +173,7 @@ public class TimeLimitMiddlewareTests
 
         var services = new ServiceCollection()
             .AddSingleton<IUserInfoService>(userInfo)
+            .AddSingleton<IGuardianService>(guardianService)
             .AddSingleton<ILocalizationService>(localization)
             .AddSingleton<IHttpContextAccessor>(accessor)
             .AddSingleton<Kumunita.Web.Localization.EffectiveTimezoneResolver>(resolver)

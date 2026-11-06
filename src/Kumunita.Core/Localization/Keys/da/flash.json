@@ -1,0 +1,17 @@
+{
+  "flash.translation_choose_language": "V\u00E6lg et sprog til overs\u00E6ttelsen.",
+  "flash.translation_needs_text": "En overs\u00E6ttelse skal have noget tekst.",
+  "flash.translation_added": "Overs\u00E6ttelse tilf\u00F8jet ({0}).",
+  "flash.translation_updated": "Overs\u00E6ttelse opdateret ({0}).",
+  "flash.translation_removed": "Overs\u00E6ttelse fjernet ({0}).",
+  "flash.not_signed_in": "Ikke logget ind.",
+  "flash.comment_needs_text": "En kommentar skal have noget tekst.",
+  "flash.comment_added": "Kommentar tilf\u00F8jet.",
+  "flash.comment_deleted": "Kommentar slettet.",
+  "flash.translation_gone_add": "Den overs\u00E6ttelse findes ikke l\u00E6ngere; tilf\u00F8j den igen.",
+  "flash.translation_gone": "Den overs\u00E6ttelse findes ikke l\u00E6ngere.",
+  "flash.choose_language_remove": "V\u00E6lg et sprog, der skal fjernes.",
+  "flash.translation_needs_title_or_text": "En overs\u00E6ttelse skal have en titel eller noget tekst.",
+  "flash.translation_needs_name_or_description": "En overs\u00E6ttelse skal have et navn og/eller en beskrivelse.",
+  "flash.report_submitted": "Anmeldelse sendt. En moderator kan gennemg\u00E5 den."
+}

@@ -1,0 +1,10 @@
+{
+  "grant.heading": "Hvem du giver adgang til",
+  "grant.hint": "Afkryds \u00E9n eller flere \u2014 eller brug \u0022Select all\u0022-r\u00E6kken over hver liste som en genvej.",
+  "grant.empty_users": "Du er den eneste verificerede beboer, s\u00E5 der er ingen andre at give adgang til endnu.",
+  "grant.empty_groups": "Der findes ingen grupper p\u00E5 platformen endnu \u2014 opret \u00E9n under \u0022Grupper\u0022 for at tilf\u00F8je gruppebaseret synlighed.",
+  "grant.select_all": "V\u00E6lg alle",
+  "grant.label_residences": "Beboere",
+  "grant.label_groups": "Grupper",
+  "grant.count_selected": "{0} af {1} valgt"
+}

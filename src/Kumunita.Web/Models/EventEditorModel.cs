@@ -48,7 +48,7 @@ namespace Kumunita.Web.Models;
 /// <item><see cref="TagIds"/> — a <see cref="string"/> form field
 /// (posted by <c>client/lib/tag-suggest.ts</c> as a JSON array of label
 /// strings, or a CSV fallback), parsed server-side by
-/// <see cref="Kumunita.Web.Security.TagSlugs.Parse"/> — the same body-parsed
+/// <see cref="Kumunita.Web.Security.TagSlugParser.Parse"/> — the same body-parsed
 /// idiom as <c>ImageIds</c> / <c>AttachmentIds</c> (the client never
 /// posts a structured shape; the server normalizes before the service
 /// sees it).</item>
@@ -296,7 +296,7 @@ public sealed class EventEditorModel
     /// <summary>The composer's <b>tag</b> input — a <see cref="string"/>
     /// form field (posted by <c>client/lib/tag-suggest.ts</c> as a JSON
     /// array of label strings, or a CSV fallback), parsed server-side by
-    /// <see cref="Kumunita.Web.Security.TagSlugs.Parse"/>. The client
+    /// <see cref="Kumunita.Web.Security.TagSlugParser.Parse"/>. The client
     /// never posts a structured shape; the server normalizes (trim /
     /// dedup / drop-blank) before the service sees it. <see
     /// cref="IReadOnlyList{T}"/> is **not** a form-bindable shape (ASP.NET

@@ -2,7 +2,6 @@ using System.Collections;
 using System.Security.Claims;
 using Kumunita.Core.PersonalNotes;
 using Kumunita.Web.Controllers;
-using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -100,15 +99,11 @@ public sealed class NotesControllerTests
         var notes = Substitute.For<IPersonalNoteService>();
         notes.When(x => x.CreateNoteAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<string>(), Arg.Any<IDocumentSession>()))
+                Arg.Any<string>()))
             .Throws(new KeyNotFoundException(
                 "Target 'p-invisible-to-actor' is not visible to the actor."));
 
-        var store = Substitute.For<IDocumentStore>();
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(notes, store, subjectId: actor);
+        var controller = Build(notes, subjectId: actor);
         var result = await controller.Attach(targetKind, targetId, "my note");
 
         // C-M37·3 / D3 — the non-leaky 404 (never 403 — the M16 create-gate
@@ -117,9 +112,7 @@ public sealed class NotesControllerTests
         Assert.IsType<NotFoundResult>(result);
 
         // C-M37·3 — no note row is committed on the refuse path: the
-        // SaveChangesAsync commit never runs (the witness — the controller
-        // returns the 404 before delegating the commit to the caller).
-        await session.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        // seam's <c>CreateNoteAsync</c> was not called (the witness below).
 
         // C-M37·1 — the seam is the sole writer (the controller never
         // re-derives access; the CreateNoteAsync call is the seam's, not
@@ -128,7 +121,7 @@ public sealed class NotesControllerTests
         // targetKind / targetId / body verbatim + the caller's session (the
         // C3 same-transaction lane — the caller owns the single write).
         await notes.Received(1).CreateNoteAsync(
-            actor, targetKind, targetId, "my note", Arg.Any<IDocumentSession>());
+            actor, targetKind, targetId, "my note");
     }
 
     // ── 2 — NotesController_Attach_AbsentTarget_404_NoNoteRow ─────────────
@@ -159,15 +152,11 @@ public sealed class NotesControllerTests
         var notes = Substitute.For<IPersonalNoteService>();
         notes.When(x => x.CreateNoteAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<string>(), Arg.Any<IDocumentSession>()))
+                Arg.Any<string>()))
             .Throws(new KeyNotFoundException(
                 "Target 'p-does-not-exist' is not visible to the actor."));
 
-        var store = Substitute.For<IDocumentStore>();
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(notes, store, subjectId: actor);
+        var controller = Build(notes, subjectId: actor);
         var result = await controller.Attach(targetKind, targetId, "my note");
 
         // C-M37·3 / D3 — the non-leaky 404 (never 403 — the M16 create-gate
@@ -177,9 +166,7 @@ public sealed class NotesControllerTests
         Assert.IsType<NotFoundResult>(result);
 
         // C-M37·3 — no note row is committed on the refuse path: the
-        // SaveChangesAsync commit never runs (the witness — the controller
-        // returns the 404 before delegating the commit to the caller).
-        await session.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        // seam's <c>CreateNoteAsync</c> was not called (the witness below).
 
         // C-M37·1 — the seam is the sole writer (the controller never
         // re-derives access; the CreateNoteAsync call is the seam's, not
@@ -188,7 +175,7 @@ public sealed class NotesControllerTests
         // targetKind / targetId / body verbatim + the caller's session (the
         // C3 same-transaction lane — the caller owns the single write).
         await notes.Received(1).CreateNoteAsync(
-            actor, targetKind, targetId, "my note", Arg.Any<IDocumentSession>());
+            actor, targetKind, targetId, "my note");
     }
 
     // ── 3 — NotesController_HasNote_NonOwner_404_NoAuditRow ───────────────
@@ -260,18 +247,13 @@ public sealed class NotesControllerTests
         const string noteId = "n-owner-note";
 
         var notes = Substitute.For<IPersonalNoteService>();
-        var store = Substitute.For<IDocumentStore>();
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(notes, store, subjectId: actor);
+        var controller = Build(notes, subjectId: actor);
         var result = await controller.NoteEditSave(noteId, "my new body");
 
         // C3 — the redirect-after-write (back to /notes) + the commit.
         Assert.IsType<RedirectResult>(result);
-        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await notes.Received(1).UpdateNoteBodyAsync(
-            actor, noteId, "my new body", Arg.Any<IDocumentSession>());
+            actor, noteId, "my new body");
     }
 
     /// <summary>
@@ -294,8 +276,7 @@ public sealed class NotesControllerTests
 
         Assert.IsType<NotFoundResult>(result);
         await notes.DidNotReceive().UpdateNoteBodyAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<IDocumentSession>());
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
 
     /// <summary>
@@ -312,20 +293,15 @@ public sealed class NotesControllerTests
         const string noteId = "n-owner-note";
 
         var notes = Substitute.For<IPersonalNoteService>();
-        var store = Substitute.For<IDocumentStore>();
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(notes, store, subjectId: actor);
+        var controller = Build(notes, subjectId: actor);
         var result = await controller.NoteDelete(noteId);
 
         // C3 — the redirect-after-write + the commit. DeleteNoteAsync
         // returns the default enum value (Deleted) under NSubstitute's
         // auto-substitution, so the success branch (commit + redirect) runs.
         Assert.IsType<RedirectResult>(result);
-        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await notes.Received(1).DeleteNoteAsync(
-            actor, noteId, Arg.Any<IDocumentSession>());
+            actor, noteId);
     }
 
     /// <summary>
@@ -346,7 +322,7 @@ public sealed class NotesControllerTests
 
         Assert.IsType<NotFoundResult>(result);
         await notes.DidNotReceive().DeleteNoteAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IDocumentSession>());
+                Arg.Any<string>(), Arg.Any<string>());
     }
 
     /// <summary>
@@ -364,17 +340,12 @@ public sealed class NotesControllerTests
         const string folderId = "f-owner-folder";
 
         var notes = Substitute.For<IPersonalNoteService>();
-        var store = Substitute.For<IDocumentStore>();
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(notes, store, subjectId: actor);
+        var controller = Build(notes, subjectId: actor);
         var result = await controller.NoteMoveSave(noteId, folderId);
 
         Assert.IsType<RedirectResult>(result);
-        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await notes.Received(1).MoveNoteToFolderAsync(
-            actor, noteId, folderId, Arg.Any<IDocumentSession>());
+            actor, noteId, folderId);
     }
 
     /// <summary>
@@ -392,17 +363,12 @@ public sealed class NotesControllerTests
         const string name = "My folder";
 
         var notes = Substitute.For<IPersonalNoteService>();
-        var store = Substitute.For<IDocumentStore>();
-        var session = Substitute.For<IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(notes, store, subjectId: actor);
+        var controller = Build(notes, subjectId: actor);
         var result = await controller.FolderNewSave(name);
 
         Assert.IsType<RedirectResult>(result);
-        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await notes.Received(1).CreateFolderAsync(
-            actor, name, null, Arg.Any<IDocumentSession>());
+            actor, name, null);
     }
 
     /// <summary>
@@ -424,7 +390,7 @@ public sealed class NotesControllerTests
 
         Assert.IsType<NotFoundResult>(result);
         await notes.DidNotReceive().DeleteFolderAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IDocumentSession>());
+            Arg.Any<string>(), Arg.Any<string>());
     }
 
     // ── Harness ──────────────────────────────────────────────────────────
@@ -445,13 +411,10 @@ public sealed class NotesControllerTests
     /// </summary>
     private static NotesController Build(
         IPersonalNoteService notes,
-        IDocumentStore? store = null,
         string? subjectId = null,
         string[]? roles = null)
     {
-        store ??= Substitute.For<IDocumentStore>();
-
-        var controller = new NotesController(notes, store);
+        var controller = new NotesController(notes);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

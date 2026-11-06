@@ -1,0 +1,7 @@
+{
+  "security.flash_totp_invalid_enable": "Der Authenticator-Code war ung\u00FCltig. Aktiviere die Zwei-Faktor-Authentifizierung erneut.",
+  "security.flash_2fa_enabled": "Die Zwei-Faktor-Authentifizierung ist jetzt aktiviert. Melde dich ab sofort mit deiner Authenticator-App an.",
+  "security.flash_codes_rotated": "Deine Wiederherstellungscodes wurden erneuert. Kopiere sie jetzt \u2013 sie werden nicht noch einmal angezeigt.",
+  "security.flash_totp_invalid_disable": "Der Authenticator-Code war ung\u00FCltig. Die Zwei-Faktor-Authentifizierung ist weiterhin aktiviert.",
+  "security.flash_2fa_disabled": "Die Zwei-Faktor-Authentifizierung wurde deaktiviert."
+}

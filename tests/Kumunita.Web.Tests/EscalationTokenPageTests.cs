@@ -235,7 +235,11 @@ public class EscalationTokenPageTests(PostgresFixture fixture) : IClassFixture<P
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
 
-        var controller = new EscalationConfigController(store);
+        // IMPROVE-CODE C09 — the controller now takes the owning module's
+        // seam (IEscalationOutboundConfigService), not the raw store; the
+        // service wraps the real Marten store (this integration test's shape).
+        var controller = new EscalationConfigController(
+            new Kumunita.Core.ErrorReports.EscalationOutboundConfigService(store));
         var httpContext = new DefaultHttpContext();
         httpContext.User = GlobalAdminPrincipal();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };

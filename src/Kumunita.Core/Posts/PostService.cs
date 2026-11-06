@@ -3,6 +3,7 @@ using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
+using Kumunita.Core.Translations;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -33,7 +34,7 @@ namespace Kumunita.Core.Posts;
 /// keeps this concrete (it composes two *seams*, not itself a seam).
 /// </para>
 /// </summary>
-public sealed class PostService
+public partial class PostService
 {
     private static readonly int PageSize = 30;
 
@@ -58,7 +59,7 @@ public sealed class PostService
     // [tags]) keep compiling unchanged — the same CS1736 shape as `_tags` above.
     // The DI registration passes the live `Notifications.NotificationService`;
     // the frozen service's `EmitAsync` surface is untouched (unit-series rule 4).
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     // M36 (ADR 0165, U04) — the mention-resolution read seam (the U03
     // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
@@ -68,9 +69,18 @@ public sealed class PostService
     // `Mentions.MentionService` (composing the frozen `DirectoryService` read).
     private readonly Mentions.IMentionService? _mentions;
 
+    // ADR 0288 (IMPROVE-CODE C06) — the shared translation-variant write lane (a D6-legal
+    // `record` in the Translations module). The six post/reply write methods below are thin
+    // forwarders into these two lanes; the surface-specific data (standing matrix, the row's
+    // title/body shape, the reply's parent-post standing re-check) lives in the descriptor's
+    // functions, verbatim from the pre-C06 bodies. The read seams (Get*TranslationsAsync) stay
+    // here — their shape is surface-specific (the reply read is batched); the lane is the write seam.
+    public TranslationLane<Post, PostTranslation> PostTranslationLane { get; }
+    public TranslationLane<PostReply, ReplyTranslation> ReplyTranslationLane { get; }
+
     public PostService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store,
         ITagService? tags = null,
-        NotificationService? notifications = null,
+        INotificationEmitter? notifications = null,
         Mentions.IMentionService? mentions = null)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
@@ -79,6 +89,61 @@ public sealed class PostService
         _tags = tags;
         _notifications = notifications;
         _mentions = mentions;
+        // C3-03 — the group-post lane (the 4 group-post methods live on this
+        // seam; PostService keeps thin forwarders for the C08 test-compat
+        // facade). Same deps as PostService's group-post bodies used.
+        _groupPosts = new GroupPostService(store, authz, notifications, mentions);
+
+        PostTranslationLane = new TranslationLane<Post, PostTranslation>(new TranslationDescriptor<Post, PostTranslation>
+        {
+            TargetKind = "post",
+            ActionPrefix = "posttranslation",
+            Noun = "Post",
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Post p, object? extra, string actorId, IReadOnlySet<string> actorRoles) =>
+                PostTranslationPolicy.ResolveTranslationStanding(p.GroupId.Length > 0, p.ComponentId, p.AuthorId, actorId, actorRoles),
+            LoadParent = (session, id) => session.LoadAsync<Post>(id),
+            Find = (session, id, lang) => session.Query<PostTranslation>().Where(t => t.PostId == id && t.LanguageCode == lang).FirstOrDefaultAsync(),
+            Create = (id, lang, title, body, actor, created) => new PostTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"), PostId = id, LanguageCode = lang,
+                Title = title, Body = body, AuthorId = actor, Created = created,
+            },
+            ApplyUpdate = (row, title, body, _, _) =>
+            {
+                row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+                row.Body = body;
+            },
+        });
+
+        ReplyTranslationLane = new TranslationLane<PostReply, ReplyTranslation>(new TranslationDescriptor<PostReply, ReplyTranslation>
+        {
+            TargetKind = "reply",
+            ActionPrefix = "replytranslation",
+            Noun = "Reply",
+            LoadStandingExtra = async (IDocumentSession session, PostReply reply) =>
+            {
+                var parent = await session.LoadAsync<Post>(reply.PostId);
+                if (parent is null)
+                    throw new KeyNotFoundException($"Reply '{reply.Id}' has no parent post; nothing to translate.");
+                return (object)parent;
+            },
+            ResolveStanding = (PostReply reply, object? extra, string actorId, IReadOnlySet<string> actorRoles) =>
+            {
+                // The reply itself has no component (C-M3·1) — its standing reads the parent
+                // post's group/component scope and the reply's own AuthorId.
+                var parent = (Post)extra!;
+                return PostTranslationPolicy.ResolveTranslationStanding(
+                    parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
+            },
+            LoadParent = (session, id) => session.LoadAsync<PostReply>(id),
+            Find = (session, id, lang) => session.Query<ReplyTranslation>().Where(t => t.ReplyId == id && t.LanguageCode == lang).FirstOrDefaultAsync(),
+            Create = (id, lang, _, body, actor, created) => new ReplyTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"), ReplyId = id, Body = body, AuthorId = actor, Created = created,
+            },
+            ApplyUpdate = (row, _, body, _, _) => { row.Body = body; },
+        });
     }
 
     /// <summary>
@@ -502,7 +567,7 @@ public sealed class PostService
 
         // TG (ADR 0044, U8b) — the tag attach lane (C3 single-transaction
         // idiom: the write + the audit row commit atomically on the **same**
-        // <c>IDocumentSession</c> — the <c>AddPostTranslationAsync</c>
+        // <c>IDocumentSession</c> — the <c>PostTranslationLane.AddAsync</c>
         // precedent). Only if the form gave slugs (null/empty ⇒ no tags, the
         // U4 additive default-empty pin). The <c>AttachToPostAsync</c> lane
         // re-checks the standing (author ∪ GlobalAdmin, C-TG·5) and
@@ -936,97 +1001,9 @@ public sealed class PostService
         return reply;
     }
 
-    // ─── ADR 0016 — author-only group-post edit lane (title + body only) ───
-
-    /// <summary>
-    /// Re-write a **group-lane** post's title and body, **author-only**
-    /// (ADR 0016). A direct mirror of the component-post edit lane (ADR 0014)
-    /// for the group lane (ADR 0013): only the post's own
-    /// <see cref="Post.AuthorId"/> may edit; there is **no** moderator,
-    /// GlobalAdmin, or break-glass branch (G·4 — the group lane has no
-    /// moderator peek; a moderator's lever over a group post is its absence
-    /// from the moderation surface, not re-writing text).
-    /// <para>
-    /// The editable fields are <see cref="Post.Title"/>,
-    /// <see cref="Post.Body"/>, and <see cref="Post.LanguageCode"/> (ADR 0018,
-    /// ADR 0016 as amended — the authored-in tag is editable on this lane too, so
-    /// an author can correct the language a group post was written in; it is
-    /// re-resolved through the shared <see cref="ResolveLanguageCodeAsync"/> helper,
-    /// mirroring the ADR 0014 community-post lane and the ADR 0017 announcement
-    /// edit lane). The group lane's identity fields are
-    /// **immutable** — <c>GroupId</c> (the lane itself), <c>ComponentId</c>
-    /// (must stay empty, G·2 lane exclusivity), <c>Audience</c> (non-null
-    /// empty, G·8 — there is no audience to re-choose on the group lane),
-    /// <c>AuthorId</c>, <c>Created</c>, and <c>Status</c> are all untouched.
-    /// The edit stamps <see cref="Post.Modified"/> forward.
-    /// </para>
-    /// <para>
-    /// A missing id is a <see cref="KeyNotFoundException"/>; a non-author is
-    /// the <see cref="UnauthorizedAccessException"/>. The Web layer (the group
-    /// lane's 404 shape) maps both to a 404 to stay non-leaky, unlike the
-    /// component lane's 403. One <c>SaveChangesAsync</c> (invariant C3).
-    /// </para>
-    /// <para>
-    /// <paramref name="attachmentIds"/> (ATT U12, C-ATT·4) carries the group
-    /// post's file-attachment references — the Web layer re-parses the
-    /// (re-submitted) body's <c>/attachment/{id}</c> links and passes them in;
-    /// Core writes them verbatim, replace-style. <b>Deliberate asymmetry
-    /// (recorded, C-ATT·8/9):</b> the image lane's post/group-post edit lanes
-    /// do <b>not</b> set <see cref="Post.ImageIds"/>; <b>this</b> lane persists
-    /// <see cref="Post.AttachmentIds"/> so the serve route can find the group
-    /// post row owning the id. Optional trailing parameter (nullable, the
-    /// CS1736 shape) — the existing controller call site keeps compiling.
-    /// </para>
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor is not the post's author.</exception>
-    public async Task<Post> UpdateGroupPostAsync(
-        string postId,
-        string actorId,
-        string? title,
-        string body,
-        string? languageCode,
-        IDocumentSession session,
-        IReadOnlyList<string>? attachmentIds = null)
-    {
-        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(session);
-
-        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to edit.");
-
-        // Group-lane check (G·2): only a group post (non-empty GroupId) is
-        // editable on this lane. A component post (empty GroupId) is the
-        // component edit lane's (ADR 0014) surface, not this one — fail closed.
-        if (string.IsNullOrEmpty(post.GroupId))
-            throw new KeyNotFoundException($"Post '{postId}' is not a group post; nothing to edit here.");
-
-        // Author-only gate (the sole decision on this lane): only the author may edit.
-        if (!string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
-            throw new UnauthorizedAccessException("Only the author of a post may edit it.");
-
-        post.Title = title;
-        post.Body = body ?? string.Empty;
-        // ADR 0018 (ADR 0016 amended) — the authored-in tag is editable on this lane:
-        // the author can correct the language the post was written in. Re-resolved
-        // through the shared helper so a blank submission falls back to the
-        // instance default (it never blanks a stored tag).
-        post.LanguageCode = await ResolveLanguageCodeAsync(languageCode, session).ConfigureAwait(false);
-        // ATT U12 (C-ATT·4/8) — the group-post edit lane persists the re-parsed
-        // attachment references (replace-style). Deliberate asymmetry: the image
-        // lane's edit lanes do not set ImageIds (C-ATT·9); this lane persists
-        // AttachmentIds so the serve route can find the group post row.
-        post.AttachmentIds = attachmentIds ?? [];
-        post.Modified = DateTimeOffset.UtcNow;
-        // GroupId / ComponentId / Audience / AuthorId / Created / Status are
-        // deliberately untouched — the group lane's identity is immutable.
-
-        session.Store(post);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return post;
-    }
+    // ─── ADR 0016 — author-only group-post edit lane: C3-03 — the
+    //     UpdateGroupPostAsync body lives on <see cref="GroupPostService"/>
+    //     (the forwarder is with the other 3 group-post forwarders below). ───
 
     // ─── ADR 0024 — author soft-delete lanes (post + reply) ─────────────────
 
@@ -1302,306 +1279,57 @@ public sealed class PostService
         await session.SaveChangesAsync().ConfigureAwait(false);
     }
 
-    // ─── group posts (ADR 0013) — the group-lane surface (U6; the M3 composition
-    //     pattern applied to the membership lane; the lane owns every access read,
-    //     ADR 0006-D; no audience / moderate / break-glass branch — G·1/G·4) ───
+    // ─── group posts (ADR 0013) — C3-03: the 4-method group-post surface
+    //     (ListGroupFeedAsync / GetGroupPostAsync / CreateGroupPostAsync /
+    //     UpdateGroupPostAsync) extracted to <see cref="GroupPostService"/>
+    //     (a real part-vs-whole surface; the C3-00 EventRsvpGuardianService
+    //     pattern). The Posts DI registration supplies the live instance.
+    //     PostService keeps these as thin forwarders (the C08 test-compat
+    //     facade pattern — ProjectService still implements ITodoService /
+    //     IBoardService via sibling forwarders) so the existing Core tests
+    //     that construct a PostService and call the group lane run unchanged.
+    //     The Web layer resolves <see cref="IGroupPostService"/> directly. ───
 
     /// <summary>
-    /// A group's channel feed (G1–G4 FACES, design doc §2.3(a)): the candidate
-    /// set is the group's posts — <c>Post.GroupId == groupId</c>,
-    /// <c>Created desc</c>, paged with the class's existing <c>PageSize</c> (the
-    /// 30-per-page shape is M3's, unchanged). Exactly one
-    /// <see cref="IAuthorizationService.CanSeeGroupFeedAsync(string, string, int)"/>
-    /// (the **standalone** form — a plain read with no in-flight caller
-    /// transaction, the <see cref="ListFeedAsync"/> precedent) writes the
-    /// visit's **single aggregate** <c>AccessAudit</c> row (G·5: TargetKind
-    /// "grouppost", TargetId null, counts). Allow ⇒ the paged candidates (G1);
-    /// Deny ⇒ a <see cref="FeedResult"/> with an **empty** visible list and
-    /// <see cref="FeedResult.HiddenCount"/> = the candidate count (G2). **0
-    /// candidates ⇒** empty <see cref="FeedResult"/>, no decision, **no** row
-    /// (the M3 <see cref="ListFeedAsync"/> 0-candidate shape). **No audience
-    /// evaluation of any kind** (G·1/G·8 — membership is the sole decision).
+    /// The <see cref="GroupPostService"/> lane this class's 4 group-post
+    /// forwarders delegate to (C3-03). Built once from the same deps
+    /// (<see cref="_store"/> / <see cref="_authz"/> / <see cref="_notifications"/>
+    /// / <see cref="_mentions"/>) so the forwarders are behaviour-identical to
+    /// the pre-extraction bodies.
     /// </summary>
-    public async Task<FeedResult> ListGroupFeedAsync(string groupId, string actorId, int page,
+    private readonly GroupPostService _groupPosts;
+
+    /// <summary>
+    /// A group's channel feed (ADR 0013) — delegates to
+    /// <see cref="GroupPostService.ListGroupFeedAsync"/> (C3-03 extraction;
+    /// the body lives on the <see cref="GroupPostService"/> seam).
+    /// </summary>
+    public Task<FeedResult> ListGroupFeedAsync(string groupId, string actorId, int page,
         SortSpec? sort = null, int? pageSize = null)
-    {
-        if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group feed requires a groupId.", nameof(groupId));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
-        if (page < 1) page = 1;
-
-        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
-
-        await using var session = _store.QuerySession();
-        IQueryable<Post> q = session
-            .Query<Post>()
-            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft);
-
-        var candidates = await OrderByPostSort(q, sort)
-            .Skip((page - 1) * ps)
-            .Take(ps)
-            .ToListAsync()
-            .ConfigureAwait(false);
-
-        // C-M7·5 (D8) — the 0-candidate early return runs **before** any
-        // decision and **before** the D2 CountAsync: an oversized page is a
-        // no-decision, Total: 0, HasMore: false.
-        if (candidates.Count == 0)
-            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
-
-        // M7 (ADR 0090 D2 / C-M7·7) — the candidate-set count (pre-decision,
-        // post-filter), one CountAsync over the same filtered query.
-        int candidateCount = await session
-            .Query<Post>()
-            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft)
-            .CountAsync()
-            .ConfigureAwait(false);
-
-        // G·5 (the C-M3·3 analog) — one standalone whole-channel call over the
-        // paged candidate set writes the visit's single aggregate AccessAudit
-        // row (G·5). Standalone form: a plain read with no caller transaction
-        // (the ListFeedAsync precedent), so the standalone method's own commit
-        // is the correct C3 lane. The channel is all-or-nothing for a principal,
-        // so the paged candidates are returned as-is on Allow.
-        var decision = await _authz
-            .CanSeeGroupFeedAsync(actorId, groupId, candidates.Count)
-            .ConfigureAwait(false);
-
-        if (decision.Allowed)
-            // G1 — the paged candidates, as-is (membership is the sole decision; G·1).
-            return new FeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidateCount, HasMore: candidates.Count == ps);
-
-        // G2 — Deny: empty visible list, HiddenCount = the candidate count (the
-        // aggregate Deny row **is** the audit evidence — G·1/G·5); never a
-        // post's fields. HasMore is false on Deny (the design doc §7.4 pin —
-        // the paging signal is computed from the page's window only on Allow;
-        // a Deny visit has no visible page to page through).
-        return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: candidates.Count, Page: page, Total: 0, HasMore: false);
-    }
+        => _groupPosts.ListGroupFeedAsync(groupId, actorId, page, sort, pageSize);
 
     /// <summary>
-    /// A group post's detail + its one-level replies (G11 FACES, design doc
-    /// §2.3(b) — the C-M3·1 analog, G·7): the post is loaded first (the M3
-    /// fail-closed shape: missing ⇒ <c>Post = null</c>, no decision, **no**
-    /// row); a post with an **empty** <c>GroupId</c> (not a group post) or
-    /// <c>GroupId != groupId</c> (route/lane mismatch) ⇒ <c>Post = null</c>,
-    /// no row (fail-closed). Otherwise **exactly one**
-    /// <see cref="IAuthorizationService.CanSeeGroupAsync(string, string, string?)"/>
-    /// (standalone) — the detail decision row (TargetKind "grouppost",
-    /// **TargetId = postId**, G·5). Allow ⇒ the post + its
-    /// <see cref="PostReply"/> list **as-is** — the replies inherit the parent's
-    /// single group-lane decision: no second evaluation, no per-reply row (G·7).
-    /// Deny ⇒ <c>Post = null</c> with **no** replies (Web 404 — G·3/G·4) — the
-    /// decision's row **was** written (C3). **No** audience evaluation
-    /// (G·1/G·8).
+    /// A group post's detail + replies (ADR 0013) — delegates to
+    /// <see cref="GroupPostService.GetGroupPostAsync"/> (C3-03 extraction).
     /// </summary>
-    public async Task<PostDetailResult> GetGroupPostAsync(string groupId, string postId, string actorId)
-    {
-        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
-
-        await using var session = _store.QuerySession();
-        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
-        if (post is null)
-            // M3 fail-closed shape: the post does not exist ⇒ no decision, no row.
-            return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
-
-        // Lane fail-closed (design doc §2.2): a post with an empty GroupId (not a
-        // group post) or a route/lane mismatch (GroupId != groupId) is denied with
-        // **no** decision and **no** row (the M3 shape, §2.3(b) row 3).
-        if (string.IsNullOrEmpty(post.GroupId) || post.GroupId != groupId)
-            return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
-
-        // ADR 0037 — draft gate (author-only, no audit row): a group-lane draft is
-        // invisible to every member and to any moderator/admin except its author.
-        // The group-lane membership decision (CanSeeGroupAsync) is NOT consulted —
-        // no CanSeeGroupAsync, no AccessAudit row. The sole decision is a pure
-        // AuthorId == actorId ordinal check (ADR 0037 author-only pin, stronger
-        // than the lane's membership gate). A non-author member is denied (the
-        // group lane's Web 404 shape); the author sees the draft with its
-        // replies (G·7 shape: replies returned as-is, no second evaluation).
-        if (post.IsDraft)
-        {
-            if (!string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
-                return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
-
-            var authorReplies = await session
-                .Query<PostReply>()
-                .Where(r => r.PostId == postId)
-                .OrderBy(r => r.Created)
-                .ToListAsync()
-                .ConfigureAwait(false);
-
-            return new PostDetailResult(Post: post, Replies: authorReplies);
-        }
-
-        // G11 (C-M3·1 analog, G·7) — exactly one standalone single-target call →
-        // the detail decision row (TargetId = postId, G·5). No audience
-        // evaluation of any kind (G·1/G·8).
-        var decision = await _authz.CanSeeGroupAsync(actorId, groupId, postId).ConfigureAwait(false);
-
-        if (!decision.Allowed)
-            // Deny ⇒ Post = null, no replies (Web 404 — G·3/G·4); the row was
-            // written (C3).
-            return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
-
-        // G·7 — the reply list is returned **as-is** under the parent's single
-        // group-lane decision: no second authorization evaluation, no per-reply
-        // audit row (the M3 replies shape, §2.3(b) row 1).
-        var replies = await session
-            .Query<PostReply>()
-            .Where(r => r.PostId == postId)
-            .OrderBy(r => r.Created)
-            .ToListAsync()
-            .ConfigureAwait(false);
-
-        return new PostDetailResult(Post: post, Replies: replies);
-    }
+    public Task<PostDetailResult> GetGroupPostAsync(string groupId, string postId, string actorId)
+        => _groupPosts.GetGroupPostAsync(groupId, postId, actorId);
 
     /// <summary>
-    /// Creates a group post, in the **caller's** in-flight session (invariant
-    /// C3). The **create gate is the group-lane decision** (G·3): one
-    /// <see cref="IAuthorizationService.CanSeeGroupAsync(string, string, string?, IDocumentSession)"/>
-    /// with <c>targetPostId: null</c>, in the caller's transaction — **deny**:
-    /// the row is committed by a <c>SaveChangesAsync()</c> **before**
-    /// <see cref="UnauthorizedAccessException"/> throws (the gate row must
-    /// survive — G6 FACES; Web maps it to 404); **allow**: the gate row + the
-    /// new post commit in **one** <c>SaveChangesAsync()</c> (atomic with the
-    /// write, C3). The gate is the **sole** decision (G·3): **no**
-    /// <c>actorRoles</c> parameter (contrast <see cref="CreatePostAsync"/>'s
-    /// GlobalAdmin/moderator skip — a non-member GlobalAdmin is **denied**, G8
-    /// FACES/G·4), **no** break-glass, and **no** membership read here (the lane
-    /// owns its reads — ADR 0006-D). The write pins G·2/G·8:
-    /// <c>ComponentId = string.Empty</c>, <c>Audience = new Audience()</c>
-    /// (non-null, **empty**). One <c>SaveChangesAsync()</c>.
+    /// Creates a group post (ADR 0013) — delegates to
+    /// <see cref="GroupPostService.CreateGroupPostAsync"/> (C3-03 extraction).
     /// </summary>
-    /// <exception cref="UnauthorizedAccessException">The actor (or, under an
-    /// in-scope <c>read</c> grant, the owner) is not a member of
-    /// <c>draft.GroupId</c> — thrown **after** the gate row is persisted.</exception>
-    public async Task<Post> CreateGroupPostAsync(GroupPostDraft draft, string actorId, IDocumentSession session)
-    {
-        ArgumentNullException.ThrowIfNull(draft);
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An authoring actor is required.", nameof(actorId));
-        if (string.IsNullOrEmpty(draft.GroupId))
-            // G·3 — non-empty channel enforced **before** any decision (no audit
-            // row is written for such input — the §2.2 GroupPostDraft pin).
-            throw new ArgumentException("A group post requires a non-empty GroupId (the group lane).", nameof(draft.GroupId));
-        ArgumentNullException.ThrowIfNull(session);
+    public Task<Post> CreateGroupPostAsync(GroupPostDraft draft, string actorId, IDocumentSession session)
+        => _groupPosts.CreateGroupPostAsync(draft, actorId, session);
 
-        // G·3 — the create gate **is** the group-lane decision: one session-variant
-        // call with targetPostId: null (⇒ the row's TargetId = the group id, the
-        // channel as the gate's target), in the caller's transaction. Deny ⇒ the
-        // row is persisted by this SaveChangesAsync **before** the throw (the
-        // gate row must survive — G6 FACES; Web maps the exception to 404). Allow
-        // ⇒ the gate row + the new post commit in one SaveChangesAsync (C3).
-        var decision = await _authz
-            .CanSeeGroupAsync(actorId, draft.GroupId, null, session)
-            .ConfigureAwait(false);
-
-        if (!decision.Allowed)
-        {
-            await session.SaveChangesAsync().ConfigureAwait(false);
-            throw new UnauthorizedAccessException(
-                $"You are not a member of the group '{draft.GroupId}'; " +
-                "only group members may post to a group channel.");
-        }
-
-        var post = new Post
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            ComponentId = string.Empty, // G·2 — lane exclusivity: structurally absent from the M3 feeds.
-            GroupId = draft.GroupId,    // G·2 — the non-empty group lane.
-            AuthorId = actorId,
-            Title = draft.Title,
-            Body = draft.Body,
-            Audience = new Audience(),  // G·8 — written non-null **empty**; never authored here.
-            ImageIds = draft.ImageIds ?? [], // RC R·3/R·7 (ADR 0025) — populated server-side by the Web layer (the U05 group-post create wiring); null-coalesce to the POCO's non-null empty list (the CreatePostAsync precedent).
-            AttachmentIds = draft.AttachmentIds ?? [], // ATT U4 (C-ATT·4) — populated server-side by the Web layer (AttachmentIds.ExtractAttachmentIds); null-coalesce to the POCO's non-null empty list (the CreatePostAsync precedent).
-            LanguageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session).ConfigureAwait(false), // ADR 0018
-            IsDraft = draft.IsDraft ?? false, // ADR 0037 — draft mode (group lane); the author-only gate is the same pure AuthorId==actorId check (the author is a group member by construction of the create gate).
-            Created = DateTimeOffset.UtcNow
-        };
-
-        session.Store(post);
-
-        // M6 (ADR 0076, plan U04) — the F2 group-post emitter. **Per-member**
-        // emission (the M4 §6.4 "per-recipient" precedent — one inbox row + one
-        // conditional email per member, excluding the post's author). Each
-        // member's idempotency key is the §6.3 shape `notification:group.post:
-        // {postId}:{member}` (D4, F10) — stable + content-derived, so a
-        // re-emission of the same post to the same member is a no-op. `EmitAsync`
-        // runs on the caller's session and does **not** commit — the
-        // `SaveChangesAsync` below is the single commit (C3). The members are
-        // read from the caller's session (the same-transaction lane; strong
-        // consistency, invariant C4).
-        //
-        // A draft (ADR 0037 — invisible to all but the author) must **not**
-        // notify members: they could not yet see the content, so an inbox
-        // row + email for it would leak intake they did not consent to
-        // reading (intake honesty). Notification is deferred to the publish
-        // lane (the moment the post becomes visible to members).
-        if (_notifications is not null && !(draft.IsDraft ?? false))
-        {
-            var members = await session.Query<GroupMembership>()
-                .Where(m => m.GroupId == draft.GroupId)
-                .Select(m => m.UserId)
-                .ToListAsync()
-                .ConfigureAwait(false);
-            foreach (var member in members)
-            {
-                if (string.IsNullOrWhiteSpace(member) || string.Equals(member, actorId, StringComparison.Ordinal))
-                    continue;                                   // the post's author does not notify themselves
-                await _notifications.EmitAsync(
-                    session,
-                    recipientId: member,
-                    kind: NotificationKinds.GroupPost,
-                    idempotencyKey: $"notification:group.post:{post.Id}:{member}",
-                    body: TruncateUgcSnippet(post.Body),
-                    linkPath: $"/groups/{draft.GroupId}/posts/{post.Id}",
-                    targetId: draft.GroupId,
-                    ct: default).ConfigureAwait(false);
-            }
-        }
-
-        // M36 (ADR 0165, U05) — the group post mention emitter (Part 2.3
-        // lane 3, `group.post.mention`). Additive, *inside* the lane (the
-        // frozen method signature + audit rows untouched). Draft-gated
-        // (M36·8, ADR 0037): the same `!(draft.IsDraft ?? false)` pin as the
-        // group-post member emission above. Extract candidate `@`-tokens from
-        // the post body, resolve them against the frozen directory read (the
-        // author is never a recipient — M36-5 self pin), and emit one
-        // `group.post.mention` notification per resolved recipient on the
-        // caller's session. The per-recipient idempotency key (M36·4) keeps a
-        // re-emission of the same (post, recipient) pair a no-op (ADR 0076
-        // D4 / F10). `EmitAsync` does not commit; the `SaveChangesAsync`
-        // below is the single commit (C3). No new authorization surface, no
-        // `AccessAudit` row (M36·5 — a mention is a personal read).
-        if (_mentions is not null && _notifications is not null && !(draft.IsDraft ?? false))
-        {
-            var mentionTokens = Mentions.MentionTokens.ExtractTokens(post.Body);
-            if (mentionTokens.Count > 0)
-            {
-                var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId)
-                    .ConfigureAwait(false);
-                foreach (var recipientId in mentionRecipients)
-                {
-                    await _notifications.EmitAsync(
-                        session,
-                        recipientId: recipientId,
-                        kind: NotificationKinds.GroupPostMention,
-                        idempotencyKey: $"notification:group.post.mention:{post.Id}:{recipientId}",
-                        body: UgcSnippets.Truncate(post.Body),
-                        targetId: null,
-                        linkPath: $"/groups/{draft.GroupId}/posts/{post.Id}",
-                        ct: default).ConfigureAwait(false);
-                }
-            }
-        }
-
-        // One SaveChangesAsync — the C3 same-transaction lane (ADR 0006-E): the
-        // gate decision row + the new post commit atomically.
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return post;
-    }
+    /// <summary>
+    /// Re-write a group-lane post (author-only, ADR 0016) — delegates to
+    /// <see cref="GroupPostService.UpdateGroupPostAsync"/> (C3-03 extraction).
+    /// </summary>
+    public Task<Post> UpdateGroupPostAsync(
+        string postId, string actorId, string? title, string body, string? languageCode,
+        IDocumentSession session, IReadOnlyList<string>? attachmentIds = null)
+        => _groupPosts.UpdateGroupPostAsync(postId, actorId, title, body, languageCode, session, attachmentIds);
 
     // ─── ADR 0022 — user-added post/reply translations lane ────────────────
 
@@ -1693,623 +1421,36 @@ public sealed class PostService
             .ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Adds a **user-added translation** of a post in the **caller's** in-flight
-    /// session (invariant C3 — the same-transaction lane; the
-    /// <see cref="IDocumentSession"/> is the caller's, so the write and the
-    /// in-session <c>AccessAudit</c> row commit or roll back atomically).
-    /// <para>
-    /// <b>Standing (ADR 0022, the approved default):</b> the post's
-    /// <b>author</b> (<see cref="AccessVia.Owner"/>); a
-    /// <see cref="Identity.Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>);
-    /// and — on the **community** lane only — a
-    /// <c>Moderator</c> scoped to the post's component
-    /// (<see cref="AccessVia.Moderator"/>). On the **group** lane (
-    /// <see cref="Post.GroupId"/> non-empty, ADR 0013) the component-moderator
-    /// standing does **not** apply (ADR 0007 — no component-moderator scope
-    /// exists for a group; GlobalAdmin is the only non-author standing). A
-    /// denied actor throws <see cref="UnauthorizedAccessException"/> **before**
-    /// anything is stored.
-    /// </para>
-    /// <para>
-    /// <paramref name="languageCode"/> is the **target** language (a
-    /// <see cref="Kumunita.Core.Localization.LanguageCatalog.Id"/> the Web offers
-    /// from the enabled catalog); it is written **verbatim** (never floored to
-    /// the instance default — a blank target is a caller error). One
-    /// <c>SaveChangesAsync</c>.
-    /// </para>
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// author / GlobalAdmin / (community) component-moderator standings.</exception>
-    public async Task<PostTranslation> AddPostTranslationAsync(
-        string postId,
-        string languageCode,
-        string? title,
-        string body,
-        string actorId,
-        IReadOnlySet<string> actorRoles,
-        IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to translate.");
-
-        var via = ResolveTranslationStanding(
-            post.GroupId.Length > 0, post.ComponentId, post.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the post's author (or a moderator of the community, or an admin) " +
-                "may add a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new PostTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            PostId = postId,
-            LanguageCode = languageCode,
-            Title = title,
-            Body = body,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        // Audit row (ADR 0022 write-lane, the ModerationService.FileReportAsync
-        // precedent — a hand-written audit row with no CanAsync decision call):
-        // the Via tag records the standing the actor used (Owner / Moderator /
-        // Admin).
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "posttranslation.add",
-            TargetKind = "post",
-            TargetId = postId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(translation);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return translation;
-    }
-
-    /// <summary>
-    /// Adds a **user-added translation** of a reply in the **caller's** in-flight
-    /// session (invariant C3; the <see cref="IDocumentSession"/> is the caller's).
-    /// <para>
-    /// <b>Standing (ADR 0022, mirroring the parent post's):</b> the reply's
-    /// <b>author</b> (<see cref="AccessVia.Owner"/>); a
-    /// <see cref="Identity.Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>);
-    /// and — on the **community** lane only — a <c>Moderator</c> scoped to the
-    /// parent post's component (<see cref="AccessVia.Moderator"/>). On the
-    /// **group** lane the component-moderator standing does not apply (ADR 0007).
-    /// A denied actor throws <see cref="UnauthorizedAccessException"/> before
-    /// anything is stored.
-    /// </para>
-    /// <para>
-    /// <paramref name="languageCode"/> is the target language (written verbatim;
-    /// a blank target is a caller error); the translation is body-only (a reply
-    /// has no title — C-M3·1). One <c>SaveChangesAsync</c>.
-    /// </para>
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The reply id (or its parent post)
-    /// is not found.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
-    /// author / GlobalAdmin / (community) component-moderator standings.</exception>
-    public async Task<ReplyTranslation> AddReplyTranslationAsync(
-        string replyId,
-        string languageCode,
-        string body,
-        string actorId,
-        IReadOnlySet<string> actorRoles,
-        IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
-        if (reply is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to translate.");
-
-        // Standing mirrors the parent post's lane (community vs group) and the
-        // parent post's component scope — the reply itself has no component
-        // (C-M3·1), so the scope comes from the parent.
-        var parent = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
-        if (parent is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' has no parent post; nothing to translate.");
-
-        var via = ResolveTranslationStanding(
-            parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the reply's author (or a moderator of the community, or an admin) " +
-                "may add a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new ReplyTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            ReplyId = replyId,
-            LanguageCode = languageCode,
-            Body = body,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "replytranslation.add",
-            TargetKind = "reply",
-            TargetId = replyId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(translation);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return translation;
-    }
-
-    // ─── ADR 0048 — edit + delete lane for post/reply translations ───────
-    // The ADR 0022 write lane was add-only (one row per (parent, language)
-    // pair, enforced by the unique index in PostDocTypes). ADR 0048 lifts the
-    // "add-only" pin: a standing-holder (the same matrix as the add lane —
-    // author / GlobalAdmin / (community-lane) component-moderator) may now
-    // **update** the existing (parent, language) row in place, or **remove**
-    // it. Update is a field-write on the existing row (same Title/Body
-    // shape as the add, the parent re-validated by load); Remove is a hard
-    // `session.Delete` of the row (the trail is preserved by the
-    // <c>AccessAudit</c> row written in the same session — ADR 0024's
-    // soft-delete rationale does not apply to a translation: it has no
-    // children to keep visible, and a soft-delete would block re-adding the
-    // same language via the unique index). Standing is re-derived from the
-    // **parent** (the row's own <c>AuthorId</c> is the adder, which may be a
-    // different standing-holder — the post's author, a GlobalAdmin, or a
-    // community moderator). Both lanes write a hand-written
-    // <c>AccessAudit</c> row in the caller's session (C3) and commit
-    // atomically (one <c>SaveChangesAsync</c>).
-
-    /// <summary>
-    /// **Updates** the existing <see cref="PostTranslation"/> row for
-    /// (<paramref name="postId"/>, <paramref name="languageCode"/>) in the
-    /// <b>caller's</b> in-flight session (C3). Standing (ADR 0048, same as
-    /// the ADR 0022 add lane): the post's **author**
-    /// (<see cref="AccessVia.Owner"/>), a <see cref="Identity
-    /// .Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>), and — on the
-    /// community lane only — a <c>Moderator</c> scoped to the post's
-    /// component (<see cref="AccessVia.Moderator"/>). The group lane has no
-    /// component-moderator standing (ADR 0007). A denied actor throws
-    /// <see cref="UnauthorizedAccessException"/> before anything is written.
-    /// <para>
-    /// The row's <see cref="PostTranslation.Title"/> /
-    /// <see cref="PostTranslation.Body"/> are replaced verbatim (a blank
-    /// <paramref name="title"/> clears the title, matching the add lane's
-    /// null-coalescing; a blank <paramref name="body"/> is a caller error —
-    /// a translation with no body is not a translation). The parent
-    /// <see cref="Post"/> and the <c>(PostId, LanguageCode)</c> row are both
-    /// loaded in the same session: a missing parent is a
-    /// <see cref="KeyNotFoundException"/> (the parent was deleted after the
-    /// translation was added, or the id is a hallucination), a missing row
-    /// is a <see cref="KeyNotFoundException"/> (a shape error for this
-    /// route — the Web layer offers this route only for languages that
-    /// already have a row). One <c>SaveChangesAsync</c>.
-    /// </para>
-    /// </summary>
-    public async Task<PostTranslation> UpdatePostTranslationAsync(
-        string postId, string languageCode, string? title, string body,
-        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to update.");
-
-        var row = await session.Query<PostTranslation>()
-            .Where(t => t.PostId == postId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Post '{postId}' has no translation in '{languageCode}'; nothing to update.");
-
-        var via = ResolveTranslationStanding(
-            post.GroupId.Length > 0, post.ComponentId, post.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the post's author (or a moderator of the community, or an admin) " +
-                "may edit a translation of it.");
-
-        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-        row.Body = body;
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "posttranslation.update",
-            TargetKind = "post",
-            TargetId = postId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return row;
-    }
-
-    /// <summary>
-    /// **Removes** the existing <see cref="PostTranslation"/> row for
-    /// (<paramref name="postId"/>, <paramref name="languageCode"/>) in the
-    /// <b>caller's</b> in-flight session (C3). Standing is the same matrix
-    /// as <see cref="UpdatePostTranslationAsync"/> — the ADR 0048
-    /// author / GlobalAdmin / (community) component-moderator rule,
-    /// re-derived from the parent post. A hard <c>session.Delete</c> of the
-    /// row; the trail is preserved by the <see cref="Authorization
-    /// .AccessAudit"/> row written in the same session (action
-    /// <c>posttranslation.remove</c>). A missing parent or a missing row is
-    /// a <see cref="KeyNotFoundException"/> (a double-remove is a shape
-    /// error for this route — the Web layer offers the delete affordance
-    /// only for languages that have a row). One <c>SaveChangesAsync</c>.
-    /// </summary>
-    public async Task RemovePostTranslationAsync(
-        string postId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
-        if (post is null)
-            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to remove.");
-
-        var row = await session.Query<PostTranslation>()
-            .Where(t => t.PostId == postId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Post '{postId}' has no translation in '{languageCode}'; nothing to remove.");
-
-        var via = ResolveTranslationStanding(
-            post.GroupId.Length > 0, post.ComponentId, post.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the post's author (or a moderator of the community, or an admin) " +
-                "may remove a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "posttranslation.remove",
-            TargetKind = "post",
-            TargetId = postId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Delete(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// **Updates** the existing <see cref="ReplyTranslation"/> row for
-    /// (<paramref name="replyId"/>, <paramref name="languageCode"/>) in the
-    /// <b>caller's</b> in-flight session (C3). Standing mirrors the parent
-    /// post's lane (community vs group) and the parent's component scope —
-    /// the reply itself has no component (C-M3·1), so the scope comes from
-    /// the parent. A denied actor throws
-    /// <see cref="UnauthorizedAccessException"/> before anything is
-    /// written. A missing parent post, a missing reply, or a missing
-    /// (ReplyId, LanguageCode) row is a
-    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>.
-    /// </summary>
-    public async Task<ReplyTranslation> UpdateReplyTranslationAsync(
-        string replyId, string languageCode, string body,
-        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
-        if (reply is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to update.");
-
-        var parent = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
-        if (parent is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' has no parent post; nothing to update.");
-
-        var row = await session.Query<ReplyTranslation>()
-            .Where(t => t.ReplyId == replyId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Reply '{replyId}' has no translation in '{languageCode}'; nothing to update.");
-
-        var via = ResolveTranslationStanding(
-            parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the reply's author (or a moderator of the community, or an admin) " +
-                "may edit a translation of it.");
-
-        row.Body = body;
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "replytranslation.update",
-            TargetKind = "reply",
-            TargetId = replyId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return row;
-    }
-
-    /// <summary>
-    /// **Removes** the existing <see cref="ReplyTranslation"/> row for
-    /// (<paramref name="replyId"/>, <paramref name="languageCode"/>) in the
-    /// <b>caller's</b> in-flight session (C3). Standing mirrors the parent
-    /// post's lane and component scope (the ADR 0048 author / GlobalAdmin /
-    /// (community) component-moderator rule). A hard
-    /// <c>session.Delete</c>; the trail is preserved by the
-    /// <see cref="Authorization.AccessAudit"/> row (action
-    /// <c>replytranslation.remove</c>). A missing parent post, reply, or
-    /// row is a <see cref="KeyNotFoundException"/>. One
-    /// <c>SaveChangesAsync</c>.
-    /// </summary>
-    public async Task RemoveReplyTranslationAsync(
-        string replyId, string languageCode,
-        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
-    {
-        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-
-        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
-        if (reply is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to remove.");
-
-        var parent = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
-        if (parent is null)
-            throw new KeyNotFoundException($"Reply '{replyId}' has no parent post; nothing to remove.");
-
-        var row = await session.Query<ReplyTranslation>()
-            .Where(t => t.ReplyId == replyId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Reply '{replyId}' has no translation in '{languageCode}'; nothing to remove.");
-
-        var via = ResolveTranslationStanding(
-            parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the reply's author (or a moderator of the community, or an admin) " +
-                "may remove a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "replytranslation.remove",
-            TargetKind = "reply",
-            TargetId = replyId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Delete(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-    }
+    // ─── ADR 0022 + 0048 — post / reply translation write lanes ─────────────
+    // C2-01 (IMPROVE-CODE-2): the six per-surface `*Translation*` write methods
+    // (add / update / remove × post / reply) are retired. Their body was a one-
+    // line forwarder into the shared <see cref="TranslationLane{TParent,TVar}"/>
+    // (ADR 0288); the Web layer now codes against <see cref="PostTranslationLane"/>
+    // and <see cref="ReplyTranslationLane"/> directly (a D6-legal `record` in the
+    // Translations module, so pointing the controller at it adds no boundary edge).
+    // The standing matrix, the audit-row shape, the (parent, language) row shape,
+    // and the caller-supplied session are all defined once in the descriptor —
+    // byte-identical to the retired forwarders. The read seams
+    // (<see cref="GetPostTranslationsAsync"/> / <see cref="GetReplyTranslationsAsync"/>)
+    // and the <see cref="CanAddTranslation"/> display pin stay on this service:
+    // their shape is surface-specific (the reply read is batched; the display pin
+    // is the C04 seam the Web calls), which the write lane intentionally does not own.
 
     /// <summary>
     /// The public ADR 0022 standing probe the Web layer calls to decide whether
     /// to render the "add a translation" affordance (a <b>display</b> pin, not a
-    /// gate — the real deny is the <see cref="AddPostTranslationAsync"/> /
-    /// <see cref="AddReplyTranslationAsync"/> standing check, which re-runs the
-    /// same rule server-side). Keeping this in Core — not duplicated in the two
-    /// detail controllers — is the ADR 0006-D "the service owns the decision,
-    /// not the Web" shape; it delegates to the same
-    /// <see cref="ResolveTranslationStanding"/> the write lanes use, so the
-    /// display and the gate can never drift apart. ADR 0048: the edit /
-    /// remove lanes (the same standing matrix, re-derived from the parent)
-    /// reuse this exact display pin, so the "add a …" / "edit …" / "remove …"
-    /// affordances render under the same standing — the display and the
-    /// three gates can never drift apart.
+    /// gate — the real deny is the <see cref="PostTranslationLane"/> /
+    /// <see cref="ReplyTranslationLane"/> standing re-check, which re-runs the
+    /// same rule server-side). C04: the rule moved to
+    /// <see cref="PostTranslationPolicy.CanAddTranslation"/> — a thin forwarder
+    /// here keeps the call surface unchanged; the Web no longer reaches the
+    /// concrete service for the decision. ADR 0048: the edit / remove lanes
+    /// (the two lanes' <c>UpdateAsync</c> / <c>RemoveAsync</c>) reuse this exact
+    /// display pin, so the "add a …" / "edit …" / "remove …" affordances render
+    /// under the same standing.
     /// </summary>
     public static bool CanAddTranslation(
         bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-        => ResolveTranslationStanding(isGroupLane, componentId, rowAuthorId, actorId, actorRoles) is not null;
+        => PostTranslationPolicy.CanAddTranslation(isGroupLane, componentId, rowAuthorId, actorId, actorRoles);
 
-    /// <summary>
-    /// The ADR 0022 translation standing resolver (shared by
-    /// <see cref="AddPostTranslationAsync"/> /
-    /// <see cref="AddReplyTranslationAsync"/> /
-    /// <see cref="CanAddTranslation"/>). Returns the <see cref="AccessVia"/>
-    /// the actor qualifies under, or <c>null</c> to deny. Precedence (most
-    /// specific standing first, so the audit row records the narrowest right
-    /// that applied): the row's **author** (
-    /// <see cref="AccessVia.Owner"/>); a **GlobalAdmin**
-    /// (<see cref="AccessVia.Admin"/>); and, on the **community** lane only
-    /// (a <see cref="Kumunita.Core.Identity.Roles.ModeratorComponent"/> claim
-    /// scoped to the post's component) — a **Moderator**
-    /// (<see cref="AccessVia.Moderator"/>). The group lane has no
-    /// component-moderator standing (ADR 0007).
-    /// </summary>
-    private static AccessVia? ResolveTranslationStanding(
-        bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (string.Equals(rowAuthorId, actorId, StringComparison.Ordinal))
-            return AccessVia.Owner;
-
-        if (actorRoles.Contains(Identity.Roles.GlobalAdmin))
-            return AccessVia.Admin;
-
-        if (!isGroupLane
-            && !string.IsNullOrEmpty(componentId)
-            && actorRoles.Contains(Identity.Roles.ModeratorComponent(componentId)))
-            return AccessVia.Moderator;
-
-        return null;
-    }
-
-    /// <summary>
-    /// <b>Reverse-lookup</b> read seam (RC U03, R·5): the first post (by
-    /// <c>Created</c> ascending — deterministic) whose
-    /// <see cref="Post.ImageIds"/> contains <paramref name="mediaId"/> — the
-    /// serving route's owner resolution reads this (RC R·4). **Un-audited**
-    /// (RC R·5 — the audit row belongs to the route's
-    /// <see cref="IAuthorizationService.CanAsync"/>, not this read); null when
-    /// no post references the id (the route 404s). Read-only — no write lane,
-    /// no <c>actorId</c> parameter (there is no decision to log here).
-    /// </summary>
-    public async Task<Post?> FindPostByImageIdAsync(string mediaId)
-    {
-        if (string.IsNullOrEmpty(mediaId))
-            throw new ArgumentException("A media id is required.", nameof(mediaId));
-
-        await using var session = _store.QuerySession();
-        return await session
-            .Query<Post>()
-            .Where(p => p.ImageIds.Contains(mediaId))
-            .OrderBy(p => p.Created)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// <b>Reverse-lookup</b> read seam (RC U03, R·5): the first reply (by
-    /// <c>Created</c> ascending) whose <see cref="PostReply.ImageIds"/>
-    /// contains <paramref name="mediaId"/>. **Un-audited** (RC R·5 — the audit
-    /// row belongs to the route's <see cref="IAuthorizationService.CanAsync"/>);
-    /// null when no reply references the id (the route 404s). Read-only.
-    /// </summary>
-    public async Task<PostReply?> FindReplyByImageIdAsync(string mediaId)
-    {
-        if (string.IsNullOrEmpty(mediaId))
-            throw new ArgumentException("A media id is required.", nameof(mediaId));
-
-        await using var session = _store.QuerySession();
-        return await session
-            .Query<PostReply>()
-            .Where(r => r.ImageIds.Contains(mediaId))
-            .OrderBy(r => r.Created)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// <b>Reverse-lookup</b> read seam (ATT U3, C-ATT·4): the first post (by
-    /// <c>Created</c> ascending — deterministic) whose
-    /// <see cref="Post.AttachmentIds"/> contains <paramref name="mediaId"/> —
-    /// the attachment serving route's owner resolution reads this (C-ATT·7).
-    /// **Un-audited** (the audit row belongs to the route's
-    /// <see cref="IAuthorizationService.CanAsync"/>, not this read); null when
-    /// no post references the id (the route 404s). Read-only — no write lane,
-    /// no <c>actorId</c> parameter (there is no decision to log here).
-    /// </summary>
-    public async Task<Post?> FindPostByAttachmentIdAsync(string mediaId)
-    {
-        if (string.IsNullOrEmpty(mediaId))
-            throw new ArgumentException("A media id is required.", nameof(mediaId));
-
-        await using var session = _store.QuerySession();
-        return await session
-            .Query<Post>()
-            .Where(p => p.AttachmentIds.Contains(mediaId))
-            .OrderBy(p => p.Created)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// <b>Reverse-lookup</b> read seam (ATT U3, C-ATT·4): the first reply (by
-    /// <c>Created</c> ascending) whose <see cref="PostReply.AttachmentIds"/>
-    /// contains <paramref name="mediaId"/>. **Un-audited** (the audit row
-    /// belongs to the route's <see cref="IAuthorizationService.CanAsync"/>);
-    /// null when no reply references the id (the route 404s). Read-only.
-    /// </summary>
-    public async Task<PostReply?> FindReplyByAttachmentIdAsync(string mediaId)
-    {
-        if (string.IsNullOrEmpty(mediaId))
-            throw new ArgumentException("A media id is required.", nameof(mediaId));
-
-        await using var session = _store.QuerySession();
-        return await session
-            .Query<PostReply>()
-            .Where(r => r.AttachmentIds.Contains(mediaId))
-            .OrderBy(r => r.Created)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-    }
 }

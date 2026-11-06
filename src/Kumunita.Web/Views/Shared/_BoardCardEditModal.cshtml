@@ -236,7 +236,7 @@
                        dropdown / hidden field) and reads
                        <c>data-tag-suggest-initial</c> once per bind, which
                        is awkward in a single-instance modal reused per card.
-                       The server's <see cref="TagSlugs.Parse"/> accepts a
+                       The server's <see cref="TagSlugParser.Parse"/> accepts a
                        JSON array OR a raw CSV string (the documented
                        fallback), so a comma-separated field posts the same
                        tag set the chip component would. The full chip UI is

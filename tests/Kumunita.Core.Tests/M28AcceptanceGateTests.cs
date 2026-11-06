@@ -70,12 +70,13 @@ public class M28AcceptanceGateTests(PostgresFixture fixture) : IClassFixture<Pos
     public async Task Gate1_ClosedLoop_BlockedWindow_ContainingNow_RestrictsChild()
     {
         var store = await BootStoreAsync();
-        var svc = new UserInfoService(store);   // services null ⇒ no admin standing
+        var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);   // services null ⇒ no admin standing
 
         const string guardian = "u-m28-gate1-guardian";
         const string child = "u-m28-gate1-child";
 
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // "Now" — the CURRENT instant (the gate is about the child being
         // restricted at the moment the guardian sets the window, not a
@@ -87,12 +88,12 @@ public class M28AcceptanceGateTests(PostgresFixture fixture) : IClassFixture<Pos
         // A Blocked-mode window containing the current hour (empty DaysOfWeek
         // = all days — the hour alone pins the window). The child is
         // restricted DURING the window (F1 — the lean-default polarity).
-        await svc.SetChildTimeLimitAsync(guardian, child,
+        await guardianService.SetChildTimeLimitAsync(guardian, child,
             new GuardianTimeLimitSchedule { Enabled = true, Mode = TimeLimitMode.Blocked, Hours = [now.Hour] });
 
         // C-M28·4 — the ENFORCEMENT read (no guardian gate) sees the schedule
         // live on the very next call (no projection, no cache).
-        var read = await svc.GetActiveTimeLimitAsync(child);
+        var read = await guardianService.GetActiveTimeLimitAsync(child);
         Assert.NotNull(read);
         Assert.True(read!.Enabled);
         Assert.Equal(TimeLimitMode.Blocked, read.Mode);
@@ -114,28 +115,29 @@ public class M28AcceptanceGateTests(PostgresFixture fixture) : IClassFixture<Pos
     public async Task Gate2_Handoff_AllowedWindow_Then_Clear_Is_AlwaysAllowed()
     {
         var store = await BootStoreAsync();
-        var svc = new UserInfoService(store);   // services null ⇒ no admin standing
+        var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);   // services null ⇒ no admin standing
 
         const string guardian = "u-m28-gate2-guardian";
         const string child = "u-m28-gate2-child";
 
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         var now = DateTimeOffset.UtcNow;
         var zone = TimeZoneInfo.Utc;
 
         // BEFORE — no schedule (the floor, C-M28·3): always allowed.
-        Assert.Null(await svc.GetActiveTimeLimitAsync(child));
+        Assert.Null(await guardianService.GetActiveTimeLimitAsync(child));
         Assert.True(GuardianTimeLimitEvaluator.IsAllowedNow(null, now, zone));
 
         // An Allowed-mode window containing the current hour (empty DaysOfWeek
         // = all days). The child may use the platform DURING the window (F2 —
         // the allow-list polarity) → "now" (in-window) → allowed.
-        await svc.SetChildTimeLimitAsync(guardian, child,
+        await guardianService.SetChildTimeLimitAsync(guardian, child,
             new GuardianTimeLimitSchedule { Enabled = true, Mode = TimeLimitMode.Allowed, Hours = [now.Hour] });
 
         // C-M28·4 — the read sees the schedule live on the next call.
-        var read = await svc.GetActiveTimeLimitAsync(child);
+        var read = await guardianService.GetActiveTimeLimitAsync(child);
         Assert.NotNull(read);
         Assert.True(read!.Enabled);
         Assert.Equal(TimeLimitMode.Allowed, read.Mode);
@@ -144,13 +146,13 @@ public class M28AcceptanceGateTests(PostgresFixture fixture) : IClassFixture<Pos
         Assert.True(GuardianTimeLimitEvaluator.IsAllowedNow(read, now, zone));
 
         // CLEAR (null) — the row is deleted (the M20 "clear" idiom).
-        await svc.SetChildTimeLimitAsync(guardian, child, null);
+        await guardianService.SetChildTimeLimitAsync(guardian, child, null);
 
         // F3 — the floor: the enforcement read returns null = "never
         // restricted", and IsAllowedNow(null, ...) is always true (C-M28·3).
         // Strong consistency (C-M28·4): the clear is live on the very next
         // read.
-        var cleared = await svc.GetActiveTimeLimitAsync(child);
+        var cleared = await guardianService.GetActiveTimeLimitAsync(child);
         Assert.Null(cleared);
         Assert.True(GuardianTimeLimitEvaluator.IsAllowedNow(cleared, now, zone));
     }

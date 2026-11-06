@@ -41,6 +41,7 @@ internal static class MentionEmitters
     {
         public required IDocumentStore Store { get; init; }
         public required UserInfoService UserInfo { get; init; }
+        public required ProfileSettingsService ProfileSettings { get; init; }
         public required NotificationService Notifications { get; init; }
         public required MentionService Mentions { get; init; }
         public required List<(string Key, string Recipient, string Subject, string Body)> Staged { get; init; }
@@ -66,9 +67,10 @@ internal static class MentionEmitters
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         // The frozen M2 directory read (M36·2) — a read, not a decision (M36·5),
         // so a bare IAuthorizationService substitute satisfies the ctor guard.
-        var directory = new DirectoryService(userInfo, Substitute.For<IAuthorizationService>());
+        var directory = new DirectoryService(userInfo, profileSettings, Substitute.For<IAuthorizationService>());
         var mentions = new MentionService(directory);
 
         var translator = Substitute.For<ITranslationProvider>();
@@ -92,6 +94,7 @@ internal static class MentionEmitters
         {
             Store = store,
             UserInfo = userInfo,
+            ProfileSettings = profileSettings,
             Notifications = notifications,
             Mentions = mentions,
             Staged = staged,

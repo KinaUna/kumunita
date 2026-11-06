@@ -373,15 +373,17 @@ public class PageControllerTranslationTests
     {
         var authzImpl = authz ?? Substitute.For<IAuthorizationService>();
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
         var storeImpl = store ?? Substitute.For<IDocumentStore>();
         var localization = Substitute.For<ILocalizationService>();
         localization.ListLanguagesAsync().Returns(new List<LanguageCatalog>());
 
-        var controller = new PageController(pages, authzImpl, localization, userInfo, storeImpl);
+        var controller = new PageController(pages, authzImpl, localization, userInfo, Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), storeImpl);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 

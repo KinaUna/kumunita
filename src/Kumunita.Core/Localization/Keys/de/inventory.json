@@ -1,0 +1,6 @@
+{
+  "inventory.flash_item_updated": "Gegenstand aktualisiert.",
+  "inventory.flash_item_deleted": "Gegenstand gel\u00F6scht.",
+  "inventory.flash_checked_out": "Gegenstand ausgeliehen.",
+  "inventory.flash_checked_in": "Gegenstand zur\u00FCckgegeben."
+}

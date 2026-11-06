@@ -30,8 +30,9 @@ public class DirectoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new DirectoryService(userInfo, authz);
+        var svc = new DirectoryService(userInfo, new ProfileSettingsService(store), authz);
 
         var verifiedOther = "u-dir-verified-other";
         var unverifiedViewer = "u-dir-unverified-viewer";
@@ -69,8 +70,8 @@ public class DirectoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         // seam (UpsertProfileAsync appends no Audit row — M1's bootstrap surface — so
         // the audit count below starts well-defined at 0 for any DirectoryService
         // decision rows).
-        await userInfo.UpsertProfileAsync(verifiedProfile, new ProfileUpdate(null, null, null, null, null));
-        await userInfo.UpsertProfileAsync(unverifiedProfile, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(verifiedProfile, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(unverifiedProfile, new ProfileUpdate(null, null, null, null, null));
 
         // The suspended resident: BlockAsync is the real admin lane (it needs
         // UserManager; pulling Identity infra into this test would obscure the pin).
@@ -129,5 +130,31 @@ public class DirectoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
         return store;
+    }
+}
+
+/// <summary>
+/// C2-03 seam test: the <see cref="Kumunita.Core.UserInfo.IDirectoryService"/>
+/// interface the crossing modules code against (IMPROVE-CODE-2 C2-03 — the
+/// C03 INotificationEmitter pattern; ADR 0006-D "route + authz + shape").
+/// Names the interface for the seam-test Rule 2 (I*Service named by a test).
+/// The <see cref="Kumunita.Core.UserInfo.DirectoryService"/> concrete
+/// implements the interface; this test pins that relationship.
+/// </summary>
+public class IDirectoryServiceSeamTest
+{
+    [Fact]
+    public void DirectoryService_Implements_IDirectoryService()
+    {
+        Assert.True(typeof(Kumunita.Core.UserInfo.IDirectoryService).IsAssignableFrom(typeof(Kumunita.Core.UserInfo.DirectoryService)));
+    }
+
+    [Fact]
+    public void IDirectoryService_Expose_The_Three_Crossing_Reads()
+    {
+        var t = typeof(Kumunita.Core.UserInfo.IDirectoryService);
+        Assert.NotNull(t.GetMethod("ListAsync"));
+        Assert.NotNull(t.GetMethod("DetailAsync"));
+        Assert.NotNull(t.GetMethod("PreviewAsAsync"));
     }
 }

@@ -32,16 +32,16 @@ public sealed class ProfileFindService : IProfileFindService
     // `PageSize = 30` precedent).
     private const int PageSize = 30;
 
-    private readonly IUserInfoService _userInfo;
+    private readonly IProfileSettingsService _profileSettings;
     private readonly IAuthorizationService _authz;
     private readonly IDocumentStore _store;
 
     public ProfileFindService(
-        IUserInfoService userInfo,
+        IProfileSettingsService profileSettings,
         IAuthorizationService authz,
         IDocumentStore store)
     {
-        _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _store = store ?? throw new ArgumentNullException(nameof(store));
     }
@@ -69,7 +69,7 @@ public sealed class ProfileFindService : IProfileFindService
 
         // Candidate set (the GetProfilesAsync(false) shape) filtered by the tag
         // (C-M23·6) — the match is a feed organizer (D6), never a gate.
-        var candidates = (await _userInfo.GetProfilesAsync(false).ConfigureAwait(false))
+        var candidates = (await _profileSettings.GetProfilesAsync(false).ConfigureAwait(false))
             .Where(p => !p.Blocked && p.TagIds.Contains(tag.Id))
             .ToList();
         // C-M3·2 / M3 0-candidate shape: the 0-candidate early return runs
@@ -120,7 +120,7 @@ public sealed class ProfileFindService : IProfileFindService
         // The bio substring (M8 D4 floor): a case-insensitive substring over a
         // non-null Bio (the M8 D4 engine; D8·2 defers full-text/semantic).
         var needle = q.Trim();
-        var candidates = (await _userInfo.GetProfilesAsync(false).ConfigureAwait(false))
+        var candidates = (await _profileSettings.GetProfilesAsync(false).ConfigureAwait(false))
             .Where(p => !p.Blocked
                 && p.Bio is not null
                 && p.Bio.Contains(needle, StringComparison.OrdinalIgnoreCase))

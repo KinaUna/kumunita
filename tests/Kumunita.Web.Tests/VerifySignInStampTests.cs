@@ -169,6 +169,16 @@ public sealed class VerifySignInStampTests(PostgresFixture fixture) : IClassFixt
         var identity = Substitute.For<IIdentityService>();
         var profile  = new Profile { SubjectId = Subject, Verified = true };
         identity.VerifyWithTokenAsync(Arg.Any<string>()).Returns(profile);
+        // C3-05 (ADR 0295) — the verify-token read now runs through this seam.
+        // Faithful to the old controller behavior: load the by-id row from the
+        // same real store the test seeded (the old LoadUsableVerifyTokenAsync
+        // did session.LoadAsync<IdentityToken>(id)).
+        identity.LoadVerifyTokenAsync(Arg.Any<string>())
+            .Returns(async callInfo =>
+            {
+                await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+                return await s.LoadAsync<IdentityToken>(callInfo.Arg<string>());
+            });
 
         // IUserInfoService — the principal factory's GetProfileAsync seam.
         var userInfo = Substitute.For<IUserInfoService>();
@@ -186,6 +196,7 @@ public sealed class VerifySignInStampTests(PostgresFixture fixture) : IClassFixt
                 new IdentityErrorDescriber(),
                 NullLogger<RoleManager<IdentityRole>>.Instance),
             userInfo: userInfo,
+            profileSettings: Substitute.For<IProfileSettingsService>(),
             identity: identity,
             options: Options.Create(new IdentityOptions()));
 
@@ -227,8 +238,9 @@ public sealed class VerifySignInStampTests(PostgresFixture fixture) : IClassFixt
                 Substitute.For<IUserConfirmation<User>>()),
             userManager: userManager,
             identity: identity,
-            userInfo: userInfo,
-            store: store);
+            // C3-05 (ADR 0295) — the store arg is gone; the verify-token read is
+            // now the identity.LoadVerifyTokenAsync seam (wired above to the same store).
+            userInfo: userInfo);
 
         controller.ControllerContext = new ControllerContext { HttpContext = ctx };
         controller.TempData = new TempDataDictionary(ctx, new NoOpTempDataProvider());

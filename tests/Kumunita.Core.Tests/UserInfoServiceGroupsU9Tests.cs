@@ -40,6 +40,7 @@ public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixtu
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string a = "u-u9-a";
         const string b = "u-u9-b";
@@ -56,7 +57,7 @@ public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixtu
         // C owns a group A is unrelated to — must NOT appear for A.
         var cGroup = await svc.CreateGroupAsync(c, "C group", null);
 
-        var result = await svc.GetGroupsForUserAsync(a);
+        var result = await groupService.GetGroupsForUserAsync(a);
 
         var ids = result.Select(g => g.Id).ToHashSet();
         Assert.Contains(owned1.Id, ids);
@@ -75,14 +76,15 @@ public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixtu
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string a = "u-u9-a2";
         var owned = await svc.CreateGroupAsync(a, "A2 group", null);
 
         // The two reads under test are candidates, not decisions — neither may
         // append an AccessAudit row (invariant C3's lane is untouched).
-        await svc.GetGroupsForUserAsync(a);
-        await svc.GetGroupMembersAsync(owned.Id);
+        await groupService.GetGroupsForUserAsync(a);
+        await groupService.GetGroupMembersAsync(owned.Id);
 
         await using var session = store.QuerySession();
         var audits = await session.Query<Kumunita.Core.Authorization.AccessAudit>()
@@ -102,6 +104,7 @@ public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixtu
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-u9-owner";
         const string member = "u-u9-member";
@@ -109,19 +112,19 @@ public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixtu
         var group = await svc.CreateGroupAsync(owner, "Live group", null);
 
         // The owner is the only member at creation (owner ∪ owner).
-        var before = await svc.GetGroupMembersAsync(group.Id);
+        var before = await groupService.GetGroupMembersAsync(group.Id);
         Assert.Single(before);
         Assert.Equal(owner, before[0].UserId);
 
         // Add a member — live on the very next call.
         await svc.AddGroupMemberAsync(group.Id, member, addedBy: owner);
-        var afterAdd = await svc.GetGroupMembersAsync(group.Id);
+        var afterAdd = await groupService.GetGroupMembersAsync(group.Id);
         Assert.Equal(2, afterAdd.Count);
         Assert.Contains(afterAdd, m => m.UserId == member);
 
         // Remove the member — live on the very next call.
         await svc.RemoveGroupMemberAsync(group.Id, member, removedBy: owner);
-        var afterRemove = await svc.GetGroupMembersAsync(group.Id);
+        var afterRemove = await groupService.GetGroupMembersAsync(group.Id);
         Assert.Single(afterRemove);
         Assert.Equal(owner, afterRemove[0].UserId);
     }
@@ -132,9 +135,10 @@ public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixtu
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
-        Assert.Empty(await svc.GetGroupMembersAsync(string.Empty));
-        Assert.Empty(await svc.GetGroupsForUserAsync(string.Empty));
+        Assert.Empty(await groupService.GetGroupMembersAsync(string.Empty));
+        Assert.Empty(await groupService.GetGroupsForUserAsync(string.Empty));
     }
 
     // ── Test 5 — member self-leave (ADR 0008): userId == removedBy == member ──
@@ -154,6 +158,7 @@ public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixtu
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-u9-selfleave-owner";
         const string member = "u-u9-selfleave-member";
@@ -166,11 +171,11 @@ public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixtu
 
         // C4: the leave is live on the very next read, on both read lanes
         // (the per-group member read and the user-axis group projection).
-        var after = await svc.GetGroupMembersAsync(group.Id);
+        var after = await groupService.GetGroupMembersAsync(group.Id);
         Assert.Single(after);
         Assert.Equal(owner, after[0].UserId);
 
-        var groupsForMember = await svc.GetGroupsForUserAsync(member);
+        var groupsForMember = await groupService.GetGroupsForUserAsync(member);
         Assert.DoesNotContain(group.Id, groupsForMember.Select(g => g.Id));
 
         // The audit row: Action "group.remove-member", ActorId = the member

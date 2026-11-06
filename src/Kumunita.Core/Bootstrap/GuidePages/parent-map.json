@@ -1,0 +1,21 @@
+{
+  "todos": "projects",
+  "boards": "projects",
+  "calendar": "events",
+  "timezone": "settings",
+  "date-format": "settings",
+  "page-size": "settings",
+  "home": "settings",
+  "quiet-hours": "settings",
+  "messaging": "settings",
+  "change-password": "settings",
+  "my-data": "settings",
+  "kiosk": "settings",
+  "members": "groups",
+  "group-settings": "groups",
+  "accounts": "admins",
+  "communities": "admins",
+  "platform": "admins",
+  "security": "admins",
+  "analytics": "admins"
+}

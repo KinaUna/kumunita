@@ -6,6 +6,7 @@ using Kumunita.Core.Inventory;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
+using Kumunita.Core.Targets;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -68,15 +69,8 @@ public sealed class BookmarkService : IBookmarkService
     private static readonly string[] ClosedTargetKindsOrdered =
         ["post", "event", "todo", "announcement", "page", "project", "board", "inventory", "directory"];
 
-    private readonly IUserInfoService _userInfo;
-    private readonly IAuthorizationService _authz;
     private readonly IDocumentStore _store;
-    private readonly IAnnouncementService _announcements;
-    private readonly IPageService _pages;
-    private readonly IEventService _events;
-    private readonly IProjectService _projects;
-    private readonly IInventoryService _inventory;
-    private readonly IIdentityService _identity;
+    private readonly IContentTargetResolver _resolver;
 
     /// <summary>
     /// Composes the eight frozen seams over the host-registered Marten
@@ -92,25 +86,11 @@ public sealed class BookmarkService : IBookmarkService
     /// <see cref="IUserInfoService"/>.
     /// </summary>
     public BookmarkService(
-        IUserInfoService userInfo,
-        IAuthorizationService authz,
         IDocumentStore store,
-        IAnnouncementService announcements,
-        IPageService pages,
-        IEventService events,
-        IProjectService projects,
-        IInventoryService inventory,
-        IIdentityService identity)
+        IContentTargetResolver resolver)
     {
-        _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
-        _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _store = store ?? throw new ArgumentNullException(nameof(store));
-        _announcements = announcements ?? throw new ArgumentNullException(nameof(announcements));
-        _pages = pages ?? throw new ArgumentNullException(nameof(pages));
-        _events = events ?? throw new ArgumentNullException(nameof(events));
-        _projects = projects ?? throw new ArgumentNullException(nameof(projects));
-        _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
-        _identity = identity ?? throw new ArgumentNullException(nameof(identity));
+        _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
     }
 
     // ── List (D5 degraded resolution; C-M17·2 zero-audit personal read) ───
@@ -142,7 +122,7 @@ public sealed class BookmarkService : IBookmarkService
         var resolved = new List<(Bookmark Row, string? Title, string? Link)>();
         foreach (var row in rows)
         {
-            var (title, link) = await ResolveForListAsync(row.TargetKind, row.TargetId, ownerId).ConfigureAwait(false);
+            var (title, link) = await _resolver.ResolveForListAsync(row.TargetKind, row.TargetId, ownerId, ContentTargetKinds.Bookmarks).ConfigureAwait(false);
             resolved.Add((row, title, link));
         }
 
@@ -240,7 +220,7 @@ public sealed class BookmarkService : IBookmarkService
         // FIRST, the *same call the target's detail page uses*: Deny / absent
         // / soft-deleted ⇒ Refused (404; no row; the target's own audit row is
         // the decision's, not M17's).
-        var (visible, _, _) = await ResolveTargetAsync(targetKind, targetId, ownerId).ConfigureAwait(false);
+        var (visible, _, _) = await _resolver.ResolveAsync(targetKind, targetId, ownerId, ContentTargetKinds.Bookmarks).ConfigureAwait(false);
         if (!visible)
             return new BookmarkToggleResult(BookmarkToggleStatus.Refused);
 
@@ -532,7 +512,7 @@ public sealed class BookmarkService : IBookmarkService
         // the D5 degrade (a dangling bookmark still renders the
         // bm.list.degraded label; the move control works regardless).
         var (title, link) =
-            await ResolveForListAsync(bookmark.TargetKind, bookmark.TargetId, ownerId).ConfigureAwait(false);
+            await _resolver.ResolveForListAsync(bookmark.TargetKind, bookmark.TargetId, ownerId, ContentTargetKinds.Bookmarks).ConfigureAwait(false);
         return new BookmarkRow(
             bookmark.TargetKind,
             bookmark.TargetId,
@@ -582,381 +562,119 @@ public sealed class BookmarkService : IBookmarkService
         }
     }
 
-    // ── The D5 list resolution — a pure, non-auditing doc load ────────────
+    // ── Committed write overloads (IMPROVE-CODE C09 — the controller's
+    //    caller-owns-commit write lanes moved off the controller) ─────────
+    // The house idiom (the <c>PersonalNoteService</c> C09 precedent): a
+    // service method with NO <see cref="IDocumentSession"/> param opens its
+    // own session, does the work, and commits — the controller drops
+    // <c>IDocumentStore</c> from its ctor (ADR 0006 §D "route + authz +
+    // shape"). Each overload delegates to the frozen session-based method
+    // above (the D3 / D4 / ADR 0168 pins are unchanged) and owns the single
+    // write (the C3 "caller owns the single write" lane, now the service's).
 
     /// <summary>
-    /// Resolves a list row to (<c>title</c>, <c>link</c>) by **loading the
-    /// target document directly** — a pure read that commits <b>no</b>
-    /// <see cref="AccessAudit"/> row and makes <b>no</b>
-    /// <see cref="IAuthorizationService.CanAsync"/> call
-    /// (C-M17·2 / F3_OwnerListLoadsZeroAuditRows, the ADR 0105 "reads never
-    /// audit" + M6-inbox personal-read shape; the
-    /// <see cref="EventService.GetAsync"/> / <see cref="AnnouncementService"/>.
-    /// GetAsync "pure read" precedent). Both return <c>null</c> when the
-    /// target is absent, soft-deleted, or a non-author draft (the D5 degrade
-    /// — C-M17·5).
-    /// <para>
-    /// This is deliberately distinct from the D3 write-lane check
-    /// (<see cref="ResolveTargetAsync"/>): the write lane re-runs the target's
-    /// own frozen <c>CanAsync(Read)</c> (the detail page's exact decision),
-    /// which commits the target's own audit row. That is correct and expected
-    /// at bookmark *creation* (C-M17·3), but would violate the list's
-    /// zero-audit pin if reused here — so the list resolves by document shape
-    /// alone (existence + not-deleted + draft-to-own), which is exactly the
-    /// information a bookmark row needs to render a <c>Title</c> and a
-    /// <c>Link</c>. A bookmark is a pointer the owner already earned by
-    /// bookmarking a target they could see; re-asserting the audience decision
-    /// on the personal read is precisely the leak the C-M17·2 pin forbids.
-    /// </para>
+    /// The committed <c>Toggle</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>Toggle</c> write lane moved behind this service, ADR 0006 §D).
+    /// Delegates to the session-based <see cref="ToggleAsync"/> in the
+    /// service's own session (the D3 write-lane check is unchanged); the
+    /// controller's flash / redirect / 404 mapping is unchanged.
     /// </summary>
-    private async Task<(string? Title, string? Link)> ResolveForListAsync(
-        string targetKind, string targetId, string actorId)
+    public async Task<BookmarkToggleResult> ToggleAsync(
+        string ownerId, string targetKind, string targetId, CancellationToken ct = default)
     {
-        await using var s = _store.QuerySession();
-        switch (targetKind)
-        {
-            case "post":
-            {
-                var post = await s.LoadAsync<Post>(targetId).ConfigureAwait(false);
-                if (post is null || post.DeletedAt is not null)
-                    return (null, null);
-                // ADR 0037 — the author-only draft gate, as a pure ordinal
-                // check (no CanAsync, no audit row).
-                if (post.IsDraft && !string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
-                    return (null, null);
-                return (post.Title, $"/posts/{targetId}");
-            }
-
-            case "event":
-            {
-                var ev = await s.LoadAsync<Event>(targetId).ConfigureAwait(false);
-                if (ev is null || ev.IsDeleted)
-                    return (null, null);
-                if (ev.IsDraft && !string.Equals(ev.AuthorId, actorId, StringComparison.Ordinal))
-                    return (null, null);
-                return (ev.Title, $"/events/{targetId}");
-            }
-
-            case "todo":
-            {
-                var todo = await s.LoadAsync<TodoItem>(targetId).ConfigureAwait(false);
-                if (todo is null || todo.IsDeleted)
-                    return (null, null);
-                return (todo.Title, $"/projects/todos/{targetId}");
-            }
-
-            case "project":
-            {
-                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
-                // "project" shape re-applied (a pure doc load, no CanAsync,
-                // no audit row — C-M17·2). The Project has no IsDraft (D8a —
-                // a project is live on creation), so only the IsDeleted
-                // gate applies (the ADR 0024 soft-delete flag).
-                var project = await s.LoadAsync<Project>(targetId).ConfigureAwait(false);
-                if (project is null || project.IsDeleted)
-                    return (null, null);
-                return (project.Title, $"/projects/projects/{targetId}");
-            }
-
-            case "board":
-            {
-                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
-                // "board" shape re-applied (a pure doc load, no CanAsync,
-                // no audit row — C-M17·2). The KanbanBoard has no IsDraft
-                // (D8a), so only the IsDeleted gate applies.
-                var board = await s.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
-                if (board is null || board.IsDeleted)
-                    return (null, null);
-                return (board.Title, $"/projects/boards/{targetId}");
-            }
-
-            case "announcement":
-            {
-                var a = await s.LoadAsync<Announcement>(targetId).ConfigureAwait(false);
-                if (a is null)
-                    return (null, null);
-                return (a.Title, $"/announcements/{targetId}");
-            }
-
-            case "page":
-            {
-                var page = await s.LoadAsync<Page>(targetId).ConfigureAwait(false);
-                if (page is null || page.IsDeleted)
-                    return (null, null);
-                if (page.IsDraft && !string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
-                    return (null, null);
-                var path = await BuildPagePathAsync(page.Id).ConfigureAwait(false);
-                return path is null ? (null, null) : (page.Title, path);
-            }
-
-            case "inventory":
-            {
-                var item = await s.LoadAsync<InventoryItem>(targetId).ConfigureAwait(false);
-                if (item is null || item.IsDeleted)
-                    return (null, null);
-                return (item.Name, $"/inventory/{targetId}");
-            }
-
-            case "directory":
-            {
-                var profile = await _userInfo.GetProfileAsync(targetId).ConfigureAwait(false);
-                if (profile is null || profile.Blocked)
-                    return (null, null);
-                return (profile.DisplayName, $"/directory/{targetId}");
-            }
-
-            default:
-                return (null, null);
-        }
-    }
-
-    // ── The D3 write-lane resolution (the owning surface's own frozen read) ─
-
-    /// <summary>
-    /// Resolves a target to (<c>visible</c>, <c>title</c>, <c>link</c>) the
-    /// way the target's own detail page reads it — the single source of truth
-    /// for the D3 write-lane check (§2.3). <c>title</c> / <c>link</c> are
-    /// both <c>null</c> when the target is absent, soft-deleted, a non-author
-    /// draft, or denied to the actor. Re-runs the target's own frozen
-    /// <c>CanAsync(Read)</c> (committing the target's own audit row —
-    /// C-M17·3); NOT used by the personal list read (C-M17·2).
-    /// </summary>
-    private async Task<(bool Visible, string? Title, string? Link)> ResolveTargetAsync(
-        string targetKind, string targetId, string actorId)
-    {
-        switch (targetKind)
-        {
-            case "post":
-            {
-                await using var s = _store.QuerySession();
-                var post = await s.LoadAsync<Post>(targetId).ConfigureAwait(false);
-                if (post is null || post.DeletedAt is not null)
-                    return (false, null, null);
-
-                // ADR 0037 — the author-only draft gate (the PostService.
-                // GetPostAsync shape): a non-author never passes.
-                if (post.IsDraft && !string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
-                    return (false, null, null);
-
-                var decision = await _authz.CanAsync(actorId, AccessAction.Read, new PostToAuditableResource(post))
-                    .ConfigureAwait(false);
-                if (!decision.Allowed)
-                    return (false, null, null);
-
-                return (true, post.Title, $"/posts/{targetId}");
-            }
-
-            case "event":
-            {
-                try
-                {
-                    var ev = await _events.GetAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, ev.Title, $"/events/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            case "todo":
-            {
-                try
-                {
-                    var detail = await _projects.GetTodoAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, detail.Todo.Title, $"/projects/todos/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            case "project":
-            {
-                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
-                // "project" D3 shape re-applied: re-runs the owning surface's
-                // own frozen IProjectService.GetProjectAsync read (the same
-                // call the /projects/{id} detail page uses — the C-M17·3
-                // pin: the target's own audit row commits, M17 commits none
-                // of its own). KeyNotFoundException (404 on absent /
-                // soft-deleted) + UnauthorizedAccessException (403 on
-                // denied) both degrade to Refused — the M17 404-not-403
-                // Web mapping collapses the split to a non-leaky 404 (the
-                // D3 table: a denied / absent / soft-deleted target is
-                // Refused, the M16 create-gate posture).
-                try
-                {
-                    var project = await _projects.GetProjectAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, project.Title, $"/projects/projects/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            case "board":
-            {
-                // ADR 0118 amendment (2026-10-16) — the M37 PersonalNotes
-                // "board" D3 shape re-applied: re-runs the owning surface's
-                // own frozen IProjectService.GetBoardAsync read (the same
-                // call the /projects/boards/{id} detail page uses — the
-                // C-M17·3 pin: the target's own audit row commits, M17
-                // commits none of its own). KeyNotFoundException +
-                // UnauthorizedAccessException both degrade to Refused.
-                try
-                {
-                    var detail = await _projects.GetBoardAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, detail.Board.Title, $"/projects/boards/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            case "announcement":
-            {
-                // The announcement lane has no AccessAudit / CanAsync of its
-                // own — its GetAsync is the whole visibility gate (the
-                // scope-vs-role split), returning null when not visible.
-                //
-                // D3/F2 (ADR 0118): the write-lane check must re-run *the same
-                // read the detail page uses*, so the owner's real standing is
-                // in play. The Bookmarks seam hands us only an owner id (roles
-                // never cross the frozen IBookmarkService seam), so we resolve
-                // the owner's thin-principal role set in-Core via the frozen
-                // IIdentityService (the same category of composition as the
-                // already-composed IUserInfoService) and hand that set to the
-                // announcement read. A GlobalAdmin / community-moderator who is
-                // not a member therefore resolves a community-targeted row —
-                // matching the detail page — instead of the old lapse of an
-                // empty role set denying them. Fail-closed shape preserved:
-                // no EF account row (or no principal) ⇒ empty set ⇒ the read
-                // degrades exactly as before.
-                var principal = await _identity.GetBySubjectAsync(actorId).ConfigureAwait(false);
-                var roles = principal is not null
-                    ? new HashSet<string>(principal.Roles, StringComparer.Ordinal)
-                    : new HashSet<string>(StringComparer.Ordinal);
-                var a = await _announcements.GetAsync(targetId, actorId, roles)
-                    .ConfigureAwait(false);
-                if (a is null)
-                    return (false, null, null);
-                return (true, a.Title, $"/announcements/{targetId}");
-            }
-
-            case "page":
-            {
-                await using var s = _store.QuerySession();
-                var page = await s.LoadAsync<Page>(targetId).ConfigureAwait(false);
-                if (page is null || page.IsDeleted)
-                    return (false, null, null);
-
-                // ADR 0037 — the author-only draft gate (the PageController.
-                // Show shape): a non-author never passes.
-                if (page.IsDraft && !string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
-                    return (false, null, null);
-
-                var decision = await _authz.CanAsync(actorId, AccessAction.Read, new PageToAuditableResource(page))
-                    .ConfigureAwait(false);
-                if (!decision.Allowed)
-                    return (false, null, null);
-
-                var path = await BuildPagePathAsync(page.Id).ConfigureAwait(false);
-                return path is null ? (false, null, null) : (true, page.Title, path);
-            }
-
-            case "inventory":
-            {
-                // ADR 0118 amendment (2026-10-16) — the M16 Inventory detail
-                // page's own read, re-run: IInventoryService.GetItemAsync
-                // (the same call the /inventory/{id} detail page uses — the
-                // C-M17·3 pin: the target's own audit row commits, M17
-                // commits none of its own). KeyNotFoundException (404 on
-                // absent / soft-deleted / denied — the C-M3·4 non-leaky shape)
-                // degrades to Refused.
-                try
-                {
-                    var item = await _inventory.GetItemAsync(targetId, actorId).ConfigureAwait(false);
-                    return (true, item.Name, $"/inventory/{targetId}");
-                }
-                catch (KeyNotFoundException)
-                {
-                    return (false, null, null);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return (false, null, null);
-                }
-            }
-
-            case "directory":
-            {
-                // The M37 PersonalNotes "directory" D3 shape re-applied:
-                // the profile read (GetProfileAsync — a pure read, the detail
-                // page's own projection) + the frozen CanAsync(Read) over the
-                // ProfileToAuditableResource (the C-M17·3 pin: the target's
-                // own audit row commits, M17 commits none of its own).
-                var profile = await _userInfo.GetProfileAsync(targetId).ConfigureAwait(false);
-                if (profile is null || profile.Blocked)
-                    return (false, null, null);
-                var decision = await _authz.CanAsync(
-                    actorId, AccessAction.Read, new ProfileToAuditableResource(profile))
-                    .ConfigureAwait(false);
-                if (!decision.Allowed)
-                    return (false, null, null);
-                return (true, profile.DisplayName, $"/directory/{targetId}");
-            }
-
-            default:
-                return (false, null, null);
-        }
+        await using var session = _store.LightweightSession();
+        var result = await ToggleAsync(ownerId, targetKind, targetId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
     }
 
     /// <summary>
-    /// The <c>/pages/</c>-prefixed ancestor-slug chain of a page (the
-    /// <see cref="PageService.GetPathAsync"/> shape, walked over the store —
-    /// <c>IPageService</c> exposes no by-id path lane, so the bookmark surface
-    /// derives the same derived path from the <see cref="Page.ParentId"/>
-    /// chain directly). <c>null</c> on a broken chain.
+    /// The committed <c>Remove</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>Remove</c> write lane moved behind this service, ADR 0006 §D).
+    /// Delegates to the session-based <see cref="RemoveAsync"/> in the
+    /// service's own session (the D4 physical-removal pin is unchanged);
+    /// the controller's flash / redirect mapping is unchanged.
     /// </summary>
-    private async Task<string?> BuildPagePathAsync(string pageId)
+    public async Task<BookmarkToggleResult> RemoveAsync(
+        string ownerId, string targetKind, string targetId, CancellationToken ct = default)
     {
-        var segments = new List<string>();
-        string? currentId = pageId;
-        int guard = 0;
-        while (currentId is not null && ++guard <= 64)
-        {
-            await using var s = _store.QuerySession();
-            var page = await s.LoadAsync<Page>(currentId).ConfigureAwait(false);
-            if (page is null)
-                return null;
-            if (!string.IsNullOrWhiteSpace(page.Slug))
-                segments.Add(page.Slug);
-            currentId = page.ParentId;
-        }
+        await using var session = _store.LightweightSession();
+        var result = await RemoveAsync(ownerId, targetKind, targetId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
 
-        if (segments.Count == 0)
-            return null;
+    /// <summary>
+    /// The committed <c>CreateFolder</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>FolderNewSave</c> write lane moved behind this service, ADR
+    /// 0006 §D). Delegates to the session-based
+    /// <see cref="CreateFolderAsync"/> in the service's own session (the
+    /// ADR 0168 D2 pins are unchanged); the controller's flash / redirect
+    /// / 404 / 400 mapping is unchanged.
+    /// </summary>
+    public async Task<FolderRow> CreateFolderAsync(
+        string ownerId, string name, string? parentId, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await CreateFolderAsync(ownerId, name, parentId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
 
-        segments.Reverse();
-        return "/pages/" + string.Join("/", segments);
+    /// <summary>
+    /// The committed <c>RenameFolder</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>FolderRenameSave</c> write lane moved behind this service, ADR
+    /// 0006 §D). Delegates to the session-based
+    /// <see cref="RenameFolderAsync"/> in the service's own session (the
+    /// ADR 0168 D2 pins are unchanged); the controller's flash / redirect
+    /// / 404 / 400 mapping is unchanged.
+    /// </summary>
+    public async Task<FolderRow> RenameFolderAsync(
+        string ownerId, string folderId, string newName, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await RenameFolderAsync(ownerId, folderId, newName, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>
+    /// The committed <c>DeleteFolder</c> lane (IMPROVE-CODE C09 — the
+    /// <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>FolderDelete</c> write lane moved behind this service, ADR
+    /// 0006 §D). Delegates to the session-based
+    /// <see cref="DeleteFolderAsync"/> in the service's own session (the
+    /// ADR 0168 D2 pins are unchanged); the controller's flash / redirect
+    /// / 404 mapping is unchanged.
+    /// </summary>
+    public async Task<BookmarkFolderDeleteResult> DeleteFolderAsync(
+        string ownerId, string folderId, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await DeleteFolderAsync(ownerId, folderId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>
+    /// The committed <c>MoveBookmarkToFolder</c> lane (IMPROVE-CODE C09 —
+    /// the <see cref="Kumunita.Web.Controllers.BookmarksController"/>
+    /// <c>BookmarkMoveSave</c> write lane moved behind this service, ADR
+    /// 0006 §D). Delegates to the session-based
+    /// <see cref="MoveBookmarkToFolderAsync"/> in the service's own
+    /// session (the ADR 0168 D2 pins are unchanged); the controller's flash
+    /// / redirect / 404 mapping is unchanged.
+    /// </summary>
+    public async Task<BookmarkRow> MoveBookmarkToFolderAsync(
+        string ownerId, string targetKind, string targetId, string? folderId, CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+        var result = await MoveBookmarkToFolderAsync(ownerId, targetKind, targetId, folderId, session).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
     }
 }

@@ -1,0 +1,16 @@
+{
+  "directory.title": "Kontaktliste",
+  "directory.lead": "Alle i nabolaget \u2014 alle beboere p\u00E5 platformen.",
+  "directory.empty": "Ingen beboere i dette nabolag endnu.",
+  "directory.no_results": "Ingen beboere matcher dit s\u00F8gning.",
+  "directory.search": "S\u00F8g",
+  "directory.verified_only": "Kun verificerede",
+  "directory.clear": "Ryd",
+  "directory.detail_back": "\u2190 Tilbage til kontaktlisten",
+  "directory.detail_verified": "Verifieret",
+  "directory.detail_contact_address": "Adresse",
+  "directory.detail_contact_email": "E-mail",
+  "directory.detail_contact_phone": "Telefon",
+  "directory.send_message": "Send en besked",
+  "directory.detail_no_contact": "Denne beboer har (endnu) ikke delt en kontaktmulighed med dig. Du kan stadig se deres profilside."
+}

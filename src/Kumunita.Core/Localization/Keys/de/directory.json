@@ -1,0 +1,16 @@
+{
+  "directory.title": "Verzeichnis",
+  "directory.lead": "Alle in der Nachbarschaft \u2014 jede:r Anwohner:in auf der Plattform.",
+  "directory.empty": "Noch keine Anwohner:innen in dieser Nachbarschaft.",
+  "directory.no_results": "Keine Anwohner:innen entsprechen deiner Suche.",
+  "directory.search": "Suchen",
+  "directory.verified_only": "Nur verifizierte",
+  "directory.clear": "Zur\u00FCcksetzen",
+  "directory.detail_back": "\u2190 Zur\u00FCck zum Verzeichnis",
+  "directory.detail_verified": "Verifiziert",
+  "directory.detail_contact_address": "Adresse",
+  "directory.detail_contact_email": "E-Mail",
+  "directory.detail_contact_phone": "Telefon",
+  "directory.send_message": "Nachricht senden",
+  "directory.detail_no_contact": "Diese:r Anwohner:in hat dir (noch) keine Kontaktm\u00F6glichkeit geteilt. Du kannst aber immer noch die Profilseite sehen."
+}

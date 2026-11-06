@@ -2,6 +2,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Tags;
+using Kumunita.Core.Translations;
 using Marten;
 using Marten.Services;
 
@@ -63,7 +64,7 @@ public sealed class PageService : IPageService
     // PageService(store, tags) keep compiling unchanged — the same CS1736
     // shape as PostService._notifications / AnnouncementService._notifications).
     // The DI registration passes the live Notifications.NotificationService.
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
     // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
@@ -71,14 +72,59 @@ public sealed class PageService : IPageService
     // so the existing test call sites keep compiling unchanged.
     private readonly Mentions.IMentionService? _mentions;
 
+    // C06 (ADR 0288) — the one shared translation-variant write lane. The pages
+    // surface's add/update/remove translation methods are thin forwarders into
+    // this (the descriptor names the pages quirks: GlobalAdmin / Translator /
+    // (User-page) author standing via CheckTranslateStanding +
+    // ResolveTranslationStandingVia, verbatim title on both Create and
+    // ApplyUpdate). The session is the caller's (the PostService shape, passed
+    // in as a parameter).
+    private readonly TranslationLane<Page, PageTranslation> _translationLane;
+
     public PageService(IDocumentStore store, ITagService? tags = null,
-        NotificationService? notifications = null,
+        INotificationEmitter? notifications = null,
         Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _tags = tags;
         _notifications = notifications;
         _mentions = mentions;
+        _translationLane = new TranslationLane<Page, PageTranslation>(new TranslationDescriptor<Page, PageTranslation>
+        {
+            TargetKind = "page",
+            ActionPrefix = "page.translation",
+            Noun = "Page",
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Page page, object? _, string actorId, IReadOnlySet<string> actorRoles) =>
+            {
+                // The gate + the Via tag, exactly the original's two-step
+                // shape: CheckTranslateStanding throws on a denied actor
+                // (UnauthorizedAccessException) and ResolveTranslationStandingVia
+                // records the narrowest right that applied (Owner for a blog
+                // author, Admin for GlobalAdmin / Translator).
+                PageStandingPolicy.CheckTranslateStanding(actorId, actorRoles, page);
+                return ResolveTranslationStandingVia(page, actorId, actorRoles);
+            },
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<Page>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<PageTranslation>()
+                .Where(t => t.PageId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new PageTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                PageId = id,
+                LanguageCode = lang,
+                Title = title,
+                Body = body,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (PageTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            {
+                row.Title = title;
+                row.Body = body;
+            }
+        });
     }
 
     // ─── Read lanes (ADR 0039 §3.3 / §3.4 / §3.5) ─────────────────────────
@@ -210,177 +256,18 @@ public sealed class PageService : IPageService
             .ConfigureAwait(false);
     }
 
-    // ─── Standing-matrix gate helpers (ADR 0039 §3.7 — pure, no store) ────
+    // ─── Standing-matrix gates (ADR 0039 §3.7 / ADR 0040 / ADR 0161) ──────
     //
-    // The C3 server-side re-check pattern (the AnnouncementService
-    // EnsureCreatePermissionAsync / EnsureEditPermissionAsync shape): a Web
-    // [Authorize(Roles=…)] is a convenience pre-gate, not the source of
-    // truth. Each helper is a **pure** role-claim check (no DB access), so
-    // it is directly testable and callable from any of U03's write lanes.
-    // A null page is a KeyNotFoundException (the Web layer's 404); a denied
-    // actor is an UnauthorizedAccessException (the Web layer's 403). The
-    // existing role claims (Roles.GlobalAdmin / Roles.Translator) are
-    // consulted — no new AccessAction, no new AccessVia, no branch in the
-    // frozen IAuthorizationService (ADR 0039). ADR 0040 removes the community
-    // Moderator lane from pages (a system page has no community to moderate; a
-    // blog page is personal content), so Roles.ModeratorComponent grants no
-    // page standing.
-
-    /// <summary>
-    /// The **create** standing (ADR 0040, amending ADR 0039 §3.7): a
-    /// <see cref="PageKind.System"/> page is <b>GlobalAdmin only</b> (a
-    /// community Moderator has <i>no</i> standing on a system page — the ADR
-    /// 0040 amendment, user sign-off 2026-09-17); a <see cref
-    /// "PageKind.User"/> (blog) page may be created by <b>any signed-in
-    /// actor</b> (they become the author). The "only the user themselves"
-    /// constraint is enforced by the <b>ownership</b> guard in
-    /// <see cref="EnsureBlogOwnershipAsync"/> (a blog page must nest under the
-    /// actor's own <c>blog/{uid}</c> root), <b>not</b> here.
-    /// </summary>
-    public static void CheckCreateStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (page is null)
-            throw new KeyNotFoundException("A page is required for the create standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required.");
-
-        if (page.Kind == PageKind.System)
-        {
-            if (actorRoles.Contains(Roles.GlobalAdmin))
-                return;
-            throw new UnauthorizedAccessException("Only a GlobalAdmin may create a system page.");
-        }
-
-        // PageKind.User (a blog page): any signed-in actor — they become the
-        // author. The ownership guard ensures it is under their own blog root.
-    }
-
-    /// <summary>
-    /// The **edit** standing (ADR 0040, amending ADR 0039 §3.7): a
-    /// <see cref="PageKind.System"/> page is <b>GlobalAdmin only</b> (the
-    /// author branch is disabled for a system page — a community Moderator
-    /// has no standing on it); a <see cref="PageKind.User"/> (blog) page is
-    /// the <b>author ∪ GlobalAdmin</b> (the ADR 0040 amendment: a community
-    /// Moderator has no standing on a resident's personal blog — it is
-    /// personal content, not community content).
-    /// </summary>
-    public static void CheckEditStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (page is null)
-            throw new KeyNotFoundException("A page is required for the edit standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required.");
-
-        if (page.Kind == PageKind.System)
-        {
-            if (actorRoles.Contains(Roles.GlobalAdmin))
-                return;
-            throw new UnauthorizedAccessException("Only a GlobalAdmin may edit a system page.");
-        }
-
-        // PageKind.User (a blog page): the author (the resident) ∪ GlobalAdmin
-        // (platform override). A community Moderator has no standing on a
-        // resident's personal blog (ADR 0040 — a blog page is personal
-        // content, not community content).
-        if (string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
-            return;
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;
-
-        throw new UnauthorizedAccessException(
-            "Only the author or a GlobalAdmin may edit this blog page.");
-    }
-
-    /// <summary>
-    /// The **translation** standing (ADR 0040, amending ADR 0039 §3.7 /
-    /// ADR 0029 carried over, and further amended by ADR 0161 to close the
-    /// "an editor cannot translate their own page" gap): a
-    /// <see cref="PageKind.System"/> page may be translated by a
-    /// <b>GlobalAdmin or a Translator</b> (a platform page has no community to
-    /// moderate; its author is an audit identity, not a standing branch); a
-    /// <see cref="PageKind.User"/> (blog) page is <b>the page's author ∪
-    /// GlobalAdmin ∪ Translator</b> — the author branch is the ADR 0161
-    /// symmetry with the edit standing (a blog page's edit standing is the
-    /// author ∪ GlobalAdmin, ADR 0040), so a resident who can edit their own
-    /// page can also translate it. A community Moderator has <b>no</b>
-    /// translation standing on either kind (a blog is personal content, not
-    /// community content).
-    /// </summary>
-    public static void CheckTranslateStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (page is null)
-            throw new KeyNotFoundException("A page is required for the translation standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required.");
-
-        if (!CanTranslatePage(actorId, actorRoles, page))
-            throw new UnauthorizedAccessException(
-                "Only the page's author, a GlobalAdmin, or a Translator may add a translation.");
-    }
-
-    /// <summary>
-    /// The public ADR 0029 standing probe the Web layer calls to decide
-    /// whether to render the "add a translation" affordance on a page (a
-    /// <b>display</b> pin, not a gate — the real deny is the
-    /// <see cref="AddTranslationAsync"/> standing re-check, which re-runs this
-    /// same rule server-side via <see cref="CheckTranslateStanding"/>). It
-    /// delegates to the single shared decision body
-    /// (<see cref="CanTranslatePageCore"/>), so the display and the gate can
-    /// never drift apart (the
-    /// <see cref="Kumunita.Core.Posts.PostService.CanAddTranslation"/> /
-    /// <see cref="Kumunita.Core.Announcements.AnnouncementService
-    /// .CanTranslateAnnouncement"/> shape).
-    /// </summary>
-    public static bool CanTranslatePage(string actorId, IReadOnlySet<string> actorRoles, Page? page)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (page is null)
-            return false;
-        if (string.IsNullOrEmpty(actorId))
-            return false;
-        return CanTranslatePageCore(actorId, actorRoles, page);
-    }
-
-    /// <summary>
-    /// The single shared translation-standing decision (ADR 0040, amending
-    /// ADR 0039 §3.7 / ADR 0029 carried over, and further amended by ADR 0161
-    /// to close the "an editor cannot translate their own page" gap): a
-    /// GlobalAdmin or a Translator qualifies on **any** page (system or user).
-    /// Additionally (ADR 0161) the **author** of a <see cref="PageKind.User"/>
-    /// (blog) page qualifies — the same branch the edit standing uses (a blog
-    /// page's edit standing is the author ∪ GlobalAdmin, ADR 0040), so a
-    /// resident who can edit their own page can also translate it. A system
-    /// page's author is an audit identity, not a standing branch (a system
-    /// page is GlobalAdmin-only), so the author branch is scoped to
-    /// <see cref="PageKind.User"/> only — mirroring <see
-    /// cref="CheckEditStanding"/>. A community Moderator has **no** translation
-    /// standing on either kind (the ADR 0040 amendment: a system page has no
-    /// community to moderate; a blog page is personal content). Called by both
-    /// <see cref="CanTranslatePage"/> (the display probe) and <see
-    /// cref="CheckTranslateStanding"/> (the write-lane gate), so the two can
-    /// never disagree.
-    /// </summary>
-    private static bool CanTranslatePageCore(string actorId, IReadOnlySet<string> actorRoles, Page page)
-    {
-        // ADR 0161 — the author of a blog (User) page may translate it, the
-        // same branch CheckEditStanding grants for editing (author ∪
-        // GlobalAdmin on a User page). A System page's author is an audit
-        // identity, not a standing branch, so this is scoped to User kind —
-        // a resident cannot translate a system page by being its author (only
-        // GlobalAdmin / Translator may, as before).
-        if (page.Kind == PageKind.User
-            && string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
-            return true;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return true;
-        if (actorRoles.Contains(Roles.Translator))
-            return true;
-        return false;
-    }
+    // The create / edit / translate standing re-checks + the translate
+    // display probe were extracted from this service into
+    // <see cref="PageStandingPolicy"/> (the C3-01 ADR 0290 named-seam
+    // shrink — the pure, session-free <c>*Policy</c> shape, mirroring
+    // <see cref="Events.EventStandingPolicy"/>). The C3 server-side
+    // re-check pattern is unchanged: a Web [Authorize(Roles=…)] is a
+    // convenience pre-gate, not the source of truth; the write lanes below
+    // still call the same three gates (now on the policy static) before
+    // committing. A null page is a KeyNotFoundException (404); a denied
+    // actor is an UnauthorizedAccessException (403).
 
     // ─── Hierarchy guards (ADR 0039 §3.3 — cycle-guard + depth-cap) ───────
     //
@@ -607,7 +494,7 @@ public sealed class PageService : IPageService
         // Standing re-check (server-side, C3 single-source pin, ADR 0040
         // kind-aware): a system page is GlobalAdmin-only; a blog page is
         // any signed-in actor (they become the author).
-        CheckCreateStanding(actorId, actorRoles, page);
+        PageStandingPolicy.CheckCreateStanding(actorId, actorRoles, page);
 
         // TG (C-TG·6, D6, F5): a PageKind.System page's TagIds is **always
         // empty** — the write lane is the guard (the shape permits the field,
@@ -646,32 +533,10 @@ public sealed class PageService : IPageService
 
         // Root-slug guard (the index does not cover it — Postgres treats NULLs
         // as distinct, the U01 drift note): if ParentId is null, no *other*
-        // root page may already carry this slug **in the same namespace**.
-        // ADR 0040 scopes the collision by (Kind, AuthorId):
-        //   • a <b>system</b> root (Kind=System) collides only with another
-        //     same-slug system root — the <c>system/</c> namespace is singular;
-        //   • a <b>blog</b> root (Kind=User) collides only with another
-        //     same-slug root owned by the <b>same</b> author — two residents'
-        //     blogs are disjoint by ownership, so two residents may both have
-        //     a root page slugged <c>"recipes"</c> (their <c>blog/{uid}</c>
-        //     namespaces never overlap), while a single resident is still
-        //     capped at one blog root (a second top-level page of theirs
-        //     nests under the first).
-        if (page.ParentId is null)
-        {
-            var existingRoot = await session.Query<Page>()
-                .Where(p => p.ParentId == null
-                    && p.Slug == page.Slug
-                    && p.Kind == page.Kind
-                    && p.AuthorId == page.AuthorId
-                    && p.IsDeleted == false)
-                .FirstOrDefaultAsync()
-                .ConfigureAwait(false);
-            if (existingRoot is not null && !string.Equals(existingRoot.Id, page.Id, StringComparison.Ordinal))
-                throw new InvalidOperationException(
-                    $"A root page with slug '{page.Slug}' already exists in this namespace (id '{existingRoot.Id}'); " +
-                    "choose a different slug or nest the new page under a parent.");
-        }
+        // root page may already carry this slug **in the same namespace**
+        // (ADR 0040 scopes the collision by (Kind, AuthorId)) — see
+        // <see cref="EnsureCreateRootSlugAsync"/>.
+        await EnsureCreateRootSlugAsync(page, session).ConfigureAwait(false);
 
         var now = DateTimeOffset.UtcNow;
         if (string.IsNullOrEmpty(page.Id))
@@ -705,6 +570,59 @@ public sealed class PageService : IPageService
         session.Store(page);
         session.Store(audit);
 
+        // ADR 0084 (page-child emitter) + M36 ADR 0165 (page-mention
+        // emitter) — the two notification emitters on the create path,
+        // extracted along the comment-marked phase seam. One
+        // SaveChangesAsync below commits the page + the audit row + the
+        // inbox rows atomically (C3) — see
+        // <see cref="EmitPageCreationNotificationsAsync"/>.
+        await EmitPageCreationNotificationsAsync(page, actorId, session).ConfigureAwait(false);
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+
+        // TG (ADR 0044, U8b) — the tag attach lane on the create path (C3
+        // single-transaction idiom, same session as the page write — the
+        // <c>PostService.PostTranslationLane.AddAsync</c> precedent). Only if the
+        // form gave slugs (null/empty ⇒ no tags, the U4 additive
+        // default-empty pin) **and** the page is a <c>PageKind.User</c>
+        // (blog) page — the <c>System</c>-page refusal already fired above
+        // (the U4 write-lane gate, C-TG·6, D6), so this code is reached only
+        // for a <c>User</c> page with non-empty tags. The
+        // <c>AttachToPageAsync</c> lane re-checks the standing (author ∪
+        // GlobalAdmin, ADR 0040, C-TG·5) and create-or-reuses each tag
+        // (C-TG·4); it stores the resolved <c>Tag</c> ids onto
+        // <c>Page.TagIds</c> (replacing the POCO's default-empty list). A
+        // bad <c>Slug</c> is an <c>ArgumentException</c> from
+        // <c>DeriveSlug</c> (C-TG·4) — the Web layer maps it to a form
+        // error (the M3 "a form is a shape" precedent).
+        if (page.TagIds is { Count: > 0 } && _tags is not null)
+        {
+            var resolved = await _tags.AttachToPageAsync(page.Id, page.TagIds, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            page.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(page);
+            await session.SaveChangesAsync().ConfigureAwait(false);
+        }
+
+        return page;
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the two create-path notification emitters
+    /// extracted along the comment-marked phase seam of <see
+    /// cref="CreateAsync"/>: the ADR 0084 page-child emitter (opt-IN; the
+    /// parent page's enabled subscribers, excluding the author, a draft never
+    /// notifying — the intake-honesty pin) and the M36 (ADR 0165)
+    /// page-mention emitter (the author is never a recipient, M36·5). Runs
+    /// on the caller's in-flight <paramref name="session"/> and does **not**
+    /// commit — the single <c>SaveChangesAsync</c> in <see cref="CreateAsync"/>
+    /// commits the page + audit row + inbox rows atomically (C3). Behaviour
+    /// is unchanged: the same guards, the same recipients, the same
+    /// idempotency keys / bodies / link paths.
+    /// </summary>
+    private async Task EmitPageCreationNotificationsAsync(
+        Page page, string actorId, IDocumentSession session)
+    {
         // ADR 0084 — the page-child emitter (opt-IN kind: the resident must
         // have stored an Enabled=true subscription row for the parent page's
         // id; IsSubscriptionEnabledForAsync short-circuits the emission for
@@ -716,8 +634,6 @@ public sealed class PageService : IPageService
         // intake they did not consent to reading (intake honesty — the same
         // pin as PostService's group/post lane). Notification is deferred to
         // the publish lane (the moment the page becomes visible).
-        // One SaveChangesAsync commits the page + the audit row + the inbox
-        // rows atomically (C3).
         if (_notifications is not null && !page.IsDraft && page.ParentId is { } parentId)
         {
             var subscribers = await session.Query<Notifications.NotificationSubscription>()
@@ -781,34 +697,6 @@ public sealed class PageService : IPageService
                 }
             }
         }
-
-        await session.SaveChangesAsync().ConfigureAwait(false);
-
-        // TG (ADR 0044, U8b) — the tag attach lane on the create path (C3
-        // single-transaction idiom, same session as the page write — the
-        // <c>PostService.AddPostTranslationAsync</c> precedent). Only if the
-        // form gave slugs (null/empty ⇒ no tags, the U4 additive
-        // default-empty pin) **and** the page is a <c>PageKind.User</c>
-        // (blog) page — the <c>System</c>-page refusal already fired above
-        // (the U4 write-lane gate, C-TG·6, D6), so this code is reached only
-        // for a <c>User</c> page with non-empty tags. The
-        // <c>AttachToPageAsync</c> lane re-checks the standing (author ∪
-        // GlobalAdmin, ADR 0040, C-TG·5) and create-or-reuses each tag
-        // (C-TG·4); it stores the resolved <c>Tag</c> ids onto
-        // <c>Page.TagIds</c> (replacing the POCO's default-empty list). A
-        // bad <c>Slug</c> is an <c>ArgumentException</c> from
-        // <c>DeriveSlug</c> (C-TG·4) — the Web layer maps it to a form
-        // error (the M3 "a form is a shape" precedent).
-        if (page.TagIds is { Count: > 0 } && _tags is not null)
-        {
-            var resolved = await _tags.AttachToPageAsync(page.Id, page.TagIds, actorId, actorRoles, session)
-                .ConfigureAwait(false);
-            page.TagIds = resolved.Select(t => t.Id).ToList();
-            session.Store(page);
-            await session.SaveChangesAsync().ConfigureAwait(false);
-        }
-
-        return page;
     }
 
     /// <summary>
@@ -834,7 +722,7 @@ public sealed class PageService : IPageService
             throw new KeyNotFoundException($"Page '{updated.Id}' was not found in the session; nothing to edit.");
 
         // Standing re-check (server-side, C3 single-source pin).
-        CheckEditStanding(actorId, actorRoles, existing);
+        PageStandingPolicy.CheckEditStanding(actorId, actorRoles, existing);
 
         // TG (C-TG·6, D6, F5): a PageKind.System page's TagIds is **always
         // empty** — the write lane is the guard (the shape permits the field,
@@ -1119,58 +1007,8 @@ public sealed class PageService : IPageService
         string pageId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(pageId))
-            throw new ArgumentException("A page id is required.", nameof(pageId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
-        if (page is null)
-            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to translate.");
-
-        // Standing re-check (server-side, ADR 0040): GlobalAdmin / Translator
-        // on either kind — a community Moderator has no translation standing.
-        // CheckTranslateStanding is the U02 pure helper — it throws
-        // UnauthorizedAccessException if the actor has no qualifying standing.
-        CheckTranslateStanding(actorId, actorRoles, page);
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new PageTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            PageId = pageId,
-            LanguageCode = languageCode,
-            Title = title,
-            Body = body,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        var via = ResolveTranslationStandingVia(page, actorId, actorRoles);
-
-        var audit = new AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "page.translation.add",
-            TargetKind = "page",
-            TargetId = pageId,
-            Via = via,
-            Outcome = AccessOutcome.Allow
-        };
-
-        session.Store(translation);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return translation;
+        return await _translationLane.AddAsync(session, pageId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     // ─── ADR 0048 — edit + delete lane for page translations ───────────────
@@ -1195,53 +1033,8 @@ public sealed class PageService : IPageService
         string pageId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(pageId))
-            throw new ArgumentException("A page id is required.", nameof(pageId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
-        if (page is null)
-            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to update.");
-
-        var row = await session.Query<PageTranslation>()
-            .Where(t => t.PageId == pageId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Page '{pageId}' has no translation in '{languageCode}'; nothing to update.");
-
-        CheckTranslateStanding(actorId, actorRoles, page);
-
-        row.Title = title;
-        row.Body = body;
-
-        var now = DateTimeOffset.UtcNow;
-        var via = ResolveTranslationStandingVia(page, actorId, actorRoles);
-        var audit = new AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "page.translation.update",
-            TargetKind = "page",
-            TargetId = pageId,
-            Via = via,
-            Outcome = AccessOutcome.Allow
-        };
-
-        session.Store(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return row;
+        return await _translationLane.UpdateAsync(session, pageId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1257,47 +1050,8 @@ public sealed class PageService : IPageService
         string pageId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(pageId))
-            throw new ArgumentException("A page id is required.", nameof(pageId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
-        if (page is null)
-            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to remove.");
-
-        var row = await session.Query<PageTranslation>()
-            .Where(t => t.PageId == pageId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Page '{pageId}' has no translation in '{languageCode}'; nothing to remove.");
-
-        CheckTranslateStanding(actorId, actorRoles, page);
-
-        var now = DateTimeOffset.UtcNow;
-        var via = ResolveTranslationStandingVia(page, actorId, actorRoles);
-        var audit = new AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "page.translation.remove",
-            TargetKind = "page",
-            TargetId = pageId,
-            Via = via,
-            Outcome = AccessOutcome.Allow
-        };
-
-        session.Delete(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
+        await _translationLane.RemoveAsync(session, pageId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     // ─── ADR 0058 — reset to the seeded baseline text ────────────────────
@@ -1308,8 +1062,8 @@ public sealed class PageService : IPageService
     /// <c>de</c> / <c>fr</c> / <c>da</c> <see cref="PageTranslation"/> rows
     /// are overwritten with the code-owned seed registries (the same text the
     /// seeder writes on first boot — <see cref="Bootstrap
-    /// .FirstBootSeeder.EnDefaultPages"/> / <see cref="Bootstrap
-    /// .FirstBootSeeder.GuidePages"/> and the matching baselines), so a
+    /// .SeededContentCatalog.EnDefaultPages"/> / <see cref="Bootstrap
+    /// .SeededContentCatalog.GuidePages"/> and the matching baselines), so a
     /// page's text can be re-seeded to the latest shipped version after a
     /// code release. <para>
     /// **Standing (ADR 0040, amending §3.7):** the **same as edit** — a
@@ -1330,7 +1084,7 @@ public sealed class PageService : IPageService
     /// slug never seeded) is a <see cref="InvalidOperationException"/> — the
     /// Web layer maps that to a re-rendered form error (there is nothing to
     /// reset to; the button is hidden in that case by <see
-    /// cref="Bootstrap.FirstBootSeeder.HasSeededText"/>). One
+    /// cref="Bootstrap.SeededContentCatalog.HasSeededText"/>). One
     /// <c>SaveChangesAsync</c>; a hand-written <see cref="AccessAudit"/> row
     /// (action <c>page.reset</c>) is stored in the caller's session.
     /// </para>
@@ -1353,7 +1107,7 @@ public sealed class PageService : IPageService
         // gate, per ADR 0058: a system page is GlobalAdmin-only; a blog page
         // is the author ∪ GlobalAdmin. A community Moderator has no reset
         // standing on either kind (reset is a platform-level operation).
-        CheckEditStanding(actorId, actorRoles, page);
+        PageStandingPolicy.CheckEditStanding(actorId, actorRoles, page);
 
         // The actual overwrite (the en body + the de/fr/da translation rows)
         // is delegated to the seeder's reset applier — it owns the seeded
@@ -1361,7 +1115,7 @@ public sealed class PageService : IPageService
         // InvalidOperationException when the slug has no seeded baseline;
         // the Web lane maps that to a form error.
         var now = DateTimeOffset.UtcNow;
-        await Bootstrap.FirstBootSeeder.ResetSeededTextAsync(session, page, now, CancellationToken.None).ConfigureAwait(false);
+        await Bootstrap.SeededContentCatalog.ResetSeededTextAsync(session, page, now, CancellationToken.None).ConfigureAwait(false);
 
         // Audit: the narrowest standing that applied (the edit resolver —
         // Owner if the actor is the author of a blog page, else Admin for a
@@ -1401,7 +1155,7 @@ public sealed class PageService : IPageService
         // decision.
         await using var session = _store.QuerySession();
 
-        var slugs = Bootstrap.FirstBootSeeder.AllSeededSlugs();
+        var slugs = Bootstrap.SeededContentCatalog.AllSeededSlugs();
         var slugSet = new HashSet<string>(slugs, StringComparer.Ordinal);
 
         // One bulk query over the seeded slugs (the (ParentId, Slug) index is
@@ -1425,14 +1179,14 @@ public sealed class PageService : IPageService
             .ToListAsync()
             .ConfigureAwait(false);
 
-        var enDefault = Bootstrap.FirstBootSeeder.EnDefaultPages();
-        var deDefault = Bootstrap.FirstBootSeeder.DeDefaultPages();
-        var frDefault = Bootstrap.FirstBootSeeder.FrDefaultPages();
-        var daDefault = Bootstrap.FirstBootSeeder.DaDefaultPages();
-        var enGuides = Bootstrap.FirstBootSeeder.GuidePages();
-        var deGuides = Bootstrap.FirstBootSeeder.DeGuidePages();
-        var frGuides = Bootstrap.FirstBootSeeder.FrGuidePages();
-        var daGuides = Bootstrap.FirstBootSeeder.DaGuidePages();
+        var enDefault = Bootstrap.SeededContentCatalog.EnDefaultPages();
+        var deDefault = Bootstrap.SeededContentCatalog.DeDefaultPages();
+        var frDefault = Bootstrap.SeededContentCatalog.FrDefaultPages();
+        var daDefault = Bootstrap.SeededContentCatalog.DaDefaultPages();
+        var enGuides = Bootstrap.SeededContentCatalog.GuidePages();
+        var deGuides = Bootstrap.SeededContentCatalog.DeGuidePages();
+        var frGuides = Bootstrap.SeededContentCatalog.FrGuidePages();
+        var daGuides = Bootstrap.SeededContentCatalog.DaGuidePages();
 
         var result = new List<SeededPageStatus>(slugs.Count);
         foreach (var slug in slugs)
@@ -1534,7 +1288,7 @@ public sealed class PageService : IPageService
                 "Resetting the seeded pages requires GlobalAdmin standing.");
 
         var now = DateTimeOffset.UtcNow;
-        var slugs = Bootstrap.FirstBootSeeder.AllSeededSlugs();
+        var slugs = Bootstrap.SeededContentCatalog.AllSeededSlugs();
 
         // Load every seeded page that exists in one query (the read path's
         // slug-set shape).
@@ -1552,7 +1306,7 @@ public sealed class PageService : IPageService
             // (the caller owns it). It throws InvalidOperationException when
             // the slug has no seeded baseline; the slug came from AllSeededSlugs
             // so that cannot happen here.
-            await Bootstrap.FirstBootSeeder
+            await Bootstrap.SeededContentCatalog
                 .ResetSeededTextAsync(session, page, now, CancellationToken.None)
                 .ConfigureAwait(false);
 
@@ -1577,6 +1331,22 @@ public sealed class PageService : IPageService
 
         await session.SaveChangesAsync().ConfigureAwait(false);
         return resetCount;
+    }
+
+    /// <inheritdoc cref="IPageService.ResetToSeededAsync(string, string, IReadOnlySet{string})"/>
+    public async Task ResetToSeededAsync(
+        string pageId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        await using var session = _store.LightweightSession();
+        await ResetToSeededAsync(pageId, actorId, actorRoles, session).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IPageService.ResetAllSeededPagesAsync(string, IReadOnlySet{string})"/>
+    public async Task<int> ResetAllSeededPagesAsync(
+        string actorId, IReadOnlySet<string> actorRoles)
+    {
+        await using var session = _store.LightweightSession();
+        return await ResetAllSeededPagesAsync(actorId, actorRoles, session).ConfigureAwait(false);
     }
 
     // ─── Write-lane standing resolvers (U03 — distinct from U02's helpers) ─
@@ -1758,6 +1528,39 @@ public sealed class PageService : IPageService
             throw new UnauthorizedAccessException(
                 $"A blog page may only be nested under the actor's own blog root " +
                 $"(found root author '{root.AuthorId}', actor '{actorId}').");
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the <b>root-slug guard</b> of <see
+    /// cref="CreateAsync"/> extracted along the comment-marked phase seam.
+    /// The <c>(ParentId, Slug)</c> unique index does not cover the root case
+    /// (Postgres treats NULLs as distinct, the U01 drift note), so when
+    /// <c>ParentId</c> is null no *other* root page may already carry this
+    /// slug **in the same namespace**. ADR 0040 scopes the collision by
+    /// (Kind, AuthorId): a <b>system</b> root collides only with another
+    /// same-slug system root (the <c>system/</c> namespace is singular); a
+    /// <b>blog</b> root collides only with another same-slug root owned by the
+    /// <b>same</b> author (two residents' blogs are disjoint by ownership). A
+    /// collision is an <see cref="InvalidOperationException"/>. Pure read +
+    /// throws — no write. Behaviour is unchanged.
+    /// </summary>
+    private static async Task EnsureCreateRootSlugAsync(Page page, IDocumentSession session)
+    {
+        if (page.ParentId is not null)
+            return;   // not a root — the guard only applies to top-level pages
+
+        var existingRoot = await session.Query<Page>()
+            .Where(p => p.ParentId == null
+                && p.Slug == page.Slug
+                && p.Kind == page.Kind
+                && p.AuthorId == page.AuthorId
+                && p.IsDeleted == false)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (existingRoot is not null && !string.Equals(existingRoot.Id, page.Id, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"A root page with slug '{page.Slug}' already exists in this namespace (id '{existingRoot.Id}'); " +
+                "choose a different slug or nest the new page under a parent.");
     }
 
     /// <summary>

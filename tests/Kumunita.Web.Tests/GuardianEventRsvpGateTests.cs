@@ -27,7 +27,7 @@ namespace Kumunita.Web.Tests;
 ///       The mode write is never reached.</item>
 /// <item><b>Happy path.</b> A guardian with an active link POSTs the mode:
 ///       the action calls
-///       <see cref="IUserInfoService.SetChildEventRsvpModeAsync"/> with the
+///       <see cref="IGuardianService.SetChildEventRsvpModeAsync"/> with the
 ///       (childId, mode, guardianId) tuple, the mode is live on the very next
 ///       <see cref="IUserInfoService.GetProfileAsync"/> read (C4 strong
 ///       consistency), a <c>guardian.event_rsvp_mode</c> audit row with
@@ -49,7 +49,7 @@ namespace Kumunita.Web.Tests;
 /// <see cref="GuardianMessagingRestrictionTests"/> (the real Marten store,
 /// the real <see cref="UserInfoService"/>, the real
 /// <c>ActiveLinkAsync</c> standing gate) — the mode write is the
-/// <see cref="IUserInfoService.SetChildEventRsvpModeAsync"/> seam, and the
+/// <see cref="IGuardianService.SetChildEventRsvpModeAsync"/> seam, and the
 /// <c>guardian.event_rsvp_mode</c> audit row is only produced by the real
 /// store.
 /// </summary>
@@ -119,9 +119,9 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
 
         // The child asked to attend (the self-lane refusal stored the
         // Pending request row + left no RSVP row).
-        var events = EventsService(store);
+        var rsvp = RsvpService(store);
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => events.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken));
+            () => rsvp.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken));
 
         var result = await controller.ApproveEventRsvp(Child, EventId);
         Assert.IsType<RedirectToActionResult>(result);
@@ -129,10 +129,10 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         // The child's RSVP row landed with the request's desired status.
         await using (var session = store.QuerySession())
         {
-            var rsvp = await session.Query<EventRsvp>()
+            var rsvpRow = await session.Query<EventRsvp>()
                 .Where(r => r.EventId == EventId && r.UserId == Child)
                 .SingleAsync(TestContext.Current.CancellationToken);
-            Assert.Equal(RsvpStatus.Going, rsvp.Status);
+            Assert.Equal(RsvpStatus.Going, rsvpRow.Status);
         }
 
         // The request row is Approved (ResolvedBy = the guardian).
@@ -155,9 +155,9 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
     public async Task DenyEventRsvp_NonGuardian_Returns404_NoWrite()
     {
         var (controller, store) = await BuildAsync(actorSubjectId: NonGuardian);
-        var events = EventsService(store);
+        var rsvp = RsvpService(store);
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => events.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken));
+            () => rsvp.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken));
 
         var result = await controller.DenyEventRsvp(Child, EventId);
 
@@ -179,12 +179,12 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
     public async Task VetoEventRsvp_Guardian_RemovesChildRsvp_AuditedViaGuardian()
     {
         var (controller, store) = await BuildAsync(actorSubjectId: Guardian);
-        var events = EventsService(store);
+        var rsvp = RsvpService(store);
 
         // The GuardianNotifies posture: the child RSVPs freely...
-        await (new UserInfoService(store)).SetChildEventRsvpModeAsync(
+        await (new GuardianService(store)).SetChildEventRsvpModeAsync(
             Child, EventRsvpMode.GuardianNotifies, Guardian);
-        await events.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        await rsvp.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken);
 
         // ...and the guardian vetoes (the window to undo).
         var result = await controller.VetoEventRsvp(Child, EventId);
@@ -218,6 +218,12 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
 
     private static EventService EventsService(IDocumentStore store)
         => new(store, new AuthorizationService(store, new UserInfoService(store)), new UserInfoService(store));
+
+    // C3-00 (ADR 0290 named seam) — the RSVP cluster now lives on the
+    // EventRsvpGuardianService; the self-lane seeding + the controller's
+    // resolve lanes run through it (the same store the EventsService used).
+    private static EventRsvpGuardianService RsvpService(IDocumentStore store)
+        => new(store, new UserInfoService(store));
 
     private async Task<(GuardianController controller, IDocumentStore store)> BuildAsync(
         string actorSubjectId, bool withEvents = true)
@@ -281,9 +287,12 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
 
         var userInfo = new UserInfoService(store);
         var identity = Substitute.For<IIdentityService>();   // unused in these tests
-        var controller = new GuardianController(
-            userInfo, identity, store,
-            withEvents ? EventsService(store) : null);
+        // C3-00 (ADR 0290 named seam) — the RSVP cluster now lives on the
+        // IEventRsvpGuardian seam; the resolve lanes (Approve/Deny/Veto) and
+        // the self-lane seeding run through it. Null when withEvents is false
+        // (the null-safe 404 test).
+        var rsvpSeam = withEvents ? RsvpService(store) : null;
+        var controller = new GuardianController(userInfo, Substitute.For<IGroupService>(), new GuardianService(store), Substitute.For<IProfileSettingsService>(), identity, store, withEvents ? EventsService(store) : null, rsvpSeam);
 
         // The ClaimsPrincipal — the actor's subject id via the Kumunita.Sub
         // claim (KumunitaPrincipal.SubjectId reads this).

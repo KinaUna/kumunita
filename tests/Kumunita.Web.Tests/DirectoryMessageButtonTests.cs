@@ -213,6 +213,7 @@ public sealed class DirectoryMessageButtonTests
         BuildDetail(string viewerSubjectId, Profile target, bool viewerAllowed)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         userInfo.GetProfileAsync(target.SubjectId).Returns(target);
         // DirectoryService needs a non-null authz to construct (its contact gate),
         // but the CONTROLLER's bio-gate seam is passed null: these tests do not set
@@ -222,7 +223,7 @@ public sealed class DirectoryMessageButtonTests
         // (a null Decision). The contact/bio gates are not the subject of these
         // tests; only CanMessage is.
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
-        var directory = new DirectoryService(userInfo, authz);
+        var directory = new DirectoryService(userInfo, profileSettings, authz);
         var messaging = Substitute.For<IMessagingService>();
         messaging.IsMessagingAllowedForAsync(viewerSubjectId).Returns(viewerAllowed);
 
@@ -241,13 +242,14 @@ public sealed class DirectoryMessageButtonTests
         BuildDetailNoMessagingSeam(string viewerSubjectId, Profile target)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         userInfo.GetProfileAsync(target.SubjectId).Returns(target);
         // DirectoryService needs a non-null authz to construct, but the
         // CONTROLLER's bio-gate seam is null (fail-closed, no
         // CanAsync(...).Allowed call — which would NRE on the unstubbed
         // NSubstitute). Only CanMessage is under test here.
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
-        var directory = new DirectoryService(userInfo, authz);
+        var directory = new DirectoryService(userInfo, profileSettings, authz);
 
         var controller = new DirectoryController(directory, authz: null,
             store: null, localization: null, translationProvider: null, messaging: null);
@@ -269,9 +271,10 @@ public sealed class DirectoryMessageButtonTests
         BuildIndex(IReadOnlyList<Profile> profiles, string viewerSubjectId, bool viewerAllowed)
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetProfilesAsync(Arg.Any<bool>()).Returns(profiles.ToList());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        profileSettings.GetProfilesAsync(Arg.Any<bool>()).Returns(profiles.ToList());
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
-        var directory = new DirectoryService(userInfo, authz);
+        var directory = new DirectoryService(userInfo, profileSettings, authz);
         var messaging = Substitute.For<IMessagingService>();
         messaging.IsMessagingAllowedForAsync(viewerSubjectId).Returns(viewerAllowed);
 

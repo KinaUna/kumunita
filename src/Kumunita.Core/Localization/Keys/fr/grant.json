@@ -1,0 +1,10 @@
+{
+  "grant.heading": "\u00C0 qui accorder",
+  "grant.hint": "Coche une ou plusieurs \u2014 ou utilise la ligne \u00AB Select all \u00BB au-dessus de chaque liste comme raccourci.",
+  "grant.empty_users": "Tu es le seul habitant v\u00E9rifi\u00E9, donc il n\u0027y a encore personne \u00E0 qui accorder.",
+  "grant.empty_groups": "Aucun groupe n\u0027existe encore sur la plateforme \u2014 cr\u00E9e-en un sous \u00AB Groupes \u00BB pour ajouter une visibilit\u00E9 par groupe.",
+  "grant.select_all": "Tout s\u00E9lectionner",
+  "grant.label_residences": "R\u00E9sidents",
+  "grant.label_groups": "Groupes",
+  "grant.count_selected": "{0} sur {1} s\u00E9lectionn\u00E9(s)"
+}

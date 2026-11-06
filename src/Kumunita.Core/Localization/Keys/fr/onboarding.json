@@ -1,0 +1,18 @@
+{
+  "onboarding.title": "Configurer ton compte",
+  "onboarding.intro": "Une br\u00E8ve visite guid\u00E9e des quelques r\u00E9glages qui font fonctionner Kumunita pour toi. Tout m\u00E8ne au r\u00E9glage qui l\u0027a d\u00E9j\u00E0 \u2014 termine en une minute ou reviens quand tu veux.",
+  "onboarding.step_displayname": "Ton nom d\u0027affichage",
+  "onboarding.step_avatar": "Ton avatar",
+  "onboarding.step_language": "Ta langue d\u0027interface",
+  "onboarding.step_timezone": "Ton fuseau horaire",
+  "onboarding.step_dateformat": "Ton format de date et d\u0027heure",
+  "onboarding.step_email": "Ta langue des e-mails et des notifications",
+  "onboarding.step_contact": "Tes coordonn\u00E9es et qui peut les voir",
+  "onboarding.step_messaging": "Si tu peux utiliser la messagerie directe",
+  "onboarding.visit": "Aller \u00E0 ce r\u00E9glage",
+  "onboarding.finish": "Tout est pr\u00EAt \u2014 terminer la configuration",
+  "onboarding.skip": "Passer pour l\u0027instant",
+  "onboarding.flash_done": "Configuration termin\u00E9e \u2014 bienvenue dans ton quartier.",
+  "onboarding.banner.text": "Terminer la configuration de ton compte ?",
+  "onboarding.banner.action": "D\u00E9marrer la configuration"
+}

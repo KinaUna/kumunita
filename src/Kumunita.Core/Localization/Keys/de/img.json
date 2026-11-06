@@ -1,0 +1,14 @@
+{
+  "img.edit.close": "Schlie\u00DFen",
+  "img.edit.crop_area": "Zuschneidebereich",
+  "img.edit.width": "Breite",
+  "img.edit.output": "Ergebnis",
+  "img.edit.reset_crop": "Zuschneiden zur\u00FCcksetzen",
+  "img.edit.use_original": "Original verwenden",
+  "img.edit.apply": "Anwenden",
+  "img.edit.title": "Dein Avatar zuschneiden",
+  "img.edit.err_edit": "Die Bearbeitung ist fehlgeschlagen.",
+  "img.edit.err_could": "Das Bild konnte nicht bearbeitet werden.",
+  "img.edit.err_load": "Das Bild konnte nicht zum Bearbeiten geladen werden.",
+  "img.edit.err_export": "Der Bild-Export ist fehlgeschlagen."
+}

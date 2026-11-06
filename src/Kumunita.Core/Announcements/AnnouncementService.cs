@@ -2,6 +2,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Query;
+using Kumunita.Core.Translations;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -41,7 +42,7 @@ namespace Kumunita.Core.Announcements;
 /// so the service is what guarantees the split is real).
 /// </para>
 /// </summary>
-public sealed class AnnouncementService : IAnnouncementService
+public partial class AnnouncementService : IAnnouncementService
 {
     // ADR 0090 D4 — the M7 paged feed's page size (the PostService / EventService
     // / ProjectService `PageSize = 30` precedent).
@@ -49,12 +50,14 @@ public sealed class AnnouncementService : IAnnouncementService
 
     private readonly IDocumentStore _store;
     private readonly IUserInfoService _userInfo;
+    // C07 (ADR 0286) — the IProfileSettingsService sibling (the moved method's owner).
+    private readonly IProfileSettingsService _profileSettings;
     // ADR 0084 — the M6 notification emitter seam (optional nullable default
     // so existing test call sites that construct AnnouncementService
     // positionally (store, userInfo) keep compiling unchanged — the same
     // CS1736 shape as PostService._notifications). The DI registration
     // passes the live Notifications.NotificationService.
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
     // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
@@ -62,14 +65,53 @@ public sealed class AnnouncementService : IAnnouncementService
     // existing test call sites keep compiling unchanged.
     private readonly Kumunita.Core.Mentions.IMentionService? _mentions;
 
+    // C06 (ADR 0288) — the one shared translation-variant write lane. The
+    // announcements surface's add/update/remove translation methods are thin
+    // forwarders into this (the descriptor names the announcements quirks: the
+    // GlobalAdmin / Translator / (targeted-community) Moderator standing via the
+    // surface's ResolveTranslationStanding, verbatim title on Create, blank-title
+    // normalize on ApplyUpdate). The session is the caller's (the PostService
+    // shape, passed in as a parameter).
+    private readonly TranslationLane<Announcement, AnnouncementTranslation> _translationLane;
+
     public AnnouncementService(IDocumentStore store, IUserInfoService userInfo,
-        NotificationService? notifications = null,
+        IProfileSettingsService profileSettings,
+        INotificationEmitter? notifications = null,
         Kumunita.Core.Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _notifications = notifications;
         _mentions = mentions;
+        _translationLane = new TranslationLane<Announcement, AnnouncementTranslation>(new TranslationDescriptor<Announcement, AnnouncementTranslation>
+        {
+            TargetKind = "announcement",
+            ActionPrefix = "announcementtranslation",
+            Noun = "Announcement",
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Announcement a, object? _, string actorId, IReadOnlySet<string> actorRoles)
+                => ResolveTranslationStanding(a.Scope, a.CommunityId, actorId, actorRoles),
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<Announcement>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<AnnouncementTranslation>()
+                .Where(t => t.AnnouncementId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new AnnouncementTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                AnnouncementId = id,
+                LanguageCode = lang,
+                Title = title,
+                Body = body,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (AnnouncementTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            {
+                row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+                row.Body = body;
+            }
+        });
     }
 
     /// <summary>
@@ -321,7 +363,7 @@ public sealed class AnnouncementService : IAnnouncementService
             }
             else
             {
-                var all = await _userInfo.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
+                var all = await _profileSettings.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
                 const string targetId = "announcements";           // the flat/public sentinel (ADR 0084)
                 foreach (var p in all)
                 {
@@ -570,7 +612,7 @@ public sealed class AnnouncementService : IAnnouncementService
             }
             else
             {
-                var all = await _userInfo.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
+                var all = await _profileSettings.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
                 const string targetId = "announcements";
                 foreach (var p in all)
                 {
@@ -736,60 +778,8 @@ public sealed class AnnouncementService : IAnnouncementService
         IReadOnlySet<string> actorRoles,
         IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(announcementId))
-            throw new ArgumentException("An announcement id is required.", nameof(announcementId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var announcement = await session.LoadAsync<Announcement>(announcementId).ConfigureAwait(false);
-        if (announcement is null)
-            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found in the session; nothing to translate.");
-
-        var via = ResolveTranslationStanding(announcement.Scope, announcement.CommunityId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only an admin, a translator, or a moderator of the targeted community " +
-                "may add a translation of this announcement.");
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new AnnouncementTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            AnnouncementId = announcementId,
-            LanguageCode = languageCode,
-            Title = title,
-            Body = body,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        // Audit row (the ADR 0022 write-lane precedent — a hand-written audit
-        // row with no CanAsync decision call): the Via tag records the
-        // standing the actor used (Admin for GlobalAdmin/Translator,
-        // Moderator for a targeted community's moderator).
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "announcementtranslation.add",
-            TargetKind = "announcement",
-            TargetId = announcementId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(translation);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return translation;
+        return await _translationLane.AddAsync(session, announcementId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     // ─── ADR 0048 — edit + delete lane for announcement translations ─────
@@ -821,56 +811,8 @@ public sealed class AnnouncementService : IAnnouncementService
         string announcementId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(announcementId))
-            throw new ArgumentException("An announcement id is required.", nameof(announcementId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var announcement = await session.LoadAsync<Announcement>(announcementId).ConfigureAwait(false);
-        if (announcement is null)
-            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found in the session; nothing to update.");
-
-        var row = await session.Query<AnnouncementTranslation>()
-            .Where(t => t.AnnouncementId == announcementId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Announcement '{announcementId}' has no translation in '{languageCode}'; nothing to update.");
-
-        var via = ResolveTranslationStanding(announcement.Scope, announcement.CommunityId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only an admin, a translator, or a moderator of the targeted community " +
-                "may edit a translation of this announcement.");
-
-        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-        row.Body = body;
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "announcementtranslation.update",
-            TargetKind = "announcement",
-            TargetId = announcementId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
-        return row;
+        return await _translationLane.UpdateAsync(session, announcementId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -887,50 +829,8 @@ public sealed class AnnouncementService : IAnnouncementService
         string announcementId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
-        if (string.IsNullOrEmpty(announcementId))
-            throw new ArgumentException("An announcement id is required.", nameof(announcementId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new ArgumentException("An acting actor is required.", nameof(actorId));
-        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
-
-        var announcement = await session.LoadAsync<Announcement>(announcementId).ConfigureAwait(false);
-        if (announcement is null)
-            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found in the session; nothing to remove.");
-
-        var row = await session.Query<AnnouncementTranslation>()
-            .Where(t => t.AnnouncementId == announcementId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException(
-                $"Announcement '{announcementId}' has no translation in '{languageCode}'; nothing to remove.");
-
-        var via = ResolveTranslationStanding(announcement.Scope, announcement.CommunityId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only an admin, a translator, or a moderator of the targeted community " +
-                "may remove a translation of this announcement.");
-
-        var now = DateTimeOffset.UtcNow;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "announcementtranslation.remove",
-            TargetKind = "announcement",
-            TargetId = announcementId,
-            Via = via.Value,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Delete(row);
-        session.Store(audit);
-        await session.SaveChangesAsync().ConfigureAwait(false);
+        await _translationLane.RemoveAsync(session, announcementId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -949,7 +849,7 @@ public sealed class AnnouncementService : IAnnouncementService
     /// </summary>
     public static bool CanTranslateAnnouncement(
         AnnouncementScope scope, string? communityId, string actorId, IReadOnlySet<string> actorRoles)
-        => ResolveTranslationStanding(scope, communityId, actorId, actorRoles) is not null;
+        => AnnouncementTranslationPolicy.CanTranslateAnnouncement(scope, communityId, actorId, actorRoles);
 
     /// <summary>
     /// The ADR 0029 announcement-translation standing resolver (shared by
@@ -970,20 +870,7 @@ public sealed class AnnouncementService : IAnnouncementService
     /// </summary>
     private static Authorization.AccessVia? ResolveTranslationStanding(
         AnnouncementScope scope, string? communityId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (actorRoles.Contains(Roles.Translator))
-            return Authorization.AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return Authorization.AccessVia.Admin;
-
-        if (scope == AnnouncementScope.Community
-            && communityId is not null
-            && actorRoles.Contains(Roles.ModeratorComponent(communityId)))
-            return Authorization.AccessVia.Moderator;
-
-        return null;
-    }
+        => AnnouncementTranslationPolicy.ResolveTranslationStanding(scope, communityId, actorId, actorRoles);
 
     /// <summary>
     /// Resolves the actor's read-visibility for announcements: whether they are signed in
@@ -1074,7 +961,7 @@ public sealed class AnnouncementService : IAnnouncementService
             throw new UnauthorizedAccessException(
                 $"Only a GlobalAdmin or a moderator of community '{target}' may target that community.");
 
-        var components = await _userInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
+        var components = await _profileSettings.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
         if (components is null || !components.Any(c => c.Id == target))
             throw new ArgumentException(
                 $"Unknown community '{target}' for the announcement target.",
@@ -1215,225 +1102,4 @@ public sealed class AnnouncementService : IAnnouncementService
                 (resolver.admin || resolver.communities.Contains(announcement.CommunityId!)));
     }
 
-    public async Task<bool> AreAnnouncementCommentsEnabledAsync()
-    {
-        using var session = _store.QuerySession();
-        var settings = await session
-            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None)
-            .ConfigureAwait(false);
-        // The <c>true</c> floor: a missing singleton reads as "comments on"
-        // (the NotifyAdminsOnSignup precedent).
-        return settings is null || settings.AnnouncementCommentsEnabled;
-    }
-
-    public async Task SetAnnouncementCommentsEnabledAsync(bool enabled, string actorId)
-    {
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to change the announcement-comments gate.");
-
-        await using var session = _store.OpenSession(new SessionOptions());
-        var settings = await session
-            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None)
-            .ConfigureAwait(false);
-        if (settings is null)
-            settings = new LocaleSettings { AnnouncementCommentsEnabled = enabled };
-        else
-            settings.AnnouncementCommentsEnabled = enabled;
-
-        // The singleton-toggle audit row (the signup.set-open / timezone.set-default
-        // shape — the <c>true</c> floor, ADR 0004 §B.1 additive field).
-        session.Store(settings);
-        session.Store(new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = DateTimeOffset.UtcNow,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "announcementcomments.set-enabled",
-            TargetKind = "announcementcomments",
-            TargetId = "announcementcomments",
-            Via = Authorization.AccessVia.Admin,
-            Outcome = Authorization.AccessOutcome.Allow
-        });
-        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
-    }
-
-    public async Task<IReadOnlyList<AnnouncementComment>> GetAnnouncementCommentsAsync(
-        string announcementId, string? actorId, IReadOnlySet<string> actorRoles)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (string.IsNullOrEmpty(announcementId))
-            throw new KeyNotFoundException("An announcement id is required.");
-
-        // ADR 0101 — signed-in only: a visitor (no subject id) is refused the
-        // comment list outright (the 403 shape — a comment surface, not a
-        // content read, so the Web maps this to Forbid).
-        if (string.IsNullOrWhiteSpace(actorId))
-            throw new UnauthorizedAccessException("Comments are visible to signed-in residents only.");
-
-        using var session = _store.QuerySession();
-        var announcement = await session
-            .LoadAsync<Announcement>(announcementId, CancellationToken.None)
-            .ConfigureAwait(false);
-        if (announcement is null)
-            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found.");
-
-        // The comment is visible only under the announcement's own flat scope
-        // split (the GetAsync predicate) — a community-targeted announcement's
-        // comments go to that community's members / moderators / a GlobalAdmin
-        // only; a public one to any signed-in user. A non-visible announcement
-        // is a 404 (non-leaky, the announcement lane's posture) — the Web maps
-        // KeyNotFound to NotFound.
-        var resolver = await ResolveReadVisibilityAsync(actorId, actorRoles).ConfigureAwait(false);
-        if (announcement.IsDraft || !IsAnnouncementVisible(announcement, resolver))
-            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found.");
-
-        return (await session
-            .Query<AnnouncementComment>()
-            .Where(c => c.AnnouncementId == announcementId)
-            .OrderBy(c => c.Created)
-            .ToListAsync(CancellationToken.None)
-            .ConfigureAwait(false)).ToList();
-    }
-
-    public async Task<IReadOnlyDictionary<string, int>> CountAnnouncementCommentsAsync(
-        IReadOnlyCollection<string> announcementIds)
-    {
-        ArgumentNullException.ThrowIfNull(announcementIds);
-        if (announcementIds.Count == 0)
-            return new Dictionary<string, int>();
-
-        using var session = _store.QuerySession();
-        // TODO (ADR 0248): a list page holds at most PageSize announcements, so one projected
-        // column is fine; move the grouping into the query if a page ever carries many comments.
-        var owners = await session
-            .Query<AnnouncementComment>()
-            .Where(c => announcementIds.Contains(c.AnnouncementId))
-            .Select(c => c.AnnouncementId)
-            .ToListAsync(CancellationToken.None)
-            .ConfigureAwait(false);
-
-        return owners
-            .GroupBy(id => id, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
-    }
-
-    public async Task<AnnouncementComment> CreateAnnouncementCommentAsync(
-        string announcementId,
-        string actorId,
-        IReadOnlySet<string> actorRoles,
-        string body,
-        string? languageCode,
-        IDocumentSession session)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-        if (string.IsNullOrEmpty(announcementId))
-            throw new KeyNotFoundException("An announcement id is required.");
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A comment body is required.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to comment on an announcement.");
-
-        // ADR 0101 — signed-in only (enforced above by the actorId check) and
-        // admin-toggle-gated.
-        var settings = await session
-            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None)
-            .ConfigureAwait(false);
-        if (settings is not null && !settings.AnnouncementCommentsEnabled)
-            throw new UnauthorizedAccessException("Commenting on announcements is currently disabled.");
-
-        // The announcement must exist and be visible to the actor under its
-        // flat scope split (a missing / not-visible id is a 404, non-leaky).
-        var announcement = await session
-            .LoadAsync<Announcement>(announcementId, CancellationToken.None)
-            .ConfigureAwait(false);
-        if (announcement is null)
-            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found; nothing to comment on.");
-        var resolver = await ResolveReadVisibilityAsync(actorId, actorRoles).ConfigureAwait(false);
-        if (announcement.IsDraft || !IsAnnouncementVisible(announcement, resolver))
-            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found; nothing to comment on.");
-
-        var now = DateTimeOffset.UtcNow;
-        var comment = new AnnouncementComment
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            AnnouncementId = announcementId,
-            AuthorId = actorId,
-            Body = body,
-            Created = now,
-            LanguageCode = await ResolveLanguageCodeAsync(languageCode, session).ConfigureAwait(false) // ADR 0018 — the authored-in tag (instance-default floor).
-        };
-
-        // Audit row (the ADR 0029 / ADR 0100 write-lane precedent — a hand-written
-        // row; the C3 atomic commit).
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "announcementcomment.create",
-            TargetKind = "announcement",
-            TargetId = announcementId,
-            Via = Authorization.AccessVia.Owner,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(comment);
-        session.Store(audit);
-        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
-        return comment;
-    }
-
-    public async Task<AnnouncementComment> DeleteAnnouncementCommentAsync(
-        string announcementId,
-        string commentId,
-        string actorId,
-        IReadOnlySet<string> actorRoles,
-        IDocumentSession session)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        ArgumentNullException.ThrowIfNull(session);
-        if (string.IsNullOrEmpty(announcementId))
-            throw new KeyNotFoundException("An announcement id is required.");
-        if (string.IsNullOrEmpty(commentId))
-            throw new KeyNotFoundException("A comment id is required.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to delete a comment.");
-
-        var comment = await session
-            .LoadAsync<AnnouncementComment>(commentId, CancellationToken.None)
-            .ConfigureAwait(false);
-        if (comment is null)
-            throw new KeyNotFoundException($"Comment '{commentId}' was not found in the session; nothing to delete.");
-        if (!string.Equals(comment.AnnouncementId, announcementId, StringComparison.Ordinal))
-            throw new KeyNotFoundException($"Comment '{commentId}' is not on announcement '{announcementId}'; nothing to delete.");
-
-        // Standing (ADR 0016 / ADR 0024 shape): author-only. A non-author is
-        // refused before any write (the ADR 0016 reply-delete precedent — no
-        // moderator / GlobalAdmin branch on a comment's own delete).
-        if (!string.Equals(comment.AuthorId, actorId, StringComparison.Ordinal))
-            throw new UnauthorizedAccessException($"Actor is not the author of comment '{commentId}'.");
-
-        comment.DeletedAt = DateTimeOffset.UtcNow; // ADR 0024 — the soft-delete stamp.
-        var now = comment.DeletedAt!.Value;
-        var audit = new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "announcementcomment.delete",
-            TargetKind = "announcement",
-            TargetId = announcementId,
-            Via = Authorization.AccessVia.Owner,
-            Outcome = Authorization.AccessOutcome.Allow
-        };
-
-        session.Store(comment);
-        session.Store(audit);
-        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
-        return comment;
-    }
 }

@@ -1,0 +1,17 @@
+{
+  "flash.translation_choose_language": "Choose a language for the translation.",
+  "flash.translation_needs_text": "A translation needs some text.",
+  "flash.translation_added": "Translation added ({0}).",
+  "flash.translation_updated": "Translation updated ({0}).",
+  "flash.translation_removed": "Translation removed ({0}).",
+  "flash.not_signed_in": "Not signed in.",
+  "flash.comment_needs_text": "A comment needs some text.",
+  "flash.comment_added": "Comment added.",
+  "flash.comment_deleted": "Comment deleted.",
+  "flash.translation_gone_add": "That translation no longer exists; add it again.",
+  "flash.translation_gone": "That translation no longer exists.",
+  "flash.choose_language_remove": "Choose a language to remove.",
+  "flash.translation_needs_title_or_text": "A translation needs a title or some text.",
+  "flash.translation_needs_name_or_description": "A translation needs a name and/or description.",
+  "flash.report_submitted": "Report submitted. A moderator may review it."
+}

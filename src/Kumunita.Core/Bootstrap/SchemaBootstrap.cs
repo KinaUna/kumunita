@@ -112,7 +112,9 @@ public static class SchemaBootstrap
             // these five steps to the first-boot lane.
             var userManager = sp.GetRequiredService<UserManager<User>>();
             var roleManager = sp.GetRequiredService<RoleManager<IdentityRole>>();
-            var userInfo = sp.GetRequiredService<IUserInfoService>();
+            // C07 (ADR 0286) — the first-boot seeder's SeedComponentsAsync moved
+            // to IProfileSettingsService.
+            var profileSettings = sp.GetRequiredService<IProfileSettingsService>();
             var mailer = sp.GetRequiredService<IMailerStage>();
             var community = sp.GetRequiredService<IOptions<CommunityOptions>>().Value;
             var seedAdmin = sp.GetRequiredService<IOptions<SeedAdminOptions>>().Value;
@@ -126,7 +128,7 @@ public static class SchemaBootstrap
                                   + "Running the first-boot seeder (plan M1 step 6). ");
 
             await FirstBootSeeder.SeedAsync(
-                identity, store, userManager, roleManager, userInfo, mailer,
+                identity, store, userManager, roleManager, profileSettings, mailer,
                 community,
                 seedAdmin,
                 verification.TtlDays,
@@ -156,13 +158,13 @@ public static class SchemaBootstrap
             //     never clobbering a community Translator's edit; ADR 0057 amended
             //     2026-09-21)
             await using var backfillSession = store.OpenSession(new Marten.Services.SessionOptions());
-            await FirstBootSeeder
+            await SeededContentCatalog
                 .BackfillPageTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
-            await FirstBootSeeder
+            await SeededContentCatalog
                 .BackfillUiStringBaselinesAsync(backfillSession, ct).ConfigureAwait(false);
-            await FirstBootSeeder
+            await SeededContentCatalog
                 .BackfillUserGuidesAsync(backfillSession, ct).ConfigureAwait(false);
-            await FirstBootSeeder
+            await SeededContentCatalog
                 .BackfillGuideTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
             logger.LogInformation(
                 "Warm boot: backfill complete (de/fr/da rows for the canonical " +

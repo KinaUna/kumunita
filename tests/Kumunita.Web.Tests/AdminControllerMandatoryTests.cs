@@ -42,6 +42,7 @@ public class AdminControllerMandatoryTests
     public async Task ToggleCommunityMandatory_GlobalAdmin_Delegates_Lane()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         var controller = Build(userInfo, roles: [Roles.GlobalAdmin]);
 
         try { await controller.ToggleCommunityMandatory(CompId, true); }
@@ -56,6 +57,7 @@ public class AdminControllerMandatoryTests
     public async Task ToggleCommunityMandatory_ToOptional_Delegates_False()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         var controller = Build(userInfo, roles: [Roles.GlobalAdmin]);
 
         try { await controller.ToggleCommunityMandatory(CompId, false); }
@@ -70,6 +72,7 @@ public class AdminControllerMandatoryTests
     public async Task ToggleCommunityMandatory_BlankComponentId_NeverInvokesService()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         var controller = Build(userInfo, roles: [Roles.GlobalAdmin]);
 
         try { await controller.ToggleCommunityMandatory(string.Empty, true); }
@@ -85,15 +88,16 @@ public class AdminControllerMandatoryTests
     public async Task AddCommunity_WhenMandatory_Creates_Then_SetsMandatory()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.CreateCommunityAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>())
+        var community = Substitute.For<ICommunityMembershipService>();
+        community.CreateCommunityAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>())
             .Returns(new Component { Id = CompId, Name = "The Club" });
-        var controller = Build(userInfo, roles: [Roles.GlobalAdmin]);
+        var controller = Build(userInfo, roles: [Roles.GlobalAdmin], community: community);
 
         var model = new AddCommunityViewModel { Name = "The Club", Mandatory = true };
         try { await controller.AddCommunity(model); }
         catch { /* expected: the create-then-set NRE after both calls */ }
 
-        await userInfo.Received(1).CreateCommunityAsync("The Club", null, AdminSubject);
+        await community.Received(1).CreateCommunityAsync("The Club", null, AdminSubject);
         await userInfo.Received(1).SetCommunityMandatoryAsync(
             CompId, true, AdminSubject,
             Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)));
@@ -103,20 +107,21 @@ public class AdminControllerMandatoryTests
     public async Task AddCommunity_WhenNotMandatory_DoesNotSetMandatory()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        var controller = Build(userInfo, roles: [Roles.GlobalAdmin]);
+        var community = Substitute.For<ICommunityMembershipService>();
+        var controller = Build(userInfo, roles: [Roles.GlobalAdmin], community: community);
 
         var model = new AddCommunityViewModel { Name = "The Club", Mandatory = false };
         try { await controller.AddCommunity(model); }
         catch { /* expected */ }
 
-        await userInfo.Received(1).CreateCommunityAsync("The Club", null, AdminSubject);
+        await community.Received(1).CreateCommunityAsync("The Club", null, AdminSubject);
         await userInfo.DidNotReceiveWithAnyArgs().SetCommunityMandatoryAsync(
             Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>());
     }
 
     // ── Harness ──────────────────────────────────────────────────────────────
 
-    private static AdminController Build(IUserInfoService userInfo, string[] roles)
+    private static AdminController Build(IUserInfoService userInfo, string[] roles, ICommunityMembershipService? community = null)
     {
         // The AppDbContext is never queried by these lanes (the toggle is a
         // plain core delegate; the add form composes two core seam calls), so a
@@ -127,12 +132,7 @@ public class AdminControllerMandatoryTests
                 .UseNpgsql("Host=localhost;Database=_test_never_opened;Username=_;******")
                 .Options);
 
-        var controller = new AdminController(
-            identities: db,
-            store:      Substitute.For<IDocumentStore>(),
-            identity:   Substitute.For<IIdentityService>(),
-            userInfo:   userInfo,
-            // SP U03 — these lanes never touch the Platform-pages resolution;
+        var controller = new AdminController(identities: db, store:      Substitute.For<IDocumentStore>(), identity:   Substitute.For<IIdentityService>(), userInfo:   userInfo, community ?? Substitute.For<ICommunityMembershipService>(), Substitute.For<IProfileSettingsService>(), // SP U03 — these lanes never touch the Platform-pages resolution;
             // a default (unconfigured) stub is fine.
             pages:      Substitute.For<IPageService>());
 

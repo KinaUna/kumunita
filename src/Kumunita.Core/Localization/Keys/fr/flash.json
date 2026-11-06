@@ -1,0 +1,17 @@
+{
+  "flash.translation_choose_language": "Choisissez une langue pour la traduction.",
+  "flash.translation_needs_text": "Une traduction a besoin d\u2019un peu de texte.",
+  "flash.translation_added": "Traduction ajout\u00E9e ({0}).",
+  "flash.translation_updated": "Traduction mise \u00E0 jour ({0}).",
+  "flash.translation_removed": "Traduction supprim\u00E9e ({0}).",
+  "flash.not_signed_in": "Non connect\u00E9.",
+  "flash.comment_needs_text": "Un commentaire a besoin d\u2019un peu de texte.",
+  "flash.comment_added": "Commentaire ajout\u00E9.",
+  "flash.comment_deleted": "Commentaire supprim\u00E9.",
+  "flash.translation_gone_add": "Cette traduction n\u2019existe plus ; ajoutez-la \u00E0 nouveau.",
+  "flash.translation_gone": "Cette traduction n\u2019existe plus.",
+  "flash.choose_language_remove": "Choisissez une langue \u00E0 supprimer.",
+  "flash.translation_needs_title_or_text": "Une traduction a besoin d\u2019un titre ou d\u2019un peu de texte.",
+  "flash.translation_needs_name_or_description": "Une traduction a besoin d\u2019un nom et/ou d\u2019une description.",
+  "flash.report_submitted": "Signalement envoy\u00E9. Un mod\u00E9rateur pourra l\u2019examiner."
+}

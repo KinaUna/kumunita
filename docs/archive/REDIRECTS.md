@@ -36,6 +36,7 @@ folder (no per-file rows are needed).
 | docs/plans-milestones/done/guardian-assignment-second-audit-row/… | [docs/archive/lanes/guardian-assignment-second-audit-row/…](lanes/guardian-assignment-second-audit-row/) |
 | docs/plans-milestones/done/guardian-controls/… | [docs/archive/lanes/guardian-controls/…](lanes/guardian-controls/) |
 | docs/plans-milestones/done/improve/… | [docs/archive/lanes/improve/…](lanes/improve/) |
+| docs/plans-milestones/plan-improve-code.md (+ the c00–c13 prompts + handoff-notes.md) · `plan-improve-code-2.md` / `plan-improve-code-3.md` (+ the c2-00–c2-08 / c3-00–c3-08 prompts) · `improve-code-2-handoff-notes.md` / `improve-code-3-handoff-notes.md` | [docs/archive/lanes/improve-code/…](lanes/improve-code/) (all three rounds: `plan-improve-code.md` + `c00`–`c13` (round 1) · `plan-improve-code-2.md` + `c2-00`–`c2-08` (round 2) · `plan-improve-code-3.md` + `c3-00`–`c3-08` (round 3, shipped 2026-11-06) + the three handoff notes) |
 | docs/plans-milestones/done/inline-editor/… | [docs/archive/lanes/inline-editor/…](lanes/inline-editor/) |
 | docs/plans-milestones/done/ip/… | [docs/archive/lanes/ip/…](lanes/ip/) |
 | docs/plans-milestones/done/languages-seeded/… | [docs/archive/lanes/languages-seeded/…](lanes/languages-seeded/) |

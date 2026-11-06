@@ -1,0 +1,70 @@
+@* IMPROVE-CODE C11 — extracted from _Layout.cshtml (the <footer>).
+   Pure markup — no view-locals, no injected services beyond the
+   <kw-l> TagHelper and the _MountSlot partial that render through
+   the shared tag helper pipeline. The markup is byte-identical. *@
+<footer class="kmb-footer">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-12 col-md-5 col-lg-4">
+                <p class="navbar-brand mb-2">Kumunita</p>
+                <p class="mb-2" style="max-width: 34ch;"><kw-l key="footer.tagline">A private home for one neighborhood — the feed, the groups and the pinned notes. What happens on your street stays on your street.</kw-l></p>
+                <p class="small mb-0">&copy; @DateTime.Now.Year Kumunita <kw-l key="footer.copyright">· self-hosted by your community</kw-l></p>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <h3><kw-l key="nav.community">Community</kw-l></h3>
+                <ul class="list-unstyled d-grid gap-2">
+                    <li><a asp-area="" asp-controller="Home" asp-action="Index"><kw-l key="nav.home">Home</kw-l></a></li>
+                    @* ADR 0039 §3.8 — the mount-point resolver (footer/community slot):
+                       the page mounted here renders as a link; an unmounted slot
+                       renders nothing. Display, not access — the Show action is
+                       the Read decision. *@
+                    @{ ViewData["MountSlot"] = "footer/community"; }
+                    <partial name="_MountSlot" />
+                    <li><a href="/announcements"><kw-l key="nav.announcements">Announcements</kw-l></a></li>
+                    <li><a asp-controller="Posts" asp-action="AllSections"><kw-l key="footer.feed">The feed</kw-l></a></li>
+                </ul>
+            </div>
+            @* SP U03 (ADR 0043 D4) — the footer "Platform" column: the five
+               shipped platform surfaces, linked **unconditionally** for every
+               visitor (floor-honesty — no existence probe, no @if: a link whose
+               page is absent from the tree lands on its existing floor). The
+               navbar is deliberately untouched (the recorded D4 decision). *@
+            <div class="col-6 col-md-4 col-lg-2">
+                <h3><kw-l key="footer.platform.heading">Platform</kw-l></h3>
+                <ul class="list-unstyled d-grid gap-2">
+                    <li><a href="/about"><kw-l key="footer.platform.about">About</kw-l></a></li>
+                    <li><a href="/terms"><kw-l key="footer.platform.terms">Terms of use</kw-l></a></li>
+                    <li><a href="/help"><kw-l key="footer.platform.help">Help</kw-l></a></li>
+                    <li><a href="/privacy"><kw-l key="footer.platform.privacy">Privacy</kw-l></a></li>
+                    <li><a href="/conduct"><kw-l key="footer.platform.conduct">Code of conduct</kw-l></a></li>
+                    @* M32 (ADR 0155) — the public "Report an issue" affordance
+                       (the issue.nav key, key 9 of the U06 closed set): links the
+                       M32 /issues/new general issue-submission surface. Linked
+                       unconditionally for every visitor (floor-honesty, the SP U03
+                       shape above) because M32·4 is public/anonymous-safe — the
+                       M31·2 500-form precedent. The design doc §2.3 named it "the
+                       nav entry (issue.nav)"; the footer Platform column is the
+                       public, platform-level seam that matches that intent — the
+                       signed-in-only More menu would gate a public surface. *@
+                    <li><a href="/issues/new"><kw-l key="issue.nav">Report an issue</kw-l></a></li>
+                </ul>
+            </div>
+            <div class="col-6 col-md-4 col-lg-3">
+                <h3><kw-l key="footer.project.heading">The project</kw-l></h3>
+                <ul class="list-unstyled d-grid gap-2">
+                    @foreach (var link in RepositoryInfo.Links)
+                    {
+                        <li>
+                            <a href="@link.Url" target="_blank" rel="noopener noreferrer"><kw-l key="@link.Key">@link.Label</kw-l></a>
+                        </li>
+                    }
+                </ul>
+            </div>
+            <div class="col-12 col-md-3 col-lg-3">
+                <h3><kw-l key="footer.gtk_heading">Good to know</kw-l></h3>
+                <p class="small mb-2"><kw-l key="footer.gtk_privacy">Private by default: each post's audience is chosen by its author, and everything is readable by you, not the world.</kw-l></p>
+                <p class="small mb-0"><kw-l key="footer.gtk_oss">Kumunita is open source — the code, the decisions, the docs.</kw-l></p>
+            </div>
+        </div>
+    </div>
+</footer>

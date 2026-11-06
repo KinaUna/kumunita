@@ -1,0 +1,12 @@
+{
+  "todo.blocked_by": "En attente de",
+  "todo.blocked_by_none": "Aucun bloquant",
+  "todo.blocked_generic": "Une autre t\u00E2che (non visible pour vous)",
+  "todo.blocked_filter": "En attente de quelque chose",
+  "todo.event_link": "\u00C9v\u00E9nement li\u00E9",
+  "todo.set_event.label": "Lier \u00E0 un \u00E9v\u00E9nement",
+  "todo.set_event.pick": "Choisir un \u00E9v\u00E9nement",
+  "todo.set_event.create_new": "Cr\u00E9er un nouvel \u00E9v\u00E9nement\u2026",
+  "todo.set_event.create_hint": "Cr\u00E9ez un nouvel \u00E9v\u00E9nement \u00E0 lier \u00E0 cette to-do. Il est enregistr\u00E9 en brouillon \u2014 vous pouvez le publier depuis sa page de d\u00E9tail.",
+  "todo.set_event.create_submit": "Cr\u00E9er et lier"
+}

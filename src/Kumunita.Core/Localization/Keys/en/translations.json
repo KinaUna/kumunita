@@ -1,0 +1,17 @@
+{
+  "translations.bulk.export": "Download translations (CSV)",
+  "translations.bulk.import": "Upload translations (CSV)",
+  "translations.bulk.import_hint": "Blank cells are skipped (they never erase a translation); a file with an unknown key or language is refused unchanged.",
+  "translations.bulk.save_all": "Save all",
+  "translations.bulk.mode_batch": "Batch editing",
+  "translations.bulk.mode_single": "Edit one at a time",
+  "translations.editor.back": "\u2190 Back to languages",
+  "translations.editor.title": "UI strings for {0}",
+  "translations.editor.lede": "The full list of strings the platform shows to its residents. Each row shows the key, its English reference text, and the current value in {0}. Saving a row adds or updates its translation \u2014 visible on the next request.",
+  "translations.editor.mode_label": "Editor mode",
+  "translations.editor.th_key": "Key",
+  "translations.editor.th_en_reference": "English reference",
+  "translations.editor.th_value": "Value in {0}",
+  "translations.editor.value_aria": "Value for {0} in {1}",
+  "translations.bulk.export_title": "Download this language\u0027s UI strings as a CSV file"
+}

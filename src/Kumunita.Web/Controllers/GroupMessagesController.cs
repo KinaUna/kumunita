@@ -66,7 +66,7 @@ public sealed class GroupMessagesController(
     ILogger<GroupMessagesController> logger,
     IGroupMessagingService groupMessaging,
     IMessagingService messaging,
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IProfileSettingsService profileSettings,
     ILocalizationService? localization = null,
     ITranslationProvider? translationProvider = null) : Controller
 {
@@ -74,6 +74,7 @@ public sealed class GroupMessagesController(
     private readonly IGroupMessagingService _groupMessaging = groupMessaging;
     private readonly IMessagingService _messaging = messaging;
     private readonly IUserInfoService _userInfo = userInfo;
+    private readonly IProfileSettingsService _profileSettings = profileSettings;
     private readonly ILocalizationService? _localization = localization;
     private readonly ITranslationProvider? _translationProvider = translationProvider;
 
@@ -127,7 +128,7 @@ public sealed class GroupMessagesController(
         // except the actor themself (the same candidate set as the M9
         // 1:1 picker — the recipient's own standing is the gate, the
         // DirectoryController.D1 two-sided shape).
-        var candidates = (await _userInfo.GetProfilesAsync(verifiedOnly: false))
+        var candidates = (await _profileSettings.GetProfilesAsync(verifiedOnly: false))
             .Where(p => !p.Blocked && p.SubjectId != actorId
                         && p.MessagingOptIn && !p.MessagingRestricted)
             .Select(p => new GroupPickerCandidate(p.SubjectId, p.DisplayName))
@@ -276,7 +277,7 @@ public sealed class GroupMessagesController(
         var pendingIds = (roster?.Members.Where(m => m.Pending) ?? Array.Empty<GroupMessageMember>())
             .Select(m => m.SubjectId)
             .ToHashSet(StringComparer.Ordinal);
-        var addCandidates = (await _userInfo.GetProfilesAsync(verifiedOnly: false))
+        var addCandidates = (await _profileSettings.GetProfilesAsync(verifiedOnly: false))
             .Where(p => !p.Blocked
                         && p.MessagingOptIn && !p.MessagingRestricted
                         && !existing.Contains(p.SubjectId)

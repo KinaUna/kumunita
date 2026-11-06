@@ -1,0 +1,23 @@
+{
+  "myportability.index.lede": "Vos propres contenus \u2014 les messages, \u00E9v\u00E9nements, projets, documents, pages, conversations et m\u00E9dias que vous avez cr\u00E9\u00E9s \u2014 dans une seule archive *.kumunita portable. Exportez-la en fichier, ou r\u00E9importez l\u2019une de vos archives dans cette communaut\u00E9. Votre mot de passe n\u2019y figure jamais et seules vos propres lignes voyagent.",
+  "myportability.export_desc": "Une archive *.kumunita \u2014 vos propres contenus et m\u00E9dias (jamais votre mot de passe, et uniquement vos lignes).",
+  "myportability.import_desc": "R\u00E9importez l\u2019une de vos archives *.kumunita. Nous v\u00E9rifierons ce qui convient \u00E0 cette communaut\u00E9 et ce qui demande votre d\u00E9cision \u2014 vous d\u00E9cidez, \u00E9l\u00E9ment par \u00E9l\u00E9ment, o\u00F9 va chaque pi\u00E8ce.",
+  "myportability.resolve.summary_lead": "Votre archive a \u00E9t\u00E9 compar\u00E9e \u00E0 cette communaut\u00E9.",
+  "myportability.resolve.summary_counts": "Lignes qui conviennent et seront import\u00E9es : {0}. Doublons d\u00E9j\u00E0 pr\u00E9sents qui seront ignor\u00E9s : {1}.",
+  "myportability.resolve.summary_tail": "Celles ci-dessous font r\u00E9f\u00E9rence \u00E0 un groupe qui n\u2019existe pas ici \u2014 vous d\u00E9cidez, une par une, o\u00F9 elles vont.",
+  "myportability.resolve.nothing": "Rien \u00E0 r\u00E9soudre \u2014 chaque ligne de votre archive convient \u00E0 cette communaut\u00E9 ou existe d\u00E9j\u00E0.",
+  "myportability.resolve.archive_label": "Votre archive *.kumunita",
+  "myportability.resolve.archive_hint": "La m\u00EAme archive que celle import\u00E9e ci-dessus \u2014 vos choix sont appliqu\u00E9s \u00E0 son contenu.",
+  "myportability.resolve.reason": "Cet \u00E9l\u00E9ment ({0}) fait r\u00E9f\u00E9rence \u00E0 {1} {2}, qui n\u2019existe pas ici.",
+  "myportability.resolve.reason_unknown": "Une r\u00E9f\u00E9rence de cette ligne n\u2019existe pas ici.",
+  "myportability.resolve.target_label": "Groupe cible (pour \u00AB Ajouter ailleurs \u00BB)",
+  "myportability.resolve.choose_group": "\u2014 choisir un groupe \u2014",
+  "myportability.resolve.no_groups": "Vous n\u2019\u00EAtes membre d\u2019aucun groupe ici \u2014 vous pouvez ignorer cette ligne.",
+  "myportability.index.title": "Mes donn\u00E9es",
+  "myportability.export": "Exporter",
+  "myportability.import": "Importer",
+  "myportability.import.resolve": "Appliquer mes choix",
+  "myportability.resolve.add_elsewhere": "Ajouter ailleurs",
+  "myportability.resolve.discard": "Rejeter",
+  "myportability.status": "Statut"
+}

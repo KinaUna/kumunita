@@ -1,0 +1,10 @@
+{
+  "grant.heading": "Wem zugewiesen",
+  "grant.hint": "Eine oder mehrere ausw\u00E4hlen \u2014 oder nutze die \u201ESelect all\u201C-Zeile \u00FCber jeder Liste als Kurzbefehl.",
+  "grant.empty_users": "Du bist der/die einzige:r verifizierte Anwohner:in, also gibt es noch niemanden, dem/der hier zugewiesen werden kann.",
+  "grant.empty_groups": "Auf der Plattform existieren noch keine Gruppen \u2014 erstelle eine unter \u201EGruppen\u201C, um gruppenbezogene Sichtbarkeit hinzuzuf\u00FCgen.",
+  "grant.select_all": "Alle ausw\u00E4hlen",
+  "grant.label_residences": "Anwohner",
+  "grant.label_groups": "Gruppen",
+  "grant.count_selected": "{0} von {1} ausgew\u00E4hlt"
+}

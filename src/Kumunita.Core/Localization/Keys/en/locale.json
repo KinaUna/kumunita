@@ -1,0 +1,19 @@
+{
+  "locale.settings_title": "Your settings",
+  "locale.language_heading": "Language",
+  "locale.lede": "Pick the language the platform shows you. Your choice is saved in a browser cookie \u2014 it takes effect on the next request, and never affects other residents.",
+  "locale.preferred_label": "Preferred language",
+  "locale.default_note": "The instance default is ",
+  "locale.default_note_tail": ". If your preferred language is later removed by the admin, the platform silently falls back to the instance default.",
+  "locale.save": "Save",
+  "locale.reset": "Reset to instance default",
+  "locale.public_title": "Choose your language",
+  "locale.instance_default": "\u2014 instance default",
+  "locale.browser_matched": "\u2014 matched from your browser",
+  "locale.browser_note": "We picked ",
+  "locale.browser_note_tail": " from your browser settings. Saving makes it your preferred language \u2014 it stays until you change it.",
+  "locale.flash_set": "Language preference set to \u0022{0}\u0022 \u2014 it takes effect on the next request.",
+  "locale.flash_reset": "Language preference reset \u2014 the instance default will be used.",
+  "locale.reset_confirm": "Reset your language preference to the instance default?",
+  "locale.email_reset_confirm": "Reset your email \u0026amp; notification language to the instance default?"
+}

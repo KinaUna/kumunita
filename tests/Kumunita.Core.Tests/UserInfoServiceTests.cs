@@ -43,6 +43,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         var subjectId = "u-profile-1";
         var profile = new Profile
@@ -61,7 +64,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         // implemented): patch is all-null, so the bootstrap record (profile) supplies every
         // field — including the nested Visibility document — and the assertions below prove
         // every field survives the round-trip.
-        await svc.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
 
         var read = await svc.GetProfileAsync(subjectId);
 
@@ -91,6 +94,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         // Three residents: two verified, one unverified.
         const string verifiedA = "u-gp-a";
@@ -111,18 +117,18 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
                 Verified = verified,
                 Visibility = new Audience(),
             };
-            await svc.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
+            await profileSettings.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
         }
 
         // verifiedOnly: true → only the two verified residents.
-        var verifiedOnly = await svc.GetProfilesAsync(verifiedOnly: true);
+        var verifiedOnly = await profileSettings.GetProfilesAsync(verifiedOnly: true);
         Assert.Equal(2, verifiedOnly.Count);
         Assert.Contains(verifiedOnly, p => p.SubjectId == verifiedA);
         Assert.Contains(verifiedOnly, p => p.SubjectId == verifiedB);
         Assert.DoesNotContain(verifiedOnly, p => p.SubjectId == unverifiedC);
 
         // verifiedOnly: false → every profile, including the unverified one.
-        var all = await svc.GetProfilesAsync(verifiedOnly: false);
+        var all = await profileSettings.GetProfilesAsync(verifiedOnly: false);
         Assert.Equal(3, all.Count);
         Assert.Contains(all, p => p.SubjectId == unverifiedC);
 
@@ -149,6 +155,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         // Two enabled components and one disabled, planted directly (Component.Id
         // is the identity — distinct stable ids).
@@ -165,14 +174,14 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         }
 
         // enabledOnly: true → only the two enabled components.
-        var enabledOnly = await svc.GetComponentsAsync(enabledOnly: true);
+        var enabledOnly = await profileSettings.GetComponentsAsync(enabledOnly: true);
         Assert.Equal(2, enabledOnly.Count);
         Assert.Contains(enabledOnly, c => c.Id == enabledA);
         Assert.Contains(enabledOnly, c => c.Id == enabledB);
         Assert.DoesNotContain(enabledOnly, c => c.Id == disabledC);
 
         // enabledOnly: false → every component, including the disabled one.
-        var all = await svc.GetComponentsAsync(enabledOnly: false);
+        var all = await profileSettings.GetComponentsAsync(enabledOnly: false);
         Assert.Equal(3, all.Count);
         Assert.Contains(all, c => c.Id == disabledC);
 
@@ -193,6 +202,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string owner = "u-owner-2";
         var group = await svc.CreateGroupAsync(owner, "Team X", "desc");
@@ -207,6 +219,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string owner = "u-owner-3";
         const string member = "u-member";
@@ -252,6 +267,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string o = "u-owner";
         var a = new Group { Id = "g-a", Name = "A", OwnerId = o };
@@ -300,6 +318,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         var now = DateTimeOffset.UtcNow;
         const string owner = "u-owner";
@@ -419,6 +440,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string owner = "u-owner-grant";
         const string delegatee = "u-delegate-grant";
@@ -469,6 +493,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string owner = "u-owner-revoke";
         const string delegatee = "u-delegate-revoke";
@@ -517,8 +544,11 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
-        var seeded = await svc.SeedComponentsAsync();
+        var seeded = await profileSettings.SeedComponentsAsync();
 
         var ids = seeded.Select(c => c.Id).ToHashSet();
         Assert.Equal(new[] { "safety", "maintenance", "social", "governance" }.ToHashSet(), ids);
@@ -528,13 +558,13 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         // An existing row's deliberate ON must survive a re-seed (C5's "only the flag path
         // flips it" — re-seeding never resets it).
         const string actor = "admin-seed";
-        await svc.SetComponentModeratorAccessAsync("safety", true, actor);
+        await profileSettings.SetComponentModeratorAccessAsync("safety", true, actor);
         await using (var session = store.QuerySession())
         {
             Assert.True((await session.LoadAsync<Component>("safety", TestContext.Current.CancellationToken))!.ModeratorAccess);
         }
 
-        var reseeded = await svc.SeedComponentsAsync();
+        var reseeded = await profileSettings.SeedComponentsAsync();
 
         Assert.Equal(4, reseeded.Count);
         Assert.Contains(reseeded, c => c.Id == "safety" && c.ModeratorAccess);
@@ -553,13 +583,16 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
-        await svc.SeedComponentsAsync();
+        await profileSettings.SeedComponentsAsync();
 
         const string actor = "u-admin";
         const string component = "social";
 
-        await svc.SetComponentModeratorAccessAsync(component, true, actor);
+        await profileSettings.SetComponentModeratorAccessAsync(component, true, actor);
         await using (var session = store.QuerySession())
         {
             Assert.True((await session.LoadAsync<Component>(component, TestContext.Current.CancellationToken))!.ModeratorAccess);
@@ -575,7 +608,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             Assert.Equal(AccessOutcome.Allow, on.Outcome);
         }
 
-        await svc.SetComponentModeratorAccessAsync(component, false, actor);
+        await profileSettings.SetComponentModeratorAccessAsync(component, false, actor);
         await using (var session = store.QuerySession())
         {
             Assert.False((await session.LoadAsync<Component>(component, TestContext.Current.CancellationToken))!.ModeratorAccess);
@@ -606,9 +639,12 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string actor = "admin-create";
-        var created = await svc.CreateCommunityAsync("Greenridge", "A quiet corner community.", actor);
+        var created = await communityService.CreateCommunityAsync("Greenridge", "A quiet corner community.", actor);
 
         // Defaults the admin never has to type (C5: ModeratorAccess is OFF by
         // default — only a deliberate flip sets it). Enabled is on by default,
@@ -623,7 +659,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         Assert.Equal(0, created.SortOrder);
 
         // Live read (invariant C4): the very next GetComponentsAsync call sees it.
-        var live = await svc.GetComponentsAsync(enabledOnly: true);
+        var live = await profileSettings.GetComponentsAsync(enabledOnly: true);
         Assert.Contains(live, c => c.Id == created.Id);
 
         // The audit row (invariant C3): one "community.add" row targeting the
@@ -651,9 +687,12 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            svc.CreateCommunityAsync("   ", "desc", "admin"));
+            communityService.CreateCommunityAsync("   ", "desc", "admin"));
     }
 
     // Test A3 — UpdateCommunityAsync null-patch (admin edit)
@@ -666,15 +705,18 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string actor = "admin-update";
-        var component = await svc.CreateCommunityAsync("Old Name", "Old description", actor);
+        var component = await communityService.CreateCommunityAsync("Old Name", "Old description", actor);
 
         // Update: rename + change sort, but leave the stored description
         // untouched (null patch field = keep as-is — the form's contract; an
         // admin who doesn't know the current description can still rename the
         // community without wiping what's there).
-        await svc.UpdateCommunityAsync(
+        await communityService.UpdateCommunityAsync(
             componentId: component.Id,
             name: "New Name",
             description: null,
@@ -711,13 +753,16 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string actor = "admin-flip";
-        var component = await svc.CreateCommunityAsync("Flip", null, actor);
+        var component = await communityService.CreateCommunityAsync("Flip", null, actor);
 
         // Flip moderator access ON (the ADR 0003 standing; C5's deliberate
         // ON) — and leave Enabled untouched.
-        await svc.UpdateCommunityAsync(
+        await communityService.UpdateCommunityAsync(
             componentId: component.Id,
             name: null, description: null, sortOrder: null,
             moderatorAccess: true, enabled: null, actorId: actor);
@@ -731,7 +776,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
 
         // Flip enabled OFF (the hide path; the user-chosen "remove") — and
         // leave ModeratorAccess untouched.
-        await svc.UpdateCommunityAsync(
+        await communityService.UpdateCommunityAsync(
             componentId: component.Id,
             name: null, description: null, sortOrder: null,
             moderatorAccess: null, enabled: false, actorId: actor);
@@ -758,9 +803,12 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.UpdateCommunityAsync("does-not-exist", "n", "d", 1, null, null, "admin"));
+            communityService.UpdateCommunityAsync("does-not-exist", "n", "d", 1, null, null, "admin"));
     }
 
     // Test A6 — SetCommunityEnabledAsync (admin hide / restore)
@@ -775,13 +823,16 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string actor = "admin-toggle";
-        var component = await svc.CreateCommunityAsync("Toggle", null, actor);
+        var component = await communityService.CreateCommunityAsync("Toggle", null, actor);
         Assert.True(component.Enabled);
 
         // Disable (the "remove a community" path the user chose — the hide, not the delete).
-        await svc.SetCommunityEnabledAsync(component.Id, false, actor);
+        await communityService.SetCommunityEnabledAsync(component.Id, false, actor);
         await using (var session = store.QuerySession())
         {
             Assert.False((await session.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken))!.Enabled);
@@ -793,7 +844,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
 
         // Re-enable (the restore path — the "the row + posts + assignments remain
         // intact" guarantee). The next enabledOnly:true read sees it.
-        await svc.SetCommunityEnabledAsync(component.Id, true, actor);
+        await communityService.SetCommunityEnabledAsync(component.Id, true, actor);
         await using (var session = store.QuerySession())
         {
             Assert.True((await session.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken))!.Enabled);
@@ -805,7 +856,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
 
         // The component remains in the GetComponentsAsync(enabledOnly:true) set
         // (it's back on) — the hide/restore round-trip preserves the row.
-        var visible = await svc.GetComponentsAsync(enabledOnly: true);
+        var visible = await profileSettings.GetComponentsAsync(enabledOnly: true);
         Assert.Contains(visible, c => c.Id == component.Id);
     }
 
@@ -824,21 +875,24 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         // First-boot seed (the four known defaults).
-        await svc.SeedComponentsAsync();
+        await profileSettings.SeedComponentsAsync();
 
         // An admin adds a community and explicitly enables standing moderator
         // access (C5's intentional ON).
-        var adminRow = await svc.CreateCommunityAsync("Admin's Garden", null, "admin");
-        await svc.UpdateCommunityAsync(
+        var adminRow = await communityService.CreateCommunityAsync("Admin's Garden", null, "admin");
+        await communityService.UpdateCommunityAsync(
             componentId: adminRow.Id,
             name: null, description: null, sortOrder: null,
             moderatorAccess: true, enabled: null, actorId: "admin");
 
         // Warm re-seed (the rare outer-gate bypass) — the four seeds are
         // idempotent and the admin row is untouched (including its flag).
-        await svc.SeedComponentsAsync();
+        await profileSettings.SeedComponentsAsync();
 
         await using var session = store.QuerySession();
         var adminAfter = await session.LoadAsync<Component>(adminRow.Id, TestContext.Current.CancellationToken);
@@ -869,6 +923,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         var subject = "u-upsert";
         var bootstrap = new Profile
@@ -879,7 +936,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             Verified = true,
             Visibility = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, subject)]),
         };
-        await svc.UpsertProfileAsync(bootstrap, new ProfileUpdate(null, null, null, null, null));
+        await profileSettings.UpsertProfileAsync(bootstrap, new ProfileUpdate(null, null, null, null, null));
 
         var created = await svc.GetProfileAsync(subject);
         Assert.NotNull(created);
@@ -888,7 +945,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         Assert.True(created.Verified);
 
         // A patch that sets DisplayName and leaves Email null updates only DisplayName.
-        await svc.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             bootstrap, // identity/context; patch's non-null fields take priority
             new ProfileUpdate("Second Name", null, null, null, null));
 
@@ -912,6 +969,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string admin  = "u-mem-admin";
         const string target = "u-mem-target";
         const string comp   = "c-mem-a";
@@ -938,6 +998,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string admin  = "u-mem-admin2";
         const string target = "u-mem-target2";
         const string comp   = "c-mem-b";
@@ -965,6 +1028,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string admin  = "u-mem-admin3";
         const string target = "u-mem-target3";
         const string comp   = "c-mem-c";
@@ -990,6 +1056,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string admin  = "u-mem-admin4";
         const string target = "u-mem-target4";
         const string comp   = "c-mem-d";
@@ -1015,6 +1084,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string admin  = "u-mem-admin5";
         const string target = "u-mem-target5";
         const string c1 = "c-mem-e";
@@ -1048,17 +1120,20 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-mand-admin";
         await Plant(store, new Component { Id = comp, Name = "Mand", Enabled = true });
 
         await svc.SetCommunityMandatoryAsync(comp, true, "a-admin", RoleSet(Roles.GlobalAdmin));
-        Assert.True((await svc.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
+        Assert.True((await profileSettings.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
         var mandatoryAudit = (await AuditsFor(store, "a-admin", "community.set-mandatory"))
             .Single(a => a.TargetKind == "component" && a.TargetId == comp);
         Assert.Equal(AccessVia.Admin, mandatoryAudit.Via); // admin-only lane → never Moderator
 
         await svc.SetCommunityMandatoryAsync(comp, false, "a-admin", RoleSet(Roles.GlobalAdmin));
-        Assert.False((await svc.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
+        Assert.False((await profileSettings.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
         Assert.Single(await AuditsFor(store, "a-admin", "community.set-optional"), a => a.TargetId == comp);
     }
 
@@ -1067,6 +1142,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-mand-mod";
         await Plant(store, new Component { Id = comp, Name = "M", Enabled = true });
         const string mod = "mod-mod";
@@ -1079,7 +1157,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
                 RoleSet(Roles.Moderator, Roles.ModeratorComponent(comp))));
 
         // No side effects of the refusal: flag untouched, no audit row at all.
-        Assert.False((await svc.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
+        Assert.False((await profileSettings.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
         Assert.Empty(await AuditsFor(store, mod, "community.set-mandatory"));
     }
     [Fact]
@@ -1087,6 +1165,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-mand-mbr";
         await Plant(store, new Component { Id = comp, Name = "M", Enabled = true });
 
@@ -1099,6 +1180,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string mand = "c-union-mand";
         await Plant(store, new Component { Id = mand, Name = "M", Enabled = true, Mandatory = true });
 
@@ -1113,6 +1197,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-union-disabled";
         await Plant(store, new Component { Id = comp, Name = "M", Enabled = false, Mandatory = true });
 
@@ -1124,6 +1211,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-add";
         await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
 
@@ -1144,6 +1234,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-add-mbr";
         await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
 
@@ -1156,6 +1249,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-rm-mand";
         await Plant(store, new Component { Id = comp, Name = "M", Enabled = true, Mandatory = true });
         await Plant(store, new ComponentMembership { Id = "m-rm", ComponentId = comp, UserId = "u-t" });
@@ -1170,6 +1266,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-rm-opt";
         await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
         await Plant(store, new ComponentMembership { Id = "m-rm2", ComponentId = comp, UserId = "u-t" });
@@ -1185,6 +1284,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-clear-mand";
         await Plant(store, new Component { Id = comp, Name = "M", Enabled = true, Mandatory = true });
         await Plant(store, new ComponentMembership { Id = "m-clear", ComponentId = comp, UserId = "u-t" });
@@ -1200,6 +1302,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-selfleave";
         await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
         const string actor = "u-self";
@@ -1218,6 +1323,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-members";
         const string other = "c-members-other";
         await Plant(store, new Component { Id = comp, Name = "A", Enabled = true });
@@ -1226,7 +1334,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         await Plant(store, new ComponentMembership { Id = "m-2", ComponentId = comp, UserId = "u-b" });
         await Plant(store, new ComponentMembership { Id = "m-3", ComponentId = other, UserId = "u-x" });
 
-        var rows = await svc.GetCommunityMembersAsync(comp);
+        var rows = await communityService.GetCommunityMembersAsync(comp);
 
         Assert.Equal(2, rows.Count);
         Assert.Contains(rows, r => r.UserId == "u-a");
@@ -1242,6 +1350,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-block-excl";
         const string child = "u-block-child";
         await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
@@ -1266,6 +1377,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string mand = "c-block-mand";
         const string child = "u-block-mand-child";
         await Plant(store, new Component { Id = mand, Name = "M", Enabled = true, Mandatory = true });
@@ -1290,6 +1404,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-block-toggle";
         const string child = "u-block-toggle-child";
         const string guardian = "u-block-toggle-guardian";
@@ -1300,10 +1417,10 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             SubjectId = child, DisplayName = "Child", Verified = true, Blocked = false,
             Visibility = new Audience(), BlockedCommunityIds = []
         });
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // Block — the community leaves the effective set, the raw read keeps it.
-        await svc.SetChildCommunityBlockAsync(child, comp, true, guardian);
+        await guardianService.SetChildCommunityBlockAsync(child, comp, true, guardian);
         Assert.DoesNotContain(comp, await svc.GetEffectiveCommunityIdsAsync(child));
         Assert.Contains(comp, await svc.GetCommunityIdsAsync(child));
         Assert.Contains(comp, (await svc.GetProfileAsync(child))!.BlockedCommunityIds);
@@ -1312,7 +1429,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         Assert.Equal(guardian, blockRow.ActorId);
 
         // Unblock — the effective set is restored (full access again).
-        await svc.SetChildCommunityBlockAsync(child, comp, false, guardian);
+        await guardianService.SetChildCommunityBlockAsync(child, comp, false, guardian);
         Assert.Contains(comp, await svc.GetEffectiveCommunityIdsAsync(child));
         Assert.DoesNotContain(comp, (await svc.GetProfileAsync(child))!.BlockedCommunityIds);
         var unblockRow = (await AuditsFor(store, guardian, "guardian.community_unblock")).Single(a => a.TargetId == comp);
@@ -1324,6 +1441,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string comp = "c-block-nonguardian";
         const string child = "u-block-nonguardian-child";
         await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
@@ -1336,7 +1456,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         // No active guardian link for (guardian, child) → the standing gate
         // fires (the GU deny-by-default shape). The write never happens.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.SetChildCommunityBlockAsync(child, comp, true, "u-stranger"));
+            () => guardianService.SetChildCommunityBlockAsync(child, comp, true, "u-stranger"));
         Assert.Empty((await svc.GetProfileAsync(child))!.BlockedCommunityIds);
     }
 

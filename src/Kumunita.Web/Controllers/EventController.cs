@@ -10,7 +10,6 @@ using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -73,8 +72,9 @@ public sealed class EventController : Controller
 
     private readonly IEventService events;
     private readonly IUserInfoService userInfo;
+    private readonly IProfileSettingsService profileSettings;
+    private readonly IGroupService groupService;
     private readonly ILocalizationService localization;
-    private readonly IDocumentStore store;
     private readonly EffectiveTimezoneResolver timezone;
     private readonly ITranslationProvider? translationProvider;
     // M12 (ADR 0112, §field-map) — the tag read seam, resolving the
@@ -99,6 +99,13 @@ public sealed class EventController : Controller
     // <see cref="ProjectsController"/> idiom); absent, the section simply
     // omits.
     private readonly IProjectService? projects;
+    // C08 (ADR 0287) — the Projects split: the event-detail linked to-dos /
+    // boards read lanes (ListTodosForEventAsync / ListBoardsForEventAsync) and
+    // the event-create-to-do lanes (CreateTodoAsync / SetTodoEventAsync) now
+    // live on the sibling seams. Optional (the CS1736 idiom) so test sites keep
+    // compiling; DI supplies them in the app.
+    private readonly ITodoService? todos;
+    private readonly IBoardService? boards;
 
     // ADR 0020 — the per-request **effective date-time format** resolver,
     // injected (like the <c>EffectiveTimezoneResolver</c> above) so the
@@ -113,26 +120,43 @@ public sealed class EventController : Controller
     // Calendar_Label_IsViewAppropriate</c> pin, invariant/en). DI always
     // supplies the live resolver in the app.
     private readonly EffectiveDateFormatResolver? dateFormat;
+    // C3-00 (ADR 0290 named seam) — the guardian event-attendance RSVP seam
+    // (the self-lane <c>RsvpAsync</c> now lives on this seam, extracted from
+    // <c>EventService</c>). Nullable (the CS1736 idiom) so the pre-seam test
+    // construction sites keep compiling; the <c>Rsvp</c> action null-guards
+    // (a missing seam is a 404 — the <see cref="GuardianController"/> idiom).
+    private readonly IEventRsvpGuardian? rsvpGuardian;
 
     public EventController(
         IEventService events,
-        IUserInfoService userInfo,
+        IUserInfoService userInfo, IProfileSettingsService profileSettings, IGroupService groupService,
         ILocalizationService localization,
-        IDocumentStore store,
         EffectiveTimezoneResolver timezone,
         ITranslationProvider? translationProvider = null,
         ITagService? tags = null,
         IProjectService? projects = null,
-        EffectiveDateFormatResolver? dateFormat = null)
+        ITodoService? todos = null,
+        IBoardService? boards = null,
+        EffectiveDateFormatResolver? dateFormat = null,
+        IEventRsvpGuardian? rsvpGuardian = null)
     {
         this.events = events;
+        // C3-00 (ADR 0290 named seam) — the guardian event-attendance RSVP
+        // cluster (the self-lane RsvpAsync lives here now, extracted from
+        // EventService). Nullable (the CS1736 idiom) so the pre-seam test
+        // construction sites keep compiling; the Rsvp action null-guards (a
+        // missing seam is a 404 — the <see cref="GuardianController"/> idiom).
+        this.rsvpGuardian = rsvpGuardian;
         this.userInfo = userInfo;
+this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
+        this.groupService = groupService ?? throw new ArgumentNullException(nameof(groupService));
         this.localization = localization;
-        this.store = store;
         this.timezone = timezone;
         this.translationProvider = translationProvider;
         this.tags = tags;
         this.projects = projects;
+        this.todos = todos;
+        this.boards = boards;
         this.dateFormat = dateFormat;
     }
     private static string? SubjectId(ClaimsPrincipal user) =>
@@ -141,16 +165,9 @@ public sealed class EventController : Controller
     private static IReadOnlySet<string> RoleSet(ClaimsPrincipal user) =>
         KumunitaPrincipal.RoleSet(user);
 
-    // ── Seed helpers (U05, IMPROVE lane — the composer trio is now defined
-    // once in <see cref="ComposerSeedOptions"/>; the per-controller copies
-    // that used to live here are thin delegates to that helper. The
-    // doc-comment's "mirrored, not re-invented" claim is now true.)
-
-    private Task SeedGrantPickerOptionsAsync()
-        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo);
-
-    private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-        => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+    // U05, IMPROVE lane — the composer trio is defined once in
+    // <see cref="ComposerSeedOptions"/>; the per-controller stubs that used to
+    // live here are deleted (C11 — the call sites call the helper directly).
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the
@@ -170,9 +187,6 @@ public sealed class EventController : Controller
             return await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
         return await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
     }
-
-    private Task<IReadOnlyList<(string Id, string Name)>> SeedComponentPickerAsync()
-        => ComposerSeedOptions.SeedComponentPickerAsync(userInfo);
 
     /// <summary>
     /// ADR 0051 — in place, swap <paramref name="event"/>'s Title/Body to the
@@ -380,7 +394,7 @@ public sealed class EventController : Controller
         var componentIds = events
             .Concat(myEvents)
             .Select(e => e.ComponentId).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
-        var allComponents = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var allComponents = await profileSettings.GetComponentsAsync(enabledOnly: true);
         var componentById = allComponents
             .Where(c => componentIds.Contains(c.Id))
             .ToDictionary(c => c.Id, c => string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name);
@@ -663,7 +677,7 @@ public sealed class EventController : Controller
 
         // Component display names (a *read* lookup, never a gate — C-M3·2).
         var componentIds = events.Select(e => e.ComponentId).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
-        var allComponents = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var allComponents = await profileSettings.GetComponentsAsync(enabledOnly: true);
         var componentById = allComponents
             .Where(c => componentIds.Contains(c.Id))
             .ToDictionary(c => c.Id, c => string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name);
@@ -916,7 +930,7 @@ public sealed class EventController : Controller
         // §3.4 standing affordances (the buttons' rule, in step with the service).
         var canEdit = false;
         var canDelete = false;
-        try { EventService.CheckEditStanding(actorId, roles, ev); canEdit = true; }
+        try { EventStandingPolicy.CheckEdit(actorId, roles, ev); canEdit = true; }
         catch (KeyNotFoundException) { canEdit = false; }
         catch (UnauthorizedAccessException) { canEdit = false; }
         // The §3.4 standing matrix's edit + delete rows are identical (author ∪
@@ -934,7 +948,7 @@ public sealed class EventController : Controller
         string? componentName = null;
         if (!string.IsNullOrEmpty(ev.ComponentId))
         {
-            var allComponents = await userInfo.GetComponentsAsync(enabledOnly: true);
+            var allComponents = await profileSettings.GetComponentsAsync(enabledOnly: true);
             var match = allComponents.FirstOrDefault(c => c.Id == ev.ComponentId);
             componentName = match is not null && !string.IsNullOrWhiteSpace(match.Name) ? match.Name : null;
         }
@@ -979,12 +993,12 @@ public sealed class EventController : Controller
         // display pin (author / Translator / GlobalAdmin) — the real gate is the
         // server-side re-check in the Add/Update/Remove lanes at POST.
         var eventTranslations = await this.events.GetEventTranslationsAsync(id);
-        var enabledLanguages = await SeedLanguagePickerAsync();
+        var enabledLanguages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
         var translationCodes = eventTranslations.Select(t => t.LanguageCode).ToHashSet();
         var languages = enabledLanguages
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
             .ToList();
-        var canTranslate = EventService.CanAddTranslation(ev.AuthorId, actorId, roles);
+        var canTranslate = EventStandingPolicy.CanAddTranslation(ev.AuthorId, actorId, roles);
 
         // ADR 0115 D2 (M14 interlock) — the **linked to-dos** section (the
         // reverse read seam's page, mapped to <see cref="LinkedTodoRow"/>
@@ -999,7 +1013,7 @@ public sealed class EventController : Controller
         IReadOnlyList<LinkedTodoRow>? linkedTodos = null;
         if (projects is not null)
         {
-            var linkedPage = await projects.ListTodosForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
+            var linkedPage = await todos.ListTodosForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
             if (linkedPage.Items.Count > 0)
             {
                 linkedTodos = linkedPage.Items
@@ -1026,7 +1040,7 @@ public sealed class EventController : Controller
         IReadOnlyList<LinkedBoardRow>? linkedBoards = null;
         if (projects is not null)
         {
-            var linkedBoardsPage = await projects.ListBoardsForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
+            var linkedBoardsPage = await boards.ListBoardsForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
             if (linkedBoardsPage.Items.Count > 0)
             {
                 linkedBoards = linkedBoardsPage.Items
@@ -1168,7 +1182,7 @@ public sealed class EventController : Controller
         TodoItem todo;
         try
         {
-            todo = await projects.CreateTodoAsync(actorId, RoleSet(User), request, HttpContext.RequestAborted);
+            todo = await todos.CreateTodoAsync(actorId, RoleSet(User), request, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)
         {
@@ -1191,7 +1205,7 @@ public sealed class EventController : Controller
         // already-successful create).
         try
         {
-            await projects.SetTodoEventAsync(
+            await todos.SetTodoEventAsync(
                 todo.Id, actorId, RoleSet(User), id, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)
@@ -1407,14 +1421,14 @@ public sealed class EventController : Controller
             End = start.DateTime.AddHours(1),
             ReminderEnabled = true,
             SaveAsDraft = true, // ADR 0037 — a new event is a draft until published.
-            Languages = await SeedLanguagePickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
             LanguageCode = await ResolveComposeDefaultLanguageAsync(),
-            Components = await SeedComponentPickerAsync(),
+            Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
         };
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
         return View("Create", model);
     }
 
@@ -1430,7 +1444,7 @@ public sealed class EventController : Controller
     /// single deserialization site (the M2 single-source pin, ADR 0001-B); the
     /// <c>ImageIds</c> / <c>AttachmentIds</c> are the server-side body parse
     /// (RC R·3 / ATT U5 — the client never sends them); the <c>TagIds</c> are
-    /// the server-side <see cref="TagSlugs.Parse"/> (TG, ADR 0044).
+    /// the server-side <see cref="TagSlugParser.Parse"/> (TG, ADR 0044).
     /// </summary>
     [HttpPost("/events/new")]
     [ValidateAntiForgeryToken]
@@ -1457,9 +1471,9 @@ public sealed class EventController : Controller
 
         // Re-seed the pickers so a failed-shape re-render below still shows the
         // language + component + grant options.
-        model.Components = await SeedComponentPickerAsync();
-        model.Languages = await SeedLanguagePickerAsync();
-        await SeedGrantPickerOptionsAsync();
+        model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
         if (!model.IsValid)
         {
@@ -1509,7 +1523,7 @@ public sealed class EventController : Controller
             ReminderEnabled = model.ReminderEnabled,
             IsDraft = model.SaveAsDraft, // ADR 0037 — the composer's save-as-draft toggle.
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
-            TagIds = TagSlugs.Parse(model.TagIds), // TG (ADR 0044) — server-side parse + normalize.
+            TagIds = TagSlugParser.Parse(model.TagIds), // TG (ADR 0044) — server-side parse + normalize.
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 — server-side body parse.
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U5 — server-side body parse.
             // M18 (ADR 0119, D2 / D7) — the composer's recurrence picker, mapped
@@ -1574,7 +1588,7 @@ public sealed class EventController : Controller
 
         try
         {
-            EventService.CheckEditStanding(actorId, roles, ev);
+            EventStandingPolicy.CheckEdit(actorId, roles, ev);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1602,8 +1616,8 @@ public sealed class EventController : Controller
             ReminderEnabled = ev.ReminderEnabled,
             LanguageCode = ev.LanguageCode,
             TagIds = ev.TagIds.Count > 0 ? JsonSerializer.Serialize(ev.TagIds) : "[]",
-            Languages = await SeedLanguagePickerAsync(),
-            Components = await SeedComponentPickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
+            Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings),
             // M18 (ADR 0119, D3) — a non-head occurrence's rule is null (the
             // head carries the rule), so the composer hides the picker on a
             // non-head row (the @if guard in Edit.cshtml); false on the create
@@ -1625,7 +1639,7 @@ public sealed class EventController : Controller
                 model.EndsOnDate = TimeZoneInfo.ConvertTime(headEnds, editorZone).DateTime;
         }
 
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
         return View("Edit", model);
     }
 
@@ -1659,7 +1673,7 @@ public sealed class EventController : Controller
 
         try
         {
-            EventService.CheckEditStanding(actorId, roles, ev);
+            EventStandingPolicy.CheckEdit(actorId, roles, ev);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1667,9 +1681,9 @@ public sealed class EventController : Controller
         }
 
         model.Id = id;
-        model.Components = await SeedComponentPickerAsync();
-        model.Languages = await SeedLanguagePickerAsync();
-        await SeedGrantPickerOptionsAsync();
+        model.Components = await ComposerSeedOptions.SeedComponentPickerAsync(profileSettings);
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
         if (!model.IsValid)
         {
@@ -1719,7 +1733,7 @@ public sealed class EventController : Controller
             Audience = model.Audience.BuildAudience(),
             ReminderEnabled = model.ReminderEnabled,
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
-            TagIds = TagSlugs.Parse(model.TagIds),
+            TagIds = TagSlugParser.Parse(model.TagIds),
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
             // M18 (ADR 0119, D2 / D4) — the composer's recurrence picker, mapped
@@ -1808,7 +1822,7 @@ public sealed class EventController : Controller
 
         try
         {
-            EventService.CheckEditStanding(actorId, roles, ev);
+            EventStandingPolicy.CheckEdit(actorId, roles, ev);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1919,10 +1933,16 @@ public sealed class EventController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Rsvp(string id, [FromForm] RsvpStatus status)
     {
+        // C3-00 (ADR 0290 named seam) — the self-lane RSVP now lives on the
+        // <see cref="IEventRsvpGuardian"/> seam (extracted from EventService).
+        // A missing seam (the pre-seam test construction sites) is a 404 —
+        // the <see cref="GuardianController"/> null-guard idiom.
+        if (rsvpGuardian is null)
+            return NotFound();
         var actorId = SubjectId(User) ?? string.Empty;
         try
         {
-            await this.events.RsvpAsync(id, actorId, status, HttpContext.RequestAborted);
+            await rsvpGuardian.RsvpAsync(id, actorId, status, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)
         {
@@ -1956,7 +1976,7 @@ public sealed class EventController : Controller
     // a missing event/row is a 404 (<see cref="KeyNotFoundException"/> →
     // <c>NotFound</c>). The M4 convention: the service opens its **own** write
     // session (C3) — the controller does **not** wrap the call in
-    // <see cref="IDocumentStore.LightweightSession"/> (contrast the M3
+    // a document-store write session (contrast the M3
     // <see cref="PostsController"/> translation lanes).
 
     /// <summary>

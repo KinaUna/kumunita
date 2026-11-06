@@ -16,8 +16,8 @@ namespace Kumunita.Core.Tests;
 /// <see cref="PostService.GetPostTranslationsAsync"/> /
 /// <see cref="PostService.GetReplyTranslationsAsync"/> (the "a read, not a
 /// decision" surface — no audit row) and
-/// <see cref="PostService.AddPostTranslationAsync"/> /
-/// <see cref="PostService.AddReplyTranslationAsync"/> (the standing gate —
+/// <see cref="PostService.PostTranslationLane"/> /
+/// <see cref="PostService.ReplyTranslationLane"/> (the standing gate —
 /// author / community-moderator / GlobalAdmin — + its hand-written
 /// <c>AccessAudit</c> row, the <c>ModerationService.FileReportAsync</c>
 /// precedent) and the public <see cref="PostService.CanAddTranslation"/>
@@ -142,7 +142,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         await Plant(store, CommunityPost("a022-p", author));
 
         var created = await RunInSession(store, async s =>
-            await posts.AddPostTranslationAsync("a022-p", "pl", "Tyt", "ciało", author, RoleSet(), s));
+            await posts.PostTranslationLane.AddAsync(s, "a022-p", "pl", "Tyt", "ciało", author, RoleSet()));
 
         Assert.Equal("a022-p", created.PostId);
         Assert.Equal("pl", created.LanguageCode);
@@ -169,9 +169,9 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         await Plant(store, CommunityPost("a022-p", author));
 
         await RunInSession(store, async s =>
-            await posts.AddPostTranslationAsync(
-                "a022-p", "de", null, "Körper", moderator,
-                RoleSet(Roles.Moderator, Roles.ModeratorComponent(ComponentId)), s));
+            await posts.PostTranslationLane.AddAsync(
+                s, "a022-p", "de", null, "Körper", moderator,
+                RoleSet(Roles.Moderator, Roles.ModeratorComponent(ComponentId))));
 
         var audit = Assert.Single(await AuditsFor(store, "posttranslation.add"));
         Assert.Equal(AccessVia.Moderator, audit.Via);
@@ -189,8 +189,8 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         await Plant(store, CommunityPost("a022-p", author));
 
         await RunInSession(store, async s =>
-            await posts.AddPostTranslationAsync(
-                "a022-p", "es", null, "cuerpo", admin, RoleSet(Roles.GlobalAdmin), s));
+            await posts.PostTranslationLane.AddAsync(
+                s, "a022-p", "es", null, "cuerpo", admin, RoleSet(Roles.GlobalAdmin)));
 
         var audit = Assert.Single(await AuditsFor(store, "posttranslation.add"));
         Assert.Equal(AccessVia.Admin, audit.Via);
@@ -208,7 +208,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         await Plant(store, CommunityPost("a022-p", author));
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
-            posts.AddPostTranslationAsync("a022-p", "pl", null, "ciało", stranger, RoleSet(Roles.Member), s)));
+            posts.PostTranslationLane.AddAsync(s, "a022-p", "pl", null, "ciało", stranger, RoleSet(Roles.Member))));
 
         // No domain row, no audit row — the denial is before any write.
         Assert.Empty(await posts.GetPostTranslationsAsync("a022-p"));
@@ -227,9 +227,9 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         await Plant(store, CommunityPost("a022-p", author));
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
-            posts.AddPostTranslationAsync(
-                "a022-p", "pl", null, "ciało", mod,
-                RoleSet(Roles.Moderator, Roles.ModeratorComponent(otherComp)), s)));
+            posts.PostTranslationLane.AddAsync(
+                s, "a022-p", "pl", null, "ciało", mod,
+                RoleSet(Roles.Moderator, Roles.ModeratorComponent(otherComp)))));
 
         Assert.Empty(await posts.GetPostTranslationsAsync("a022-p"));
         Assert.Empty(await AuditsFor(store, "posttranslation.add"));
@@ -258,9 +258,9 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         // A GlobalAdmin-scoped claim is irrelevant here; a *component* moderator
         // claim must not grant standing on the group lane (ADR 0007).
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
-            posts.AddPostTranslationAsync(
-                "a022-gp", "pl", null, "ciało", mod,
-                RoleSet(Roles.Moderator, Roles.ModeratorComponent(ComponentId)), s)));
+            posts.PostTranslationLane.AddAsync(
+                s, "a022-gp", "pl", null, "ciało", mod,
+                RoleSet(Roles.Moderator, Roles.ModeratorComponent(ComponentId)))));
 
         Assert.Empty(await posts.GetPostTranslationsAsync("a022-gp"));
         Assert.Empty(await AuditsFor(store, "posttranslation.add"));
@@ -284,7 +284,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         await RunInSession(store, s =>
-            posts.AddPostTranslationAsync("a022-gp", "fr", null, "corps", author, RoleSet(), s));
+            posts.PostTranslationLane.AddAsync(s, "a022-gp", "fr", null, "corps", author, RoleSet()));
 
         var audit = Assert.Single(await AuditsFor(store, "posttranslation.add"));
         Assert.Equal(AccessVia.Owner, audit.Via);
@@ -307,7 +307,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         var created = await RunInSession(store, s =>
-            posts.AddReplyTranslationAsync("a022-r", "pl", "odpowiedź", author, RoleSet(), s));
+            posts.ReplyTranslationLane.AddAsync(s, "a022-r", "pl", null, "odpowiedź", author, RoleSet()));
 
         Assert.Equal("a022-r", created.ReplyId);
         Assert.Equal("odpowiedź", created.Body);
@@ -337,9 +337,9 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         await RunInSession(store, s =>
-            posts.AddReplyTranslationAsync(
-                "a022-r", "de", "Antwort", mod,
-                RoleSet(Roles.Moderator, Roles.ModeratorComponent(ComponentId)), s));
+            posts.ReplyTranslationLane.AddAsync(
+                s, "a022-r", "de", null, "Antwort", mod,
+                RoleSet(Roles.Moderator, Roles.ModeratorComponent(ComponentId))));
 
         var audit = Assert.Single(await AuditsFor(store, "replytranslation.add"));
         Assert.Equal(AccessVia.Moderator, audit.Via);
@@ -361,7 +361,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
-            posts.AddReplyTranslationAsync("a022-r", "pl", "odpowiedź", stranger, RoleSet(Roles.Member), s)));
+            posts.ReplyTranslationLane.AddAsync(s, "a022-r", "pl", null, "odpowiedź", stranger, RoleSet(Roles.Member))));
 
         Assert.Empty((await posts.GetReplyTranslationsAsync(new[] { "a022-r" })).ToList());
         Assert.Empty(await AuditsFor(store, "replytranslation.add"));
@@ -384,7 +384,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         var updated = await RunInSession(store, s =>
-            posts.UpdatePostTranslationAsync("a022-p", "pl", "Nowy", "nowe ciało", author, RoleSet(), s));
+            posts.PostTranslationLane.UpdateAsync(s, "a022-p", "pl", "Nowy", "nowe ciało", author, RoleSet()));
 
         Assert.Equal("a022-t1", updated.Id);
         Assert.Equal("Nowy", updated.Title);
@@ -417,7 +417,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         var updated = await RunInSession(store, s =>
-            posts.UpdatePostTranslationAsync("a022-p", "pl", null, "ciało", author, RoleSet(), s));
+            posts.PostTranslationLane.UpdateAsync(s, "a022-p", "pl", null, "ciało", author, RoleSet()));
 
         Assert.Null(updated.Title);
     }
@@ -432,7 +432,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         await Plant(store, CommunityPost("a022-p", author));
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() => RunInSession(store, s =>
-            posts.UpdatePostTranslationAsync("a022-p", "pl", "T", "ciało", author, RoleSet(), s)));
+            posts.PostTranslationLane.UpdateAsync(s, "a022-p", "pl", "T", "ciało", author, RoleSet())));
 
         Assert.Empty(await AuditsFor(store, "posttranslation.update"));
     }
@@ -453,7 +453,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
-            posts.UpdatePostTranslationAsync("a022-p", "pl", "X", "ciało", stranger, RoleSet(Roles.Member), s)));
+            posts.PostTranslationLane.UpdateAsync(s, "a022-p", "pl", "X", "ciało", stranger, RoleSet(Roles.Member))));
 
         Assert.Single(await posts.GetPostTranslationsAsync("a022-p")); // untouched
         Assert.Empty(await AuditsFor(store, "posttranslation.update"));
@@ -474,7 +474,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         await RunInSession(store, s =>
-            posts.RemovePostTranslationAsync("a022-p", "pl", author, RoleSet(), s));
+            posts.PostTranslationLane.RemoveAsync(s, "a022-p", "pl", author, RoleSet()));
 
         Assert.Empty(await posts.GetPostTranslationsAsync("a022-p"));
 
@@ -495,7 +495,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         await Plant(store, CommunityPost("a022-p", author));
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() => RunInSession(store, s =>
-            posts.RemovePostTranslationAsync("a022-p", "pl", author, RoleSet(), s)));
+            posts.PostTranslationLane.RemoveAsync(s, "a022-p", "pl", author, RoleSet())));
 
         Assert.Empty(await AuditsFor(store, "posttranslation.remove"));
     }
@@ -516,7 +516,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
-            posts.RemovePostTranslationAsync("a022-p", "pl", stranger, RoleSet(Roles.Member), s)));
+            posts.PostTranslationLane.RemoveAsync(s, "a022-p", "pl", stranger, RoleSet(Roles.Member))));
 
         Assert.Single(await posts.GetPostTranslationsAsync("a022-p")); // untouched
         Assert.Empty(await AuditsFor(store, "posttranslation.remove"));
@@ -542,7 +542,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         var updated = await RunInSession(store, s =>
-            posts.UpdateReplyTranslationAsync("a022-r", "pl", "nowa odpowiedź", author, RoleSet(), s));
+            posts.ReplyTranslationLane.UpdateAsync(s, "a022-r", "pl", null, "nowa odpowiedź", author, RoleSet()));
 
         Assert.Equal("nowa odpowiedź", updated.Body);
 
@@ -575,7 +575,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         await RunInSession(store, s =>
-            posts.RemoveReplyTranslationAsync("a022-r", "pl", author, RoleSet(), s));
+            posts.ReplyTranslationLane.RemoveAsync(s, "a022-r", "pl", author, RoleSet()));
 
         Assert.Empty((await posts.GetReplyTranslationsAsync(new[] { "a022-r" })).ToList());
 
@@ -606,7 +606,7 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
-            posts.UpdateReplyTranslationAsync("a022-r", "pl", "x", stranger, RoleSet(Roles.Member), s)));
+            posts.ReplyTranslationLane.UpdateAsync(s, "a022-r", "pl", null, "x", stranger, RoleSet(Roles.Member))));
 
         Assert.Empty(await AuditsFor(store, "replytranslation.update"));
     }

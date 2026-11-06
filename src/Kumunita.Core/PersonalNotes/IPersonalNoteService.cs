@@ -54,6 +54,16 @@ public interface IPersonalNoteService
         IDocumentSession session);
 
     /// <summary>
+    /// <see cref="CreateNoteAsync(string, string, string, string, IDocumentSession)"/>
+    /// with the commit owned here (IMPROVE-CODE C09 — the Web seam no longer
+    /// opens a Marten session): the row commits in this service's own fresh
+    /// <c>IDocumentSession</c> before the return. Same visibility table, same
+    /// <see cref="KeyNotFoundException"/> contract.
+    /// </summary>
+    Task<NoteRow> CreateNoteAsync(
+        string ownerId, string targetKind, string targetId, string body);
+
+    /// <summary>
     /// The owner's own note by id — zero audit (C-M37·2). A non-owner gets a
     /// non-leaky 404 (the Web layer's <c>[Authorize]</c> +
     /// <c>ownerId == User id</c> check). A missing note throws
@@ -86,6 +96,13 @@ public interface IPersonalNoteService
         string ownerId, string noteId, string body, IDocumentSession session);
 
     /// <summary>
+    /// <see cref="UpdateNoteBodyAsync(string, string, string, IDocumentSession)"/>
+    /// with the commit owned here (IMPROVE-CODE C09 — see the
+    /// <see cref="CreateNoteAsync(string, string, string, string)"/> shape).
+    /// </summary>
+    Task<NoteRow> UpdateNoteBodyAsync(string ownerId, string noteId, string body);
+
+    /// <summary>
     /// Physical removal — the body is gone, the note row is gone (the M17
     /// Bookmark shape). A dangling row is removable (D7 / F4 — no target
     /// read). Returns <see cref="NoteDeleteStatus.Deleted"/> on success,
@@ -97,6 +114,13 @@ public interface IPersonalNoteService
         string ownerId, string noteId, IDocumentSession session);
 
     /// <summary>
+    /// <see cref="DeleteNoteAsync(string, string, IDocumentSession)"/> with
+    /// the commit owned here (IMPROVE-CODE C09 — the same committed-write
+    /// shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    Task<NoteDeleteStatus> DeleteNoteAsync(string ownerId, string noteId);
+
+    /// <summary>
     /// Adds a tag to the note — the tag is normalized (lowercase, trimmed,
     /// deduped, sorted — D5 / C-M37·5). A non-owner or missing note throws
     /// <see cref="KeyNotFoundException"/>.
@@ -105,12 +129,26 @@ public interface IPersonalNoteService
         string ownerId, string noteId, string tag, IDocumentSession session);
 
     /// <summary>
+    /// <see cref="AddTagAsync(string, string, string, IDocumentSession)"/>
+    /// with the commit owned here (IMPROVE-CODE C09 — the same committed-
+    /// write shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    Task<NoteRow> AddTagAsync(string ownerId, string noteId, string tag);
+
+    /// <summary>
     /// Removes a tag from the note — the tag is normalized before removal
     /// (D5 / C-M37·5). A non-owner or missing note throws
     /// <see cref="KeyNotFoundException"/>.
     /// </summary>
     Task<NoteRow> RemoveTagAsync(
         string ownerId, string noteId, string tag, IDocumentSession session);
+
+    /// <summary>
+    /// <see cref="RemoveTagAsync(string, string, string, IDocumentSession)"/>
+    /// with the commit owned here (IMPROVE-CODE C09 — the same committed-
+    /// write shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    Task<NoteRow> RemoveTagAsync(string ownerId, string noteId, string tag);
 
     /// <summary>
     /// The "noted" state on reload — the F1 witness, zero audit (C-M37·2).
@@ -140,11 +178,25 @@ public interface IPersonalNoteService
         string ownerId, string name, string? parentId, IDocumentSession session);
 
     /// <summary>
+    /// <see cref="CreateFolderAsync(string, string, string, IDocumentSession)"/>
+    /// with the commit owned here (IMPROVE-CODE C09 — the same committed-
+    /// write shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    Task<FolderRow> CreateFolderAsync(string ownerId, string name, string? parentId);
+
+    /// <summary>
     /// Renames a folder within the owner's tree. The D6 witness — the
     /// <c>(OwnerId, ParentId, Name)</c> unique index is re-checked.
     /// </summary>
     Task<FolderRow> RenameFolderAsync(
         string ownerId, string folderId, string newName, IDocumentSession session);
+
+    /// <summary>
+    /// <see cref="RenameFolderAsync(string, string, string, IDocumentSession)"/>
+    /// with the commit owned here (IMPROVE-CODE C09 — the same committed-
+    /// write shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    Task<FolderRow> RenameFolderAsync(string ownerId, string folderId, string newName);
 
     /// <summary>
     /// Deletes a folder and moves its notes to the root
@@ -154,11 +206,25 @@ public interface IPersonalNoteService
         string ownerId, string folderId, IDocumentSession session);
 
     /// <summary>
+    /// <see cref="DeleteFolderAsync(string, string, IDocumentSession)"/> with
+    /// the commit owned here (IMPROVE-CODE C09 — the same committed-write
+    /// shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    Task<FolderDeleteResult> DeleteFolderAsync(string ownerId, string folderId);
+
+    /// <summary>
     /// Moves a note to (or from) a folder in the owner's tree. The D6 pin —
     /// the note and the folder are in the same owner's tree.
     /// </summary>
     Task<NoteRow> MoveNoteToFolderAsync(
         string ownerId, string noteId, string? folderId, IDocumentSession session);
+
+    /// <summary>
+    /// <see cref="MoveNoteToFolderAsync(string, string, string, IDocumentSession)"/>
+    /// with the commit owned here (IMPROVE-CODE C09 — the same committed-
+    /// write shape as <see cref="CreateNoteAsync(string, string, string, string)"/>).
+    /// </summary>
+    Task<NoteRow> MoveNoteToFolderAsync(string ownerId, string noteId, string? folderId);
 }
 
 // ── Result types (design doc §2.2 — locked verbatim) ──────────────────────

@@ -6,7 +6,6 @@ using Kumunita.Core.Bookmarks;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Inventory;
-using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
@@ -767,12 +766,16 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             NullLogger<IdentityService>.Instance);
 
         var authz = new AuthorizationService(store, userInfo);
-        var announcements = new AnnouncementService(store, userInfo);
-        var pages = new PageService(store);
+        var announcements = new AnnouncementService(store, userInfo, new ProfileSettingsService(store));
         var events = new EventService(store, authz, userInfo);
         var projects = new ProjectService(store, authz, userInfo);
         var inventory = new InventoryService(store, authz, userInfo);
-        var bm = new BookmarkService(userInfo, authz, store, announcements, pages, events, projects, inventory, identity);
+        // IMPROVE-CODE C05 — the target-resolution seam the service now
+        // delegates to (the same real seams, composed into the one resolver).
+        var resolver = new Targets.ContentTargetResolver(
+            userInfo, new GroupService(store), authz, store, announcements, events, projects, projects, projects, inventory,
+            identity);
+        var bm = new BookmarkService(store, resolver);
         return (userInfo, authz, bm);
     }
 

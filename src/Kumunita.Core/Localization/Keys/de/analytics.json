@@ -1,0 +1,12 @@
+{
+  "analytics.trend.title": "Trend",
+  "analytics.trend.window.7": "7 Tage",
+  "analytics.trend.window.30": "30 Tage",
+  "analytics.trend.window.90": "90 Tage",
+  "analytics.trend.window.180": "180 Tage",
+  "analytics.trend.window.365": "365 Tage",
+  "analytics.trend.col.date": "Datum",
+  "analytics.trend.col.total": "Gesamtanfragen",
+  "analytics.trend.legend.total": "Gesamtanfragen pro Tag",
+  "analytics.trend.empty": "In diesem Zeitfenster wurden noch keine Anfragen aufgezeichnet."
+}

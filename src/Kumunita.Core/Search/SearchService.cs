@@ -73,32 +73,35 @@ public sealed class SearchService : ISearchService
     public const int TruncationRadius = 120;
 
     /// <summary>The four original search surfaces (D2 — the four resident content surfaces).</summary>
-    public const string PostsSurface = "posts";
-    public const string EventsSurface = "events";
-    public const string PagesSurface = "pages";
-    public const string AnnouncementsSurface = "announcements";
+    public const string PostsSurface = SearchKeys.PostsSurface;
+    public const string EventsSurface = SearchKeys.EventsSurface;
+    public const string PagesSurface = SearchKeys.PagesSurface;
+    public const string AnnouncementsSurface = SearchKeys.AnnouncementsSurface;
 
     /// <summary>The six extended surfaces (ADR 0124 — the M8 D2 "out" list, realized).</summary>
-    public const string ProjectsSurface = "projects";
-    public const string BoardsSurface = "boards";
-    public const string TodosSurface = "todos";
-    public const string InventorySurface = "inventory";
-    public const string DocumentsSurface = "documents";
-    public const string PeopleSurface = "people";
+    public const string ProjectsSurface = SearchKeys.ProjectsSurface;
+    public const string BoardsSurface = SearchKeys.BoardsSurface;
+    public const string TodosSurface = SearchKeys.TodosSurface;
+    public const string InventorySurface = SearchKeys.InventorySurface;
+    public const string DocumentsSurface = SearchKeys.DocumentsSurface;
+    public const string PeopleSurface = SearchKeys.PeopleSurface;
 
     private readonly IDocumentStore _store;
     private readonly IAuthorizationService _authz;
     private readonly IUserInfoService _userInfo;
+    // C07 (ADR 0286) — the IProfileSettingsService sibling (the moved method's owner).
+    private readonly IProfileSettingsService _profileSettings;
 
     /// <summary>
     /// Create the search service over the three frozen seams (the ADR 0006-D
     /// frozen-composition shape — no fourth dependency, no new seam).
     /// </summary>
-    public SearchService(IDocumentStore store, IAuthorizationService authz, IUserInfoService userInfo)
+    public SearchService(IDocumentStore store, IAuthorizationService authz, IUserInfoService userInfo, IProfileSettingsService profileSettings)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
     }
 
     // ── surface=all (D1 / D8) ──────────────────────────────────────────────
@@ -660,7 +663,7 @@ public sealed class SearchService : ISearchService
     {
         if (string.IsNullOrWhiteSpace(actorId)) return [];
 
-        var candidates = (await _userInfo.GetProfilesAsync(false).ConfigureAwait(false))
+        var candidates = (await _profileSettings.GetProfilesAsync(false).ConfigureAwait(false))
             .Where(p => !p.Blocked)
             .ToList();
 

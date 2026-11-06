@@ -1,0 +1,14 @@
+{
+  "message.nav": "Nachrichten",
+  "message.title": "Nachrichten",
+  "message.new": "Neue Unterhaltung",
+  "message.thread.empty": "Noch keine Nachrichten \u2014 melde dich einfach.",
+  "message.compose.placeholder": "Nachricht schreiben\u2026",
+  "message.compose.send": "Senden",
+  "message.unread": "ungelesen",
+  "message.disabled": "Direktnachrichten sind auf dieser Instanz deaktiviert.",
+  "message.compose.disabled": "Diese Person hat Direktnachrichten deaktiviert, daher kannst du keine neue Nachricht senden.",
+  "message.other": "die andere Person",
+  "message.sent_to": "Gesendet an {0}.",
+  "message.load_earlier": "Fr\u00FChere Nachrichten laden"
+}

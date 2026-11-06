@@ -63,6 +63,8 @@ public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string resident = "u-ma1-resident";
 
         await SeedProfileAsync(store, resident);
@@ -72,11 +74,11 @@ public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture
         Assert.False((await svc.GetProfileAsync(resident))!.MessagingOptIn);
 
         // Opt in — live on the very next read.
-        await svc.SetMessagingOptInAsync(resident, true, resident);
+        await profileSettings.SetMessagingOptInAsync(resident, true, resident);
         Assert.True((await svc.GetProfileAsync(resident))!.MessagingOptIn);
 
         // Opt back out — the value round-trips.
-        await svc.SetMessagingOptInAsync(resident, false, resident);
+        await profileSettings.SetMessagingOptInAsync(resident, false, resident);
         Assert.False((await svc.GetProfileAsync(resident))!.MessagingOptIn);
 
         // No audit row (a profile-field write — "not an access decision").
@@ -94,10 +96,12 @@ public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string stranger = "u-ma1-stranger";   // no profile planted
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.SetMessagingOptInAsync(stranger, true, stranger));
+            profileSettings.SetMessagingOptInAsync(stranger, true, stranger));
 
         // Never load-or-create: no profile row appeared.
         Assert.Null(await svc.GetProfileAsync(stranger));
@@ -120,22 +124,24 @@ public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string guardian = "u-ma2-guardian";
         const string child = "u-ma2-child";
 
         await SeedProfileAsync(store, child);
-        await svc.CreateGuardianLinkAsync(child, guardian);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
 
         // Default floor: a fresh child is not restricted (the ceiling is
         // off; the child's own opt-in decides).
         Assert.False((await svc.GetProfileAsync(child))!.MessagingRestricted);
 
         // Restrict — the ceiling is live on the very next read.
-        await svc.SetChildMessagingRestrictionAsync(child, true, guardian);
+        await guardianService.SetChildMessagingRestrictionAsync(child, true, guardian);
         Assert.True((await svc.GetProfileAsync(child))!.MessagingRestricted);
 
         // Allow — the ceiling lifts (the child's own opt-in now decides).
-        await svc.SetChildMessagingRestrictionAsync(child, false, guardian);
+        await guardianService.SetChildMessagingRestrictionAsync(child, false, guardian);
         Assert.False((await svc.GetProfileAsync(child))!.MessagingRestricted);
 
         // The audit row (guardian.messaging_restrict, Via: Guardian).
@@ -156,13 +162,15 @@ public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string stranger = "u-ma2-stranger";   // no link over the child
         const string child = "u-ma2-child";
 
         await SeedProfileAsync(store, child);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SetChildMessagingRestrictionAsync(child, true, stranger));
+            guardianService.SetChildMessagingRestrictionAsync(child, true, stranger));
 
         // The ceiling is untouched (the refuse fired before the write).
         Assert.False((await svc.GetProfileAsync(child))!.MessagingRestricted);
@@ -243,8 +251,9 @@ public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture
 
         await SeedProfileAsync(store, child, optIn: true);
         await messaging.SetMessagingEnabledAsync(true, "u-admin");   // instance on
-        await userInfo.CreateGuardianLinkAsync(child, guardian);     // the standing the ceiling write needs
-        await userInfo.SetChildMessagingRestrictionAsync(child, true, guardian);   // ceiling on
+        var guardianService = new GuardianService(store);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);     // the standing the ceiling write needs
+        await guardianService.SetChildMessagingRestrictionAsync(child, true, guardian);   // ceiling on
 
         // The child's own opt-in is on, but the guardian's ceiling wins.
         Assert.True((await userInfo.GetProfileAsync(child))!.MessagingOptIn);
@@ -266,8 +275,9 @@ public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture
 
         await SeedProfileAsync(store, child, optIn: true);
         await messaging.SetMessagingEnabledAsync(true, "u-admin");   // instance on
-        await userInfo.CreateGuardianLinkAsync(child, guardian);     // the standing the ceiling write needs
-        await userInfo.SetChildMessagingRestrictionAsync(child, false, guardian);   // ceiling off
+        var guardianService = new GuardianService(store);
+        await guardianService.CreateGuardianLinkAsync(child, guardian);     // the standing the ceiling write needs
+        await guardianService.SetChildMessagingRestrictionAsync(child, false, guardian);   // ceiling off
 
         Assert.True(await messaging.IsMessagingAllowedForAsync(child));
     }
@@ -328,6 +338,8 @@ public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var messaging = new MessagingService(store, userInfo);
         return (store, userInfo, messaging);
     }

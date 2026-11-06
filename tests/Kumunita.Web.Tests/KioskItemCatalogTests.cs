@@ -20,16 +20,16 @@ public class KioskItemCatalogTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Theory]
-    [InlineData(KioskItemType.Board, SearchService.BoardsSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.Todo, SearchService.TodosSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.Project, SearchService.ProjectsSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.Page, SearchService.PagesSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.Announcement, SearchService.AnnouncementsSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.CommunityPost, SearchService.PostsSurface, SearchScope.Community)]
-    [InlineData(KioskItemType.GroupPost, SearchService.PostsSurface, SearchScope.Groups)]
+    [InlineData(KioskItemType.Board, SearchKeys.BoardsSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.Todo, SearchKeys.TodosSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.Project, SearchKeys.ProjectsSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.Page, SearchKeys.PagesSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.Announcement, SearchKeys.AnnouncementsSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.CommunityPost, SearchKeys.PostsSurface, SearchScope.Community)]
+    [InlineData(KioskItemType.GroupPost, SearchKeys.PostsSurface, SearchScope.Groups)]
     public async Task BlankQuery_Browses_TheTypesSurface(KioskItemType type, string surface, SearchScope scope)
     {
-        var (catalog, search, _) = Build();
+        var (catalog, search, _, _, _) = Build();
         search.BrowseSurfaceAsync(surface, scope, Actor, IKioskItemCatalog.MaxResults, Arg.Any<CancellationToken>())
             .Returns(Hits(Hit("a", "Alpha", DaysAgo(1))));
 
@@ -42,10 +42,10 @@ public class KioskItemCatalogTests
     [Fact]
     public async Task Query_Searches_WithTheResultCap()
     {
-        var (catalog, search, _) = Build();
-        search.SearchSurfaceAsync(SearchService.TodosSurface, "bins", SearchScope.Community, Actor, 1,
+        var (catalog, search, _, _, _) = Build();
+        search.SearchSurfaceAsync(SearchKeys.TodosSurface, "bins", SearchScope.Community, Actor, 1,
                 Arg.Any<CancellationToken>(), null, IKioskItemCatalog.MaxResults)
-            .Returns(new SearchSurfacePage(SearchService.TodosSurface, [Hit("t1", "Put the bins out", DaysAgo(2))], 1, false));
+            .Returns(new SearchSurfacePage(SearchKeys.TodosSurface, [Hit("t1", "Put the bins out", DaysAgo(2))], 1, false));
 
         var items = await catalog.SearchAsync(KioskItemType.Todo, " bins ", Actor, Ct);
 
@@ -56,12 +56,12 @@ public class KioskItemCatalogTests
     [Fact]
     public async Task Event_Merges_CommunityAndGroupScopes_NewestFirst_WithGroupName()
     {
-        var (catalog, search, userInfo) = Build();
-        search.BrowseSurfaceAsync(SearchService.EventsSurface, SearchScope.Community, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
+        var (catalog, search, _, groupService, _) = Build();
+        search.BrowseSurfaceAsync(SearchKeys.EventsSurface, SearchScope.Community, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Hits(Hit("e-old", "Street party", DaysAgo(5))));
-        search.BrowseSurfaceAsync(SearchService.EventsSurface, SearchScope.Groups, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
+        search.BrowseSurfaceAsync(SearchKeys.EventsSurface, SearchScope.Groups, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Hits(Hit("e-new", "Choir practice", DaysAgo(1), groupId: "g-1")));
-        userInfo.GetGroupsForUserAsync(Actor).Returns(Task.FromResult<IReadOnlyList<Group>>([new Group { Id = "g-1", Name = "Choir" }]));
+        groupService.GetGroupsForUserAsync(Actor).Returns(Task.FromResult<IReadOnlyList<Group>>([new Group { Id = "g-1", Name = "Choir" }]));
 
         var items = await catalog.SearchAsync(KioskItemType.Event, null, Actor, Ct);
 
@@ -74,9 +74,9 @@ public class KioskItemCatalogTests
     [Fact]
     public async Task UntitledPost_UsesTheBodyExcerpt_OnOneLine()
     {
-        var (catalog, search, _) = Build();
-        search.BrowseSurfaceAsync(SearchService.PostsSurface, SearchScope.Community, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(Hits(new SearchHit("p1", SearchService.PostsSurface, null, null, "Lost cat\n  near the park", DaysAgo(1))));
+        var (catalog, search, _, _, _) = Build();
+        search.BrowseSurfaceAsync(SearchKeys.PostsSurface, SearchScope.Community, Actor, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Hits(new SearchHit("p1", SearchKeys.PostsSurface, null, null, "Lost cat\n  near the park", DaysAgo(1))));
 
         var items = await catalog.SearchAsync(KioskItemType.CommunityPost, "", Actor, Ct);
 
@@ -86,8 +86,8 @@ public class KioskItemCatalogTests
     [Fact]
     public async Task Calendar_Lists_EnabledComponents_FilteredByName()
     {
-        var (catalog, search, userInfo) = Build();
-        userInfo.GetComponentsAsync(true).Returns(Task.FromResult<IReadOnlyList<Component>>(
+        var (catalog, search, _, _, profileSettings) = Build();
+        profileSettings.GetComponentsAsync(true).Returns(Task.FromResult<IReadOnlyList<Component>>(
         [
             new Component { Id = "c-2", Name = "Garden club", SortOrder = 2 },
             new Component { Id = "c-1", Name = "Main street", SortOrder = 1 },
@@ -104,7 +104,7 @@ public class KioskItemCatalogTests
     [Fact]
     public async Task BlankActor_ReturnsNothing()
     {
-        var (catalog, search, _) = Build();
+        var (catalog, search, _, _, _) = Build();
 
         var items = await catalog.SearchAsync(KioskItemType.Board, "", "", Ct);
 
@@ -112,11 +112,13 @@ public class KioskItemCatalogTests
         await search.DidNotReceiveWithAnyArgs().BrowseSurfaceAsync(default!, default, default!, default);
     }
 
-    private static (KioskItemCatalog catalog, ISearchService search, IUserInfoService userInfo) Build()
+    private static (KioskItemCatalog catalog, ISearchService search, IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings) Build()
     {
         var search = Substitute.For<ISearchService>();
         var userInfo = Substitute.For<IUserInfoService>();
-        return (new KioskItemCatalog(search, userInfo), search, userInfo);
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        return (new KioskItemCatalog(search, userInfo, groupService, profileSettings), search, userInfo, groupService, profileSettings);
     }
 
     private static SearchHit Hit(string id, string title, DateTimeOffset created, string? groupId = null)

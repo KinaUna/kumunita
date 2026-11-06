@@ -1,0 +1,19 @@
+{
+  "locale.settings_title": "Tes param\u00E8tres",
+  "locale.language_heading": "Langue",
+  "locale.lede": "Choisis la langue que la plateforme t\u0027affiche. Ton choix est enregistr\u00E9 dans un cookie du navigateur \u2014 il prend effet \u00E0 la prochaine requ\u00EAte, et n\u0027affecte jamais les autres habitants.",
+  "locale.preferred_label": "Langue pr\u00E9f\u00E9r\u00E9e",
+  "locale.default_note": "Le d\u00E9faut de l\u0027instance est ",
+  "locale.default_note_tail": ". Si ta langue pr\u00E9f\u00E9r\u00E9e est supprim\u00E9e par un admin plus tard, la plateforme bascule silencieusement sur le d\u00E9faut de l\u0027instance.",
+  "locale.save": "Enregistrer",
+  "locale.reset": "R\u00E9initialiser au d\u00E9faut de l\u0027instance",
+  "locale.public_title": "Choisis ta langue",
+  "locale.instance_default": "\u2014 d\u00E9faut de l\u0027instance",
+  "locale.browser_matched": "\u2014 d\u0027apr\u00E8s ton navigateur",
+  "locale.browser_note": "Nous avons choisi ",
+  "locale.browser_note_tail": " d\u0027apr\u00E8s les r\u00E9glages de ton navigateur. L\u0027enregistrer en fait ta langue pr\u00E9f\u00E9r\u00E9e \u2014 elle reste telle quelle jusqu\u0027\u00E0 ce que tu la changes.",
+  "locale.flash_set": "Langue r\u00E9gl\u00E9e sur \u0022{0}\u0022 \u2014 elle prend effet \u00E0 la prochaine requ\u00EAte.",
+  "locale.flash_reset": "Pr\u00E9f\u00E9rence de langue r\u00E9initialis\u00E9e \u2014 le d\u00E9faut de l\u0027instance sera utilis\u00E9.",
+  "locale.reset_confirm": "R\u00E9initialiser ta pr\u00E9f\u00E9rence de langue au d\u00E9faut de l\u0027instance ?",
+  "locale.email_reset_confirm": "R\u00E9initialiser la langue des e-mails et des notifications au d\u00E9faut de l\u0027instance ?"
+}

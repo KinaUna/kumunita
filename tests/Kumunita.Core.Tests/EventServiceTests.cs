@@ -50,8 +50,8 @@ namespace Kumunita.Core.Tests;
 ///       <c>CanAsync</c> call, no audit row. Feeds exclude drafts
 ///       unconditionally.</item>
 /// <item><b>The standing matrix is a pure role-claim check</b> (ADR 0054
-///       §3.4, the <see cref="PageService.CheckCreateStanding"/> /
-///       <see cref="PageService.CheckEditStanding"/> shape): create = any
+///       §3.4, the <see cref="PageStandingPolicy.CheckCreateStanding"/> /
+///       <see cref="PageStandingPolicy.CheckEditStanding"/> shape): create = any
 ///       signed-in resident (they become the author); edit = author ∪
 ///       GlobalAdmin. A null event is a 404; a denied actor is a 403. No new
 ///       <c>AccessAction</c>, no new <c>AccessVia</c>, no branch in the frozen
@@ -81,7 +81,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_FeedVisibleToAudienceMember()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f1-author";
         const string grantee = "u-u03-f1-grantee";
         const string stranger = "u-u03-f1-stranger";
@@ -117,7 +117,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_FeedPublicEventVisibleToResident()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f2-author";
         const string resident = "u-u03-f2-resident";
 
@@ -152,7 +152,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_CommunityAudienceVisibleToMember()
     {
         var store = await BootStoreAsync();
-        var (userInfo, _, svc) = Services(store);
+        var (userInfo, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f3-author";
         const string member = "u-u03-f3-member";
         const string nonMember = "u-u03-f3-nonmember";
@@ -198,7 +198,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_GrantAudienceOnlyGranteeSees()
     {
         var store = await BootStoreAsync();
-        var (userInfo, _, svc) = Services(store);
+        var (userInfo, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f4-author";
         const string member = "u-u03-f4-member";
         const string outsider = "u-u03-f4-outsider";
@@ -243,7 +243,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_DraftInvisibleToNonAuthor()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f5-author";
         const string stranger = "u-u03-f5-stranger";
 
@@ -284,7 +284,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_FeedOrderedStartAscending()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f6-author";
         const string resident = "u-u03-f6-resident";
 
@@ -314,7 +314,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_SoftDeletedExcludedFromFeedAndDetail()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f7-author";
         const string resident = "u-u03-f7-resident";
 
@@ -360,7 +360,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_GetRsvps_ReturnsRsvps()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f8-author";
         const string rsvp1 = "u-u03-f8-r1";
         const string rsvp2 = "u-u03-f8-r2";
@@ -404,7 +404,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_GetMyRsvp_ReturnsOwn()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f9-author";
         const string me = "u-u03-f9-me";
         const string other = "u-u03-f9-other";
@@ -454,7 +454,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_GetMyRsvp_DraftNonAuthor_404()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u03-f10-author";
         const string stranger = "u-u03-f10-stranger";
 
@@ -489,7 +489,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     // ════════════════════════════════════════════════════════════════════════
     // Standing-matrix gate helpers (pure — no store, no async).
     // ADR 0054 §3.4: create = any signed-in resident; edit = author ∪
-    // GlobalAdmin. The PageService.CheckCreateStanding / CheckEditStanding
+    // GlobalAdmin. The PageStandingPolicy.CheckCreateStanding / CheckEditStanding
     // shape; the ADR 0014 / 0016 / 0017 precedent.
     // ════════════════════════════════════════════════════════════════════════
 
@@ -612,7 +612,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_CreateWritesEventAndAuditRow()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-c1-author";
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
@@ -654,7 +654,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_CreateAudienceWrittenVerbatim()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-c2-author";
         const string grantee = "u-u04-c2-grantee";
         const string stranger = "u-u04-c2-stranger";
@@ -688,7 +688,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_CreateNoActor_Denies()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         // An empty actor is a 403 — thrown before any store access (the
         // CheckCreateStanding denial). No event row and no audit row land.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
@@ -706,7 +706,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_UpdateAuthorEditsAndPreservesAuthor()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-u1-author";
         var created = new DateTimeOffset(2099, 4, 3, 9, 0, 0, TimeSpan.Zero);
 
@@ -743,7 +743,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_UpdateNoOpDoesNotStampModified()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-u2-author";
         var created = new DateTimeOffset(2099, 4, 4, 9, 0, 0, TimeSpan.Zero);
 
@@ -775,7 +775,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_UpdateReparsesMediaIds()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-u3-author";
         var created = new DateTimeOffset(2099, 4, 5, 9, 0, 0, TimeSpan.Zero);
 
@@ -816,7 +816,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_UpdateStrangerDenied()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-u4-author";
         const string stranger = "u-u04-u4-stranger";
         var created = new DateTimeOffset(2099, 4, 6, 9, 0, 0, TimeSpan.Zero);
@@ -839,7 +839,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_UpdateMissingEvent_404()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => svc.UpdateAsync("no-such-event", "u-u04-u5", EmptyRoles, new UpdateEventRequest { Title = "t" }, TestContext.Current.CancellationToken));
     }
@@ -853,7 +853,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PublishAuthorOnly()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-p1-author";
         const string resident = "u-u04-p1-resident";
         var created = new DateTimeOffset(2099, 4, 7, 9, 0, 0, TimeSpan.Zero);
@@ -889,7 +889,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PublishStrangerDenied()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-p2-author";
         const string stranger = "u-u04-p2-stranger";
         var created = new DateTimeOffset(2099, 4, 8, 9, 0, 0, TimeSpan.Zero);
@@ -915,7 +915,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PublishIdempotentNoDoubleStamp()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-p3-author";
         var created = new DateTimeOffset(2099, 4, 9, 9, 0, 0, TimeSpan.Zero);
 
@@ -942,7 +942,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_SoftDeleteAuthorExcludesFromFeedAndDetail()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-d1-author";
         const string resident = "u-u04-d1-resident";
         var created = new DateTimeOffset(2099, 4, 10, 9, 0, 0, TimeSpan.Zero);
@@ -974,7 +974,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_SoftDeleteStrangerDenied()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-d2-author";
         const string stranger = "u-u04-d2-stranger";
         var created = new DateTimeOffset(2099, 4, 11, 9, 0, 0, TimeSpan.Zero);
@@ -1000,7 +1000,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_RsvpLastWriteWins()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-r1-author";
         const string rsvp1 = "u-u04-r1-user";
         var created = new DateTimeOffset(2099, 4, 12, 9, 0, 0, TimeSpan.Zero);
@@ -1011,10 +1011,10 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         },
             TestContext.Current.CancellationToken);
 
-        var going = await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        var going = await rsvp.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going, TestContext.Current.CancellationToken);
         Assert.Equal(RsvpStatus.Going, going.Status);
 
-        var no = await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.No, TestContext.Current.CancellationToken);
+        var no = await rsvp.RsvpAsync(ev.Id, rsvp1, RsvpStatus.No, TestContext.Current.CancellationToken);
         Assert.Equal(RsvpStatus.No, no.Status);          // last write wins.
         Assert.True(no.At >= going.At);                  // the At stamp advanced (or held).
         Assert.Equal(going.Id, no.Id);                   // the same row (the unique business key).
@@ -1034,7 +1034,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_RsvpDistinctResidentsCoexist()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-r2-author";
         const string u1 = "u-u04-r2-u1";
         const string u2 = "u-u04-r2-u2";
@@ -1046,8 +1046,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         },
             TestContext.Current.CancellationToken);
 
-        await svc.RsvpAsync(ev.Id, u1, RsvpStatus.Going, TestContext.Current.CancellationToken);
-        await svc.RsvpAsync(ev.Id, u2, RsvpStatus.Maybe, TestContext.Current.CancellationToken);
+        await rsvp.RsvpAsync(ev.Id, u1, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        await rsvp.RsvpAsync(ev.Id, u2, RsvpStatus.Maybe, TestContext.Current.CancellationToken);
 
         var all = await svc.GetRsvpsAsync(ev.Id, TestContext.Current.CancellationToken);
         Assert.Equal(2, all.Count);
@@ -1063,9 +1063,9 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_RsvpMissingEvent_404()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.RsvpAsync("no-such-event", "u-u04-r3", RsvpStatus.Going, TestContext.Current.CancellationToken));
+            () => rsvp.RsvpAsync("no-such-event", "u-u04-r3", RsvpStatus.Going, TestContext.Current.CancellationToken));
     }
 
     // ── U04·17 — M4_RsvpWritesNoAccessAuditRow (ADR 0054 §3.2) ──────────────
@@ -1077,7 +1077,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_RsvpWritesNoAccessAuditRow()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u04-r4-author";
         const string rsvp1 = "u-u04-r4-user";
         var created = new DateTimeOffset(2099, 4, 14, 9, 0, 0, TimeSpan.Zero);
@@ -1093,7 +1093,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal("event.create", before.Single().Action);
 
         // The RSVP lane must add **no** audit row.
-        await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        await rsvp.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going, TestContext.Current.CancellationToken);
 
         var after = await EventAuditRows(store);
         Assert.Single(after);                                  // still exactly one (the create).
@@ -1118,7 +1118,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_NullAudienceEventIsPublic()
     {
         var store = await BootStoreAsync();
-        var (_, authz, svc) = Services(store);
+        var (_, authz, svc, rsvp) = Services(store);
         const string author = "u-u09-t02-author";
         const string resident = "u-u09-t02-resident";
 
@@ -1156,7 +1156,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PlainMemberCreateAllowed()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string resident = "u-u09-t06-resident";
 
         var ev = await svc.CreateAsync(resident, new CreateEventRequest
@@ -1185,7 +1185,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_AuthorCanEditOwnEvent()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t07-author";
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
@@ -1225,7 +1225,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PlainMemberEditDenied()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t08-author";
         const string stranger = "u-u09-t08-stranger";
 
@@ -1295,7 +1295,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_GlobalAdminOverrideEditEndToEnd()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t24-author";
         const string admin = "u-u09-t24-admin";
 
@@ -1340,7 +1340,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_GlobalAdminOverrideDeleteEndToEnd()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t25-author";
         const string admin = "u-u09-t25-admin";
         const string resident = "u-u09-t25-resident";
@@ -1379,7 +1379,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_RsvpUniqueIndexOneRowPerUser()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t14-author";
         const string r1 = "u-u09-t14-r1";
         const string r2 = "u-u09-t14-r2";
@@ -1395,10 +1395,10 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             TestContext.Current.CancellationToken);
 
         // r1 RSVPs twice (Going then No) — last write wins, one row.
-        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.Going, TestContext.Current.CancellationToken);
-        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.No, TestContext.Current.CancellationToken);
+        await rsvp.RsvpAsync(ev.Id, r1, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        await rsvp.RsvpAsync(ev.Id, r1, RsvpStatus.No, TestContext.Current.CancellationToken);
         // r2 RSVPs once (Going) — their own row.
-        await svc.RsvpAsync(ev.Id, r2, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        await rsvp.RsvpAsync(ev.Id, r2, RsvpStatus.Going, TestContext.Current.CancellationToken);
 
         var all = await svc.GetRsvpsAsync(ev.Id, TestContext.Current.CancellationToken);
         Assert.Equal(2, all.Count);                                            // exactly 2 rows.
@@ -1419,7 +1419,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_RsvpListOwnerOnly()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t15-author";
         const string r1 = "u-u09-t15-r1";
         const string stranger = "u-u09-t15-stranger";
@@ -1435,7 +1435,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             TestContext.Current.CancellationToken);
 
         // A resident RSVPs (the RSVP list will hold their row).
-        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        await rsvp.RsvpAsync(ev.Id, r1, RsvpStatus.Going, TestContext.Current.CancellationToken);
 
         // The author (owner) reads the RSVP list successfully.
         var rsvps = await svc.GetRsvpsAsync(ev.Id, TestContext.Current.CancellationToken);
@@ -1455,7 +1455,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_AuditRowShape_Create()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t17-author";
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
@@ -1553,7 +1553,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_MemberSeesUpcomingEventFeed()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t01-author";
         const string member = "u-u09-t01-member";
 
@@ -1584,7 +1584,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_CommunityAudienceSeesFeed()
     {
         var store = await BootStoreAsync();
-        var (userInfo, _, svc) = Services(store);
+        var (userInfo, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t03-author";
         const string member = "u-u09-t03-member";
         const string nonMember = "u-u09-t03-nonmember";
@@ -1620,7 +1620,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_GrantsAudienceOnlyGranteeSees()
     {
         var store = await BootStoreAsync();
-        var (userInfo, _, svc) = Services(store);
+        var (userInfo, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t04-author";
         const string member = "u-u09-t04-member";
         const string outsider = "u-u09-t04-outsider";
@@ -1660,7 +1660,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_SoftDeleteExcludesFromFeedAndDetail()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t11-author";
         const string resident = "u-u09-t11-resident";
 
@@ -1700,7 +1700,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_AuthorSoftDeleteOwnEvent()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-u09-t12-author";
         const string stranger = "u-u09-t12-stranger";
 
@@ -1792,7 +1792,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationAuthorAdds_WritesRowAndAudit()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-a1-author";
         const string evId = "a059-a1-ev";
 
@@ -1844,7 +1844,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationTranslatorAdds_ViaAdmin()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-a2-author";
         const string translator = "u-a059-a2-translator";
         const string evId = "a059-a2-ev";
@@ -1880,7 +1880,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationGlobalAdminAdds_ViaAdmin()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-a3-author";
         const string admin = "u-a059-a3-admin";
         const string evId = "a059-a3-ev";
@@ -1915,7 +1915,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationStrangerDenied_NoWrite()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-a4-author";
         const string stranger = "u-a059-a4-stranger";
         const string evId = "a059-a4-ev";
@@ -1947,7 +1947,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationMissingEvent_404()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => svc.AddEventTranslationAsync("no-such-event", "de", "t", "b",
                 "u-a059-a5", EmptyRoles,
@@ -1963,7 +1963,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationAddBlankTitle_NullNormalized()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-a6-author";
         const string evId = "a059-a6-ev";
 
@@ -1991,7 +1991,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationAuthorUpdates_AuditUpdate()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-u1-author";
         const string evId = "a059-u1-ev";
 
@@ -2031,7 +2031,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationStrangerUpdateDenied()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-u2-author";
         const string stranger = "u-a059-u2-stranger";
         const string evId = "a059-u2-ev";
@@ -2063,7 +2063,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationUpdateMissingRow_404()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-u3-author";
         const string evId = "a059-u3-ev";
 
@@ -2090,7 +2090,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationAuthorRemoves_AuditRemove()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-r1-author";
         const string evId = "a059-r1-ev";
 
@@ -2124,7 +2124,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationStrangerRemoveDenied()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-r2-author";
         const string stranger = "u-a059-r2-stranger";
         const string evId = "a059-r2-ev";
@@ -2152,7 +2152,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationRemoveMissingRow_404()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-r3-author";
         const string evId = "a059-r3-ev";
 
@@ -2178,7 +2178,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_TranslationGetOrderedByLanguageCode()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a059-g1-author";
         const string evA = "a059-g1-evA";
         const string evB = "a059-g1-evB";
@@ -2233,7 +2233,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_ListMine_RsvpAnyStatusAndAuthored_Included()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string me = "u-a065-1-me";
         const string otherAuthor = "u-a065-1-otherAuthor";
 
@@ -2313,7 +2313,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_ListMine_PastAndDeleted_Excluded()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string me = "u-a065-2-me";
         var past = DateTimeOffset.UtcNow.AddDays(-3);
 
@@ -2363,7 +2363,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_ListMine_Nothing_Planted_Empty()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
 
         // An upcoming event by a stranger (I have no RSVP, no authorship).
         var live = DateTimeOffset.UtcNow.AddHours(2);
@@ -2388,7 +2388,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_ListMine_NoActor_Denies()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync("", TestContext.Current.CancellationToken));
         // null! — the null-actor deny path is deliberate (the Web [Authorize] stops
@@ -2413,7 +2413,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PastFeed_ShowsPast_ExcludesUpcoming()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a0109-f1-author";
         const string resident = "u-a0109-f1-resident";
 
@@ -2454,7 +2454,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PastFeed_OrderedStartDescending()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a0109-f2-author";
         const string resident = "u-a0109-f2-resident";
 
@@ -2483,7 +2483,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PastFeed_AudienceGateAndAudit()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a0109-f3-author";
         const string grantee = "u-a0109-f3-grantee";
         const string stranger = "u-a0109-f3-stranger";
@@ -2516,7 +2516,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PastFeed_DraftAndDeletedExcluded()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string author = "u-a0109-f4-author";
         const string resident = "u-a0109-f4-resident";
 
@@ -2555,7 +2555,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PastFeed_ZeroCandidates_NoDecision()
     {
         var store = await BootStoreAsync();
-        var (_, _, svc) = Services(store);
+        var (_, _, svc, rsvp) = Services(store);
         const string resident = "u-a0109-f5-resident";
 
         // Only a future event exists — zero past candidates.
@@ -2584,7 +2584,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     public async Task M4_PastFeed_ComponentFilter()
     {
         var store = await BootStoreAsync();
-        var (userInfo, _, svc) = Services(store);
+        var (userInfo, _, svc, rsvp) = Services(store);
         const string author = "u-a0109-f6-author";
         const string member = "u-a0109-f6-member";
         const string compA = "c-a0109-f6-a";
@@ -2684,13 +2684,17 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     /// same three-constructor shape U01's <c>AddTransient</c> registration
     /// uses, mirrored here directly against the scratch store — the
     /// <c>PostServiceTests</c> precedent).</summary>
-    private static (UserInfoService User, AuthorizationService Authz, EventService Events)
+    private static (UserInfoService User, AuthorizationService Authz, EventService Events, EventRsvpGuardianService Rsvp)
         Services(IDocumentStore store)
     {
         var userInfo = new UserInfoService(store);
         var authz = new AuthorizationService(store, userInfo);
         var events = new EventService(store, authz, userInfo);
-        return (userInfo, authz, events);
+        // C3-00 (ADR 0290 named seam) — the RSVP cluster extracted to its own
+        // service; wire it with the same store / userInfo (the guardian gate
+        // reads GuardianLink/Profile the same way — ADR 0028 / ADR 0115).
+        var rsvp = new EventRsvpGuardianService(store, userInfo);
+        return (userInfo, authz, events, rsvp);
     }
 
     private static Audience Audience(GrantKind kind, string id)

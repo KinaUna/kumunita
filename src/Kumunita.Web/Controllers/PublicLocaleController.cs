@@ -1,6 +1,5 @@
 using Kumunita.Core.Localization;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Kumunita.Web.Controllers;
@@ -22,7 +21,6 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 public sealed class PublicLocaleController(
     ILocalizationService localization,
-    IDocumentStore store,
     // The per-request translation read seam — renders the language-change
     // flash message in the visitor's current language (locale.flash_set /
     // locale.flash_reset). Optional (default null) so any test-construction
@@ -77,13 +75,10 @@ public sealed class PublicLocaleController(
         var catalog = await localization.ListLanguagesAsync();
 
         // The instance default (M·1: preference → default → "en") — the same
-        // frozen read idiom as LocaleController.Index (IDocumentStore singleton
-        // load of LocaleSettings).
-        string defaultCode = "en";
-        await using var session = store.QuerySession();
-        var settings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, System.Threading.CancellationToken.None);
-        if (settings is not null)
-            defaultCode = settings.DefaultLanguageCode;
+        // frozen read seam as LocaleController.Index (IMPROVE-CODE C09 —
+        // the controller no longer loads the LocaleSettings singleton itself;
+        // GetDefaultLanguageCodeAsync carries the `en` floor).
+        string defaultCode = await localization.GetDefaultLanguageCodeAsync();
 
         var model = new LocaleController.LocaleSettingsViewModel
         {

@@ -55,16 +55,16 @@ public sealed class SearchController : Controller
 {
     private static readonly string[] KnownSurfaces =
     {
-        SearchService.PostsSurface,
-        SearchService.EventsSurface,
-        SearchService.PagesSurface,
-        SearchService.AnnouncementsSurface,
-        SearchService.ProjectsSurface,
-        SearchService.BoardsSurface,
-        SearchService.TodosSurface,
-        SearchService.InventorySurface,
-        SearchService.DocumentsSurface,
-        SearchService.PeopleSurface,
+        SearchKeys.PostsSurface,
+        SearchKeys.EventsSurface,
+        SearchKeys.PagesSurface,
+        SearchKeys.AnnouncementsSurface,
+        SearchKeys.ProjectsSurface,
+        SearchKeys.BoardsSurface,
+        SearchKeys.TodosSurface,
+        SearchKeys.InventorySurface,
+        SearchKeys.DocumentsSurface,
+        SearchKeys.PeopleSurface,
     };
 
     private readonly ISearchService _search;
@@ -259,7 +259,7 @@ public sealed class SearchController : Controller
         IReadOnlyDictionary<string, IReadOnlyList<SearchHit>> sections)
     {
         var pageIds = sections
-            .Where(kv => kv.Key == SearchService.PagesSurface)
+            .Where(kv => kv.Key == SearchKeys.PagesSurface)
             .SelectMany(kv => kv.Value)
             .Select(h => h.Id)
             .Distinct()

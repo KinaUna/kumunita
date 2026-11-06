@@ -4,7 +4,6 @@ using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -44,8 +43,7 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class LocaleController(
     ILocalizationService localization,
-    IUserInfoService userInfo,
-    IDocumentStore store,
+    IUserInfoService userInfo, IProfileSettingsService profileSettings,
     // The per-request translation read seam — used to render the
     // language-change flash message in the resident's current language
     // (the locale.flash_set / locale.flash_reset keys). Optional (default
@@ -223,14 +221,12 @@ public sealed class LocaleController(
                 ? await notifications.GetQuietScheduleAsync(subject)
                 : null;
 
-        // The instance default (M·1: preference → default → "en").
-        // ILocalizationService does not expose a GetDefaultLanguageAsync;
-        // the U5 handoff note confirms U6 sources this from its own read path.
-        string defaultCode = "en";
-        await using var session = store.QuerySession();
-        var settings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, System.Threading.CancellationToken.None);
-        if (settings is not null)
-            defaultCode = settings.DefaultLanguageCode;
+        // The instance default (M·1: preference → default → "en") — the
+        // ILocalizationService.GetDefaultLanguageCodeAsync seam (the `en`
+        // floor), the same read the compact PublicLocaleController uses
+        // (IMPROVE-CODE C09 — the controller no longer loads the
+        // LocaleSettings singleton itself).
+        string defaultCode = await localization.GetDefaultLanguageCodeAsync();
 
         // ADR 0046: the pre-selection = the saved preference (the cookie) or,
         // failing that, the browser's Accept-Language match against the
@@ -470,12 +466,12 @@ public sealed class LocaleController(
             {
                 // null ⇒ clear (the lane stores + saves, so the clear persists
                 // — the next request resolves to the instance default).
-                await userInfo.SetProfileTimezoneAsync(subject, null, subject);
+                await profileSettings.SetProfileTimezoneAsync(subject, null, subject);
                 TempData["info"] = await FlashAsync("settings.timezone_flash_reset");
             }
             else if (!string.IsNullOrWhiteSpace(timezone))
             {
-                await userInfo.SetProfileTimezoneAsync(subject, timezone, subject);
+                await profileSettings.SetProfileTimezoneAsync(subject, timezone, subject);
                 TempData["info"] = await FlashAsync("settings.timezone_flash_set", timezone);
             }
         }
@@ -526,11 +522,11 @@ public sealed class LocaleController(
             {
                 // null ⇒ clear (the lane stores + saves, so the clear persists
                 // — the next request resolves to the instance default).
-                await userInfo.SetProfileDateFormatAsync(subject, null, subject);
+                await profileSettings.SetProfileDateFormatAsync(subject, null, subject);
             }
             else if (!string.IsNullOrWhiteSpace(chosen))
             {
-                await userInfo.SetProfileDateFormatAsync(subject, chosen, subject);
+                await profileSettings.SetProfileDateFormatAsync(subject, chosen, subject);
             }
 
             // ADR 0169 — the first-day-of-week preference is a **separate**
@@ -542,7 +538,7 @@ public sealed class LocaleController(
             // resets the preference (the "preference if present" shape).
             if (int.TryParse(firstDayOfWeek, out var fd) && fd is >= 0 and <= 6)
             {
-                await userInfo.SetProfileFirstDayOfWeekAsync(subject, fd, subject);
+                await profileSettings.SetProfileFirstDayOfWeekAsync(subject, fd, subject);
             }
 
             TempData["info"] = await FlashAsync(
@@ -587,14 +583,14 @@ public sealed class LocaleController(
             {
                 // null ⇒ clear (the lane stores + saves, so the clear persists
                 // — the next paged read resolves to the platform default).
-                await userInfo.SetProfilePageSizeAsync(subject, null, subject);
+                await profileSettings.SetProfilePageSizeAsync(subject, null, subject);
                 TempData["info"] = await FlashAsync("settings.pagesize_flash_reset");
             }
             else if (int.TryParse(pageSize, out var value) && value > 0)
             {
                 // Stored as-is (clamped to the PageSizer range on the read path
                 // — the ADR 0019 "store, resolve on read" posture).
-                await userInfo.SetProfilePageSizeAsync(subject, value, subject);
+                await profileSettings.SetProfilePageSizeAsync(subject, value, subject);
                 TempData["info"] = await FlashAsync("settings.pagesize_flash_set", value);
             }
         }
@@ -648,9 +644,9 @@ public sealed class LocaleController(
 
         try
         {
-            await userInfo.SetProfileHideHomeIntroAsync(subject, hideHomeIntro == "true", subject);
-            await userInfo.SetProfileHomeShowUpcomingAsync(subject, homeShowUpcoming == "true", subject);
-            await userInfo.SetProfileHomeUpcomingMineOnlyAsync(subject, homeUpcomingMineOnly == "true", subject);
+            await profileSettings.SetProfileHideHomeIntroAsync(subject, hideHomeIntro == "true", subject);
+            await profileSettings.SetProfileHomeShowUpcomingAsync(subject, homeShowUpcoming == "true", subject);
+            await profileSettings.SetProfileHomeUpcomingMineOnlyAsync(subject, homeUpcomingMineOnly == "true", subject);
             TempData["info"] = await FlashAsync("settings.home_flash_saved");
         }
         catch (KeyNotFoundException)
@@ -690,12 +686,12 @@ public sealed class LocaleController(
             {
                 // null ⇒ clear (the lane stores + saves, so the clear persists
                 // — the next outbound email resolves to the instance default).
-                await userInfo.SetProfileEmailLanguageAsync(subject, null, subject);
+                await profileSettings.SetProfileEmailLanguageAsync(subject, null, subject);
                 TempData["info"] = await FlashAsync("settings.email_flash_reset");
             }
             else if (!string.IsNullOrWhiteSpace(code))
             {
-                await userInfo.SetProfileEmailLanguageAsync(subject, code, subject);
+                await profileSettings.SetProfileEmailLanguageAsync(subject, code, subject);
                 TempData["info"] = await FlashAsync("settings.email_flash_set");
             }
         }

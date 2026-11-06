@@ -53,8 +53,9 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new ProfileFindService(userInfo, authz, store);
+        var svc = new ProfileFindService(profileSettings, authz, store);
 
         const string viewer = "u-m23-find-t1-viewer";
         const string deniedSubject = "u-m23-find-t1-denied";
@@ -62,7 +63,7 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
 
         // Profile A (denied) — self-only visibility; the viewer is not granted.
         var denied = new Profile { SubjectId = deniedSubject, DisplayName = "Denied", Verified = true };
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             denied,
             new ProfileUpdate(null, null, null,
                 new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, deniedSubject)]),
@@ -70,7 +71,7 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
 
         // Profile B (visible) — the viewer is granted.
         var visible = new Profile { SubjectId = visibleSubject, DisplayName = "Visible", Verified = true };
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             visible,
             new ProfileUpdate(null, null, null,
                 new Audience(AudienceMode.Any, [
@@ -121,8 +122,9 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new ProfileFindService(userInfo, authz, store);
+        var svc = new ProfileFindService(profileSettings, authz, store);
 
         const string viewer = "u-m23-find-t2-viewer";
         const string deniedSubject = "u-m23-find-t2-denied";
@@ -135,7 +137,7 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
             Verified = true,
             Bio = "Keeps a **garden** and composts.",
         };
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             denied,
             new ProfileUpdate(null, null, null,
                 new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, deniedSubject)]),
@@ -148,7 +150,7 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
             Verified = true,
             Bio = "Tends a small Garden in the backyard.",
         };
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             visible,
             new ProfileUpdate(null, null, null,
                 new Audience(AudienceMode.Any, [
@@ -190,15 +192,16 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new ProfileFindService(userInfo, authz, store);
+        var svc = new ProfileFindService(profileSettings, authz, store);
 
         const string viewer = "u-m23-find-t3-viewer";
         const string subject = "u-m23-find-t3-subject";
 
         // One visible profile tagged "solar panels".
         var profile = new Profile { SubjectId = subject, DisplayName = "Resident", Verified = true };
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             profile,
             new ProfileUpdate(null, null, null,
                 new Audience(AudienceMode.Any, [
@@ -235,8 +238,9 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new ProfileFindService(userInfo, authz, store);
+        var svc = new ProfileFindService(profileSettings, authz, store);
 
         const string actor = "u-m23-find-t4-actor";
 
@@ -276,8 +280,9 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new ProfileFindService(userInfo, authz, store);
+        var svc = new ProfileFindService(profileSettings, authz, store);
 
         const string owner = "u-m23-find-t5-owner";
         const string other = "u-m23-find-t5-other";
@@ -293,7 +298,7 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
             Verified = true,
             Bio = "Installs solar panels on the roof.",
         };
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             ownerProfile,
             new ProfileUpdate(null, null, null,
                 new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, owner)]),
@@ -310,7 +315,7 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
             Verified = true,
             Bio = "Sells solar panel kits.",
         };
-        await userInfo.UpsertProfileAsync(
+        await profileSettings.UpsertProfileAsync(
             otherVisible,
             new ProfileUpdate(null, null, null,
                 new Audience(AudienceMode.Any, [
@@ -348,8 +353,9 @@ public sealed class ProfileFindServiceTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var svc = new ProfileFindService(userInfo, authz, store);
+        var svc = new ProfileFindService(profileSettings, authz, store);
 
         const string viewer = "u-m23-find-t6-viewer";
 

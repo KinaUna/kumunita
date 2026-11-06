@@ -186,7 +186,7 @@ public sealed class MentionsTests(PostgresFixture fixture) : IClassFixture<Postg
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
         var userInfo = new UserInfoService(store);
-        var directory = new DirectoryService(userInfo, Substitute.For<IAuthorizationService>());
+        var directory = new DirectoryService(userInfo, new ProfileSettingsService(store), Substitute.For<IAuthorizationService>());
         var svc = new MentionService(directory);
         return (store, svc);
     }

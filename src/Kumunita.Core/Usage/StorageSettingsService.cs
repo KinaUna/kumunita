@@ -85,4 +85,16 @@ public sealed class StorageSettingsService : IStorageSettingsService
     public StorageDecision Decide(long incomingBytes, long currentUsageBytes,
         CommunityStorageSettings settings, long envMaxBytes)
         => StorageLimits.Decide(incomingBytes, currentUsageBytes, settings, envMaxBytes);
+
+    /// <inheritdoc cref="IStorageSettingsService.SetAsync(long?, long, string)"/>
+    /// <remarks>
+    /// The session-based <see cref="SetAsync"/> commits on its own (C-UP·1), so
+    /// this wrapper opens the session and delegates — no second
+    /// <c>SaveChangesAsync</c>.
+    /// </remarks>
+    public async Task SetAsync(long? maxFileBytes, long perUserQuotaBytes, string actorId)
+    {
+        await using var session = _store.LightweightSession();
+        await SetAsync(maxFileBytes, perUserQuotaBytes, actorId, session).ConfigureAwait(false);
+    }
 }

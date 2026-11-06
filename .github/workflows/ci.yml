@@ -102,6 +102,66 @@ jobs:
         run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/docs-check.ps1
 
   # ---------------------------------------------------------------------------
+  # IMPROVE-CODE C00 — the code-size ratchet gate.
+  #
+  # A separate job (like `docs`, not a step in `test`): the gate reads the
+  # repo's source and the shrink-only baseline in
+  # `tools/code/code-baseline.json`, measuring with a Roslyn console tool
+  # (`tools/code/CodeMetrics`). It covers .cs/.ts/.cshtml (gates a/e/f of the
+  # docs script were retired into this finer gate by C00) and exits 0/1.
+  #
+  # The gate's `dotnet run` builds the CodeMetrics tool, so this job needs the
+  # .NET SDK (installed below). The ts-metrics pass shells out to Node, which
+  # `actions/setup-node` provides (ubuntu-latest also ships Node, but we pin
+  # the version for reproducibility — the tool only needs `node` on PATH, not
+  # a specific project).
+  #
+  # The `max raised without an `adr:`` ratchet compares the working tree's
+  # baseline against the PR's *base* branch (the branch this repo integrates
+  # into — `release`, per the `on:` triggers above). That needs the base ref
+  # present in the checkout, so this job uses `fetch-depth: 0`. The gate
+  # *fails closed* if the base is unreadable (it does not silently skip), so
+  # a broken base can no longer turn the ratchet off. A base that simply never
+  # had the file (first introduction of the baseline) is skipped — that is the
+  # legitimate case. Locally the same check defaults to `origin/development`
+  # (where this repo develops); CI overrides it with `CODE_BASELINE_BASE`.
+  # ---------------------------------------------------------------------------
+  code:
+    runs-on: ubuntu-latest
+    steps:
+      # SEC L5 (U25): tag + commit-SHA pin (same `# v5` convention as the test job).
+      # fetch-depth 0: the ratchet reads the baseline file off the base ref, so
+      # the base branch's history must be in the checkout (default is single-branch).
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      # CI plumbing (NOT a pinned gate command): install the .NET 10 SDK the
+      # Roslyn tool needs (matches global.json's sdk.version, like the test job).
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.400'
+
+      # CI plumbing: Node for the ts-metrics.js pass (the CodeMetrics tool
+      # shells out to `node`; it needs no npm project).
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '20'
+
+      # The gate: runs code-check.ps1 (exit 0/1). Its Roslyn `--check`
+      # compares against tools/code/code-baseline.json and — via
+      # CODE_BASELINE_BASE (the PR's base branch; `release` for both the push
+      # and pull_request triggers) — against that branch's baseline. An
+      # unreadable base fails the gate under CI rather than being skipped.
+      - name: Run code gate
+        env:
+          CODE_BASELINE_BASE: origin/${{ github.base_ref || 'release' }}
+        run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/code/code-check.ps1
+
+  # ---------------------------------------------------------------------------
   # F19.U4 — the E2E job (TEST-03, `code`).
   #
   # This job is ADDED by F19.U4 on top of F14.U2's landed "test" job; the two

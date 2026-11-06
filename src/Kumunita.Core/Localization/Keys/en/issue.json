@@ -1,0 +1,11 @@
+{
+  "issue.title": "Report an issue",
+  "issue.intro": "Something not working, or a problem we should know about? Tell us what happened \u2014 even if there\u0027s no error page in front of you.",
+  "issue.description.label": "What\u0027s the issue?",
+  "issue.description.placeholder": "e.g. The group calendar page is down, or I can\u0027t log in",
+  "issue.email.label": "Your email (optional)",
+  "issue.email.placeholder": "you@example.com",
+  "issue.submit": "Send issue report",
+  "issue.thanks": "Thanks \u2014 your issue has been filed.",
+  "issue.nav": "Report an issue"
+}

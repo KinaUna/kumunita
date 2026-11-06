@@ -56,6 +56,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task FindSubjectByEmail_ReturnsSubjectIdForKnownEmail()
     {
         var (identity, _, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
 
         const string email = "ga-u03-known@example.com";
         var principal = await identity.RegisterAsync("GA U03 Known", email, "Passw0rd!u03known");
@@ -86,6 +87,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task FindSubjectByEmail_IsCaseInsensitiveOnEmail()
     {
         var (identity, _, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
 
         const string email = "User@Example.com";
         var principal = await identity.RegisterAsync("GA U03 Case", email, "Passw0rd!u03case");
@@ -112,6 +114,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild_AfterAccept()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
         var ct = TestContext.Current.CancellationToken;
 
         const string assigningGuardian = "ga-handoff-assigning";
@@ -122,13 +125,13 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         // Profile by SubjectId) + the assigning guardian's active link (their
         // standing basis, G-A·1).
         await SeedChildProfileAsync(store, child, ct);
-        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
+        await guardianService.CreateGuardianLinkAsync(child, assigningGuardian);
 
         // The GA lane: the assigning guardian assigns the second guardian —
         // exactly the seam GuardianController.Assign calls (ADR 0038 §F:
         // the seam now writes a PENDING row; the standing is not minted
         // until the assignee accepts).
-        var link = await userInfo.AssignGuardianLinkAsync(
+        var link = await guardianService.AssignGuardianLinkAsync(
             child, assignedGuardian, assigningGuardian);
         Assert.Equal(GuardianLinkStatus.Pending, link.Status);
 
@@ -137,7 +140,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         // Active exclusively — the GU G·3 deny-by-default shape applied to
         // the acceptance lane).
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => userInfo.SuspendChildAsync(child, assignedGuardian));
+            () => guardianService.SuspendChildAsync(child, assignedGuardian));
 
         // The assignee ACCEPTS (the ADR 0038 §F supersession of the
         // "no acceptance step" deferral; the consent gate is the Web's
@@ -145,17 +148,17 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         // state-machine transition, the consent check is the Web layer's
         // job). The row flips Pending → Active; the guardian.create +
         // guardian.accept audit rows commit (C3).
-        var accepted = await userInfo.AcceptGuardianLinkAsync(child, assignedGuardian);
+        var accepted = await guardianService.AcceptGuardianLinkAsync(child, assignedGuardian);
         Assert.Equal(GuardianLinkStatus.Active, accepted.Status);
         Assert.Equal(assignedGuardian, accepted.ResolvedBy);
 
         // HANDOFF: the assigned guardian, now a full guardian, suspends +
         // un-suspends the child — the GU lanes resolve the new row (G-A·3 —
         // identical in kind to the creator's, no content read).
-        await userInfo.SuspendChildAsync(child, assignedGuardian);
+        await guardianService.SuspendChildAsync(child, assignedGuardian);
         Assert.True((await userInfo.GetProfileAsync(child))!.Blocked);
 
-        await userInfo.UnsuspendChildAsync(child, assignedGuardian);
+        await guardianService.UnsuspendChildAsync(child, assignedGuardian);
         Assert.False((await userInfo.GetProfileAsync(child))!.Blocked);
 
         // The suspension audit row records the ASSIGNED guardian as the actor
@@ -174,6 +177,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task Accept_ByNonAssignee_Refused()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
         var ct = TestContext.Current.CancellationToken;
 
         const string assigningGuardian = "ga-accept-nonassigning";
@@ -182,8 +186,8 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         const string child          = "ga-accept-child";
 
         await SeedChildProfileAsync(store, child, ct);
-        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
-        await userInfo.AssignGuardianLinkAsync(child, assignedGuardian, assigningGuardian);
+        await guardianService.CreateGuardianLinkAsync(child, assigningGuardian);
+        await guardianService.AssignGuardianLinkAsync(child, assignedGuardian, assigningGuardian);
 
         // A different account (the otherAssignee) tries to accept the
         // assignedGuardian's request — refused: the row's GuardianId field
@@ -193,7 +197,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         // TempData["error"] surface (the Suspend / Unsuspend / Dissolve
         // precedent).
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => userInfo.AcceptGuardianLinkAsync(child, otherAssignee));
+            () => guardianService.AcceptGuardianLinkAsync(child, otherAssignee));
     }
 
     // ── ADR 0038 §F — the accept over an already-Active row is refused ──
@@ -206,6 +210,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task Accept_AlreadyActive_Refused()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
         var ct = TestContext.Current.CancellationToken;
 
         const string assigningGuardian = "ga-accept-already-active-assigning";
@@ -213,16 +218,16 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         const string child          = "ga-accept-already-active-child";
 
         await SeedChildProfileAsync(store, child, ct);
-        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
-        await userInfo.AssignGuardianLinkAsync(child, assignedGuardian, assigningGuardian);
+        await guardianService.CreateGuardianLinkAsync(child, assigningGuardian);
+        await guardianService.AssignGuardianLinkAsync(child, assignedGuardian, assigningGuardian);
 
         // First accept: Pending → Active (the happy path).
-        await userInfo.AcceptGuardianLinkAsync(child, assignedGuardian);
+        await guardianService.AcceptGuardianLinkAsync(child, assignedGuardian);
 
         // Second accept over the same pair: refused (the row is no longer
         // Pending — the lane's honesty invariant, the C-M2b·3 shape).
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => userInfo.AcceptGuardianLinkAsync(child, assignedGuardian));
+            () => guardianService.AcceptGuardianLinkAsync(child, assignedGuardian));
     }
 
     // ── ADR 0038 §F — the decline seam: Pending → Declined + audit row ──
@@ -231,6 +236,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task Decline_PendingToDeclined_WritesDeclineAuditRow()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
         var ct = TestContext.Current.CancellationToken;
 
         const string assigningGuardian = "ga-decline-assigning";
@@ -238,13 +244,13 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         const string child          = "ga-decline-child";
 
         await SeedChildProfileAsync(store, child, ct);
-        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
-        var pending = await userInfo.AssignGuardianLinkAsync(
+        await guardianService.CreateGuardianLinkAsync(child, assigningGuardian);
+        var pending = await guardianService.AssignGuardianLinkAsync(
             child, assignedGuardian, assigningGuardian);
         Assert.Equal(GuardianLinkStatus.Pending, pending.Status);
 
         // The decline: Pending → Declined + the guardian.decline audit row.
-        var declined = await userInfo.DeclineGuardianLinkAsync(child, assignedGuardian);
+        var declined = await guardianService.DeclineGuardianLinkAsync(child, assignedGuardian);
         Assert.Equal(GuardianLinkStatus.Declined, declined.Status);
         Assert.Equal(assignedGuardian, declined.ResolvedBy);
         Assert.NotNull(declined.ResolvedAt);
@@ -265,7 +271,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         // "Declined is terminal for the lane" shape): a re-accept over a
         // Declined row is refused (the row is no longer Pending).
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => userInfo.AcceptGuardianLinkAsync(child, assignedGuardian));
+            () => guardianService.AcceptGuardianLinkAsync(child, assignedGuardian));
     }
 
     // ── ADR 0038 §F — the conferrer's re-act over a Declined row: the row
@@ -276,6 +282,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task Assign_ReActOverDeclined_FlipsBackToPending()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
         var ct = TestContext.Current.CancellationToken;
 
         const string assigningGuardian = "ga-react-assigning";
@@ -283,22 +290,22 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         const string child          = "ga-react-child";
 
         await SeedChildProfileAsync(store, child, ct);
-        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
+        await guardianService.CreateGuardianLinkAsync(child, assigningGuardian);
 
         // First assign: Pending.
-        var first = await userInfo.AssignGuardianLinkAsync(
+        var first = await guardianService.AssignGuardianLinkAsync(
             child, assignedGuardian, assigningGuardian);
         Assert.Equal(GuardianLinkStatus.Pending, first.Status);
 
         // The assignee declines: Pending → Declined.
-        await userInfo.DeclineGuardianLinkAsync(child, assignedGuardian);
+        await guardianService.DeclineGuardianLinkAsync(child, assignedGuardian);
 
         // The conferrer re-acts (the ADR 0038 §F re-act lane): the row flips
         // back to Pending. The unique index keeps this ONE row (not a
         // second); the state machine re-enters Pending. The assignee's
         // ResolvedAt/ResolvedBy are cleared; a fresh guardian.assign audit
         // row is written.
-        var second = await userInfo.AssignGuardianLinkAsync(
+        var second = await guardianService.AssignGuardianLinkAsync(
             child, assignedGuardian, assigningGuardian);
         Assert.Equal(GuardianLinkStatus.Pending, second.Status);
         Assert.Equal(first.Id, second.Id);   // the same row (the unique index)
@@ -327,6 +334,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task AssignGuardianLink_WritesPendingRow_AndAssignAuditRow()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
         var ct = TestContext.Current.CancellationToken;
 
         const string assigningGuardian = "ga-f-assigning";
@@ -336,7 +344,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         await SeedChildProfileAsync(store, child, ct);
 
         // Call the seam — one commit, the Pending row + one audit row (S·1).
-        var link = await userInfo.AssignGuardianLinkAsync(
+        var link = await guardianService.AssignGuardianLinkAsync(
             child, assignedGuardian, assigningGuardian);
         Assert.Equal(GuardianLinkStatus.Pending, link.Status);
 
@@ -377,7 +385,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         // (f) S·6 — idempotency: a second call with the same pair (while the
         //     row is still Pending) is a no-op — the row count stays 1, the
         //     audit-row count stays 1.
-        await userInfo.AssignGuardianLinkAsync(
+        await guardianService.AssignGuardianLinkAsync(
             child, assignedGuardian, assigningGuardian);
 
         await using var q2 = store.QuerySession();
@@ -404,6 +412,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task AcceptGuardianLink_WritesCreateAndAcceptAuditRows()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
         var ct = TestContext.Current.CancellationToken;
 
         const string assigningGuardian = "ga-accept-audit-assigning";
@@ -411,13 +420,13 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         const string child = "ga-accept-audit-child";
 
         await SeedChildProfileAsync(store, child, ct);
-        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
-        var pending = await userInfo.AssignGuardianLinkAsync(
+        await guardianService.CreateGuardianLinkAsync(child, assigningGuardian);
+        var pending = await guardianService.AssignGuardianLinkAsync(
             child, assignedGuardian, assigningGuardian);
         Assert.Equal(GuardianLinkStatus.Pending, pending.Status);
 
         // The accept: the standing is minted — two audit rows in one commit.
-        var accepted = await userInfo.AcceptGuardianLinkAsync(child, assignedGuardian);
+        var accepted = await guardianService.AcceptGuardianLinkAsync(child, assignedGuardian);
         Assert.Equal(GuardianLinkStatus.Active, accepted.Status);
         Assert.Equal(assignedGuardian, accepted.ResolvedBy);
         Assert.NotNull(accepted.ResolvedAt);
@@ -457,6 +466,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task GetPendingGuardianRequestsForAssignee_ReturnsOnlyAssigneesPendingRows()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
+        var guardianService = new GuardianService(store);
         var ct = TestContext.Current.CancellationToken;
 
         const string assigningGuardian = "ga-read-assigning";
@@ -464,12 +474,12 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         const string child          = "ga-read-child";
 
         await SeedChildProfileAsync(store, child, ct);
-        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
-        await userInfo.AssignGuardianLinkAsync(child, assignedGuardian, assigningGuardian);
+        await guardianService.CreateGuardianLinkAsync(child, assigningGuardian);
+        await guardianService.AssignGuardianLinkAsync(child, assignedGuardian, assigningGuardian);
 
         // The assigned guardian's read: exactly one row (their pending
         // request for this child).
-        var rows = await userInfo.GetPendingGuardianRequestsForAssigneeAsync(assignedGuardian);
+        var rows = await guardianService.GetPendingGuardianRequestsForAssigneeAsync(assignedGuardian);
         Assert.Single(rows);
         Assert.Equal(child, rows[0].ChildId);
         Assert.Equal(assigningGuardian, rows[0].AssignedById);
@@ -478,18 +488,18 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         // The assigning guardian's read: zero rows (they are not the
         // assignee of this request — they are the conferrer; their row is
         // Active from CreateGuardianLinkAsync, not Pending).
-        var otherRows = await userInfo.GetPendingGuardianRequestsForAssigneeAsync(assigningGuardian);
+        var otherRows = await guardianService.GetPendingGuardianRequestsForAssigneeAsync(assigningGuardian);
         Assert.Empty(otherRows);
 
         // A third account's read: zero rows (the ADR 0012/0013 "a
         // non-guardian learns nothing" shape applied to the identity axis).
-        var strangerRows = await userInfo.GetPendingGuardianRequestsForAssigneeAsync("stranger");
+        var strangerRows = await guardianService.GetPendingGuardianRequestsForAssigneeAsync("stranger");
         Assert.Empty(strangerRows);
 
         // After the assignee accepts: the read returns zero rows (the row is
         // no longer Pending).
-        await userInfo.AcceptGuardianLinkAsync(child, assignedGuardian);
-        var afterAccept = await userInfo.GetPendingGuardianRequestsForAssigneeAsync(assignedGuardian);
+        await guardianService.AcceptGuardianLinkAsync(child, assignedGuardian);
+        var afterAccept = await guardianService.GetPendingGuardianRequestsForAssigneeAsync(assignedGuardian);
         Assert.Empty(afterAccept);
     }
 
@@ -550,6 +560,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
             NullLogger<UserManager<User>>.Instance);
 
         var userInfo = new UserInfoService(store);
+        var guardianService = new GuardianService(store);
         var identity = new IdentityService(
             userManager,
             store,

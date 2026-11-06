@@ -49,6 +49,7 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-owner";
         const string invitee = "u-m2b-invitee";
@@ -57,15 +58,15 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
 
         // Invite: the pending row exists, but NO membership yet (C4 lane is
         // accept-only).
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
         Assert.DoesNotContain(group.Id, await svc.GetGroupIdsAsync(invitee));
-        Assert.DoesNotContain(group.Id, (await svc.GetGroupsForUserAsync(invitee)).Select(g => g.Id));
+        Assert.DoesNotContain(group.Id, (await groupService.GetGroupsForUserAsync(invitee)).Select(g => g.Id));
 
         // Accept (the self-lane — the invitee resolves their own row): the
         // membership is live on the very next read (C4 carried).
-        await svc.AcceptGroupInvitationAsync(group.Id, invitee);
+        await groupService.AcceptGroupInvitationAsync(group.Id, invitee);
         Assert.Contains(group.Id, await svc.GetGroupIdsAsync(invitee));
-        Assert.Contains(group.Id, (await svc.GetGroupsForUserAsync(invitee)).Select(g => g.Id));
+        Assert.Contains(group.Id, (await groupService.GetGroupsForUserAsync(invitee)).Select(g => g.Id));
     }
 
     // ── Lifecycle 2 — decline: no membership, row resolved ─────────────────
@@ -75,21 +76,22 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-a";
         const string invitee = "u-m2b-b";
 
         var group = await svc.CreateGroupAsync(owner, "Volunteers", null);
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
 
-        await svc.DeclineGroupInvitationAsync(group.Id, invitee);
+        await groupService.DeclineGroupInvitationAsync(group.Id, invitee);
 
         Assert.DoesNotContain(group.Id, await svc.GetGroupIdsAsync(invitee));
 
         // The row resolved — it is no longer in the invitee's pending list,
         // nor the group's pending list.
-        Assert.Empty(await svc.GetPendingInvitationsForUserAsync(invitee));
-        Assert.Empty(await svc.GetPendingInvitationsForGroupAsync(group.Id));
+        Assert.Empty(await groupService.GetPendingInvitationsForUserAsync(invitee));
+        Assert.Empty(await groupService.GetPendingInvitationsForGroupAsync(group.Id));
     }
 
     // ── Lifecycle 3 — cancel: the owner kills a pending row ────────────────
@@ -99,18 +101,19 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-c";
         const string invitee = "u-m2b-d";
 
         var group = await svc.CreateGroupAsync(owner, "Bike owners", null);
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
 
-        await svc.CancelGroupInvitationAsync(group.Id, invitee, cancelledBy: owner);
+        await groupService.CancelGroupInvitationAsync(group.Id, invitee, cancelledBy: owner);
 
         Assert.DoesNotContain(group.Id, await svc.GetGroupIdsAsync(invitee));
-        Assert.Empty(await svc.GetPendingInvitationsForUserAsync(invitee));
-        Assert.Empty(await svc.GetPendingInvitationsForGroupAsync(group.Id));
+        Assert.Empty(await groupService.GetPendingInvitationsForUserAsync(invitee));
+        Assert.Empty(await groupService.GetPendingInvitationsForGroupAsync(group.Id));
     }
 
     // ── C-M2b·1 — the SoD lane's via derivation (owner ⇒ Owner, else Admin) ──
@@ -120,12 +123,13 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-e";
         const string invitee = "u-m2b-f";
 
         var group = await svc.CreateGroupAsync(owner, "Building 12", null);
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
 
         var row = await LastAuditAsync(store, "group.invite", group.Id);
         Assert.Equal(AccessVia.Owner, row.Via);
@@ -138,13 +142,14 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-g";
         const string admin = "u-m2b-admin";
         const string invitee = "u-m2b-h";
 
         var group = await svc.CreateGroupAsync(owner, "Building 7", null);
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: admin);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: admin);
 
         var row = await LastAuditAsync(store, "group.invite", group.Id);
         Assert.Equal(AccessVia.Admin, row.Via);
@@ -157,6 +162,7 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-i";
         const string acceptor = "u-m2b-j";
@@ -165,11 +171,11 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
         var groupA = await svc.CreateGroupAsync(owner, "A", null);
         var groupD = await svc.CreateGroupAsync(owner, "D", null);
 
-        await svc.InviteGroupMemberAsync(groupA.Id, acceptor, invitedBy: owner);
-        await svc.AcceptGroupInvitationAsync(groupA.Id, acceptor);
+        await groupService.InviteGroupMemberAsync(groupA.Id, acceptor, invitedBy: owner);
+        await groupService.AcceptGroupInvitationAsync(groupA.Id, acceptor);
 
-        await svc.InviteGroupMemberAsync(groupD.Id, decliner, invitedBy: owner);
-        await svc.DeclineGroupInvitationAsync(groupD.Id, decliner);
+        await groupService.InviteGroupMemberAsync(groupD.Id, decliner, invitedBy: owner);
+        await groupService.DeclineGroupInvitationAsync(groupD.Id, decliner);
 
         var acceptRow = await LastAuditAsync(store, "group.invite.accept", groupA.Id);
         Assert.Equal(AccessVia.Owner, acceptRow.Via);   // the invitee's own standing
@@ -189,25 +195,26 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-m";
         const string invitee = "u-m2b-n";
         const string stranger = "u-m2b-o";
 
         var group = await svc.CreateGroupAsync(owner, "Building 3", null);
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
 
         // A stranger (not the row's UserId) cannot accept the invitation.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.AcceptGroupInvitationAsync(group.Id, stranger));
+            groupService.AcceptGroupInvitationAsync(group.Id, stranger));
 
         // ... and the row is still pending for the invitee (nothing changed).
-        Assert.Single(await svc.GetPendingInvitationsForUserAsync(invitee));
+        Assert.Single(await groupService.GetPendingInvitationsForUserAsync(invitee));
 
         // Same wall on the decline lane.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.DeclineGroupInvitationAsync(group.Id, stranger));
-        Assert.Single(await svc.GetPendingInvitationsForUserAsync(invitee));
+            groupService.DeclineGroupInvitationAsync(group.Id, stranger));
+        Assert.Single(await groupService.GetPendingInvitationsForUserAsync(invitee));
     }
 
     [Fact]
@@ -215,6 +222,7 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-p";
         const string invitee = "u-m2b-q";
@@ -223,11 +231,11 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
 
         // No invitation row at all for this pair.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.AcceptGroupInvitationAsync(group.Id, invitee));
+            groupService.AcceptGroupInvitationAsync(group.Id, invitee));
 
         // A group id that does not exist.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.AcceptGroupInvitationAsync("no-such-group", invitee));
+            groupService.AcceptGroupInvitationAsync("no-such-group", invitee));
     }
 
     // ── C-M2b·3 — the state machine ─────────────────────────────────────────
@@ -237,25 +245,26 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-r";
         const string invitee = "u-m2b-s";
 
         var group = await svc.CreateGroupAsync(owner, "Building 5", null);
 
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
-        await svc.DeclineGroupInvitationAsync(group.Id, invitee);
-        Assert.Empty(await svc.GetPendingInvitationsForUserAsync(invitee));
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        await groupService.DeclineGroupInvitationAsync(group.Id, invitee);
+        Assert.Empty(await groupService.GetPendingInvitationsForUserAsync(invitee));
 
         // Re-invite: the SAME (group, user) business-key row resets to
         // Pending — no second row, and the invitee is pending once.
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
-        var pending = await svc.GetPendingInvitationsForUserAsync(invitee);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        var pending = await groupService.GetPendingInvitationsForUserAsync(invitee);
         Assert.Single(pending);
         Assert.Equal(InvitationStatus.Pending, pending[0].Status);
 
         // And the self-lane works end-to-end on the re-invited row.
-        await svc.AcceptGroupInvitationAsync(group.Id, invitee);
+        await groupService.AcceptGroupInvitationAsync(group.Id, invitee);
         Assert.Contains(group.Id, await svc.GetGroupIdsAsync(invitee));
     }
 
@@ -264,19 +273,20 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-t";
         const string invitee = "u-m2b-u";
 
         var group = await svc.CreateGroupAsync(owner, "Building 6", null);
 
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
 
         // One row per (group, user) — the UniqueIndex business key; the
         // re-stamp, not a second row.
-        Assert.Single(await svc.GetPendingInvitationsForUserAsync(invitee));
-        Assert.Single(await svc.GetPendingInvitationsForGroupAsync(group.Id));
+        Assert.Single(await groupService.GetPendingInvitationsForUserAsync(invitee));
+        Assert.Single(await groupService.GetPendingInvitationsForGroupAsync(group.Id));
     }
 
     [Fact]
@@ -284,6 +294,7 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-v";
         const string invitee1 = "u-m2b-w";
@@ -295,26 +306,26 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
         var g3 = await svc.CreateGroupAsync(owner, "G3", null);
 
         // Accepted row: a second accept is an invalid transition.
-        await svc.InviteGroupMemberAsync(g1.Id, invitee1, invitedBy: owner);
-        await svc.AcceptGroupInvitationAsync(g1.Id, invitee1);
+        await groupService.InviteGroupMemberAsync(g1.Id, invitee1, invitedBy: owner);
+        await groupService.AcceptGroupInvitationAsync(g1.Id, invitee1);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.AcceptGroupInvitationAsync(g1.Id, invitee1));
+            groupService.AcceptGroupInvitationAsync(g1.Id, invitee1));
 
         // Declined row: a later accept is an invalid transition.
-        await svc.InviteGroupMemberAsync(g2.Id, invitee2, invitedBy: owner);
-        await svc.DeclineGroupInvitationAsync(g2.Id, invitee2);
+        await groupService.InviteGroupMemberAsync(g2.Id, invitee2, invitedBy: owner);
+        await groupService.DeclineGroupInvitationAsync(g2.Id, invitee2);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.AcceptGroupInvitationAsync(g2.Id, invitee2));
+            groupService.AcceptGroupInvitationAsync(g2.Id, invitee2));
 
         // Cancelled row: a later self-resolution is an invalid transition.
-        await svc.InviteGroupMemberAsync(g3.Id, invitee3, invitedBy: owner);
-        await svc.CancelGroupInvitationAsync(g3.Id, invitee3, cancelledBy: owner);
+        await groupService.InviteGroupMemberAsync(g3.Id, invitee3, invitedBy: owner);
+        await groupService.CancelGroupInvitationAsync(g3.Id, invitee3, cancelledBy: owner);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.DeclineGroupInvitationAsync(g3.Id, invitee3));
+            groupService.DeclineGroupInvitationAsync(g3.Id, invitee3));
 
         // Cancelling a pair that never had a row also throws (invalid lane).
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.CancelGroupInvitationAsync(g3.Id, "u-m2b-never", cancelledBy: owner));
+            groupService.CancelGroupInvitationAsync(g3.Id, "u-m2b-never", cancelledBy: owner));
     }
 
     // ── C3 / C-M2·2 — every write audits; the three reads never do ─────────
@@ -324,6 +335,7 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-z1";
         const string a = "u-m2b-z2";
@@ -334,13 +346,13 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
         var gB = await svc.CreateGroupAsync(owner, "ZB", null);
         var gC = await svc.CreateGroupAsync(owner, "ZC", null);
 
-        await svc.InviteGroupMemberAsync(gA.Id, a, invitedBy: owner);
-        await svc.InviteGroupMemberAsync(gB.Id, b, invitedBy: owner);
-        await svc.InviteGroupMemberAsync(gC.Id, c, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(gA.Id, a, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(gB.Id, b, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(gC.Id, c, invitedBy: owner);
 
-        await svc.AcceptGroupInvitationAsync(gA.Id, a);
-        await svc.DeclineGroupInvitationAsync(gB.Id, b);
-        await svc.CancelGroupInvitationAsync(gC.Id, c, cancelledBy: owner);
+        await groupService.AcceptGroupInvitationAsync(gA.Id, a);
+        await groupService.DeclineGroupInvitationAsync(gB.Id, b);
+        await groupService.CancelGroupInvitationAsync(gC.Id, c, cancelledBy: owner);
 
         await using var session = store.QuerySession();
         var m2bActions = await session.Query<AccessAudit>()
@@ -370,19 +382,20 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-r1";
         const string invitee = "u-m2b-r2";
 
         var group = await svc.CreateGroupAsync(owner, "Reads", null);
-        await svc.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, invitee, invitedBy: owner);
 
         var before = await AuditCountAsync(store);
 
         // The three read lanes (plan's C-M2·2 carried pin): none may append.
-        await svc.GetGroupAsync(group.Id);
-        await svc.GetPendingInvitationsForUserAsync(invitee);
-        await svc.GetPendingInvitationsForGroupAsync(group.Id);
+        await groupService.GetGroupAsync(group.Id);
+        await groupService.GetPendingInvitationsForUserAsync(invitee);
+        await groupService.GetPendingInvitationsForGroupAsync(group.Id);
 
         Assert.Equal(before, await AuditCountAsync(store));
     }
@@ -392,34 +405,35 @@ public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : 
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-m2b-o1";
         const string pending = "u-m2b-o2";
         const string resolved = "u-m2b-o3";
 
         var group = await svc.CreateGroupAsync(owner, "Ordering", null);
-        await svc.InviteGroupMemberAsync(group.Id, pending, invitedBy: owner);
-        await svc.InviteGroupMemberAsync(group.Id, resolved, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, pending, invitedBy: owner);
+        await groupService.InviteGroupMemberAsync(group.Id, resolved, invitedBy: owner);
 
-        await svc.AcceptGroupInvitationAsync(group.Id, resolved);
+        await groupService.AcceptGroupInvitationAsync(group.Id, resolved);
 
         // User axis: the resolved row dropped, the pending one survives —
         // live on the very next call (C4 on the read lanes).
-        var forUser = await svc.GetPendingInvitationsForUserAsync(pending);
+        var forUser = await groupService.GetPendingInvitationsForUserAsync(pending);
         Assert.Single(forUser);
         Assert.Equal(InvitationStatus.Pending, forUser[0].Status);
 
-        Assert.Empty(await svc.GetPendingInvitationsForUserAsync(resolved));
+        Assert.Empty(await groupService.GetPendingInvitationsForUserAsync(resolved));
 
         // Group axis: one pending row remains, for the other invitee.
-        var forGroup = await svc.GetPendingInvitationsForGroupAsync(group.Id);
+        var forGroup = await groupService.GetPendingInvitationsForGroupAsync(group.Id);
         Assert.Single(forGroup);
         Assert.Equal(pending, forGroup[0].UserId);
 
         // Fail-safe: empty ids return empty lists, no throw.
-        Assert.Empty(await svc.GetPendingInvitationsForUserAsync(string.Empty));
-        Assert.Empty(await svc.GetPendingInvitationsForGroupAsync(string.Empty));
-        Assert.Null(await svc.GetGroupAsync(string.Empty));
+        Assert.Empty(await groupService.GetPendingInvitationsForUserAsync(string.Empty));
+        Assert.Empty(await groupService.GetPendingInvitationsForGroupAsync(string.Empty));
+        Assert.Null(await groupService.GetGroupAsync(string.Empty));
     }
 
     // ── Shared helpers ──────────────────────────────────────────────────────

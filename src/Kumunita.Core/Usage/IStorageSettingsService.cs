@@ -36,6 +36,16 @@ public interface IStorageSettingsService
         Marten.IDocumentSession session);
 
     /// <summary>
+    /// The committed settings-write lane (IMPROVE-CODE C09): the
+    /// <see cref="SetAsync(long?, long, string, Marten.IDocumentSession)"/>
+    /// semantics (the C-UP·1 single in-caller-session write) on a fresh
+    /// <c>LightweightSession</c>. The session-based form commits on its own, so
+    /// this wrapper opens the session and delegates. Lets the
+    /// <c>AdminStorageController</c> drop the <c>IDocumentStore</c> dependency.
+    /// </summary>
+    Task SetAsync(long? maxFileBytes, long perUserQuotaBytes, string actorId);
+
+    /// <summary>
     /// The C-UP·4 read: <c>Σ MediaObject.SizeBytes WHERE CreatedById ==
     /// subjectId</c>. **Reuses** the M24 <see cref="IStorageMetricsService"/>
     /// C-SM·7 handoff seam of the identical signature (design §2.6); do **not**

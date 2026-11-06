@@ -1,0 +1,17 @@
+{
+  "translations.bulk.save_all": "Gem alle",
+  "translations.bulk.mode_batch": "Batchredigering",
+  "translations.bulk.mode_single": "Redig\u00E9r \u00E9n ad gangen",
+  "translations.bulk.export": "Download translationer (CSV)",
+  "translations.bulk.import": "Upload translationer (CSV)",
+  "translations.bulk.import_hint": "Tomme felter springes over (de sletter aldrig en overs\u00E6ttelse); en fil med en ukendt n\u00F8gle eller et ukendt sprog afvises u\u00E6ndret.",
+  "translations.editor.back": "\u2190 Tilbage til sprog",
+  "translations.editor.title": "UI-strings for {0}",
+  "translations.editor.lede": "Den fulde liste over de strenge, platformmen viser til sine beboere. Hver linje viser n\u00F8glen, dens engelske referencetext og den aktuelle v\u00E6rdi i {0}. Gemme en linje tilf\u00F8jer eller opdaterer dens overs\u00E6ttelse \u2014 synlig ved n\u00E6ste anmodning.",
+  "translations.editor.mode_label": "Redigerings tilstand",
+  "translations.editor.th_key": "N\u00F8gle",
+  "translations.editor.th_en_reference": "Engelsk reference",
+  "translations.editor.th_value": "V\u00E6rdi i {0}",
+  "translations.editor.value_aria": "V\u00E6rdi for {0} i {1}",
+  "translations.bulk.export_title": "Download UI-strings i dette sprog som en CSV-fil"
+}

@@ -1,0 +1,8 @@
+{
+  "tag.suggest.remove_prefix": "Supprimer l\u0027\u00E9tiquette : ",
+  "tag.input.placeholder": "p. ex. salubrit\u00E9, budget, rue-\u00E9rable",
+  "tag.input.hint": "\u00C9cris pour chercher des \u00E9tiquettes existantes, ou en cr\u00E9er une nouvelle.",
+  "tag.suggest.empty": "Aucune \u00E9tiquette correspondante \u2014 continue \u00E0 \u00E9crire ou cr\u00E9e-en une.",
+  "tag.translate.heading": "Traductions",
+  "tag.translate.save": "Enregistrer"
+}

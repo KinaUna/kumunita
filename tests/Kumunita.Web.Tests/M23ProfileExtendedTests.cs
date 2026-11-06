@@ -172,7 +172,7 @@ public sealed class M23ProfileExtendedTests
     [Fact]
     public async Task EditAction_Passes_ViewerSubject_AsActorBy()
     {
-        var (controller, userInfo) = BuildProfileController(Owner);
+        var (controller, _, profileSettings) = BuildProfileController(Owner);
 
         var model = Base();
         model.Bio = "I bake.";
@@ -184,7 +184,7 @@ public sealed class M23ProfileExtendedTests
 
         // The write is the single UpsertProfileAsync lane; the third argument
         // (actorBy) is the signed-in subject — never a form value.
-        await userInfo.Received(1).UpsertProfileAsync(
+        await profileSettings.Received(1).UpsertProfileAsync(
             Arg.Is<Profile>(p => p.SubjectId == Owner),
             Arg.Is<ProfileUpdate>(x =>
                 x.Bio == "I bake." &&
@@ -470,16 +470,13 @@ public sealed class M23ProfileExtendedTests
         }
     }
 
-    private static (ProfileController controller, IUserInfoService userInfo) BuildProfileController(
+    private static (ProfileController controller, IUserInfoService userInfo, IProfileSettingsService profileSettings) BuildProfileController(
         string principalSubjectId)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         var media = Substitute.For<IMediaStore>();
-        var controller = new ProfileController(
-            userInfo,
-            new DirectoryService(userInfo, Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>()),
-            media,
-            Options.Create(new MediaOptions()));
+        var controller = new ProfileController(userInfo, Substitute.For<IGroupService>(), profileSettings, new DirectoryService(userInfo, profileSettings, Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>()), media, Options.Create(new MediaOptions()));
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(
@@ -488,7 +485,7 @@ public sealed class M23ProfileExtendedTests
                 authenticationType: "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
-        return (controller, userInfo);
+        return (controller, userInfo, profileSettings);
     }
 
     private static (DirectoryController controller, Kumunita.Core.Authorization.IAuthorizationService authz)
@@ -497,7 +494,7 @@ public sealed class M23ProfileExtendedTests
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync(targetProfile.SubjectId).Returns(targetProfile);
         var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
-        var directory = new DirectoryService(userInfo, authz);
+        var directory = new DirectoryService(userInfo, Substitute.For<IProfileSettingsService>(), authz);
         // The bio/tags gate's document-store + translation seams are null (the
         // test-construction floor): tag display-name resolution is a no-op
         // (TagNames = null), but the bio projection + the contact gate are
@@ -524,7 +521,7 @@ public sealed class M23ProfileExtendedTests
         var stubAuthz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
         stubAuthz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
             .Returns(new Decision(false, AccessVia.Audience, ViewerA));
-        var directory = new DirectoryService(userInfo, stubAuthz);
+        var directory = new DirectoryService(userInfo, Substitute.For<IProfileSettingsService>(), stubAuthz);
         var controller = new DirectoryController(directory, authz: null, store: null, localization: null, translationProvider: null);
         SetViewer(controller, viewerSubjectId);
         return (controller, null);

@@ -206,7 +206,7 @@ public class SearchSortTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     {
         var userInfo = new UserInfoService(store);
         var authz = new AuthorizationService(store, userInfo);
-        return new SearchService(store, authz, userInfo);
+        return new SearchService(store, authz, userInfo, new ProfileSettingsService(store));
     }
 
     /// <summary>

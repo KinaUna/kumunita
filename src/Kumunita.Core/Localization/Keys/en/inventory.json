@@ -1,0 +1,6 @@
+{
+  "inventory.flash_item_updated": "Item updated.",
+  "inventory.flash_item_deleted": "Item deleted.",
+  "inventory.flash_checked_out": "Item checked out.",
+  "inventory.flash_checked_in": "Item checked in."
+}

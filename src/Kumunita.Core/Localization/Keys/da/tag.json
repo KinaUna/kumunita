@@ -1,0 +1,8 @@
+{
+  "tag.suggest.remove_prefix": "Fjern tag: ",
+  "tag.input.placeholder": "f.eks. renhold, budget, maplestreet",
+  "tag.input.hint": "Skriv for at s\u00F8ge i eksisterende tags, eller start et nyt.",
+  "tag.suggest.empty": "Ingen matchende tags \u2014 forts\u00E6t med at skrive eller start et nyt.",
+  "tag.translate.heading": "Overs\u00E6ttelser",
+  "tag.translate.save": "Gem"
+}

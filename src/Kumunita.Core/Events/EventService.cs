@@ -3,6 +3,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Query;
+using Kumunita.Core.Translations;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -34,7 +35,7 @@ namespace Kumunita.Core.Events;
 /// (bounded context), not a *branch*.
 /// </para>
 /// </summary>
-public sealed class EventService : IEventService
+public partial class EventService : IEventService
 {
     private const int PageSize = 30;
 
@@ -60,7 +61,7 @@ public sealed class EventService : IEventService
     // `PostService`. The DI registration passes the live
     // `Notifications.NotificationService`; the frozen service's `EmitAsync`
     // surface is untouched (unit-series rule 4).
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
     // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
@@ -68,8 +69,16 @@ public sealed class EventService : IEventService
     // existing test call sites keep compiling unchanged.
     private readonly Mentions.IMentionService? _mentions;
 
+    // C06 (ADR 0288) — the one shared translation-variant write lane. The events
+    // surface's add/update/remove translation methods are thin forwarders into
+    // this (the descriptor names the events quirks: author / Translator /
+    // GlobalAdmin standing via EventStandingPolicy, blank-title-normalize on
+    // Create, AuthorId/Created restamp on ApplyUpdate). The session is opened by
+    // the forwarder (the EventService owns its own write session, unlike PostService).
+    private readonly TranslationLane<Event, EventTranslation> _translationLane;
+
     public EventService(IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
-        NotificationService? notifications = null,
+        INotificationEmitter? notifications = null,
         Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -77,6 +86,36 @@ public sealed class EventService : IEventService
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _notifications = notifications;
         _mentions = mentions;
+        _translationLane = new TranslationLane<Event, EventTranslation>(new TranslationDescriptor<Event, EventTranslation>
+        {
+            TargetKind = "event",
+            ActionPrefix = "eventtranslation",
+            Noun = "Event",
+            LoadStandingExtra = (_, _) => Task.FromResult<object?>(null),
+            ResolveStanding = (Event e, object? _, string actorId, IReadOnlySet<string> actorRoles)
+                => EventStandingPolicy.ResolveTranslationStanding(e.AuthorId, actorId, actorRoles),
+            LoadParent = (IDocumentSession session, string id) => session.LoadAsync<Event>(id),
+            Find = (IDocumentSession session, string id, string lang) => session.Query<EventTranslation>()
+                .Where(t => t.EventId == id && t.LanguageCode == lang)
+                .FirstOrDefaultAsync(),
+            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new EventTranslation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                EventId = id,
+                LanguageCode = lang,
+                Title = string.IsNullOrWhiteSpace(title) ? null : title,
+                Body = body,
+                AuthorId = actorId,
+                Created = created
+            },
+            ApplyUpdate = (EventTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            {
+                row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+                row.Body = body;
+                row.AuthorId = actorId;
+                row.Created = now;
+            }
+        });
     }
 
     /// <summary>
@@ -471,109 +510,78 @@ public sealed class EventService : IEventService
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc cref="IEventService.ListDraftsAsync"/>
+    public async Task<IReadOnlyList<Event>> ListDraftsAsync(string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An actor is required to read their draft events.");
+
+        await using var session = _store.QuerySession();
+        return await session.Query<Event>()
+            .Where(e => e.IsDraft && e.AuthorId == actorId && !e.IsDeleted)
+            .OrderByDescending(e => e.Created)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
+
     // ─── Standing-matrix gate helpers (ADR 0054 §3.4 — pure, no store) ───
     //
-    // The C3 server-side re-check pattern (the PageService.CheckCreateStanding /
-    // CheckEditStanding shape; the AnnouncementService.CreateAsync C3 pattern): a
-    // Web [Authorize(Roles=…)] is a convenience pre-gate, not the source of truth.
-    // Each helper is a **pure** role-claim check (no DB access), so it is directly
-    // testable and callable from any of U04's write lanes. A null event is a
-    // KeyNotFoundException (the Web layer's 404); a denied actor is an
-    // UnauthorizedAccessException (the Web layer's 403). The existing role claim
-    // (Roles.GlobalAdmin) is consulted — **no** new AccessAction, no new AccessVia,
-    // no branch in the frozen IAuthorizationService (ADR 0006 §A; ADR 0054 §3.4).
+    // C04: these pure decisions moved to the <see cref="EventStandingPolicy"/>
+    // static (the D6-allowed cross-module target). The service keeps a thin
+    // forwarder so the Core write lanes and the <c>EventController</c> keep the
+    // exact same call surface; the rule, the throws, and the <c>AccessVia</c>
+    // derivation are the policy's, byte-identical. The Web no longer calls the
+    // concrete service for a decision (the E9 / E12 anti-pattern this unit
+    // exists to kill).
 
     /// <summary>
-    /// The **create** standing (ADR 0054 §3.4): <b>any signed-in resident</b> may
-    /// create an event (they become the author — the <c>Owner</c> branch). The
-    /// "signed-in" constraint is the <c>actorId</c> being non-empty (the Web
-    /// <c>[Authorize]</c> enforces the sign-in; this re-checks it at the Core
-    /// layer — a null/empty actor is a denial, the Web layer's 403). A non-null
-    /// <paramref name="event"/> is required (the U04 write lane passes the
-    /// <c>CreateEventRequest</c>-derived document; a null is a data bug — the
-    /// KeyNotFoundException the Web maps to a 404).
+    /// The **create** standing (ADR 0054 §3.4) — a thin forwarder to
+    /// <see cref="EventStandingPolicy.CheckCreate"/> (C04). Throws
+    /// <see cref="KeyNotFoundException"/> (null event, the Web 404) and
+    /// <see cref="UnauthorizedAccessException"/> (null/empty actor, the Web 403).
     /// </summary>
     public static void CheckCreateStanding(string actorId, IReadOnlySet<string> actorRoles, Event? @event)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (@event is null)
-            throw new KeyNotFoundException("An event is required for the create standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to create an event.");
-    }
+        => EventStandingPolicy.CheckCreate(actorId, actorRoles, @event);
 
     /// <summary>
     /// The **edit** standing (ADR 0054 §3.4, the ADR 0014 / 0016 / 0017
-    /// precedent): the event's <see cref="Event.AuthorId"/> (the
-    /// <c>Owner</c> branch) <b>or</b> a <see cref="Roles.GlobalAdmin"/>
-    /// (<c>Admin</c> override). Evaluated against the <em>stored</em> event
-    /// (loaded before the gate, so its <c>AuthorId</c> is available — the
-    /// <see cref="Announcements.AnnouncementService"/> edit-gate shape). A null
-    /// event is a <see cref="KeyNotFoundException"/> (the Web layer's 404); a
-    /// denied actor is an <see cref="UnauthorizedAccessException"/> (the Web
-    /// layer's 403). A <see cref="Roles.GlobalAdmin"/> is allowed to edit any
-    /// event (the ADR 0017 override shape — contrast ADR 0037's publish lane,
-    /// where a GlobalAdmin is <em>denied</em>).
+    /// precedent) — a thin forwarder to
+    /// <see cref="EventStandingPolicy.CheckEdit"/> (C04). Author (<c>Owner</c>)
+    /// ∪ GlobalAdmin (<c>Admin</c> override). Throws
+    /// <see cref="KeyNotFoundException"/> (null event, the Web 404) and
+    /// <see cref="UnauthorizedAccessException"/> (a denied actor, the Web 403).
     /// </summary>
     public static void CheckEditStanding(string actorId, IReadOnlySet<string> actorRoles, Event? @event)
-    {
-        ArgumentNullException.ThrowIfNull(actorRoles);
-        if (@event is null)
-            throw new KeyNotFoundException("An event is required for the edit standing check.");
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to edit an event.");
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;
-        if (string.Equals(@event.AuthorId, actorId, StringComparison.Ordinal))
-            return;
-
-        throw new UnauthorizedAccessException(
-            "Only the author or a GlobalAdmin may edit an event.");
-    }
+        => EventStandingPolicy.CheckEdit(actorId, actorRoles, @event);
 
     /// <summary>
-    /// The **translation** display pin (ADR 0059, the
-    /// <see cref="Posts.PostService.CanAddTranslation"/> shape): <c>true</c> when
-    /// <paramref name="actorId"/> may add / edit / remove a translation of the
-    /// event authored by <paramref name="eventAuthorId"/>. A <b>display</b> pin,
-    /// not a gate — the real deny is the
+    /// The **translation** display pin (ADR 0059) — a thin forwarder to
+    /// <see cref="EventStandingPolicy.CanAddTranslation"/> (C04): <c>true</c>
+    /// when <paramref name="actorId"/> may add / edit / remove a translation of
+    /// the event authored by <paramref name="eventAuthorId"/>. A <b>display</b>
+    /// pin, not a gate — the real deny is the
     /// <see cref="AddEventTranslationAsync"/> / <see cref="UpdateEventTranslationAsync"/>
-    /// / <see cref="RemoveEventTranslationAsync"/> standing check, which re-runs the
-    /// same rule server-side. Delegates to the same
-    /// <see cref="ResolveTranslationStanding"/> the write lanes use, so the display
-    /// and the three gates can never drift apart.
+    /// / <see cref="RemoveEventTranslationAsync"/> standing check, which re-runs
+    /// the same rule server-side (the
+    /// <see cref="EventStandingPolicy"/> resolver — display and gates can never
+    /// drift apart).
     /// </summary>
     public static bool CanAddTranslation(string eventAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-        => ResolveTranslationStanding(eventAuthorId, actorId, actorRoles) is not null;
+        => EventStandingPolicy.CanAddTranslation(eventAuthorId, actorId, actorRoles);
 
     /// <summary>
     /// The ADR 0059 translation standing resolver (shared by
     /// <see cref="AddEventTranslationAsync"/> / <see cref="UpdateEventTranslationAsync"/>
     /// / <see cref="RemoveEventTranslationAsync"/> /
-    /// <see cref="CanAddTranslation"/>). Returns the <see cref="AccessVia"/> the
-    /// actor qualifies under, or <c>null</c> to deny. Precedence (most specific
-    /// standing first, so the audit row records the narrowest right that applied):
-    /// the event's **author** (<see cref="AccessVia.Owner"/>); a
-    /// <see cref="Roles.Translator"/> (ADR 0021, <see cref="AccessVia.Admin"/>);
-    /// or a <see cref="Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>).
-    /// Events have **no** component-moderator standing (ADR 0054 §5 — the M4
-    /// community lane has no component-moderator branch, ADR 0007's group-lane
-    /// precedent).
+    /// <see cref="CanAddTranslation"/>) — a thin forwarder to the
+    /// <see cref="EventStandingPolicy"/> resolver (C04). Returns the
+    /// <see cref="AccessVia"/> the actor qualifies under, or <c>null</c> to deny
+    /// (author → <see cref="AccessVia.Owner"/>; a <see cref="Roles.Translator"/>
+    /// (ADR 0021) or a <see cref="Roles.GlobalAdmin"/> →
+    /// <see cref="AccessVia.Admin"/>).
     /// </summary>
     private static AccessVia? ResolveTranslationStanding(string eventAuthorId, string actorId, IReadOnlySet<string> actorRoles)
-    {
-        if (string.Equals(eventAuthorId, actorId, StringComparison.Ordinal))
-            return AccessVia.Owner;
-
-        if (actorRoles.Contains(Roles.Translator))
-            return AccessVia.Admin;
-
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return AccessVia.Admin;
-
-        return null;
-    }
+        => EventStandingPolicy.ResolveTranslationStanding(eventAuthorId, actorId, actorRoles);
 
     // ─── Write lanes (U04) — standing re-checked server-side (§3.4, C3) ───
     //
@@ -1156,787 +1164,6 @@ public sealed class EventService : IEventService
         return existing;
     }
 
-    /// <inheritdoc cref="IEventService.RsvpAsync"/>
-    /// <summary>
-    /// RSVP to an event (ADR 0054 §3.2) — the **last-write-wins** concurrency
-    /// exception, keyed per <c>(EventId, UserId)</c>: upserts the actor's single
-    /// RSVP row with the latest <see cref="RsvpStatus"/>. A resident's latest
-    /// status is simply the truth; a conflicting write is a no-op or
-    /// self-converging (the <see cref="EventDocTypes"/> unique
-    /// <c>(EventId, UserId)</c> index is the DB-enforced business key).
-    /// <para>
-    /// Standing (server-side, C3): **any signed-in resident** who may RSVP —
-    /// a null/empty actor is a <see cref="UnauthorizedAccessException"/> (403).
-    /// The event must be present and **not deleted** (a missing/deleted id is a
-    /// <see cref="KeyNotFoundException"/> — the non-leaky pin, the
-    /// <see cref="GetRsvpsAsync"/> shape). **No <see cref="AccessAudit"/> row**
-    /// is stored (the RSVP is a routine resident action, not an access decision
-    /// — the same posture as a profile edit; the <see
-    /// cref="M4_RsvpWritesNoAccessAuditRow"/> pin). This lane therefore does
-    /// **not** route the standing through <see cref="IAuthorizationService"/>
-    /// (a <c>CanAsync</c> read-decision would append a read-audit row, violating
-    /// the pin) — it enforces signed-in + presence directly.
-    /// </para>
-    /// </summary>
-    public async Task<EventRsvp> RsvpAsync(string eventId, string actorId, RsvpStatus status, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
-        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to RSVP.");
-
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null || @event.IsDeleted)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to RSVP to.");
-
-        // The lane — the guardian's event-attendance gate. A <b>supervised</b>
-        // child (an active <see cref="GuardianLink"/>) is gated by their
-        // guardian's <see cref="Profile.EventRsvpMode"/> posture:
-        //   · <see cref="EventRsvpMode.GuardianApproves"/> — the self-lane is
-        //     <b>refused</b>: a <see cref="GuardianEventRequest"/> row is
-        //     stored (the child's desired status), the active guardian(s) are
-        //     notified, and the write throws a user-presentable error (the GU
-        //     group-invitation self-lane refusal shape; the Web surfaces
-        //     <c>TempData["error"]</c> and redirects back to the event).
-        //   · <see cref="EventRsvpMode.GuardianNotifies"/> — the self-lane is
-        //     allowed; the active guardian(s) are notified after the write
-        //     (auto-approve + the window to veto).
-        //   · <see cref="EventRsvpMode.ChildDecides"/> — the self-lane is
-        //     allowed outright, no notification.
-        // An <b>unsupervised</b> actor (no active link) is never gated — the
-        // lane reduces to today's unconditional RSVP regardless of the stored
-        // mode. Fail-protective: a supervised child with a missing profile
-        // still requires guardian approval.
-        var activeLinks = await session.Query<GuardianLink>()
-            .Where(l => l.ChildId == actorId && l.Status == GuardianLinkStatus.Active)
-            .ToListAsync(ct).ConfigureAwait(false);
-        var supervised = activeLinks.Count > 0;
-        var guardianIds = activeLinks.Select(l => l.GuardianId).ToHashSet(StringComparer.Ordinal);
-        var childProfile = await session.Query<Profile>()
-            .Where(p => p.SubjectId == actorId)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        var mode = childProfile?.EventRsvpMode
-            ?? (supervised ? EventRsvpMode.GuardianApproves : EventRsvpMode.ChildDecides);
-        var supervisedApproves = supervised && mode == EventRsvpMode.GuardianApproves;
-        var supervisedNotifies = supervised && mode == EventRsvpMode.GuardianNotifies;
-
-        if (supervisedApproves)
-        {
-            // The <see cref="EventRsvpMode.GuardianApproves"/> posture: refuse
-            // the self-lane, store / refresh the request row to the child's
-            // current desired status (a fresh act — the <see cref
-            // "GuardianLink"/> "writes a fresh row, not a revival" precedent),
-            // notify the active guardian(s) (the
-            // <see cref="NotificationKinds.GuardianEventRequest"/> kind, the GU
-            // <c>guardian.group_invite</c> fan-out shape), then throw the
-            // user-presentable refusal.
-            var requestedAt = DateTimeOffset.UtcNow;
-            var request = await session.Query<GuardianEventRequest>()
-                .Where(r => r.EventId == eventId && r.ChildId == actorId)
-                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-            if (request is null)
-            {
-                request = new GuardianEventRequest
-                {
-                    Id = Guid.NewGuid().ToString("N"),
-                    EventId = eventId,
-                    ChildId = actorId,
-                    DesiredStatus = status,
-                    Status = GuardianEventRequestStatus.Pending,
-                    RequestedAt = requestedAt
-                };
-            }
-            else
-            {
-                request.DesiredStatus = status;
-                request.Status = GuardianEventRequestStatus.Pending;
-                request.RequestedAt = requestedAt;
-                request.ResolvedAt = null;
-                request.ResolvedBy = null;
-            }
-            session.Store(request);
-
-            if (_notifications is not null)
-            {
-                var childName = string.IsNullOrWhiteSpace(childProfile?.DisplayName) ? actorId : childProfile!.DisplayName;
-                foreach (var guardianId in guardianIds)
-                {
-                    await _notifications.EmitAsync(
-                        session,
-                        recipientId: guardianId,
-                        kind: NotificationKinds.GuardianEventRequest,
-                        idempotencyKey: $"notification:{NotificationKinds.GuardianEventRequest}:{eventId}:{actorId}:{guardianId}",
-                        body: $"{childName} is asking to attend an event ({status}).",
-                        linkPath: $"/me/children/{actorId}",
-                        ct: ct).ConfigureAwait(false);
-                }
-            }
-
-            await session.SaveChangesAsync(ct).ConfigureAwait(false);
-            throw new InvalidOperationException(
-                "Your attendance on this event requires your guardian's approval — the request has been sent to your guardian.");
-        }
-
-        // Last-write-wins upsert (the (EventId, UserId) unique-index business
-        // key): load the actor's existing row; mutate Status/At, else create.
-        // One SaveChangesAsync (C3). No audit row (the pin above).
-        var rsvp = await session.Query<EventRsvp>()
-            .Where(r => r.EventId == eventId && r.UserId == actorId)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-
-        var now = DateTimeOffset.UtcNow;
-        if (rsvp is null)
-        {
-            rsvp = new EventRsvp
-            {
-                Id = Guid.NewGuid().ToString("N"),
-                EventId = eventId,
-                UserId = actorId,
-                Status = status,
-                At = now
-            };
-        }
-        else
-        {
-            rsvp.Status = status;
-            rsvp.At = now;
-        }
-        // Re-Store on both branches: a row loaded (or created) and then mutated
-        // is not reliably carried to the DB by SaveChangesAsync alone — the
-        // PostService "re-store + save" quirk. Storing the freshly-created row
-        // here too keeps the idiom uniform.
-        session.Store(rsvp);
-
-        // The lane — the <see cref="EventRsvpMode.GuardianNotifies"/> posture:
-        // the self-lane was allowed, so now every active guardian is told the
-        // child attended / changed their attendance (auto-approve + the window
-        // to <see cref="VetoEventRsvpAsync"/>). The recipient is the guardian
-        // (one row per active <see cref="GuardianLink"/>), the LinkPath points
-        // at the event detail page (where the child's current RSVP is shown).
-        // The idempotency key is per-(guardian, event, child) (the
-        // <see cref="NotificationService"/> dedups on it; a re-RSVP within the
-        // same window refreshes the child's row, not the guardian's inbox).
-        if (supervisedNotifies && _notifications is not null)
-        {
-            var notifiedName = string.IsNullOrWhiteSpace(childProfile?.DisplayName) ? actorId : childProfile!.DisplayName;
-            foreach (var guardianId in guardianIds)
-            {
-                await _notifications.EmitAsync(
-                    session,
-                    recipientId: guardianId,
-                    kind: NotificationKinds.GuardianEventRsvp,
-                    idempotencyKey: $"notification:{NotificationKinds.GuardianEventRsvp}:{eventId}:{actorId}:{guardianId}",
-                    body: $"{notifiedName} RSVP'd {status} (you may veto it on the manage-child page).",
-                    linkPath: $"/events/{@event.Id}",
-                    ct: ct).ConfigureAwait(false);
-            }
-        }
-
-        // M6 (ADR 0076, plan U04) — the F3 event-rsvp emitter. The **event's**
-        // author is the recipient (the RSVPing resident is the *sender*). The
-        // UGC snippet is the RSVP status + the resident's display name (ADR
-        // 0018 — the sender's own content). The idempotency key is the §6.3
-        // `notification:event.rsvp:{rsvpId}` shape (D4, F10). `EmitAsync` runs
-        // on the caller's session and does **not** commit — the
-        // `SaveChangesAsync` below is the single commit (C3). A self-RSVP (the
-        // author RSVPing to their own event) is skipped — no self-notification.
-        if (_notifications is not null
-            && !string.IsNullOrWhiteSpace(@event.AuthorId)
-            && !string.Equals(@event.AuthorId, actorId, StringComparison.Ordinal))
-        {
-            var profile = await _userInfo.GetProfileAsync(actorId).ConfigureAwait(false);
-            var name = string.IsNullOrWhiteSpace(profile?.DisplayName) ? actorId : profile!.DisplayName;
-            await _notifications.EmitAsync(
-                session,
-                recipientId: @event.AuthorId,
-                kind: NotificationKinds.EventRsvp,
-                idempotencyKey: $"notification:event.rsvp:{rsvp.Id}",
-                body: $"{name} RSVP'd {status}",
-                targetId: null,
-                linkPath: $"/events/{@event.Id}",
-                ct: ct).ConfigureAwait(false);
-        }
-
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return rsvp;
-    }
-
-    // ─── The lane — the guardian's event-attendance lanes ────────────────────
-    // The GU standing gate re-expressed over events (the ADR 0028 G·2/G·3
-    // deny-by-default; the ADR 0038 §F conferral shape). A non-guardian /
-    // dissolved link is a <see cref="UnauthorizedAccessException"/> (the Web's
-    // 404 — the actor learns nothing). The <see cref="GuardianLink"/> document
-    // is the standing's relationship row; the <see cref
-    // "Kumunita.Core.UserInfo.IUserInfoService"/> service is the resolver — but
-    // for the lane's three guardian seams the standing is a simple active-link
-    // existence check (the same read <see cref="RsvpAsync"/> performs for the
-    // gate), so <see cref="GuardianEventLinkAsync"/> queries the
-    // <see cref="GuardianLink"/> row directly (EventService already reads
-    // <see cref="GuardianLink"/> / <see cref="Profile"/> for the gate above —
-    // no new frozen-surface seam, ADR 0006 §A). ───
-
-    /// <summary>
-    /// The lane's standing gate: an <b>active</b> <see cref="GuardianLink"/>
-    /// for the (guardian, child) pair, or <see cref
-    /// "UnauthorizedAccessException"/> (the GU G·2/G·3 deny-by-default).
-    /// </summary>
-    private static async Task<GuardianLink> GuardianEventLinkAsync(
-        IDocumentSession session, string guardianId, string childId, CancellationToken ct)
-    {
-        var link = await session.Query<GuardianLink>()
-            .Where(l => l.GuardianId == guardianId
-                        && l.ChildId == childId
-                        && l.Status == GuardianLinkStatus.Active)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (link is null)
-            throw new UnauthorizedAccessException(
-                $"No active GuardianLink for {guardianId} over {childId}; no standing to act on the child's event attendance.");
-        return link;
-    }
-
-    /// <inheritdoc cref="IEventService.ApproveEventRsvpAsync"/>
-    /// <summary>
-    /// The lane — the guardian's <b>approval</b> of a supervised child's
-    /// event-attendance request (the GU <see cref="Kumunita.Core.UserInfo
-    /// .IUserInfoService.ApproveGroupInvitationAsync" /> / <see cref
-    /// "Kumunita.Core.UserInfo.IUserInfoService.RejectGroupInvitationAsync" />
-    /// pair re-expressed over events): standing gate first (G·2/G·3), then the
-    /// request-row resolution (Pending → Approved), then the child's
-    /// <see cref="EventRsvp" /> write (the request's
-    /// <see cref="GuardianEventRequest.DesiredStatus"/>), then one
-    /// <c>guardian.event_rsvp_approve</c> audit row (<see
-    /// cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>) — all in one
-    /// session / one <c>SaveChangesAsync</c> (C3). The approval is a standing
-    /// the GU lane confers, not a content read: the child's
-    /// <see cref="EventRsvp" /> is written on their behalf, but the lane never
-    /// reads the child's content (the ADR 0028 G·1 cardinal rule).
-    /// </summary>
-    public async Task<GuardianEventRequest> ApproveEventRsvpAsync(
-        string eventId, string childId, string guardianId, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
-        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
-        if (string.IsNullOrEmpty(guardianId)) throw new UnauthorizedAccessException("A guardian id is required.");
-
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var now = DateTimeOffset.UtcNow;
-
-        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
-        await GuardianEventLinkAsync(session, guardianId, childId, ct).ConfigureAwait(false);
-
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null || @event.IsDeleted)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to approve.");
-
-        var request = await session.Query<GuardianEventRequest>()
-            .Where(r => r.EventId == eventId && r.ChildId == childId)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (request is null)
-            throw new KeyNotFoundException(
-                $"No event-attendance request for {childId} on event {eventId}; nothing to approve.");
-        if (request.Status != GuardianEventRequestStatus.Pending)
-            throw new InvalidOperationException(
-                $"Request {request.Id} is already {request.Status}; only a Pending request can be approved.");
-
-        // Resolve the request row (Pending → Approved) + write the child's
-        // RSVP with the request's DesiredStatus (the last-write-wins upsert
-        // the self-lane would have used).
-        request.Status = GuardianEventRequestStatus.Approved;
-        request.ResolvedAt = now;
-        request.ResolvedBy = guardianId;
-        session.Store(request);
-
-        var rsvp = await session.Query<EventRsvp>()
-            .Where(r => r.EventId == eventId && r.UserId == childId)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (rsvp is null)
-        {
-            rsvp = new EventRsvp
-            {
-                Id = Guid.NewGuid().ToString("N"),
-                EventId = eventId,
-                UserId = childId,
-                Status = request.DesiredStatus,
-                At = now
-            };
-        }
-        else
-        {
-            rsvp.Status = request.DesiredStatus;
-            rsvp.At = now;
-        }
-        session.Store(rsvp);
-
-        session.Store(new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = guardianId,
-            EffectivePrincipalId = guardianId,
-            Action = "guardian.event_rsvp_approve",
-            TargetKind = "event",
-            TargetId = eventId,
-            Via = Authorization.AccessVia.Guardian,
-            Outcome = Authorization.AccessOutcome.Allow
-        });
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return request;
-    }
-
-    /// <inheritdoc cref="IEventService.DenyEventRsvpAsync"/>
-    /// <summary>
-    /// The lane — the guardian's <b>denial</b> of a supervised child's
-    /// event-attendance request (the GU <see cref="Kumunita.Core.UserInfo
-    /// .IUserInfoService.RejectGroupInvitationAsync" /> shape verbatim):
-    /// standing gate first (G·2/G·3), then the request-row resolution
-    /// (Pending → Denied) + one <c>guardian.event_rsvp_deny</c> audit row
-    /// (<see cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>) — all in
-    /// one session / one <c>SaveChangesAsync</c> (C3). A denial writes <b>no</b>
-    /// <see cref="EventRsvp"/> row (the child did not attend; the self-lane
-    /// refusal left no content behind).
-    /// </summary>
-    public async Task<GuardianEventRequest> DenyEventRsvpAsync(
-        string eventId, string childId, string guardianId, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
-        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
-        if (string.IsNullOrEmpty(guardianId)) throw new UnauthorizedAccessException("A guardian id is required.");
-
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var now = DateTimeOffset.UtcNow;
-
-        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
-        await GuardianEventLinkAsync(session, guardianId, childId, ct).ConfigureAwait(false);
-
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null || @event.IsDeleted)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to deny.");
-
-        var request = await session.Query<GuardianEventRequest>()
-            .Where(r => r.EventId == eventId && r.ChildId == childId)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (request is null)
-            throw new KeyNotFoundException(
-                $"No event-attendance request for {childId} on event {eventId}; nothing to deny.");
-        if (request.Status != GuardianEventRequestStatus.Pending)
-            throw new InvalidOperationException(
-                $"Request {request.Id} is already {request.Status}; only a Pending request can be denied.");
-
-        request.Status = GuardianEventRequestStatus.Denied;
-        request.ResolvedAt = now;
-        request.ResolvedBy = guardianId;
-        session.Store(request);
-
-        session.Store(new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = guardianId,
-            EffectivePrincipalId = guardianId,
-            Action = "guardian.event_rsvp_deny",
-            TargetKind = "event",
-            TargetId = eventId,
-            Via = Authorization.AccessVia.Guardian,
-            Outcome = Authorization.AccessOutcome.Allow
-        });
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return request;
-    }
-
-    /// <inheritdoc cref="IEventService.VetoEventRsvpAsync"/>
-    /// <summary>
-    /// The lane — the guardian's <b>veto</b> (removal) of a supervised child's
-    /// existing <see cref="EventRsvp" /> (the <see
-    /// cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies" />
-    /// posture's window to undo an auto-approved attendance — the
-    /// <see cref="Kumunita.Core.UserInfo.Profile.MessagingRestricted" /> veto
-    /// shape): standing gate first (G·2/G·3), then the child's
-    /// <see cref="EventRsvp" /> deletion + one <c>guardian.event_rsvp_veto</c>
-    /// audit row (<see cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>)
-    /// — all in one session / one <c>SaveChangesAsync</c> (C3). A veto over
-    /// nothing (no <see cref="EventRsvp"/> row) is a
-    /// <see cref="KeyNotFoundException"/> (the Web's user-presentable 404).
-    /// </summary>
-    public async Task VetoEventRsvpAsync(
-        string eventId, string childId, string guardianId, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
-        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
-        if (string.IsNullOrEmpty(guardianId)) throw new UnauthorizedAccessException("A guardian id is required.");
-
-        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var now = DateTimeOffset.UtcNow;
-
-        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
-        await GuardianEventLinkAsync(session, guardianId, childId, ct).ConfigureAwait(false);
-
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null || @event.IsDeleted)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to veto.");
-
-        var rsvp = await session.Query<EventRsvp>()
-            .Where(r => r.EventId == eventId && r.UserId == childId)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (rsvp is null)
-            throw new KeyNotFoundException(
-                $"No RSVP for {childId} on event {eventId}; nothing to veto.");
-
-        session.Delete(rsvp);
-
-        session.Store(new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = guardianId,
-            EffectivePrincipalId = guardianId,
-            Action = "guardian.event_rsvp_veto",
-            TargetKind = "event",
-            TargetId = eventId,
-            Via = Authorization.AccessVia.Guardian,
-            Outcome = Authorization.AccessOutcome.Allow
-        });
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-    }
-
-    /// <inheritdoc cref="IEventService.GetPendingEventRsvpRequestsAsync"/>
-    /// <summary>
-    /// The lane — the guardian's read of a supervised child's
-    /// <b>pending</b> event-attendance requests (a read, not a decision — the
-    /// <see cref="GetMyRsvpAsync"/> posture: no <see cref
-    /// "IAuthorizationService" /> call, no audit row). The standing gate
-    /// (an active <see cref="GuardianLink" /> over the child) is the Web
-    /// layer's (the Detail GET's <c>ActiveLinkAsync</c> check — a non-guardian
-    /// learns nothing; this read itself is a plain query). Ordered by
-    /// <see cref="GuardianEventRequest.RequestedAt"/> descending.
-    /// </summary>
-    public async Task<IReadOnlyList<GuardianEventRequest>> GetPendingEventRsvpRequestsAsync(
-        string childId, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
-
-        await using var session = _store.QuerySession();
-        return await session.Query<GuardianEventRequest>()
-            .Where(r => r.ChildId == childId && r.Status == GuardianEventRequestStatus.Pending)
-            .OrderByDescending(r => r.RequestedAt)
-            .ToListAsync(ct).ConfigureAwait(false);
-    }
-
-    /// <inheritdoc cref="IEventService.GetChildRsvpsAsync"/>
-    /// <summary>
-    /// The lane — the guardian's read of a supervised child's <b>existing</b>
-    /// <see cref="EventRsvp"/> rows (a read, not a decision — the
-    /// <see cref="GetMyRsvpAsync"/> posture: no <see cref
-    /// "IAuthorizationService" /> call, no audit row). The standing gate
-    /// (an active <see cref="GuardianLink" /> over the child) is the Web
-    /// layer's (the Detail GET's <c>ActiveLinkAsync</c> check — a non-guardian
-    /// learns nothing; this read itself is a plain query). Ordered by
-    /// <see cref="EventRsvp.At"/> descending.
-    /// </summary>
-    public async Task<IReadOnlyList<EventRsvp>> GetChildRsvpsAsync(
-        string childId, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
-
-        await using var session = _store.QuerySession();
-        return await session.Query<EventRsvp>()
-            .Where(r => r.UserId == childId)
-            .OrderByDescending(r => r.At)
-            .ToListAsync(ct).ConfigureAwait(false);
-    }
-
-    // ─── Group events lane (ADR 0089) — the ADR 0013 membership lane applied to
-    //     the M4 event surface. The lane owns every access read (ADR 0006-D); the
-    //     frozen group seams (CanSeeGroupAsync / CanSeeGroupFeedAsync) are the
-    //     sole decision — no audience / moderate / break-glass branch (GE·1/GE·4).
-    //     Publish reuses the existing PublishAsync; RSVP reuses RsvpAsync;
-    //     translations reuse the ADR 0059 seams (all keyed by EventId, no group
-    //     branch). Per-member publish notifications are a named ADR 0089
-    //     deferral (M6-scope, like group posts) — NOT emitted here. ───
-
-    /// <inheritdoc cref="IEventService.ListGroupEventsAsync"/>
-    /// <summary>
-    /// A group's events feed (GE1–GE4 FACES): the candidate set is the group's
-    /// published events — <c>Event.GroupId == groupId</c>, <c>!IsDeleted</c>,
-    /// <c>!IsDraft</c>, ordered by <see cref="Event.Start"/> ascending (the
-    /// event idiom — contrast the group-post feed's <c>Created desc</c>), paged
-    /// with the class's existing <see cref="PageSize"/>. Exactly one
-    /// <see cref="IAuthorizationService.CanSeeGroupFeedAsync(string, string, int)"/>
-    /// (the **standalone** form — a plain read with no in-flight caller
-    /// transaction, the <see cref="ListUpcomingAsync"/> precedent) writes the
-    /// visit's **single aggregate** <c>AccessAudit</c> row (GE·5: TargetKind
-    /// "grouppost", TargetId null, counts). Allow ⇒ the paged candidates (GE1);
-    /// Deny ⇒ a <see cref="GroupEventFeedResult"/> with an **empty** visible
-    /// list and <see cref="GroupEventFeedResult.HiddenCount"/> = the candidate
-    /// count (GE2). **0 candidates ⇒** empty result, no decision, **no** row (the
-    /// <see cref="ListUpcomingAsync"/> 0-candidate shape). **No audience
-    /// evaluation of any kind** (GE·1/GE·8 — membership is the sole decision).
-    /// </summary>
-    public async Task<GroupEventFeedResult> ListGroupEventsAsync(string groupId, string actorId, int page,
-        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
-    {
-        if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group events feed requires a groupId.", nameof(groupId));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
-        if (page < 1) page = 1;
-        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
-
-        await using var session = _store.QuerySession();
-        IQueryable<Event> q = session
-            .Query<Event>()
-            .Where(e => e.GroupId == groupId && !e.IsDeleted && !e.IsDraft);
-        var candidates = await OrderByEventSort(q, sort, defaultAscending: true)
-            .Skip((page - 1) * ps)
-            .Take(ps)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        if (candidates.Count == 0)
-            return new GroupEventFeedResult(Visible: Array.Empty<Event>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
-
-        // GE·5 (the C-M3·3 analog) — one standalone whole-channel call over the
-        // paged candidate set writes the visit's single aggregate AccessAudit
-        // row. Standalone form (the ListUpcomingAsync precedent). The channel is
-        // all-or-nothing for a principal, so the paged candidates are returned
-        // as-is on Allow.
-        var decision = await _authorization
-            .CanSeeGroupFeedAsync(actorId, groupId, candidates.Count)
-            .ConfigureAwait(false);
-
-        if (decision.Allowed)
-            // ADR 0090 D1 / design doc §7.4 — HasMore: candidates.Count == ps.
-            return new GroupEventFeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidates.Count, HasMore: candidates.Count == ps);
-
-        // GE2 — Deny: empty visible list, HiddenCount = the candidate count (the
-        // aggregate Deny row **is** the audit evidence — GE·1/GE·5); never an
-        // event's fields. HasMore is false on Deny (the design doc §7.4 pin).
-        return new GroupEventFeedResult(Visible: Array.Empty<Event>(), HiddenCount: candidates.Count, Page: page, Total: 0, HasMore: false);
-    }
-
-    /// <inheritdoc cref="IEventService.GetGroupEventAsync"/>
-    /// <summary>
-    /// A group event's detail (GE1–GE4, GE7–GE11 FACES): the event is loaded
-    /// first (the M3 fail-closed shape: missing ⇒ <c>null</c>, no decision,
-    /// **no** row); an event with an **empty** <c>GroupId</c> (not a group
-    /// event) or <c>GroupId != groupId</c> (route/lane mismatch) ⇒ <c>null</c>,
-    /// no row (fail-closed). Otherwise the **ADR 0037 draft gate** (author-only,
-    /// a pure <c>AuthorId == actorId</c> ordinal, **no** audit row) runs
-    /// **before** the membership check (a draft is invisible to every member
-    /// except its author). For a non-draft, exactly one
-    /// <see cref="IAuthorizationService.CanSeeGroupAsync(string, string, string?)"/>
-    /// (standalone) — the detail decision row (TargetKind "grouppost",
-    /// **TargetId = eventId**, GE·5). Allow ⇒ the event; Deny ⇒ <c>null</c>
-    /// (Web 404) — the decision's row **was** written (C3). **No** audience
-    /// evaluation (GE·1/GE·8).
-    /// </summary>
-    public async Task<Event?> GetGroupEventAsync(string groupId, string eventId, string actorId, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(eventId)) throw new ArgumentException("An event id is required.", nameof(eventId));
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
-
-        await using var session = _store.QuerySession();
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null)
-            // Fail-closed: the event does not exist ⇒ no decision, no row.
-            return null;
-
-        // Lane fail-closed: an event with an empty GroupId (not a group event)
-        // or a route/lane mismatch (GroupId != groupId) is denied with **no**
-        // decision and **no** row (the PostService.GetGroupPostAsync shape).
-        if (string.IsNullOrEmpty(@event.GroupId) || @event.GroupId != groupId)
-            return null;
-
-        if (@event.IsDeleted)
-            return null; // a soft-deleted event is a 404 (the M3 non-leaky pin).
-
-        // ADR 0037 — draft gate (author-only, no audit row): a group-lane draft
-        // is invisible to every member and to any moderator/admin except its
-        // author. The membership decision is NOT consulted — a pure ordinal
-        // check, no CanSeeGroupAsync, no AccessAudit row.
-        if (@event.IsDraft)
-        {
-            if (!string.Equals(@event.AuthorId, actorId, StringComparison.Ordinal))
-                return null;
-            return @event;
-        }
-
-        // Exactly one standalone single-target call → the detail decision row
-        // (TargetId = eventId, GE·5). No audience evaluation of any kind
-        // (GE·1/GE·8).
-        var decision = await _authorization.CanSeeGroupAsync(actorId, groupId, eventId).ConfigureAwait(false);
-
-        if (!decision.Allowed)
-            return null; // Deny ⇒ null (Web 404 — GE·3/GE·4); the row was written (C3).
-
-        return @event;
-    }
-
-    /// <inheritdoc cref="IEventService.CreateGroupEventAsync"/>
-    /// <summary>
-    /// Create a group event, in the **caller's** in-flight session (invariant
-    /// C3). The **create gate is the group-lane decision** (GE·3): one
-    /// <see cref="IAuthorizationService.CanSeeGroupAsync(string, string, string?, IDocumentSession)"/>
-    /// with <c>targetEventId: null</c>, in the caller's transaction — **deny**:
-    /// the row is committed by a <c>SaveChangesAsync()</c> **before**
-    /// <see cref="UnauthorizedAccessException"/> throws (the gate row must
-    /// survive — GE6 FACES; Web maps it to 404); **allow**: the gate row + the
-    /// new event commit in **one** <c>SaveChangesAsync()</c> (atomic with the
-    /// write, C3). The gate is the **sole** decision (GE·3): **no**
-    /// <c>actorRoles</c> parameter (a non-member GlobalAdmin is **denied**,
-    /// GE8 FACES/GE·4), **no** break-glass, **no** membership read here (the
-    /// lane owns its reads — ADR 0006-D). The write pins GE·2/GE·8:
-    /// <c>GroupId</c> = the lane marker, <c>ComponentId = string.Empty</c>,
-    /// <c>Audience = new Audience()</c> (non-null, **empty**),
-    /// <c>IsDraft = true</c> (the ADR 0037 pin — a group event is a draft until
-    /// its author publishes it, reusing the existing
-    /// <see cref="PublishAsync"/>). One <c>event.create</c> audit row
-    /// (TargetKind "event", Via Owner, GE·5) + the gate row. One
-    /// <c>SaveChangesAsync()</c>.
-    /// </summary>
-    /// <exception cref="UnauthorizedAccessException">The actor (or, under an
-    /// in-scope <c>read</c> grant, the owner) is not a member of
-    /// <c>draft.GroupId</c> — thrown **after** the gate row is persisted.</exception>
-    public async Task<Event> CreateGroupEventAsync(GroupEventDraft draft, string actorId, IDocumentSession session, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(draft);
-        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An authoring actor is required.", nameof(actorId));
-        if (string.IsNullOrEmpty(draft.GroupId))
-            throw new ArgumentException("A group event requires a non-empty GroupId (the group lane).", nameof(draft.GroupId));
-        ArgumentNullException.ThrowIfNull(session);
-
-        // GE·3 — the create gate **is** the group-lane decision: one session-variant
-        // call with targetEventId: null (⇒ the row's TargetId = the group id, the
-        // channel as the gate's target), in the caller's transaction. Deny ⇒ the
-        // row is persisted by this SaveChangesAsync **before** the throw (the
-        // gate row must survive — GE6 FACES; Web maps the exception to 404).
-        // Allow ⇒ the gate row + the new event commit in one SaveChangesAsync (C3).
-        var decision = await _authorization
-            .CanSeeGroupAsync(actorId, draft.GroupId, null, session)
-            .ConfigureAwait(false);
-
-        if (!decision.Allowed)
-        {
-            await session.SaveChangesAsync(ct).ConfigureAwait(false);
-            throw new UnauthorizedAccessException(
-                $"You are not a member of the group '{draft.GroupId}'; " +
-                "only group members may create events for a group channel.");
-        }
-
-        // ADR 0018 — a null/empty authored code is materialized from the
-        // instance default (the write session's LocaleSettings, en floor).
-        var languageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session, ct).ConfigureAwait(false);
-
-        var @event = new Event
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            GroupId = draft.GroupId,             // GE·2 — the non-empty group lane.
-            ComponentId = string.Empty,          // GE·2 — lane exclusivity (the Post.ComponentId empty-pin shape; Event.ComponentId is string?, so string.Empty not null).
-            AuthorId = actorId,                  // ADR 0054 §3.4 — the author becomes the standing owner.
-            Title = draft.Title,
-            Body = draft.Body,
-            Start = draft.StartUtc,
-            End = draft.EndUtc,
-            Location = draft.Location,
-            Capacity = draft.Capacity,
-            Color = draft.Color,
-            Audience = new Audience(),           // GE·8 — written non-null **empty**; never authored here.
-            ReminderEnabled = draft.ReminderEnabled ?? true,
-            IsDraft = true,                      // ADR 0037 — a group event is a draft until its author publishes it (reusing PublishAsync).
-            LanguageCode = languageCode,         // ADR 0018
-            Created = DateTimeOffset.UtcNow
-        };
-
-        session.Store(@event);
-
-        // GE·5 — the write lane's own event.create row (TargetKind "event", Via
-        // Owner). The gate's membership row was written by the session-variant
-        // CanSeeGroupAsync above (TargetKind "grouppost") — two rows on create,
-        // mirroring how the community create stores a write row and the
-        // group-post create stores a gate row (ADR 0089 Decision).
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.create", "event", @event.Id, AccessVia.Owner));
-
-        // One SaveChangesAsync — the C3 same-transaction lane: the gate decision
-        // row + the new event commit atomically.
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return @event;
-    }
-
-    /// <inheritdoc cref="IEventService.UpdateGroupEventAsync"/>
-    /// <summary>
-    /// Edit a group event (ADR 0089 GE·4, the ADR 0016 / 0037 group-lane
-    /// precedent): **author-only** — the sole decision is
-    /// <c>existing.AuthorId == actorId</c> (ordinal); a non-author (even a
-    /// GlobalAdmin) is denied (<see cref="UnauthorizedAccessException"/>, the Web
-    /// 404). Stamps only the editable surface (<see cref="GroupEventUpdate"/>),
-    /// re-stamps <see cref="Event.Modified"/> only on a real change, and leaves
-    /// the lane markers (<see cref="Event.GroupId"/> /
-    /// <see cref="Event.ComponentId"/> / <see cref="Event.Audience"/> /
-    /// <see cref="Event.AuthorId"/> / <see cref="Event.Created"/> /
-    /// <see cref="Event.IsDraft"/> / <see cref="Event.IsDeleted"/>) untouched
-    /// (the <c>PostService.UpdateGroupPostAsync</c> shape). Runs in the
-    /// **caller's** <paramref name="session"/>; stores **no** audit row (the
-    /// ADR 0016 author-lane precedent — the author's own lane).
-    /// </summary>
-    /// <exception cref="KeyNotFoundException">The event id is not found, or it
-    /// is not a group event (empty <c>GroupId</c>).</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor is not the
-    /// author.</exception>
-    public async Task<Event> UpdateGroupEventAsync(string eventId, string actorId, GroupEventUpdate update, IDocumentSession session, CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
-        ArgumentNullException.ThrowIfNull(update);
-        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to edit a group event.");
-        ArgumentNullException.ThrowIfNull(session);
-
-        var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (existing is null)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found; nothing to edit.");
-        if (string.IsNullOrEmpty(existing.GroupId))
-            // Not a group event (the lane is fail-closed): a 404, never a
-            // cross-lane edit (the PostService.UpdateGroupPostAsync shape).
-            throw new KeyNotFoundException($"Event '{eventId}' is not a group event; nothing to edit.");
-
-        // GE·4 — author-only (GlobalAdmin explicitly denied). A pure ordinal
-        // check; the Web layer maps the exception to a 404.
-        if (!string.Equals(existing.AuthorId, actorId, StringComparison.Ordinal))
-            throw new UnauthorizedAccessException("Only the author may edit a group event.");
-
-        // ADR 0018 — resolve the authored-in tag on both sides before comparing
-        // (the UpdateAsync shape): a no-op re-save leaves the stamp untouched.
-        var existingLanguageCode = await ResolveLanguageCodeAsync(existing.LanguageCode, session, ct).ConfigureAwait(false);
-        var updatedLanguageCode = await ResolveLanguageCodeAsync(update.LanguageCode, session, ct).ConfigureAwait(false);
-
-        var changed = existing.Title != update.Title
-            || existing.Body != update.Body
-            || existing.Start != update.StartUtc
-            || existing.End != update.EndUtc
-            || !string.Equals(existing.Location, update.Location, StringComparison.Ordinal)
-            || existing.Capacity != update.Capacity
-            || !string.Equals(existing.Color, update.Color, StringComparison.Ordinal)
-            || existing.ReminderEnabled != (update.ReminderEnabled ?? existing.ReminderEnabled)
-            || existingLanguageCode != updatedLanguageCode;
-
-        // Apply the author's choices (the editable surface only). The lane
-        // markers are **deliberately not** reassigned here (GE·8) — the author of
-        // record is whoever created it, the draft/delete state is owned by the
-        // publish (ADR 0037) / delete (ADR 0024) lanes.
-        existing.Title = update.Title;
-        existing.Body = update.Body;
-        existing.Start = update.StartUtc;
-        existing.End = update.EndUtc;
-        existing.Location = update.Location;
-        existing.Capacity = update.Capacity;
-        existing.Color = update.Color;
-        if (update.ReminderEnabled is not null)
-            existing.ReminderEnabled = update.ReminderEnabled.Value;
-        existing.LanguageCode = updatedLanguageCode;
-        if (changed)
-            existing.Modified = DateTimeOffset.UtcNow;
-
-        session.Store(existing);
-        // GE·5 — **no** audit row (the ADR 0016 author-lane precedent; the
-        // author's own lane). One SaveChangesAsync (C3).
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return existing;
-    }
 
     // ─── Translation lanes (ADR 0059 — the "follow-on lane" ADR 0054 deferred) ───
     //
@@ -1997,46 +1224,8 @@ public sealed class EventService : IEventService
         string eventId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(eventId))
-            throw new ArgumentException("An event id is required.", nameof(eventId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to add a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to translate.");
-
-        // Standing re-check (server-side, C3 single-source): author (Owner) OR
-        // Translator / GlobalAdmin (Admin). Events have no component-moderator
-        // standing (ADR 0054 §5).
-        var via = ResolveTranslationStanding(@event.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the event's author (or a Translator, or a GlobalAdmin) " +
-                "may add a translation of it.");
-
-        var now = DateTimeOffset.UtcNow;
-        var translation = new EventTranslation
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            EventId = eventId,
-            LanguageCode = languageCode,
-            Title = string.IsNullOrWhiteSpace(title) ? null : title,
-            Body = body,
-            AuthorId = actorId,
-            Created = now
-        };
-
-        session.Store(translation);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "eventtranslation.add", "event", eventId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return translation;
+        return await _translationLane.AddAsync(session, eventId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IEventService.UpdateEventTranslationAsync"/>
@@ -2058,43 +1247,8 @@ public sealed class EventService : IEventService
         string eventId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(eventId))
-            throw new ArgumentException("An event id is required.", nameof(eventId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrWhiteSpace(body))
-            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to edit a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to edit.");
-
-        var via = ResolveTranslationStanding(@event.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the event's author (or a Translator, or a GlobalAdmin) " +
-                "may edit a translation of it.");
-
-        var row = await session.Query<EventTranslation>()
-            .Where(t => t.EventId == eventId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Event '{eventId}' has no translation for '{languageCode}'; nothing to edit.");
-
-        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-        row.Body = body;
-        row.AuthorId = actorId;
-        row.Created = DateTimeOffset.UtcNow;
-
-        session.Store(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "eventtranslation.update", "event", eventId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-        return row;
+        return await _translationLane.UpdateAsync(session, eventId, languageCode, title, body, actorId, actorRoles).ConfigureAwait(false);
     }
 
     /// <inheritdoc cref="IEventService.RemoveEventTranslationAsync"/>
@@ -2113,35 +1267,8 @@ public sealed class EventService : IEventService
         string eventId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(eventId))
-            throw new ArgumentException("An event id is required.", nameof(eventId));
-        if (string.IsNullOrWhiteSpace(languageCode))
-            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
-        if (string.IsNullOrEmpty(actorId))
-            throw new UnauthorizedAccessException("An acting actor is required to remove a translation.");
-        ArgumentNullException.ThrowIfNull(actorRoles);
-
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
-        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
-        if (@event is null)
-            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to remove.");
-
-        var via = ResolveTranslationStanding(@event.AuthorId, actorId, actorRoles);
-        if (via is null)
-            throw new UnauthorizedAccessException(
-                "Only the event's author (or a Translator, or a GlobalAdmin) " +
-                "may remove a translation of it.");
-
-        var row = await session.Query<EventTranslation>()
-            .Where(t => t.EventId == eventId && t.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-        if (row is null)
-            throw new KeyNotFoundException($"Event '{eventId}' has no translation for '{languageCode}'; nothing to remove.");
-
-        session.Delete(row);
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "eventtranslation.remove", "event", eventId, via.Value));
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        await _translationLane.RemoveAsync(session, eventId, languageCode, actorId, actorRoles).ConfigureAwait(false);
     }
 
     // ─── U04 private helpers ───────────────────────────────────────────────

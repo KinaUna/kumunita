@@ -20,7 +20,6 @@ using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -28,14 +27,16 @@ using Microsoft.AspNetCore.Mvc;
 public sealed class CommunityController : Controller
 {
     private readonly IUserInfoService userInfo;
+    private readonly ICommunityMembershipService community;
+    private readonly IProfileSettingsService profileSettings;
     private readonly ILocalizationService localization;
-    private readonly IDocumentStore store;
 
-    public CommunityController(IUserInfoService userInfo, ILocalizationService localization, IDocumentStore store)
+    public CommunityController(IUserInfoService userInfo, ICommunityMembershipService community, IProfileSettingsService profileSettings, ILocalizationService localization)
     {
         this.userInfo = userInfo;
+this.community = community ?? throw new ArgumentNullException(nameof(community));
+this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         this.localization = localization;
-        this.store = store;
     }
 
     // ── Standing (fail-closed, mirrors the posting gate) ──────────────────
@@ -58,15 +59,15 @@ public sealed class CommunityController : Controller
     public async Task<IActionResult> Manage(string componentId, CancellationToken ct = default)
     {
         var actorId = KumunitaPrincipal.SubjectId(User);
-        var component = (await userInfo.GetComponentsAsync(enabledOnly: false))
+        var component = (await profileSettings.GetComponentsAsync(enabledOnly: false))
             .FirstOrDefault(c => c.Id.Equals(componentId, StringComparison.OrdinalIgnoreCase));
         if (component is null || !Standing(actorId, componentId))
             return NotFound();
         if (actorId is null)
             return NotFound(); // Standing above implies non-null; pin it defensively.
 
-        var memberships = await userInfo.GetCommunityMembersAsync(componentId);
-        var profiles = await userInfo.GetProfilesAsync(verifiedOnly: false);
+        var memberships = await community.GetCommunityMembersAsync(componentId);
+        var profiles = await profileSettings.GetProfilesAsync(verifiedOnly: false);
         var nameBySubject = profiles
             .ToDictionary(p => p.SubjectId, p => p.DisplayName, StringComparer.Ordinal);
         bool TryName(string subjectId, out string? name)
@@ -202,7 +203,7 @@ public sealed class CommunityController : Controller
         if (actorId is null)
             return Forbid();
 
-        var component = (await userInfo.GetComponentsAsync(enabledOnly: false))
+        var component = (await profileSettings.GetComponentsAsync(enabledOnly: false))
             .FirstOrDefault(c => c.Id.Equals(componentId, StringComparison.OrdinalIgnoreCase));
         if (component is null)
             return NotFound();
@@ -238,13 +239,13 @@ public sealed class CommunityController : Controller
         if (actorId is null)
             return NotFound();
 
-        var component = (await userInfo.GetComponentsAsync(enabledOnly: false))
+        var component = (await profileSettings.GetComponentsAsync(enabledOnly: false))
             .FirstOrDefault(c => c.Id.Equals(componentId, StringComparison.OrdinalIgnoreCase));
         if (component is null)
             return NotFound();
 
         var canManage = Standing(actorId, componentId);
-        var canTranslate = userInfo.CanTranslateCommunity(actorId, KumunitaPrincipal.RoleSet(User));
+        var canTranslate = community.CanTranslateCommunity(actorId, KumunitaPrincipal.RoleSet(User));
         if (!canManage && !canTranslate)
             return NotFound();
 
@@ -252,7 +253,7 @@ public sealed class CommunityController : Controller
         // group/post translation surfaces read) seeds the chips and the
         // "add a translation" candidate list; a disabled or non-seeded
         // language never appears as an option.
-        var translations = await userInfo.GetCommunityTranslationsAsync(component.Id);
+        var translations = await community.GetCommunityTranslationsAsync(component.Id);
         var translationCodes = translations.Select(t => t.LanguageCode).ToHashSet();
         var catalog = await localization.ListLanguagesAsync();
         var languages = catalog
@@ -303,17 +304,17 @@ public sealed class CommunityController : Controller
         }
 
         var actorRoles = KumunitaPrincipal.RoleSet(User);
-        await using var session = store.LightweightSession();
         try
         {
-            await userInfo.AddCommunityTranslationAsync(
+            // C2-04 — the service owns the session (the single C3 SaveChangesAsync);
+            // the controller no longer opens its own LightweightSession.
+            await community.AddCommunityTranslationAsync(
                 componentId,
                 languageCode,
                 string.IsNullOrWhiteSpace(name) ? null : name,
                 string.IsNullOrWhiteSpace(description) ? null : description,
                 actorId,
-                actorRoles,
-                session);
+                actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -364,17 +365,16 @@ public sealed class CommunityController : Controller
         }
 
         var actorRoles = KumunitaPrincipal.RoleSet(User);
-        await using var session = store.LightweightSession();
         try
         {
-            await userInfo.UpdateCommunityTranslationAsync(
+            // C2-04 — the service owns the session (the single C3 SaveChangesAsync).
+            await community.UpdateCommunityTranslationAsync(
                 componentId,
                 languageCode,
                 string.IsNullOrWhiteSpace(name) ? null : name,
                 string.IsNullOrWhiteSpace(description) ? null : description,
                 actorId,
-                actorRoles,
-                session);
+                actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -415,10 +415,10 @@ public sealed class CommunityController : Controller
         }
 
         var actorRoles = KumunitaPrincipal.RoleSet(User);
-        await using var session = store.LightweightSession();
         try
         {
-            await userInfo.RemoveCommunityTranslationAsync(componentId, languageCode, actorId, actorRoles, session);
+            // C2-04 — the service owns the session (the single C3 SaveChangesAsync).
+            await community.RemoveCommunityTranslationAsync(componentId, languageCode, actorId, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {

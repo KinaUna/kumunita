@@ -1,0 +1,12 @@
+{
+  "storage.trend.title": "Tendance de stockage",
+  "storage.trend.window.30": "30 jours",
+  "storage.trend.window.90": "90 jours",
+  "storage.trend.window.180": "180 jours",
+  "storage.trend.window.365": "365 jours",
+  "storage.trend.col.date": "Date",
+  "storage.trend.col.used": "Total utilis\u00E9",
+  "storage.trend.col.free": "Libre",
+  "storage.trend.legend.used": "Total utilis\u00E9 sur la fen\u00EAtre",
+  "storage.trend.empty": "Pas encore de tendance de stockage \u2014 la capture quotidienne n\u0027a pas enregistr\u00E9 d\u0027\u00E9chantillons pour cette fen\u00EAtre."
+}

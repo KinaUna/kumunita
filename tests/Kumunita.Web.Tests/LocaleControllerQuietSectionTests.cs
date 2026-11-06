@@ -122,10 +122,10 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
             Substitute.For<ITranslationProvider>(),
             Substitute.For<IMailerStage>());
 
-        var controller = new LocaleController(
-            localization, userInfo, store,
-            translationProvider: null,
-            notifications: notifications);
+        // IMPROVE-CODE C09 — LocaleController no longer takes a store (the
+        // instance-default read is on the localization seam); the store stays
+        // for the NotificationService below.
+        var controller = new LocaleController(localization, userInfo, Substitute.For<IProfileSettingsService>(), translationProvider: null, notifications: notifications);
 
         var httpContext = new DefaultHttpContext();
         if (signedIn)

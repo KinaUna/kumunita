@@ -1,0 +1,7 @@
+{
+  "security.flash_totp_invalid_enable": "Le code de l\u2019application d\u2019authentification n\u2019\u00E9tait pas valide. Activez \u00E0 nouveau l\u2019authentification \u00E0 deux facteurs.",
+  "security.flash_2fa_enabled": "L\u2019authentification \u00E0 deux facteurs est maintenant activ\u00E9e. Connectez-vous d\u00E9sormais avec votre application d\u2019authentification.",
+  "security.flash_codes_rotated": "Vos codes de r\u00E9cup\u00E9ration ont \u00E9t\u00E9 renouvel\u00E9s. Copiez-les maintenant \u2014 ils ne seront plus affich\u00E9s.",
+  "security.flash_totp_invalid_disable": "Le code de l\u2019application d\u2019authentification n\u2019\u00E9tait pas valide. L\u2019authentification \u00E0 deux facteurs reste activ\u00E9e.",
+  "security.flash_2fa_disabled": "L\u2019authentification \u00E0 deux facteurs a \u00E9t\u00E9 d\u00E9sactiv\u00E9e."
+}

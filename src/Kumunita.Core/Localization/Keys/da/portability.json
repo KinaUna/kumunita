@@ -1,0 +1,10 @@
+{
+  "portability.index.title": "Portabilitet",
+  "portability.export": "Eksport\u00E9r",
+  "portability.import": "Import\u00E9r",
+  "portability.confirm.import": "Import\u00E9r denne arkiv? Den erstanser indholdet i instansen (gendannelsesstien \u2014 operat\u00F8rens backup f\u00F8r import er tilbageskrivningen).",
+  "portability.import.keep_existing": "Behol eksisterende konti og indhold",
+  "portability.import.keep_existing_hint": "Umarkeret: importen erstanser konti og indhold i denne instans. Markeret: eksisterende konti og indhold forbliver u\u00E6ndrede, og kun det, der er nyt, tilf\u00F8jes.",
+  "portability.status.ok": "F\u00E6rdig.",
+  "portability.status.failure": "Afvist \u2014 arkivet blev afvist, f\u00F8r noget blev skrevet:"
+}

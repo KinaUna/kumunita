@@ -55,6 +55,8 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-owner";
         const string requester = "u-jr-requester";
@@ -63,15 +65,15 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
 
         // Request: the pending row exists, but NO membership yet (the C4 lane
         // is approve-only — a request itself never touches membership).
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
         Assert.DoesNotContain(group.Id, await svc.GetGroupIdsAsync(requester));
-        Assert.DoesNotContain(group.Id, (await svc.GetGroupsForUserAsync(requester)).Select(g => g.Id));
+        Assert.DoesNotContain(group.Id, (await groupService.GetGroupsForUserAsync(requester)).Select(g => g.Id));
 
         // Approve (the owner ∪ GlobalAdmin lane): the membership is live on the
         // very next read (C4 carried).
-        await svc.ApproveJoinRequestAsync(group.Id, requester, owner);
+        await groupService.ApproveJoinRequestAsync(group.Id, requester, owner);
         Assert.Contains(group.Id, await svc.GetGroupIdsAsync(requester));
-        Assert.Contains(group.Id, (await svc.GetGroupsForUserAsync(requester)).Select(g => g.Id));
+        Assert.Contains(group.Id, (await groupService.GetGroupsForUserAsync(requester)).Select(g => g.Id));
     }
 
     // ── Lifecycle 2 — decline: no membership, row resolved ─────────────────
@@ -81,21 +83,23 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-a";
         const string requester = "u-jr-b";
 
         var group = await svc.CreateGroupAsync(owner, "Volunteers", null);
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
 
-        await svc.DeclineJoinRequestAsync(group.Id, requester, owner);
+        await groupService.DeclineJoinRequestAsync(group.Id, requester, owner);
 
         Assert.DoesNotContain(group.Id, await svc.GetGroupIdsAsync(requester));
 
         // The row resolved — it is no longer in the requester's pending list,
         // nor the group's pending list.
-        Assert.Empty(await svc.GetPendingJoinRequestsForUserAsync(requester));
-        Assert.Empty(await svc.GetPendingJoinRequestsForGroupAsync(group.Id));
+        Assert.Empty(await groupService.GetPendingJoinRequestsForUserAsync(requester));
+        Assert.Empty(await groupService.GetPendingJoinRequestsForGroupAsync(group.Id));
     }
 
     // ── Lifecycle 3 — withdraw: the requester pulls their own pending row ────
@@ -105,18 +109,20 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-c";
         const string requester = "u-jr-d";
 
         var group = await svc.CreateGroupAsync(owner, "Bike owners", null);
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
 
-        await svc.WithdrawJoinRequestAsync(group.Id, requester);
+        await groupService.WithdrawJoinRequestAsync(group.Id, requester);
 
         Assert.DoesNotContain(group.Id, await svc.GetGroupIdsAsync(requester));
-        Assert.Empty(await svc.GetPendingJoinRequestsForUserAsync(requester));
-        Assert.Empty(await svc.GetPendingJoinRequestsForGroupAsync(group.Id));
+        Assert.Empty(await groupService.GetPendingJoinRequestsForUserAsync(requester));
+        Assert.Empty(await groupService.GetPendingJoinRequestsForGroupAsync(group.Id));
     }
 
     // ── JR·1 — the SoD lane's via derivation (owner ⇒ Owner, else Admin) ─────
@@ -126,13 +132,15 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-e";
         const string requester = "u-jr-f";
 
         var group = await svc.CreateGroupAsync(owner, "Building 12", null);
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
-        await svc.ApproveJoinRequestAsync(group.Id, requester, owner);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.ApproveJoinRequestAsync(group.Id, requester, owner);
 
         var row = await LastAuditAsync(store, "group.join.approve", group.Id);
         Assert.Equal(AccessVia.Owner, row.Via);
@@ -146,14 +154,16 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-g";
         const string admin = "u-jr-admin";
         const string requester = "u-jr-h";
 
         var group = await svc.CreateGroupAsync(owner, "Building 7", null);
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
-        await svc.ApproveJoinRequestAsync(group.Id, requester, admin);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.ApproveJoinRequestAsync(group.Id, requester, admin);
 
         var row = await LastAuditAsync(store, "group.join.approve", group.Id);
         Assert.Equal(AccessVia.Admin, row.Via);
@@ -166,6 +176,8 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-i";
         const string admin = "u-jr-i-admin";
@@ -175,11 +187,11 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
         var gOwner = await svc.CreateGroupAsync(owner, "A", null);
         var gAdmin = await svc.CreateGroupAsync(owner, "D", null);
 
-        await svc.RequestToJoinGroupAsync(gOwner.Id, requester1);
-        await svc.DeclineJoinRequestAsync(gOwner.Id, requester1, owner);
+        await groupService.RequestToJoinGroupAsync(gOwner.Id, requester1);
+        await groupService.DeclineJoinRequestAsync(gOwner.Id, requester1, owner);
 
-        await svc.RequestToJoinGroupAsync(gAdmin.Id, requester2);
-        await svc.DeclineJoinRequestAsync(gAdmin.Id, requester2, admin);
+        await groupService.RequestToJoinGroupAsync(gAdmin.Id, requester2);
+        await groupService.DeclineJoinRequestAsync(gAdmin.Id, requester2, admin);
 
         var ownerRow = await LastAuditAsync(store, "group.join.decline", gOwner.Id);
         Assert.Equal(AccessVia.Owner, ownerRow.Via);
@@ -195,6 +207,8 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-j";
         const string requester = "u-jr-k";
@@ -202,14 +216,14 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
         var g1 = await svc.CreateGroupAsync(owner, "Req", null);
         var g2 = await svc.CreateGroupAsync(owner, "Withdraw", null);
 
-        await svc.RequestToJoinGroupAsync(g1.Id, requester);
+        await groupService.RequestToJoinGroupAsync(g1.Id, requester);
         var reqRow = await LastAuditAsync(store, "group.join.request", g1.Id);
         Assert.Equal(AccessVia.Owner, reqRow.Via);           // the requester's own standing
         Assert.Equal(requester, reqRow.ActorId);
         Assert.Equal(requester, reqRow.EffectivePrincipalId);
 
-        await svc.RequestToJoinGroupAsync(g2.Id, requester);
-        await svc.WithdrawJoinRequestAsync(g2.Id, requester);
+        await groupService.RequestToJoinGroupAsync(g2.Id, requester);
+        await groupService.WithdrawJoinRequestAsync(g2.Id, requester);
         var wdRow = await LastAuditAsync(store, "group.join.withdraw", g2.Id);
         Assert.Equal(AccessVia.Owner, wdRow.Via);            // the requester's own standing
         Assert.Equal(requester, wdRow.ActorId);
@@ -223,20 +237,22 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-m";
         const string requester = "u-jr-n";
         const string stranger = "u-jr-o";
 
         var group = await svc.CreateGroupAsync(owner, "Building 3", null);
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
 
         // A stranger (not the row's UserId) cannot withdraw the request.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.WithdrawJoinRequestAsync(group.Id, stranger));
+            groupService.WithdrawJoinRequestAsync(group.Id, stranger));
 
         // ... and the row is still pending for the requester (nothing changed).
-        Assert.Single(await svc.GetPendingJoinRequestsForUserAsync(requester));
+        Assert.Single(await groupService.GetPendingJoinRequestsForUserAsync(requester));
     }
 
     [Fact]
@@ -244,6 +260,8 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-p";
         const string requester = "u-jr-q";
@@ -252,11 +270,11 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
 
         // No request row at all for this pair.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.WithdrawJoinRequestAsync(group.Id, requester));
+            groupService.WithdrawJoinRequestAsync(group.Id, requester));
 
         // A group id that does not exist.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.WithdrawJoinRequestAsync("no-such-group", requester));
+            groupService.WithdrawJoinRequestAsync("no-such-group", requester));
     }
 
     // ── Approve/decline on a pair with no request row throws ─────────────────
@@ -266,6 +284,8 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-r";
         const string requester = "u-jr-s";
@@ -273,13 +293,13 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
         var group = await svc.CreateGroupAsync(owner, "Building 5", null);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.ApproveJoinRequestAsync(group.Id, requester, owner));
+            groupService.ApproveJoinRequestAsync(group.Id, requester, owner));
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.DeclineJoinRequestAsync(group.Id, requester, owner));
+            groupService.DeclineJoinRequestAsync(group.Id, requester, owner));
 
         // A group id that does not exist.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.ApproveJoinRequestAsync("no-such-group", requester, owner));
+            groupService.ApproveJoinRequestAsync("no-such-group", requester, owner));
     }
 
     // ── JR·3 — the state machine ─────────────────────────────────────────────
@@ -289,25 +309,27 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-t";
         const string requester = "u-jr-u";
 
         var group = await svc.CreateGroupAsync(owner, "Building 6", null);
 
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
-        await svc.DeclineJoinRequestAsync(group.Id, requester, owner);
-        Assert.Empty(await svc.GetPendingJoinRequestsForUserAsync(requester));
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.DeclineJoinRequestAsync(group.Id, requester, owner);
+        Assert.Empty(await groupService.GetPendingJoinRequestsForUserAsync(requester));
 
         // Re-request: the SAME (group, user) business-key row resets to
         // Pending — no second row, and the requester is pending once.
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
-        var pending = await svc.GetPendingJoinRequestsForUserAsync(requester);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
+        var pending = await groupService.GetPendingJoinRequestsForUserAsync(requester);
         Assert.Single(pending);
         Assert.Equal(JoinRequestStatus.Pending, pending[0].Status);
 
         // And the approve lane works end-to-end on the re-requested row.
-        await svc.ApproveJoinRequestAsync(group.Id, requester, owner);
+        await groupService.ApproveJoinRequestAsync(group.Id, requester, owner);
         Assert.Contains(group.Id, await svc.GetGroupIdsAsync(requester));
     }
 
@@ -316,19 +338,21 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-v";
         const string requester = "u-jr-w";
 
         var group = await svc.CreateGroupAsync(owner, "Building 8", null);
 
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
 
         // One row per (group, user) — the UniqueIndex business key; the
         // re-stamp, not a second row.
-        Assert.Single(await svc.GetPendingJoinRequestsForUserAsync(requester));
-        Assert.Single(await svc.GetPendingJoinRequestsForGroupAsync(group.Id));
+        Assert.Single(await groupService.GetPendingJoinRequestsForUserAsync(requester));
+        Assert.Single(await groupService.GetPendingJoinRequestsForGroupAsync(group.Id));
     }
 
     [Fact]
@@ -336,6 +360,8 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-x";
         const string requester1 = "u-jr-x1";
@@ -347,28 +373,28 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
         var g3 = await svc.CreateGroupAsync(owner, "G3", null);
 
         // Approved row: a second approve (or a decline) is an invalid transition.
-        await svc.RequestToJoinGroupAsync(g1.Id, requester1);
-        await svc.ApproveJoinRequestAsync(g1.Id, requester1, owner);
+        await groupService.RequestToJoinGroupAsync(g1.Id, requester1);
+        await groupService.ApproveJoinRequestAsync(g1.Id, requester1, owner);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.ApproveJoinRequestAsync(g1.Id, requester1, owner));
+            groupService.ApproveJoinRequestAsync(g1.Id, requester1, owner));
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.DeclineJoinRequestAsync(g1.Id, requester1, owner));
+            groupService.DeclineJoinRequestAsync(g1.Id, requester1, owner));
 
         // Declined row: a later approve is an invalid transition, and a second
         // decline is one too (only Pending rows may be resolved).
-        await svc.RequestToJoinGroupAsync(g2.Id, requester2);
-        await svc.DeclineJoinRequestAsync(g2.Id, requester2, owner);
+        await groupService.RequestToJoinGroupAsync(g2.Id, requester2);
+        await groupService.DeclineJoinRequestAsync(g2.Id, requester2, owner);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.ApproveJoinRequestAsync(g2.Id, requester2, owner));
+            groupService.ApproveJoinRequestAsync(g2.Id, requester2, owner));
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.DeclineJoinRequestAsync(g2.Id, requester2, owner));
+            groupService.DeclineJoinRequestAsync(g2.Id, requester2, owner));
 
         // Declined row: the self-lane withdraw is also refused (the withdraw
         // lane requires a Pending row; a resolved one is an invalid transition).
-        await svc.RequestToJoinGroupAsync(g3.Id, requester3);
-        await svc.DeclineJoinRequestAsync(g3.Id, requester3, owner);
+        await groupService.RequestToJoinGroupAsync(g3.Id, requester3);
+        await groupService.DeclineJoinRequestAsync(g3.Id, requester3, owner);
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.WithdrawJoinRequestAsync(g3.Id, requester3));
+            groupService.WithdrawJoinRequestAsync(g3.Id, requester3));
     }
 
     // ── GU gate — a supervised child is refused on the approve lane ──────────
@@ -378,6 +404,8 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-sup-owner";
         const string guardian = "u-jr-sup-guardian";
@@ -385,17 +413,17 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
         const string independent = "u-jr-sup-independent"; // no link
 
         var gSupervised = await svc.CreateGroupAsync(owner, "Supervised", null);
-        await svc.RequestToJoinGroupAsync(gSupervised.Id, supervisedChild);
-        await svc.CreateGuardianLinkAsync(supervisedChild, guardian);
+        await groupService.RequestToJoinGroupAsync(gSupervised.Id, supervisedChild);
+        await guardianService.CreateGuardianLinkAsync(supervisedChild, guardian);
 
         // Supervised: the approve lane is refused (the GU gate).
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.ApproveJoinRequestAsync(gSupervised.Id, supervisedChild, owner));
+            groupService.ApproveJoinRequestAsync(gSupervised.Id, supervisedChild, owner));
 
         // Conditional on the active link: a child with NO link approves normally.
         var gIndependent = await svc.CreateGroupAsync(owner, "Independent", null);
-        await svc.RequestToJoinGroupAsync(gIndependent.Id, independent);
-        await svc.ApproveJoinRequestAsync(gIndependent.Id, independent, owner);
+        await groupService.RequestToJoinGroupAsync(gIndependent.Id, independent);
+        await groupService.ApproveJoinRequestAsync(gIndependent.Id, independent, owner);
         Assert.Contains(gIndependent.Id, await svc.GetGroupIdsAsync(independent));
     }
 
@@ -406,6 +434,8 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-z1";
         var gA = await svc.CreateGroupAsync(owner, "ZA", null);
@@ -418,16 +448,16 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
         var c = "u-jr-z4";
         var d = "u-jr-z5";
 
-        await svc.RequestToJoinGroupAsync(gA.Id, a);
-        await svc.ApproveJoinRequestAsync(gA.Id, a, owner);
+        await groupService.RequestToJoinGroupAsync(gA.Id, a);
+        await groupService.ApproveJoinRequestAsync(gA.Id, a, owner);
 
-        await svc.RequestToJoinGroupAsync(gB.Id, b);
-        await svc.DeclineJoinRequestAsync(gB.Id, b, owner);
+        await groupService.RequestToJoinGroupAsync(gB.Id, b);
+        await groupService.DeclineJoinRequestAsync(gB.Id, b, owner);
 
-        await svc.RequestToJoinGroupAsync(gC.Id, c);
-        await svc.WithdrawJoinRequestAsync(gC.Id, c);
+        await groupService.RequestToJoinGroupAsync(gC.Id, c);
+        await groupService.WithdrawJoinRequestAsync(gC.Id, c);
 
-        await svc.RequestToJoinGroupAsync(gD.Id, d); // request only
+        await groupService.RequestToJoinGroupAsync(gD.Id, d); // request only
 
         await using var session = store.QuerySession();
         var actions = await session.Query<AccessAudit>()
@@ -455,18 +485,20 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-r1";
         const string requester = "u-jr-r2";
 
         var group = await svc.CreateGroupAsync(owner, "Reads", null);
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
 
         var before = await AuditCountAsync(store);
 
         // The two read lanes (the candidate-read pin): none may append.
-        await svc.GetPendingJoinRequestsForUserAsync(requester);
-        await svc.GetPendingJoinRequestsForGroupAsync(group.Id);
+        await groupService.GetPendingJoinRequestsForUserAsync(requester);
+        await groupService.GetPendingJoinRequestsForGroupAsync(group.Id);
 
         Assert.Equal(before, await AuditCountAsync(store));
     }
@@ -476,33 +508,35 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-o1";
         const string pending = "u-jr-o2";
         const string resolved = "u-jr-o3";
 
         var group = await svc.CreateGroupAsync(owner, "Ordering", null);
-        await svc.RequestToJoinGroupAsync(group.Id, pending);
-        await svc.RequestToJoinGroupAsync(group.Id, resolved);
+        await groupService.RequestToJoinGroupAsync(group.Id, pending);
+        await groupService.RequestToJoinGroupAsync(group.Id, resolved);
 
-        await svc.ApproveJoinRequestAsync(group.Id, resolved, owner);
+        await groupService.ApproveJoinRequestAsync(group.Id, resolved, owner);
 
         // User axis: the resolved row dropped, the pending one survives —
         // live on the very next call (C4 on the read lanes).
-        var forUser = await svc.GetPendingJoinRequestsForUserAsync(pending);
+        var forUser = await groupService.GetPendingJoinRequestsForUserAsync(pending);
         Assert.Single(forUser);
         Assert.Equal(JoinRequestStatus.Pending, forUser[0].Status);
 
-        Assert.Empty(await svc.GetPendingJoinRequestsForUserAsync(resolved));
+        Assert.Empty(await groupService.GetPendingJoinRequestsForUserAsync(resolved));
 
         // Group axis: one pending row remains, for the other requester.
-        var forGroup = await svc.GetPendingJoinRequestsForGroupAsync(group.Id);
+        var forGroup = await groupService.GetPendingJoinRequestsForGroupAsync(group.Id);
         Assert.Single(forGroup);
         Assert.Equal(pending, forGroup[0].UserId);
 
         // Fail-safe: empty ids return empty lists, no throw.
-        Assert.Empty(await svc.GetPendingJoinRequestsForUserAsync(string.Empty));
-        Assert.Empty(await svc.GetPendingJoinRequestsForGroupAsync(string.Empty));
+        Assert.Empty(await groupService.GetPendingJoinRequestsForUserAsync(string.Empty));
+        Assert.Empty(await groupService.GetPendingJoinRequestsForGroupAsync(string.Empty));
     }
 
     // ── DeleteGroupAsync cascade — the group's join requests go with it ──────
@@ -512,18 +546,20 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
+        var guardianService = new GuardianService(store);
 
         const string owner = "u-jr-del-owner";
         const string requester = "u-jr-del-requester";
 
         var group = await svc.CreateGroupAsync(owner, "Doomed", null);
-        await svc.RequestToJoinGroupAsync(group.Id, requester);
-        Assert.Single(await svc.GetPendingJoinRequestsForUserAsync(requester));
+        await groupService.RequestToJoinGroupAsync(group.Id, requester);
+        Assert.Single(await groupService.GetPendingJoinRequestsForUserAsync(requester));
 
-        await svc.DeleteGroupAsync(group.Id, owner);
+        await groupService.DeleteGroupAsync(group.Id, owner);
 
         // The request row is gone with the group (no orphan for the requester).
-        Assert.Empty(await svc.GetPendingJoinRequestsForUserAsync(requester));
+        Assert.Empty(await groupService.GetPendingJoinRequestsForUserAsync(requester));
     }
 
     // ── Shared helpers ──────────────────────────────────────────────────────

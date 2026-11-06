@@ -1,0 +1,198 @@
+@model Kumunita.Web.Models.TodoDetailViewModel
+@using Kumunita.Web.Security
+
+@* IMPROVE-CODE C11 — the to-do detail's read-surface display block (the ADR
+   0088 chip-swap, the Project / Linked-event / Parent / Waiting-on links, the
+   start / due dates, and the tags — extracted from TodoDetail.cshtml; the
+   served markup is unchanged). References only <c>Model.*</c> + the
+   <c>MarkdownRenderer</c>, so it takes the parent view-model directly. *@
+
+@* ADR 0088 — user-added translations of the to-do (the ADR 0059
+   chip-swap: the original + one variant per translation, the
+   td-swap JS shows the viewer's current-language variant
+   default — ADR 0049). The title is the to-do's surface; a
+   translation's title (if any) swaps in. The add/edit/remove
+   management is gated on Model.CanTranslate (the service's
+   display pin — the standing is re-pinned server-side). *@
+<div data-td-group="todo" class="mb-1">
+    <div class="td-variant" data-td-variant="@(Model.Todo.LanguageCode)">
+        <h1 class="mb-1">
+            @if (string.IsNullOrWhiteSpace(Model.Todo.Title))
+            {
+                <span class="text-body-tertiary"><kw-l key="projects.todo.untitled">Untitled to-do</kw-l></span>
+            }
+            else
+            {
+                @Model.Todo.Title
+            }
+        </h1>
+    </div>
+
+    @if (Model.Translations is { Count: > 0 })
+    {
+        foreach (var tr in Model.Translations)
+        {
+            <div class="td-variant" data-td-variant="@tr.LanguageCode">
+                <h1 class="mb-1">
+                    @if (string.IsNullOrWhiteSpace(tr.Title))
+                    {
+                        <span class="text-body-tertiary"><kw-l key="projects.todo.untitled">Untitled to-do</kw-l></span>
+                    }
+                    else
+                    {
+                        @tr.Title
+                    }
+                </h1>
+                @* ADR 0025 shape (the BoardDetail/ProjectDetail
+                   detail idiom) — a read surface renders the
+                   translation's body as plain rendered
+                   Markdown. *@
+                @if (!string.IsNullOrWhiteSpace(tr.Body))
+                {
+                    <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(tr.Body))</div>
+                }
+            </div>
+        }
+
+        <div class="td-chips btn-group mt-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    data-translation-chip data-td-group="todo"
+                    data-td-variant="@(Model.Todo.LanguageCode)">@Model.Todo.LanguageCode</button>
+            @foreach (var tr in Model.Translations)
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        data-translation-chip data-td-group="todo"
+                        data-td-variant="@tr.LanguageCode">@tr.LanguageCode</button>
+            }
+        </div>
+    }
+</div>
+
+@* ADR 0082 — the to-do's translation management (add / edit /
+   remove) now lives in the ⋮ action dropdown above (dropdown
+   items opening the modals beside this card) rather than as
+   these inline <details> blocks. The ADR 0088 U09/U10/U11
+   lanes (routes / form fields / server-side CanTranslate gate)
+   are unchanged — only the presentation moved. *@
+
+@* The author + assignee line (previously above the title, with
+   the assignee's avatar) moved to the author footer band at the
+   BOTTOM of the card (the community Posts/Detail.cshtml
+   pattern) — see the band below the body. *@
+
+@* U08 (ADR 0086 §3.9) — the Project link (D9): the to-do's
+   project association (F3) rendered as a link to the project
+   detail (ADR 0086 D4). The controller's read surface resolved
+   the title (a dangling / unreadable association — F6 / F8 —
+   yields null fields and the whole line is hidden: the link is
+   a display surface, not an error for the to-do). *@
+@if (Model.ProjectId is not null && Model.ProjectTitle is not null)
+{
+    <div class="text-muted small mt-2 mb-3">
+        <kw-l key="pl.todo.project_link">Project</kw-l>:
+        <a href="@($"/projects/projects/{Model.ProjectId}")">@Model.ProjectTitle</a>
+    </div>
+}
+
+@* ADR 0115 D2 (M14 interlock) — the **event link** chip
+   (the `ProjectLink` chip above, carried to the event
+   association): rendered only when the controller resolved a
+   readable, non-deleted event (C-M14·2 — a dangling /
+   unreadable association yields null fields and the whole
+   line is hidden: the chip is a display surface, never a
+   404/403 for the to-do, and the target's title / id are not
+   leaked). Absent linkage renders nothing (no empty-state
+   line). *@
+@if (Model.EventId is not null && Model.EventTitle is not null)
+{
+    <div class="text-muted small mb-3">
+        <kw-l key="todo.event_link">Linked event</kw-l>:
+        <a href="@Model.EventLinkPath">@Model.EventTitle</a>
+    </div>
+}
+
+@* The **event picker** ("Link to event") + the **VTODO**
+   "Add to calendar" affordance are **below the body** on
+   this card (moved there so the read surface — title /
+   project / event / dates / tags / body — stays uncluttered
+   at the top). See the block below the body. *@
+
+@* F9 — the parent link (a subtask is a full to-do shown under
+   its parent; the service's read surface, the view renders it). *@
+@if (!string.IsNullOrWhiteSpace(Model.Todo.ParentId) && !string.IsNullOrWhiteSpace(Model.Todo.ParentTitle))
+{
+    <div class="mb-3">
+        <span class="text-muted small"><kw-l key="projects.todo.parent">Parent</kw-l> · </span>
+        <a href="@($"/projects/todos/{Model.Todo.ParentId}")">@Model.Todo.ParentTitle</a>
+    </div>
+}
+
+@* ADR 0087 — the "waiting on" chip (the D4 surface). The
+   service resolved the blocker over the existing
+   TodoItemToAuditableResource; a to-do the actor may not read,
+   or one that is absent/soft-deleted, is a **Generic** chip
+   (no title, no link, no leak — C-TBD·4). A resolved chip is
+   a link to the blocker's detail (LinkPath non-null). The
+   blocker is purely informational — it never gates the to-do
+   itself (D2). *@
+@if (Model.Blocker is not null)
+{
+    <div class="mb-3">
+        <span class="text-muted small"><kw-l key="todo.blocked_by">Waiting on</kw-l> · </span>
+        @if (Model.Blocker.Generic)
+        {
+            <span class="badge text-bg-secondary"><kw-l key="todo.blocked_generic">Another to-do (not visible to you)</kw-l></span>
+        }
+        else
+        {
+            <a href="@Model.Blocker.LinkPath">@Model.Blocker.Title</a>
+            @if (!string.IsNullOrWhiteSpace(Model.Blocker.Status))
+            {
+                <span class="text-muted small"> · @Model.Blocker.Status</span>
+            }
+        }
+    </div>
+}
+
+@* ADR 0079 — the optional start / due dates (the <kw-dt>
+   TagHelper renders null as empty; the label is gated on the
+   value so an unset date shows nothing at all). Shown to
+   viewers in their own timezone (the kw-dt effective-timezone
+   conversion). *@
+@if (Model.Todo.StartAt is not null || Model.Todo.DueAt is not null)
+{
+    <div class="mb-3">
+        @if (Model.Todo.StartAt is not null)
+        {
+            <span class="text-muted small"><kw-l key="projects.todo.start">Start</kw-l> · </span>
+            <kw-dt dt="@Model.Todo.StartAt" format="g"></kw-dt>
+        }
+        @if (Model.Todo.StartAt is not null && Model.Todo.DueAt is not null)
+        {
+            <span class="text-muted small mx-2">·</span>
+        }
+        @if (Model.Todo.DueAt is not null)
+        {
+            <span class="text-muted small"><kw-l key="projects.todo.due">Due</kw-l> · </span>
+            <kw-dt dt="@Model.Todo.DueAt" format="g"></kw-dt>
+        }
+    </div>
+}
+
+@* ADR 0044 / 0147 — the to-do's tags (display names in the
+   viewer's language, resolved by the controller from the
+   access-scoped read seam — the <see cref="TodoDetailViewModel
+   .Tags"/> field, the Posts/Detail.cshtml chip idiom). A label,
+   never a gate (C-TG·1): each badge links to the by-tag view
+   (/tags/{slug}); a broken reference is dropped upstream, never
+   an error. Empty = no chips. *@
+@if (Model.Tags is { Count: > 0 })
+{
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        @foreach (var tag in Model.Tags)
+        {
+            <a class="kmb-chip"
+               href="/tags/@tag.Slug">@tag.DisplayedName</a>
+        }
+    </div>
+}

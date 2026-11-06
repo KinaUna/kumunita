@@ -41,8 +41,9 @@ M1–M37 and every named lane are **done** — identity, groups & delegation,
 directory & profiles, posts + moderation, multilingual, rich content, guardian
 controls, pages, events + calendar, projects, notifications, messaging, PWA,
 portability, storage, analytics, kiosk, @mentions, personal notes, and the
-`IMPROVE` + prod-hardening integration lanes — on one server-rendered stack
-over a single Postgres. The detailed, milestone-by-milestone report lives in
+`IMPROVE` + `IMPROVE-3` + prod-hardening integration lanes — on one
+server-rendered stack over a single Postgres. The detailed,
+milestone-by-milestone report lives in
 [`docs/STATUS.md`](docs/STATUS.md); the roadmap's source of truth is
 [`src/Kumunita.Web/Milestones.cs`](src/Kumunita.Web/Milestones.cs) (narrated at
 [`docs/product/roadmap.md`](docs/product/roadmap.md)).

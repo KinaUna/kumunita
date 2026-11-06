@@ -1,0 +1,14 @@
+{
+  "message.nav": "Messages",
+  "message.title": "Messages",
+  "message.new": "New conversation",
+  "message.thread.empty": "No messages yet \u2014 say hello.",
+  "message.compose.placeholder": "Write a message\u2026",
+  "message.compose.send": "Send",
+  "message.unread": "unread",
+  "message.disabled": "Direct messaging is turned off on this instance.",
+  "message.compose.disabled": "This resident has turned off direct messaging, so you can\u0027t send them a new message.",
+  "message.other": "the other person",
+  "message.sent_to": "Sent to {0}.",
+  "message.load_earlier": "Load earlier messages"
+}

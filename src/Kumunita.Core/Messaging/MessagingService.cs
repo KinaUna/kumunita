@@ -52,7 +52,7 @@ public sealed class MessagingService : IMessagingService
     // The M6 nudge lane (D6) — optional (the ADR 0077 idiom): when absent
     // (a test harness that only pins the Core contract) the send commits its
     // message + audit row and skips the notification emission.
-    private readonly NotificationService? _notifications;
+    private readonly INotificationEmitter? _notifications;
 
     // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
     // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
@@ -63,7 +63,7 @@ public sealed class MessagingService : IMessagingService
     public MessagingService(
         IDocumentStore store,
         IUserInfoService? userInfo = null,
-        NotificationService? notifications = null,
+        INotificationEmitter? notifications = null,
         Kumunita.Core.Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));

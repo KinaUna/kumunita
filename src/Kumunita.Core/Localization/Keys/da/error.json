@@ -1,0 +1,7 @@
+{
+  "error.title": "Fejl.",
+  "error.subtitle": "Der opstod en fejl under behandling af din anmodning.",
+  "error.development_title": "Udviklingsmodus",
+  "error.development_hint": "Skift til Udviklingsmilj\u00F8et viser flere detaljer om den opst\u00E5ede fejl. Udviklingsmilj\u00F8et b\u00F8r ikke aktiveres for udrullede applikationer \u2014 det kan afsl\u00F8re f\u00F8lsomme oplysninger fra fejl til slutbrugere.",
+  "error.request_id": "Anmodnings-ID:"
+}

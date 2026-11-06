@@ -55,7 +55,7 @@ public class OnboardingControllerTests
     [Fact]
     public async Task Index_NotCompleted_Exposes_BannerEligible_And_NullCompletion()
     {
-        var (controller, userInfo) = BuildController(Owner);
+        var (controller, userInfo, profileSettings) = BuildController(Owner);
         // A fresh resident: a profile with no completion stamp and no fields set.
         var profile = new Profile { SubjectId = Owner, DisplayName = "A. Resident" };
         userInfo.GetProfileAsync(Owner).Returns(profile);
@@ -88,7 +88,7 @@ public class OnboardingControllerTests
     [Fact]
     public async Task Index_Completed_Exposes_BannerCleared_And_SetHints()
     {
-        var (controller, userInfo) = BuildController(Owner);
+        var (controller, userInfo, profileSettings) = BuildController(Owner);
         var stamp = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
         var profile = new Profile
         {
@@ -136,26 +136,26 @@ public class OnboardingControllerTests
     [Fact]
     public async Task Finish_Calls_CompleteOnboardingAsync_ExactlyOnce_For_SignedIn_Subject()
     {
-        var (controller, userInfo) = BuildController(Owner);
-        userInfo.CompleteOnboardingAsync(Owner, Owner).Returns(Task.CompletedTask);
+        var (controller, userInfo, profileSettings) = BuildController(Owner);
+        profileSettings.CompleteOnboardingAsync(Owner, Owner).Returns(Task.CompletedTask);
 
         var result = await controller.Finish();
 
         // The one write: the U01 owner-scope lane, exactly once, for the
         // signed-in subject (actorBy = the subject).
-        await userInfo.Received(1).CompleteOnboardingAsync(Owner, Owner);
+        await profileSettings.Received(1).CompleteOnboardingAsync(Owner, Owner);
 
         // GATE-3 (C-M22·4): NO other field-write lane is called — the
         // walk-through's only write is CompleteOnboardingAsync.
-        await userInfo.DidNotReceive().UpsertProfileAsync(
+        await profileSettings.DidNotReceive().UpsertProfileAsync(
             Arg.Any<Profile>(), Arg.Any<ProfileUpdate>(), Arg.Any<string?>());
-        await userInfo.DidNotReceive().SetProfileAvatarAsync(
+        await profileSettings.DidNotReceive().SetProfileAvatarAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
-        await userInfo.DidNotReceive().SetProfileTimezoneAsync(
+        await profileSettings.DidNotReceive().SetProfileTimezoneAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
-        await userInfo.DidNotReceive().SetProfileDateFormatAsync(
+        await profileSettings.DidNotReceive().SetProfileDateFormatAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
-        await userInfo.DidNotReceive().SetProfileEmailLanguageAsync(
+        await profileSettings.DidNotReceive().SetProfileEmailLanguageAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
 
         // Redirects home (the LocaleController / ProfileController redirect
@@ -185,14 +185,14 @@ public class OnboardingControllerTests
     [Fact]
     public async Task Skip_Calls_The_Same_CompleteOnboardingAsync_Lane_As_Finish()
     {
-        var (controller, userInfo) = BuildController(Owner);
-        userInfo.CompleteOnboardingAsync(Owner, Owner).Returns(Task.CompletedTask);
+        var (controller, userInfo, profileSettings) = BuildController(Owner);
+        profileSettings.CompleteOnboardingAsync(Owner, Owner).Returns(Task.CompletedTask);
 
         var result = await controller.Skip();
 
         // The same single lane, exactly once, for the signed-in subject.
-        await userInfo.Received(1).CompleteOnboardingAsync(Owner, Owner);
-        await userInfo.DidNotReceive().UpsertProfileAsync(
+        await profileSettings.Received(1).CompleteOnboardingAsync(Owner, Owner);
+        await profileSettings.DidNotReceive().UpsertProfileAsync(
             Arg.Any<Profile>(), Arg.Any<ProfileUpdate>(), Arg.Any<string?>());
 
         Assert.IsType<RedirectToActionResult>(result);
@@ -252,13 +252,14 @@ public class OnboardingControllerTests
     /// <see cref="Kumunita.Web.Security.KumunitaPrincipal.SubjectId"/> reads
     /// <c>"Kumunita.Sub"</c>).
     /// </summary>
-    private static (OnboardingController controller, IUserInfoService userInfo) BuildController(
+    private static (OnboardingController controller, IUserInfoService userInfo, IProfileSettingsService profileSettings) BuildController(
         string principalSubjectId)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         // The optional ILocalizationService/ITranslationProvider seams are
         // null (default) — FlashAsync renders the EnValues floor.
-        var controller = new OnboardingController(userInfo);
+        var controller = new OnboardingController(userInfo, profileSettings);
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(
@@ -266,7 +267,7 @@ public class OnboardingControllerTests
                 new[] { new Claim("Kumunita.Sub", principalSubjectId) }, "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
-        return (controller, userInfo);
+        return (controller, userInfo, profileSettings);
     }
 
     /// <summary>An in-memory <see cref="ITempDataProvider"/> — closes the

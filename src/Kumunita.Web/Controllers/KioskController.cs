@@ -7,7 +7,6 @@ using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Kumunita.Web.Services;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -60,20 +59,17 @@ public sealed class KioskController : Controller
     private readonly IKioskService kiosk;
     private readonly IEventService events;
     private readonly EffectiveTimezoneResolver? timezone;
-    private readonly IDocumentStore? store;
     private readonly IKioskItemCatalog? catalog;
 
     public KioskController(
         IKioskService kiosk,
         IEventService events,
         EffectiveTimezoneResolver? timezone = null,
-        IDocumentStore? store = null,
         IKioskItemCatalog? catalog = null)
     {
         this.kiosk = kiosk ?? throw new ArgumentNullException(nameof(kiosk));
         this.events = events ?? throw new ArgumentNullException(nameof(events));
         this.timezone = timezone;
-        this.store = store;
         // ADR 0285 — the item picker + the per-entry resolution. Optional so a
         // test can construct the controller without it; DI always supplies it
         // (Program.cs). Without it every non-calendar entry resolves hidden.
@@ -334,17 +330,13 @@ public sealed class KioskController : Controller
         }
 
         var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
-        if (store is null)
-        {
-            TempData["error"] = await this.FlashAsync("kiosk.flash_store_unavailable", "The document store is unavailable.");
-            return RedirectToAction(nameof(SettingsGet));
-        }
-
-        await using var session = store.LightweightSession();
+        // IMPROVE-CODE C09 — the committed write lane owns its own session (the
+        // <see cref="IKioskService.SavePlaylistAsync(KioskPlaylistDraft, string, CancellationToken)"/>
+        // overload), so this controller no longer opens one or guards a null
+        // store. The save is still one <c>kiosk.save</c> audit row (M35·5).
         await kiosk.SavePlaylistAsync(
             new KioskPlaylistDraft(entries, defaultDuration, refreshInterval, displayMode, scrollSpeed),
             actorId,
-            session,
             ct).ConfigureAwait(false);
 
         TempData["info"] = await this.FlashAsync("kiosk.flash_saved", "The kiosk playlist has been saved.");

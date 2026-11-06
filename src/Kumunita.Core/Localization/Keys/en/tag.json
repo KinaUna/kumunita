@@ -1,0 +1,8 @@
+{
+  "tag.suggest.remove_prefix": "Remove tag: ",
+  "tag.input.placeholder": "e.g. sanitation, budget, maple-street",
+  "tag.input.hint": "Type to search existing tags, or start a new one.",
+  "tag.suggest.empty": "No matching tags \u2014 keep typing or start a new one.",
+  "tag.translate.heading": "Translations",
+  "tag.translate.save": "Save"
+}

@@ -3,7 +3,6 @@ using Kumunita.Core.Moderation;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -30,12 +29,11 @@ namespace Kumunita.Web.Controllers;
 /// the read seam returns <c>null</c> for both "missing" and "denied",
 /// mapping to <c>Forbid()</c> 403).
 /// <para>
-/// **Session shape (C3 / ADR 0006-C):** the controller opens its own
-/// <see cref="IDocumentStore.LightweightSession"/> and passes it to
-/// <see cref="ModerationService.FileReportTargetAsync"/>; that service
-/// performs the single <c>SaveChangesAsync</c>, so the <see
-/// cref="Report"/> row and the filing <c>AccessAudit</c> row commit or
-/// roll back atomically.
+/// **Session shape (C3-06 / ADR 0006-C):** the controller no longer owns
+/// the transaction — <see cref="ModerationService.FileReportTargetAsync"/>
+/// opens its own write session and performs the single
+/// <c>SaveChangesAsync</c>, so the <see cref="Report"/> row and the
+/// filing <c>AccessAudit</c> row commit or roll back atomically.
 /// <para>
 /// **Rate limiting:** the same <c>"report"</c> policy (10/hour/IP)
 /// applies to every endpoint in this controller (the SECURITY.md
@@ -44,11 +42,22 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 public sealed class ReportTargetsController(
-    IDocumentStore store,
-    ModerationService moderation,
+    IModerationService moderation,
     Kumunita.Core.Events.IEventService events,
     Kumunita.Core.Projects.IProjectService projects,
-    Kumunita.Core.Posts.PostService posts) : Controller
+    Kumunita.Core.Posts.PostService posts,
+    // C08 (ADR 0287) — the Projects split: the board / todo report intake reads
+    // (GetBoardAsync / GetTodoAsync) moved off IProjectService to the sibling
+    // seams; the project read (GetProjectAsync) stays on IProjectService.
+    Kumunita.Core.Projects.IBoardService boards,
+    Kumunita.Core.Projects.ITodoService todos,
+    // C3-03 (ADR 0013 named seam) — the group-post lane (GetGroupPostAsync
+    // now lives on this seam, extracted from PostService). **Optional**
+    // (null default) so the pre-seam test construction sites keep
+    // compiling; the group report intake null-guards (a missing seam is a
+    // 404 — the posts-is-null idiom). DI always supplies the live
+    // GroupPostService in the app.
+    Kumunita.Core.Posts.IGroupPostService? groupPosts = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -93,15 +102,13 @@ public sealed class ReportTargetsController(
             return Forbid();
         }
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "event",
             targetId:    ev.Id,
             componentId: ev.ComponentId,
             authorId:    ev.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/events/{id}");
@@ -143,15 +150,13 @@ public sealed class ReportTargetsController(
             return Forbid();
         }
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "project",
             targetId:    project.Id,
             componentId: project.ComponentId,
             authorId:    project.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/projects/projects/{id}");
@@ -183,7 +188,7 @@ public sealed class ReportTargetsController(
         KanbanBoard board;
         try
         {
-            var result = await projects.GetBoardAsync(id, actor, HttpContext.RequestAborted);
+            var result = await boards.GetBoardAsync(id, actor, HttpContext.RequestAborted);
             board = result.Board;
         }
         catch (KeyNotFoundException)
@@ -195,15 +200,13 @@ public sealed class ReportTargetsController(
             return Forbid();
         }
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "board",
             targetId:    board.Id,
             componentId: board.ComponentId,
             authorId:    board.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/projects/boards/{id}");
@@ -234,7 +237,7 @@ public sealed class ReportTargetsController(
         TodoItem todo;
         try
         {
-            var result = await projects.GetTodoAsync(id, actor, HttpContext.RequestAborted);
+            var result = await todos.GetTodoAsync(id, actor, HttpContext.RequestAborted);
             todo = result.Todo;
         }
         catch (KeyNotFoundException)
@@ -246,15 +249,13 @@ public sealed class ReportTargetsController(
             return Forbid();
         }
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "todo",
             targetId:    todo.Id,
             componentId: todo.ComponentId,
             authorId:    todo.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/projects/todos/{id}");
@@ -292,19 +293,19 @@ public sealed class ReportTargetsController(
         // ADR 0013 membership read + the post's audience check; a
         // missing post, a lane mismatch, or a membership Deny all
         // return Post = null (the group lane's fail-closed shape).
-        var result = await posts.GetGroupPostAsync(groupId, postId, actor);
+        if (groupPosts is null)
+            return Forbid();
+        var result = await groupPosts.GetGroupPostAsync(groupId, postId, actor);
         if (result.Post is null)
             return Forbid();
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "grouppost",
             targetId:    result.Post.Id,
             componentId: result.Post.ComponentId,
             authorId:    result.Post.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/groups/{groupId}/posts/{postId}");

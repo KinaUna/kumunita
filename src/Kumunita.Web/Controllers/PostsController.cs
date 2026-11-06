@@ -77,8 +77,8 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class PostsController(
     PostService posts,
-    ModerationService moderation,
-    IUserInfoService userInfo,
+    IModerationService moderation,
+    IUserInfoService userInfo, ICommunityMembershipService community, IProfileSettingsService profileSettings, IGroupService groupService,
     ILocalizationService localization,
     IDocumentStore store,
     // ADR 0044 (TG lane) — the tag read seam. The Detail action renders the
@@ -140,7 +140,7 @@ public sealed class PostsController(
         // set, never a visible set (C-M3·2) and never an <c>AccessAudit</c>
         // subject (C-M3·2; the Core-layer seam test
         // GetComponentsAsync_CandidateFilterEmitsNoAuditRow pins this).
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
         var component = components.FirstOrDefault(c => c.Id == componentId);
         if (component is null)
             // §2.3 row 2: missing/disabled component — the pre-feed
@@ -200,7 +200,7 @@ public sealed class PostsController(
         // the same rule the dedicated page's gate accepts; a component
         // moderator may view the rows via the page but the feed only
         // advertises it to the standing that acts on it).
-        var canTranslate = userInfo.CanTranslateCommunity(
+        var canTranslate = community.CanTranslateCommunity(
             actor, KumunitaPrincipal.RoleSet(User));
 
         // ADR 0051 — extend ADR 0049's default-visible-variant rule (already in
@@ -358,7 +358,7 @@ public sealed class PostsController(
             ? SortKeys.Parse(sort, dir, PostFeedAllowedKeys, "created", defaultDir: true)
             : null;
 
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
         // The viewer's posting reach is the same rule the composer's POST gate uses
         // (AccessibleComponentsAsync mirrors PostService.CreatePostAsync's gate). On
         // the all-sections feed, "Write a post" is offered only when the viewer can
@@ -495,7 +495,7 @@ public sealed class PostsController(
     {
         if (translationProvider is null)
             return fallbackName;
-        var translations = await userInfo.GetCommunityTranslationsAsync(componentId);
+        var translations = await community.GetCommunityTranslationsAsync(componentId);
         var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
         return match is not null && !string.IsNullOrWhiteSpace(match.Name) ? match.Name : fallbackName;
     }
@@ -580,13 +580,13 @@ public sealed class PostsController(
         // GetPostAsync) and the enabled-catalog language set the chips /
         // "add a translation" candidate list render from.
         var postTranslations = await posts.GetPostTranslationsAsync(result.Post.Id);
-        var enabledLanguages = await SeedLanguagePickerAsync();
+        var enabledLanguages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization);
         var translationCodes = postTranslations.Select(t => t.LanguageCode).ToHashSet();
         var languages = enabledLanguages
             .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
             .ToList();
         var actorRoles = KumunitaPrincipal.RoleSet(User);
-        var canTranslate = PostService.CanAddTranslation(
+        var canTranslate = PostTranslationPolicy.CanAddTranslation(
             result.Post.GroupId.Length > 0, result.Post.ComponentId, result.Post.AuthorId, actor, actorRoles);
 
         // ADR 0044 (TG lane) — the post's tags, resolved to display names in
@@ -633,7 +633,7 @@ public sealed class PostsController(
             var replyAuthorProfile = await userInfo.GetProfileAsync(reply.AuthorId);
             // ADR 0022 — the reply's standing is its parent's (community lane,
             // same component scope); the reply's own author is the Owner branch.
-            var canTranslateReply = PostService.CanAddTranslation(
+            var canTranslateReply = PostTranslationPolicy.CanAddTranslation(
                 result.Post.GroupId.Length > 0, result.Post.ComponentId, reply.AuthorId, actor, actorRoles);
             replyItems.Add(new ReplyItem(
                 reply.Id,
@@ -665,7 +665,7 @@ public sealed class PostsController(
         string? communityName = null;
         if (result.Post.ComponentId.Length > 0)
         {
-            communityName = (await userInfo.GetComponentsAsync(enabledOnly: true))
+            communityName = (await profileSettings.GetComponentsAsync(enabledOnly: true))
                 .FirstOrDefault(c => c.Id == result.Post.ComponentId)?.Name;
             if (communityName is not null && translationProvider is not null)
             {
@@ -738,7 +738,7 @@ public sealed class PostsController(
     private async Task<IReadOnlyList<Component>> AccessibleComponentsAsync(
         System.Security.Claims.ClaimsPrincipal user)
     {
-        var all = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var all = await profileSettings.GetComponentsAsync(enabledOnly: true);
 
         if (KumunitaPrincipal.IsGlobalAdmin(user))
             return all; // GlobalAdmin bypasses the membership check
@@ -766,15 +766,9 @@ public sealed class PostsController(
         return all.Where(c => accessible.Contains(c.Id)).ToList();
     }
 
-    // ── Seed helpers (U05, IMPROVE lane — the composer trio is now defined
-    // once in <see cref="ComposerSeedOptions"/>; the per-controller copies
-    // that used to live here are thin delegates to that helper.)
-
-    private Task SeedGrantPickerOptionsAsync()
-        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo);
-
-    private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-        => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
+    // U05, IMPROVE lane — the composer trio is defined once in
+    // <see cref="ComposerSeedOptions"/>; the per-controller stubs that used to
+    // live here are deleted (C11 — the call sites call the helper directly).
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the
@@ -816,7 +810,7 @@ public sealed class PostsController(
         {
             Components = components.Select(c => (c.Id, c.Name)).ToList(),
             ComponentId = first is null ? string.Empty : first.Id, // empty when zero reachable components
-            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization), // ADR 0018 — the authored-in language picker.
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
@@ -845,7 +839,7 @@ public sealed class PostsController(
         // The "Who to grant to" option lists (verified residents +
         // groups) the shared _GrantPickers partial renders — the same
         // single source the M2 Profile/Edit editor uses.
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
         return View(model);
     }
@@ -905,13 +899,13 @@ public sealed class PostsController(
         // admissible component (the §2.3 row 2 shape).
         var components = await AccessibleComponentsAsync(User);
         model.Components = components.Select(c => (c.Id, c.Name)).ToList();
-        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization); // ADR 0018 — re-seed on re-render
 
         // Re-seed the picker option lists so a failed-shape re-render
         // below still shows the "Who to grant to" options (the
         // unauthenticated guard above renders without them — an
         // acceptable edge: the picker then shows its empty-pool note).
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
 
         if (!model.IsValid)
         {
@@ -954,7 +948,7 @@ public sealed class PostsController(
             ImageIds: ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 — server-side parse of the body's /content-image/{id} links; the client never sends the ids (a form field would be spoofable).
             AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (a form field would be spoofable).
             IsDraft: model.SaveAsDraft, // ADR 0037 — draft mode: saved but invisible to all but the author until published.
-            TagSlugs: TagSlugs.Parse(model.TagIds)); // TG (ADR 0044, U8b) — the tag input (client/lib/tag-suggest.ts posts a JSON array of label strings; the server parses + normalizes).
+            TagSlugs: TagSlugParser.Parse(model.TagIds)); // TG (ADR 0044, U8b) — the tag input (client/lib/tag-suggest.ts posts a JSON array of label strings; the server parses + normalizes).
 
         // C3 same-transaction lane: the controller opens the
         // <c>IDocumentStore.LightweightSession()</c>, the
@@ -1060,13 +1054,13 @@ public sealed class PostsController(
             // editable on this lane: seed the picker from the enabled catalog
             // and pre-select the post's stored tag (the ADR 0017 edit-lane
             // precedent — pre-select the stored value, not the instance default).
-            Languages = await SeedLanguagePickerAsync(),
+            Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization),
             LanguageCode = post.LanguageCode,
             // ADR 0044 (TG lane) — the tag-suggest input's starting chips (slugs,
             // each removable). Rendered as data-tag-suggest-initial on #tags.
             ExistingTagSlugs = await SeedExistingTagSlugsAsync(post),
         };
-        await SeedGrantPickerOptionsAsync();
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
         return View(model);
     }
 
@@ -1145,8 +1139,8 @@ public sealed class PostsController(
 
         model.ComponentId = post.ComponentId;
         model.Components = await SeedEditableComponentListAsync(post.ComponentId);
-        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
-        await SeedGrantPickerOptionsAsync();
+        model.Languages = await ComposerSeedOptions.SeedLanguagePickerAsync(localization); // ADR 0018 — re-seed on re-render
+        await ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, groupService, profileSettings);
         // ADR 0044 (TG lane) — the re-render (a validation error, or a bad tag
         // slug below) must re-seed the tag input's chips from the post's
         // current tags: the bound model's ExistingTagSlugs is [BindNever] and
@@ -1193,9 +1187,9 @@ public sealed class PostsController(
                 // a **present** field (even an empty `[]` when the author removed
                 // every chip) is authoritative ⇒ empty detaches all, non-empty
                 // attaches (the U8b register patch's detach semantics in
-                // PostService.UpdatePostAsync). TagSlugs.Parse still normalizes
+                // PostService.UpdatePostAsync). TagSlugParser.Parse still normalizes
                 // (trim / dedup / drop-blank) the present case.
-                model.TagIds is null ? null : TagSlugs.Parse(model.TagIds));
+                model.TagIds is null ? null : TagSlugParser.Parse(model.TagIds));
             TempData["info"] = await this.FlashAsync("posts.flash_updated", "Post updated.");
             return Redirect($"/posts/{id}");
         }
@@ -1234,7 +1228,7 @@ public sealed class PostsController(
         if (string.IsNullOrEmpty(componentId))
             return [];
 
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
         var component = components.FirstOrDefault(c => c.Id == componentId);
         if (component is null)
             return [];
@@ -1571,7 +1565,7 @@ public sealed class PostsController(
     /// <paramref name="languageCode"/> (ADR 0022):
     /// <c>POST /posts/{id}/translations</c>. A thin Web lane (ADR 0006-D:
     /// routes + shape) that delegates the write + standing decision to
-    /// <see cref="PostService.AddPostTranslationAsync"/> (the standing
+    /// <see cref="PostService.PostTranslationLane"/> (the standing
     /// — author / community moderator / GlobalAdmin — is re-pinned
     /// server-side; the detail page's <see cref="PostDetailViewModel
     /// .CanTranslate"/> is only the display affordance).
@@ -1627,14 +1621,14 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.AddPostTranslationAsync(
+            await posts.PostTranslationLane.AddAsync(
+                session,
                 id,
                 languageCode,
                 string.IsNullOrWhiteSpace(title) ? null : title,
                 body,
                 actor,
-                actorRoles,
-                session);
+                actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1695,13 +1689,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.AddReplyTranslationAsync(
-                replyId,
-                languageCode,
-                body,
-                actor,
-                actorRoles,
-                session);
+            await posts.ReplyTranslationLane.AddAsync(session, replyId, languageCode, null, body, actor, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1726,7 +1714,7 @@ public sealed class PostsController(
     /// **Updates** the existing user-added translation of the post in
     /// <paramref name="languageCode"/> (ADR 0048):
     /// <c>POST /posts/{id}/translations/update</c>. Thin Web lane; delegates
-    /// to <see cref="PostService.UpdatePostTranslationAsync"/>. Precondition +
+    /// to <see cref="PostService.PostTranslationLane"/>. Precondition +
     /// failure shapes mirror <see cref="AddTranslation"/> (denied standing →
     /// 403 <c>Forbid</c>; missing post/row → 404 <c>NotFound</c>).
     /// </summary>
@@ -1764,14 +1752,14 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.UpdatePostTranslationAsync(
+            await posts.PostTranslationLane.UpdateAsync(
+                session,
                 id,
                 languageCode,
                 string.IsNullOrWhiteSpace(title) ? null : title,
                 body,
                 actor,
-                actorRoles,
-                session);
+                actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1791,7 +1779,7 @@ public sealed class PostsController(
     /// **Removes** the existing user-added translation of the post in
     /// <paramref name="languageCode"/> (ADR 0048):
     /// <c>POST /posts/{id}/translations/remove</c>. Thin Web lane; delegates
-    /// to <see cref="PostService.RemovePostTranslationAsync"/>. Failure
+    /// to <see cref="PostService.PostTranslationLane"/>. Failure
     /// shapes mirror <see cref="AddTranslation"/> (denied standing → 403
     /// <c>Forbid</c>; missing post/row → 404 <c>NotFound</c>).
     /// </summary>
@@ -1822,7 +1810,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.RemovePostTranslationAsync(id, languageCode, actor, actorRoles, session);
+            await posts.PostTranslationLane.RemoveAsync(session, id, languageCode, actor, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1842,7 +1830,7 @@ public sealed class PostsController(
     /// **Updates** the existing user-added translation of a reply in
     /// <paramref name="languageCode"/> (ADR 0048):
     /// <c>POST /posts/{id}/replies/{replyId}/translations/update</c>. Thin Web
-    /// lane; delegates to <see cref="PostService.UpdateReplyTranslationAsync"/>.
+    /// lane; delegates to <see cref="PostService.ReplyTranslationLane"/>.
     /// Failure shapes mirror <see cref="AddReplyTranslation"/>.
     /// </summary>
     [HttpPost("/posts/{id}/replies/{replyId}/translations/update")]
@@ -1879,7 +1867,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.UpdateReplyTranslationAsync(replyId, languageCode, body, actor, actorRoles, session);
+            await posts.ReplyTranslationLane.UpdateAsync(session, replyId, languageCode, null, body, actor, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1899,7 +1887,7 @@ public sealed class PostsController(
     /// **Removes** the existing user-added translation of a reply in
     /// <paramref name="languageCode"/> (ADR 0048):
     /// <c>POST /posts/{id}/replies/{replyId}/translations/remove</c>. Thin Web
-    /// lane; delegates to <see cref="PostService.RemoveReplyTranslationAsync"/>.
+    /// lane; delegates to <see cref="PostService.ReplyTranslationLane"/>.
     /// Failure shapes mirror <see cref="AddReplyTranslation"/>.
     /// </summary>
     [HttpPost("/posts/{id}/replies/{replyId}/translations/remove")]
@@ -1930,7 +1918,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.RemoveReplyTranslationAsync(replyId, languageCode, actor, actorRoles, session);
+            await posts.ReplyTranslationLane.RemoveAsync(session, replyId, languageCode, actor, actorRoles);
         }
         catch (UnauthorizedAccessException)
         {

@@ -1,0 +1,12 @@
+{
+  "analytics.trend.title": "Tendens",
+  "analytics.trend.window.7": "7 dage",
+  "analytics.trend.window.30": "30 dage",
+  "analytics.trend.window.90": "90 dage",
+  "analytics.trend.window.180": "180 dage",
+  "analytics.trend.window.365": "365 dage",
+  "analytics.trend.col.date": "Dato",
+  "analytics.trend.col.total": "Samtlige anmodninger",
+  "analytics.trend.legend.total": "Samtlige anmodninger pr. dag",
+  "analytics.trend.empty": "Ingen brug er registreret i dette vindue endnu."
+}

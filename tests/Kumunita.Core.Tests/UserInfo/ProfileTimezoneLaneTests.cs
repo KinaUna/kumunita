@@ -58,15 +58,16 @@ public sealed class ProfileTimezoneLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-tz-set";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
         var zone = PickNonUtcZone();
 
         // Fresh seed ⇒ no personal time zone yet (the additive field defaults to null).
         Assert.Null((await svc.GetProfileAsync(subject))?.TimeZone);
 
-        await svc.SetProfileTimezoneAsync(subject, zone, subject);
+        await profileSettings.SetProfileTimezoneAsync(subject, zone, subject);
 
         // The write is live on the very next single-profile read; the fresh
         // read through the service's own read lane is what proves the save
@@ -85,26 +86,27 @@ public sealed class ProfileTimezoneLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-tz-clear";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
         var zone = PickNonUtcZone();
 
         // Set a zone first (test 1 proves the set; this test proves the
         // explicit clear over a set value).
-        await svc.SetProfileTimezoneAsync(subject, zone, subject);
+        await profileSettings.SetProfileTimezoneAsync(subject, zone, subject);
         Assert.Equal(zone, (await svc.GetProfileAsync(subject))!.TimeZone);
 
         // null ⇒ clear (the lane still stores + saves, so the clear persists
         // — a fresh read must still see null afterwards, falling through to
         // the platform default).
-        await svc.SetProfileTimezoneAsync(subject, null, subject);
+        await profileSettings.SetProfileTimezoneAsync(subject, null, subject);
 
         Assert.Null((await svc.GetProfileAsync(subject))?.TimeZone);
 
         // …and the clear is re-settable (the lane is a plain field write,
         // not a tombstone).
-        await svc.SetProfileTimezoneAsync(subject, zone, subject);
+        await profileSettings.SetProfileTimezoneAsync(subject, zone, subject);
         Assert.Equal(zone, (await svc.GetProfileAsync(subject))!.TimeZone);
     }
 
@@ -114,12 +116,13 @@ public sealed class ProfileTimezoneLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         // The ADR 0019 pin: KeyNotFoundException for this lane (the same
         // pinned type as the avatar lane — load-throw-set-save, never
         // load-or-create).
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.SetProfileTimezoneAsync("u-tz-missing", "UTC", "u-tz-any"));
+            () => profileSettings.SetProfileTimezoneAsync("u-tz-missing", "UTC", "u-tz-any"));
 
         // Fail closed = fail *without side effects*: no profile row was
         // created (the lane never loads or creates on this path).
@@ -131,7 +134,7 @@ public sealed class ProfileTimezoneLaneTests(PostgresFixture fixture)
     /// <summary>Seed a bootstrap profile through the service's own
     /// <c>UpsertProfileAsync</c> (all-null patch ⇒ the record supplies every
     /// field — the exact idiom at <c>ProfileAvatarLaneTests</c>).</summary>
-    private static async Task SeedProfileAsync(IUserInfoService svc, string subject)
+    private static async Task SeedProfileAsync(IDocumentStore store, string subject)
     {
         var profile = new Profile
         {
@@ -139,7 +142,7 @@ public sealed class ProfileTimezoneLaneTests(PostgresFixture fixture)
             DisplayName = "Resident " + subject,
             Verified = true,
         };
-        await svc.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
+        await new ProfileSettingsService(store).UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
     }
 
     /// <summary>One scratch Postgres DB + a <c>mt</c> schema over the M1 docs

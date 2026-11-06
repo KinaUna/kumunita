@@ -1,0 +1,19 @@
+{
+  "locale.settings_title": "Dine indstillinger",
+  "locale.language_heading": "Sprog",
+  "locale.lede": "V\u00E6lg det sprog, platformen viser dig. Dit valg gemmes i en browsercookie \u2014 det tr\u00E6der i kraft ved n\u00E6ste anmodning, og p\u00E5virker aldrig andre beboere.",
+  "locale.preferred_label": "Foretrukket sprog",
+  "locale.default_note": "Instansstandarden er ",
+  "locale.default_note_tail": ". Hvis dit foretrukne sprog senere fjernes af adminen, falder platformen stille tilbage til instansstandarden.",
+  "locale.save": "Gem",
+  "locale.reset": "Nulstil til instansstandard",
+  "locale.public_title": "V\u00E6lg dit sprog",
+  "locale.instance_default": "\u2014 instansstandard",
+  "locale.browser_matched": "\u2014 fra dine browserindstillinger",
+  "locale.browser_note": "Vi har valgt ",
+  "locale.browser_note_tail": " ud fra dine browserindstillinger. Gemmer du det, bliver det dit foretrukne sprog \u2014 det bliver ved, indtil du \u00E6ndrer det.",
+  "locale.flash_set": "Sprog indstillet til \u0022{0}\u0022 \u2014 det tr\u00E6der i kraft ved n\u00E6ste anmodning.",
+  "locale.flash_reset": "Sprogindstilling nulstillet \u2014 instansstandarden bruges.",
+  "locale.reset_confirm": "Nulstil dit sprogvalg til instansstandarden?",
+  "locale.email_reset_confirm": "Nulstil dit e-mail- og beskedssprog til instansstandarden?"
+}

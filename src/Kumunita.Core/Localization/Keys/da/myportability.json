@@ -1,0 +1,23 @@
+{
+  "myportability.index.lede": "Dit eget indhold \u2014 de indl\u00E6g, arrangementer, projekter, dokumenter, sider, beskeder og medier, du har oprettet \u2014 som \u00E9t flytbart *.kumunita-arkiv. Eksport\u00E9r det som en fil, eller import\u00E9r et af dine arkiver tilbage i dette f\u00E6llesskab. Din adgangskode medf\u00F8lger aldrig, og kun dine egne r\u00E6kker rejser med.",
+  "myportability.export_desc": "\u00C9t *.kumunita-arkiv \u2014 dit eget indhold og dine egne medier (aldrig din adgangskode, og kun dine r\u00E6kker).",
+  "myportability.import_desc": "Hent et af dine *.kumunita-arkiver tilbage. Vi tjekker, hvad der passer til dette f\u00E6llesskab, og hvad der kr\u00E6ver din stillingtagen \u2014 du bestemmer, element for element, hvor hver del skal hen.",
+  "myportability.resolve.summary_lead": "Dit arkiv er blevet kontrolleret mod dette f\u00E6llesskab.",
+  "myportability.resolve.summary_counts": "R\u00E6kker, der passer og importeres: {0}. Dubletter, der allerede findes og springes over: {1}.",
+  "myportability.resolve.summary_tail": "De nedenst\u00E5ende henviser til en gruppe, der ikke findes her \u2014 du bestemmer, \u00E9n ad gangen, hvor de skal hen.",
+  "myportability.resolve.nothing": "Intet at afklare \u2014 hver r\u00E6kke i dit arkiv passer til dette f\u00E6llesskab eller findes allerede.",
+  "myportability.resolve.archive_label": "Dit *.kumunita-arkiv",
+  "myportability.resolve.archive_hint": "Det samme arkiv, som du importerede ovenfor \u2014 dine valg anvendes p\u00E5 dets indhold.",
+  "myportability.resolve.reason": "Dette element ({0}) henviser til {1} {2}, som ikke findes her.",
+  "myportability.resolve.reason_unknown": "En reference fra denne r\u00E6kke findes ikke her.",
+  "myportability.resolve.target_label": "M\u00E5lgruppe (til \u201CTilf\u00F8j andetsteds\u201D)",
+  "myportability.resolve.choose_group": "\u2014 v\u00E6lg en gruppe \u2014",
+  "myportability.resolve.no_groups": "Du er ikke medlem af nogen grupper her \u2014 du kan kassere denne r\u00E6kke.",
+  "myportability.index.title": "Mine data",
+  "myportability.export": "Eksport\u00E9r",
+  "myportability.import": "Import\u00E9r",
+  "myportability.import.resolve": "Anvend mine valg",
+  "myportability.resolve.add_elsewhere": "Tilf\u00F8j andre steder",
+  "myportability.resolve.discard": "Kass\u00E9r",
+  "myportability.status": "Status"
+}

@@ -1,0 +1,12 @@
+{
+  "todo.blocked_by": "Wartet auf",
+  "todo.blocked_by_none": "Kein Blocker",
+  "todo.blocked_generic": "Eine andere Aufgabe (dir nicht sichtbar)",
+  "todo.blocked_filter": "Wartet auf etwas",
+  "todo.event_link": "Verkn\u00FCpfte Veranstaltung",
+  "todo.set_event.label": "Mit Veranstaltung verkn\u00FCpfen",
+  "todo.set_event.pick": "Veranstaltung w\u00E4hlen",
+  "todo.set_event.create_new": "Neue Veranstaltung erstellen\u2026",
+  "todo.set_event.create_hint": "Erstellen Sie eine neue Veranstaltung, um sie mit dieser Aufgabe zu verkn\u00FCpfen. Sie wird als Entwurf gespeichert \u2014 Sie k\u00F6nnen sie auf der Detailseite der Veranstaltung ver\u00F6ffentlichen.",
+  "todo.set_event.create_submit": "Erstellen und verkn\u00FCpfen"
+}

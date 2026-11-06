@@ -36,31 +36,54 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private readonly ISearchService search;
     private readonly IUserInfoService userInfo;
+    // C07 (ADR 0286) — the IGroupService + IProfileSettingsService siblings
+    // (the GetGroupsForUserAsync / GetComponentsAsync owners).
+    private readonly IGroupService groupService;
+    private readonly IProfileSettingsService profileSettings;
     private readonly IProjectService? projects;
+    private readonly IBoardService? boards;
+    private readonly ITodoService? todos;
     private readonly IEventService? events;
     private readonly IPageService? pages;
     private readonly IAnnouncementService? announcements;
     private readonly PostService? posts;
     private readonly IAuthorizationService? authz;
+    private readonly IGroupPostService? groupPosts;
 
     public KioskItemCatalog(
         ISearchService search,
         IUserInfoService userInfo,
+        IGroupService groupService,
+        IProfileSettingsService profileSettings,
         IProjectService? projects = null,
+        IBoardService? boards = null,
+        ITodoService? todos = null,
         IEventService? events = null,
         IPageService? pages = null,
         IAnnouncementService? announcements = null,
         PostService? posts = null,
-        IAuthorizationService? authz = null)
+        IAuthorizationService? authz = null,
+        // C3-03 (ADR 0013 named seam) — the group-post lane (GetGroupPostAsync
+        // now lives on this seam, extracted from PostService). **Optional**
+        // (null default) so the pre-seam test construction sites keep
+        // compiling; the ResolveGroupPostAsync null-guards (a missing seam is
+        // a Hidden — the posts-is-null idiom). DI always supplies the live
+        // GroupPostService in the app.
+        IGroupPostService? groupPosts = null)
     {
         this.search = search ?? throw new ArgumentNullException(nameof(search));
         this.userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        this.groupService = groupService ?? throw new ArgumentNullException(nameof(groupService));
+        this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         this.projects = projects;
+        this.boards = boards;
+        this.todos = todos;
         this.events = events;
         this.pages = pages;
         this.announcements = announcements;
         this.posts = posts;
         this.authz = authz;
+        this.groupPosts = groupPosts;
     }
 
     /// <inheritdoc />
@@ -79,17 +102,17 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         // merged newest first. Every other type is a single surface + scope.
         (string Surface, SearchScope Scope)[] lanes = type switch
         {
-            KioskItemType.Board         => [(SearchService.BoardsSurface, SearchScope.Community)],
-            KioskItemType.Todo          => [(SearchService.TodosSurface, SearchScope.Community)],
-            KioskItemType.Project       => [(SearchService.ProjectsSurface, SearchScope.Community)],
-            KioskItemType.Page          => [(SearchService.PagesSurface, SearchScope.Community)],
-            KioskItemType.Announcement  => [(SearchService.AnnouncementsSurface, SearchScope.Community)],
-            KioskItemType.CommunityPost => [(SearchService.PostsSurface, SearchScope.Community)],
-            KioskItemType.GroupPost     => [(SearchService.PostsSurface, SearchScope.Groups)],
+            KioskItemType.Board         => [(SearchKeys.BoardsSurface, SearchScope.Community)],
+            KioskItemType.Todo          => [(SearchKeys.TodosSurface, SearchScope.Community)],
+            KioskItemType.Project       => [(SearchKeys.ProjectsSurface, SearchScope.Community)],
+            KioskItemType.Page          => [(SearchKeys.PagesSurface, SearchScope.Community)],
+            KioskItemType.Announcement  => [(SearchKeys.AnnouncementsSurface, SearchScope.Community)],
+            KioskItemType.CommunityPost => [(SearchKeys.PostsSurface, SearchScope.Community)],
+            KioskItemType.GroupPost     => [(SearchKeys.PostsSurface, SearchScope.Groups)],
             KioskItemType.Event         =>
             [
-                (SearchService.EventsSurface, SearchScope.Community),
-                (SearchService.EventsSurface, SearchScope.Groups),
+                (SearchKeys.EventsSurface, SearchScope.Community),
+                (SearchKeys.EventsSurface, SearchScope.Groups),
             ],
             _ => [],
         };
@@ -122,7 +145,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         IReadOnlyDictionary<string, string> groupNames = new Dictionary<string, string>();
         if (ordered.Any(h => !string.IsNullOrEmpty(h.GroupId)))
         {
-            var groups = await userInfo.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
+            var groups = await groupService.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
             groupNames = groups
                 .GroupBy(g => g.Id, StringComparer.Ordinal)
                 .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
@@ -195,7 +218,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         if (string.IsNullOrWhiteSpace(entry.ItemId))
             return new KioskResolvedItem(true, null, href, null);
 
-        var component = (await userInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false))
+        var component = (await profileSettings.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false))
             .FirstOrDefault(c => string.Equals(c.Id, entry.ItemId, StringComparison.Ordinal));
         // A disabled / removed component: the calendar would show nothing for
         // it, so the slide is the denied shape rather than an empty grid.
@@ -207,8 +230,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private async Task<KioskResolvedItem> ResolveBoardAsync(KioskEntry entry, string id, string actorId, CancellationToken ct)
     {
-        if (projects is null) return KioskResolvedItem.Hidden;
-        var board = await projects.GetBoardAsync(id, actorId, ct).ConfigureAwait(false);
+        if (boards is null) return KioskResolvedItem.Hidden;
+        var board = await boards.GetBoardAsync(id, actorId, ct).ConfigureAwait(false);
         var list = entry.BoardView == KioskBoardView.List;
         var boardId = board.Board?.Id ?? id;
         var href = $"/projects/boards/{Uri.EscapeDataString(boardId)}" + (list ? "?view=list" : string.Empty);
@@ -217,8 +240,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private async Task<KioskResolvedItem> ResolveTodoAsync(KioskEntry entry, string id, string actorId, CancellationToken ct)
     {
-        if (projects is null) return KioskResolvedItem.Hidden;
-        var detail = await projects.GetTodoAsync(id, actorId, ct).ConfigureAwait(false);
+        if (todos is null) return KioskResolvedItem.Hidden;
+        var detail = await todos.GetTodoAsync(id, actorId, ct).ConfigureAwait(false);
         var t = detail.Todo;
         if (t.IsDeleted) return KioskResolvedItem.Hidden;
         var v = new StringBuilder("T");
@@ -327,8 +350,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private async Task<KioskResolvedItem> ResolveGroupPostAsync(KioskEntry entry, string id, string actorId)
     {
-        if (posts is null || string.IsNullOrWhiteSpace(entry.GroupId)) return KioskResolvedItem.Hidden;
-        var detail = await posts.GetGroupPostAsync(entry.GroupId, id, actorId).ConfigureAwait(false);
+        if (groupPosts is null || string.IsNullOrWhiteSpace(entry.GroupId)) return KioskResolvedItem.Hidden;
+        var detail = await groupPosts.GetGroupPostAsync(entry.GroupId, id, actorId).ConfigureAwait(false);
         var post = detail.Post;
         if (post is null || post.DeletedAt is not null)
             return KioskResolvedItem.Hidden;
@@ -390,7 +413,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private async Task<IReadOnlyList<KioskItemOption>> ComponentsAsync(string q)
     {
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
         return components
             .Where(c => q.Length == 0 || c.Name.Contains(q, StringComparison.OrdinalIgnoreCase))
             .OrderBy(c => c.SortOrder)

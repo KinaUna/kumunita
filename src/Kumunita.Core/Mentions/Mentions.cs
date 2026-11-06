@@ -216,9 +216,9 @@ public interface IMentionService
 /// </summary>
 public sealed class MentionService : IMentionService
 {
-    private readonly DirectoryService _directory;
+    private readonly IDirectoryService _directory;
 
-    public MentionService(DirectoryService directory)
+    public MentionService(IDirectoryService directory)
     {
         _directory = directory ?? throw new ArgumentNullException(nameof(directory));
     }

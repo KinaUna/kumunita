@@ -47,16 +47,16 @@ public class AdminHelpControllerTests
         }
     }
 
-    private static (AdminHelpController controller, IPageService pages, IDocumentStore store)
+    private static (AdminHelpController controller, IPageService pages)
         Build(IReadOnlyList<SeededPageStatus>? pagesStatus = null)
     {
         var pages = Substitute.For<IPageService>();
         pages.GetSeededPageStatusAsync().Returns(pagesStatus ?? Array.Empty<SeededPageStatus>());
 
-        var store = Substitute.For<IDocumentStore>();
-        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
-
-        var controller = new AdminHelpController(pages, store);
+        // IMPROVE-CODE C09 — the reset lanes are committed overloads (no
+        // IDocumentSession); the controller no longer takes a store, so the
+        // fake is gone (kept in the tuple as null for the other deconstructions).
+        var controller = new AdminHelpController(pages);
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(
@@ -69,7 +69,7 @@ public class AdminHelpControllerTests
                 authenticationType: "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
-        return (controller, pages, store);
+        return (controller, pages);
     }
 
     // ── Index ────────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ public class AdminHelpControllerTests
     [Fact]
     public async Task Index_ReturnsViewModel_WithStatusListAndCount()
     {
-        var (controller, _, _) = Build(new[]
+        var (controller, _) = Build(new[]
         {
             new SeededPageStatus("terms", "pg-1", "Terms of use", true),
             new SeededPageStatus("privacy", "pg-2", "Privacy", false),
@@ -95,7 +95,7 @@ public class AdminHelpControllerTests
     [Fact]
     public async Task Index_NoUpdates_CountIsZero()
     {
-        var (controller, _, _) = Build(new[]
+        var (controller, _) = Build(new[]
         {
             new SeededPageStatus("terms", "pg-1", "Terms of use", false),
         });
@@ -112,23 +112,22 @@ public class AdminHelpControllerTests
     [Fact]
     public async Task Reset_CallsServiceWithActorAndRoles_AndRedirects()
     {
-        var (controller, pages, _) = Build();
+        var (controller, pages) = Build();
 
         var action = await controller.Reset(PageId);
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(AdminHelpController.Index), redirect.ActionName);
 
         await pages.Received(1)
-            .ResetToSeededAsync(Arg.Is(PageId), Arg.Is(Admin), Arg.Any<IReadOnlySet<string>>(),
-                Arg.Any<IDocumentSession>());
+            .ResetToSeededAsync(Arg.Is(PageId), Arg.Is(Admin), Arg.Any<IReadOnlySet<string>>());
     }
 
     [Fact]
     public async Task Reset_NonSeededSlug_SurfacesErrorAndStillRedirects()
     {
-        var (controller, pages, _) = Build();
+        var (controller, pages) = Build();
         pages.ResetToSeededAsync(Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+                Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException(
                 new InvalidOperationException("This page has no seeded baseline.")));
 
@@ -143,9 +142,8 @@ public class AdminHelpControllerTests
     [Fact]
     public async Task ResetAll_CallsServiceWithActorAndRoles_AndRedirects()
     {
-        var (controller, pages, _) = Build();
-        pages.ResetAllSeededPagesAsync(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
-                Arg.Any<IDocumentSession>())
+        var (controller, pages) = Build();
+        pages.ResetAllSeededPagesAsync(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>())
             .Returns(5);
 
         var action = await controller.ResetAll();
@@ -153,17 +151,15 @@ public class AdminHelpControllerTests
         Assert.Equal(nameof(AdminHelpController.Index), redirect.ActionName);
 
         await pages.Received(1)
-            .ResetAllSeededPagesAsync(Arg.Is(Admin), Arg.Any<IReadOnlySet<string>>(),
-                Arg.Any<IDocumentSession>());
+            .ResetAllSeededPagesAsync(Arg.Is(Admin), Arg.Any<IReadOnlySet<string>>());
         Assert.Equal("5 pages reset to their seeded text.", controller.TempData["info"] as string);
     }
 
     [Fact]
     public async Task ResetAll_SinglePage_SingularCopy()
     {
-        var (controller, pages, _) = Build();
-        pages.ResetAllSeededPagesAsync(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
-                Arg.Any<IDocumentSession>())
+        var (controller, pages) = Build();
+        pages.ResetAllSeededPagesAsync(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>())
             .Returns(1);
 
         await controller.ResetAll();

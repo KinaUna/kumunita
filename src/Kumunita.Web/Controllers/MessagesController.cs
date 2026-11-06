@@ -49,7 +49,7 @@ namespace Kumunita.Web.Controllers;
 public sealed class MessagesController(
     ILogger<MessagesController> logger,
     IMessagingService messaging,
-    IUserInfoService userInfo,
+    IUserInfoService userInfo, IProfileSettingsService profileSettings,
     // The per-request localization read seams (the LocaleController.FlashAsync
     // idiom): the <c>Send</c> success flash names the recipient ("Sent to
     // {name}"), and a UI string needs the resident's effective language to
@@ -65,6 +65,7 @@ public sealed class MessagesController(
     private readonly ILogger<MessagesController> _logger = logger;
     private readonly IMessagingService _messaging = messaging;
     private readonly IUserInfoService _userInfo = userInfo;
+    private readonly IProfileSettingsService _profileSettings = profileSettings;
     private readonly ILocalizationService? _localization = localization;
     private readonly ITranslationProvider? _translationProvider = translationProvider;
 
@@ -130,7 +131,7 @@ public sealed class MessagesController(
         // standing is the gate (the DirectoryController.D1 two-sided shape:
         // the resident's own standing read off the profile, never the
         // IsMessagingAllowedForAsync viewer half).
-        var candidates = (await _userInfo.GetProfilesAsync(verifiedOnly: false))
+        var candidates = (await _profileSettings.GetProfilesAsync(verifiedOnly: false))
             .Where(p => !p.Blocked && p.SubjectId != actorId
                         && p.MessagingOptIn && !p.MessagingRestricted)
             .Select(p => new PickerCandidate(p.SubjectId, p.DisplayName))

@@ -1,14 +1,10 @@
-using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Moderation;
-using Kumunita.Core.Posts;
-using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Marten;
 
 namespace Kumunita.Web.Controllers;
 
@@ -118,9 +114,16 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 [Route("moderation")]
 public sealed class ModerationController(
-    IDocumentStore store,
-    IUserInfoService userInfo,
-    ModerationService moderation) : Controller
+    // IMPROVE-CODE C09 — the <see cref="IUserInfoService"/> /
+    // <see cref="IProfileSettingsService"/> reads (the reporter /
+    // reply-author / target-author / standing-moderator display
+    // names + the scoped-read <c>ModeratorAssignment</c> /
+    // <c>Component.ModeratorAccess</c> reads) now live in the Core
+    // read seam <see cref="IModerationService"/> (ADR 0006 §D
+    // "route + authz + shape"); the controller resolves only the
+    // interface (the concrete <see cref="ModerationService"/> is
+    // the Core's composition-root concern).
+    IModerationService moderation) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -153,173 +156,60 @@ public sealed class ModerationController(
     /// no <c>AccessAudit</c> row (the M2
     /// <see cref="DirectoryController"/> queue shape — a read
     /// lane, not a decision lane).
+    /// <para>
+    /// IMPROVE-CODE C09 — the scoped-read + the per-row
+    /// resolution (the component / reporter / reply /
+    /// target names) now live in the Core read seam
+    /// <see cref="IModerationService.GetQueueAsync"/> (ADR
+    /// 0006 §D "route + authz + shape"); this action maps
+    /// the read model onto <see cref="ModerationQueueViewModel"/>
+    /// verbatim (the served HTML is unchanged).
+    /// </para>
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
         var actor = SubjectId(User) ?? string.Empty;
         var isGlobalAdmin = IsGlobalAdmin(User);
         var isStanding = IsStandingModerator(User);
 
-        // The raw queue — sorted At desc + Status desc (plan's line-254
-        // pin). The scoped-read filter is applied below (a read, not a
-        // decision); see the "scoped-read filter" block.
-        var reports = await session
-            .Query<Report>()
-            .OrderByDescending(r => r.At)
-            .ThenByDescending(r => r.Status)
-            .ToListAsync()
-            .ConfigureAwait(false);
+        // The scoped queue (the scoped-read filter + the per-row
+        // resolution — the controller's previous Marten reads, moved
+        // to the Core read seam, ADR 0006 §D): a GlobalAdmin sees
+        // every report; a standing-moderator sees only the
+        // reports where (a) they hold a ModeratorAssignment row
+        // on the report's ComponentId, AND (b) the component's
+        // ModeratorAccess flag is ON (the U6 handoff's flag ON
+        // gate). A plain resident (Member, no standing-moderator
+        // row) sees no reports (the C-M3b·4 SoD pin projects at
+        // the display level).
+        var queue = await moderation.GetQueueAsync(actor, isGlobalAdmin, isStanding).ConfigureAwait(false);
 
-        if (reports.Count == 0)
+        if (queue.Rows.Count == 0)
             return View(new ModerationQueueViewModel());
 
-        var componentNames = await BuildComponentNameLookupAsync(session).ConfigureAwait(false);
-
-        var rows = new List<ReportRow>(reports.Count);
-        var byStatus = new Dictionary<string, int>
-        {
-            ["filed"]    = 0,
-            ["assigned"] = 0,
-            ["unlocked"] = 0,
-            ["resolved"] = 0,
-        };
-
-        // The queue's *scoped-read* filter: a GlobalAdmin sees
-        // every report; a standing-moderator sees only the
-        // reports where (a) they hold a
-        // ModeratorAssignment row on the report's
-        // ComponentId, AND (b) the component's
-        // ModeratorAccess flag is ON. A plain resident
-        // (Member, no standing-moderator row) sees no reports.
-        // This is a READ lane, not a decision lane — no
-        // CanAsync call, no AccessAudit row (the M2
-        // DirectoryController queue shape — a read lane, not a
-        // decision lane; the "read seam" clarification in the
-        // U6 handoff note). GetAssignmentsAsync is the
-        // standing-moderator-scope read (the M1
-        // AdminController's line 64 shape); Component.ModeratorAccess
-        // is a plain POCO field read (the U6 handoff's "flag ON
-        // branch via the read seam, not via
-        // SetComponentModeratorAccessAsync" note — the flag is
-        // a plain field, read as part of the Component query). A
-        // null ComponentId is always out of a standing-moderator's
-        // scope (the C-M3b·4 "no fabricated component" shape).
-        if (!isGlobalAdmin && isStanding)
-        {
-            var myComponents = (await userInfo
-                .GetAssignmentsAsync(actor)
-                .ConfigureAwait(false))
-                .Where(a => a.ComponentId is not null)
-                .Select(a => a.ComponentId)
-                .ToHashSet();
-            // The components in the queue that this actor
-            // moderates (via their ModeratorAssignment rows). Then
-            // filter to the ones where the ModeratorAccess flag is
-            // ON (the U6 handoff's flag ON gate).
-            var scopedComponentIds = new HashSet<string>();
-            foreach (var componentName in componentNames.Keys)
-            {
-                if (!myComponents.Contains(componentName))
-                    continue;
-                var component = await session.LoadAsync<Component>(componentName).ConfigureAwait(false);
-                if (component?.ModeratorAccess == true)
-                    scopedComponentIds.Add(componentName);
-            }
-            reports = reports.Where(r =>
-                r.ComponentId is not null && scopedComponentIds.Contains(r.ComponentId))
-                .ToList();
-        }
-        else if (!isGlobalAdmin)
-        {
-            // A plain resident (Member, no standing-moderator row)
-            // sees NO reports — the C-M3b·4 SoD pin projects at the
-            // display level on the read lanes (the real write-lane
-            // gate is the action-level [Authorize] + the Core's
-            // CanAsync(Moderate) — the two independent gates).
-            reports = [];
-        }
-
-        foreach (var r in reports)
-        {
-            var reporter = await userInfo.GetProfileAsync(r.ReporterId).ConfigureAwait(false);
-
-            // ADR 0023 — the reply-report-target lane: when the report's
-            // target discriminator (Report.ReplyId) is set, load the reply +
-            // its author's display name (a read, not a decision — the UGC
-            // name renders as-is, never translated, M·3). A missing reply is
-            // rendered with a null author (defensive; the queue row still
-            // shows the post + the "reply" discriminator).
-            string? replyAuthorName = null;
-            if (r.ReplyId is not null)
-            {
-                var reply = await session.LoadAsync<PostReply>(r.ReplyId).ConfigureAwait(false);
-                if (reply is not null)
-                    replyAuthorName =
-                        (await userInfo.GetProfileAsync(reply.AuthorId).ConfigureAwait(false))?.DisplayName;
-            }
-
-            // ADR 0173 — the report-targets lane: the new surfaces
-            // (event / project / board / todo / grouppost) carry their
-            // identity on TargetKind / TargetId (PostId is empty);
-            // resolve the target's title + author for the queue row.
-            string? targetKind = r.TargetKind, targetId = r.TargetId;
-            string? targetTitle = null, targetAuthorName = null;
-            if (targetKind is not null && targetId is not null)
-            {
-                (string? title, string? authorId) = (null, null);
-                switch (targetKind)
-                {
-                    case "event":
-                        var ev = await session.LoadAsync<Kumunita.Core.Events.Event>(targetId).ConfigureAwait(false);
-                        title = ev?.Title; authorId = ev?.AuthorId; break;
-                    case "project":
-                        var pr = await session.LoadAsync<Kumunita.Core.Projects.Project>(targetId).ConfigureAwait(false);
-                        title = pr?.Title; authorId = pr?.AuthorId; break;
-                    case "board":
-                        var bd = await session.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
-                        title = bd?.Title; authorId = bd?.AuthorId; break;
-                    case "todo":
-                        var td = await session.LoadAsync<TodoItem>(targetId).ConfigureAwait(false);
-                        title = td?.Title; authorId = td?.AuthorId; break;
-                    case "grouppost":
-                        var gp = await session.LoadAsync<Post>(targetId).ConfigureAwait(false);
-                        title = gp?.Title; authorId = gp?.AuthorId; break;
-                }
-                targetTitle = title;
-                targetAuthorName = authorId is null
-                    ? null
-                    : (await userInfo.GetProfileAsync(authorId).ConfigureAwait(false))?.DisplayName;
-            }
-
-            var statusKey = r.Status ?? "filed";   // "filed" as the M3-registered POCO default
-            if (!byStatus.ContainsKey(statusKey))
-                byStatus[statusKey] = 0;
-            byStatus[statusKey] += 1;
-
-            rows.Add(new ReportRow(
-                r.Id,
-                r.PostId,
-                r.PostId.Length > 0 ? (await session.LoadAsync<Post>(r.PostId).ConfigureAwait(false))?.Title : null,
-                r.ComponentId is not null ? componentNames.GetValueOrDefault(r.ComponentId) : null,
-                reporter?.DisplayName,
-                r.Reason,
-                statusKey,
-                r.At,
-                r.ReplyId,
-                replyAuthorName,
-                TargetKind: targetKind,
-                TargetId: targetId,
-                TargetTitle: targetTitle,
-                TargetAuthorName: targetAuthorName));
-        }
+        var rows = queue.Rows.Select(r => new ReportRow(
+            r.Id,
+            r.PostId,
+            r.PostTitle,
+            r.ComponentName,
+            r.ReporterName,
+            r.Reason,
+            r.Status,
+            r.At,
+            r.ReplyId,
+            r.ReplyAuthorName,
+            TargetKind: r.TargetKind,
+            TargetId: r.TargetId,
+            TargetTitle: r.TargetTitle,
+            TargetAuthorName: r.TargetAuthorName))
+            .ToList();
 
         return View(new ModerationQueueViewModel
         {
             Reports    = rows,
-            ByStatus   = byStatus,
-            TotalCount = reports.Count,
+            ByStatus   = queue.ByStatus,
+            TotalCount = queue.Rows.Count,
         });
     }
 
@@ -343,15 +233,27 @@ public sealed class ModerationController(
         if (string.IsNullOrEmpty(id))
             return NotFound();
 
-        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
         var actor = SubjectId(User) ?? string.Empty;
         var isGlobalAdmin = IsGlobalAdmin(User);
         var isStanding = IsStandingModerator(User);
 
-        var report = await session.LoadAsync<Report>(id).ConfigureAwait(false);
-        if (report is null) return NotFound();
+        // The detail + the target / reply / standing-moderator
+        // resolution (the controller's previous Marten reads, moved
+        // to the Core read seam, ADR 0006 §D): a missing report is
+        // the Core's <see cref="KeyNotFoundException"/> → 404 (the
+        // controller maps to a 404 — non-leaky).
+        ModerationDetailReadModel detail;
+        try
+        {
+            detail = await moderation.GetDetailAsync(id).ConfigureAwait(false);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
 
-        // Scoped-read: a global admin sees every report; a
+        // Scoped-read (IMPROVE-CODE C09 — E11, the SEC lane's
+        // decision, not C09's): a global admin sees every report; a
         // standing-moderator sees only the reports on their
         // components (flag ON); a plain resident sees none
         // (C-M3b·4 SoD display-level projection; the
@@ -361,146 +263,35 @@ public sealed class ModerationController(
         // decision, per ADR 0006-D + the M2/M3 queue shape).
         if (!isGlobalAdmin)
         {
-            // A standing-moderator's read is:
-            //   GetAssignmentsAsync(actor) contains report.ComponentId
-            //   AND
-            //   Component[report.ComponentId].ModeratorAccess == true
-            // (the U6 handoff's "flag ON branch via the read seam" note —
-            // the flag is a plain POCO field read; never via
-            // SetComponentModeratorAccessAsync, which is the GlobalAdmin-
-            // only WRITE seam for the flag-flip).
-            if (!(isStanding && await IsInActorScopeAsync(session, actor, report.ComponentId)))
+            if (!(isStanding && await moderation.IsInActorScopeAsync(actor, detail.ComponentId).ConfigureAwait(false)))
                 return NotFound();
         }
 
-        // ADR 0173 — the report-targets lane: the report's target is
-        // EITHER a post (PostId set — the original M3b / ADR 0023 shape)
-        // OR one of the new surfaces (TargetKind / TargetId set — the
-        // PostId is empty). Both branches share the queue's scoped-read
-        // gate above (the component-scope filter); only the title /
-        // author resolution differs.
-        string? postTitle = null, postBody = null, postAuthorId = null;
-        string? targetKind = report.TargetKind, targetId = report.TargetId;
-        string? targetTitle = null, targetAuthorId = null;
+        var moderators = detail.Moderators
+            .Select(m => new StandingModerator(m.UserId, m.DisplayName))
+            .ToList();
 
-        if (targetKind is not null && targetId is not null)
-        {
-            switch (targetKind)
-            {
-                case "event":
-                {
-                    var ev = await session.LoadAsync<Kumunita.Core.Events.Event>(targetId).ConfigureAwait(false);
-                    if (ev is null) return NotFound();
-                    targetTitle = ev.Title; postBody = ev.Body; targetAuthorId = ev.AuthorId;
-                    break;
-                }
-                case "project":
-                {
-                    var pr = await session.LoadAsync<Kumunita.Core.Projects.Project>(targetId).ConfigureAwait(false);
-                    if (pr is null) return NotFound();
-                    targetTitle = pr.Title; postBody = pr.Description; targetAuthorId = pr.AuthorId;
-                    break;
-                }
-                case "board":
-                {
-                    var bd = await session.LoadAsync<KanbanBoard>(targetId).ConfigureAwait(false);
-                    if (bd is null) return NotFound();
-                    targetTitle = bd.Title; postBody = bd.Description; targetAuthorId = bd.AuthorId;
-                    break;
-                }
-                case "todo":
-                {
-                    var td = await session.LoadAsync<TodoItem>(targetId).ConfigureAwait(false);
-                    if (td is null) return NotFound();
-                    targetTitle = td.Title; targetAuthorId = td.AuthorId;
-                    break;
-                }
-                case "grouppost":
-                {
-                    var gp = await session.LoadAsync<Post>(targetId).ConfigureAwait(false);
-                    if (gp is null) return NotFound();
-                    targetTitle = gp.Title; postBody = gp.Body; targetAuthorId = gp.AuthorId;
-                    break;
-                }
-            }
-        }
-        else
-        {
-            var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
-            if (post is null) return NotFound();
-            postTitle = post.Title; postBody = post.Body; postAuthorId = post.AuthorId;
-        }
-
-        var reporter  = await userInfo.GetProfileAsync(report.ReporterId).ConfigureAwait(false);
-        var postAuthor = await userInfo.GetProfileAsync(
-            (postAuthorId ?? targetAuthorId) ?? string.Empty).ConfigureAwait(false);
-        var componentNames = await BuildComponentNameLookupAsync(session).ConfigureAwait(false);
-
-        // ADR 0023 — the reply-report-target lane: when the report's target
-        // discriminator (Report.ReplyId) is set, load the reply + its
-        // author's display name + the reply body (a read, not a decision —
-        // the UGC body / name render as-is, never translated — M·3). A
-        // missing reply leaves the three fields null (defensive; the view
-        // then simply omits the reply block).
-        string? replyId = report.ReplyId;
-        string? replyBody = null;
-        string? replyAuthorName = null;
-        if (replyId is not null)
-        {
-            var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
-            if (reply is not null)
-            {
-                replyBody       = reply.Body;
-                replyAuthorName =
-                    (await userInfo.GetProfileAsync(reply.AuthorId).ConfigureAwait(false))?.DisplayName;
-            }
-        }
-
-        // The standing-moderator list for the assign form
-        // (GlobalAdmin-only render shape: a standing-moderator
-        // never sees the assign form; the moderator list is the
-        // rows from ModeratorAssignment on this report's
-        // ComponentId for the display — the "who can be
-        // assigned" list for the GlobalAdmin's choice).
-        var standingModeratorIds = report.ComponentId is null
-            ? []
-            : (await session
-                .Query<ModeratorAssignment>()
-                .Where(a => a.ComponentId == report.ComponentId)
-                .Select(a => a.UserId)
-                .ToListAsync()
-                .ConfigureAwait(false));
-
-        var moderators = new List<StandingModerator>(standingModeratorIds.Count);
-        foreach (var uid in standingModeratorIds)
-        {
-            var profile = await userInfo.GetProfileAsync(uid).ConfigureAwait(false);
-            moderators.Add(new StandingModerator(uid, profile?.DisplayName));
-        }
-
-        var statusKey = report.Status ?? "filed";
+        var statusKey = detail.Status;
         var model = new ModerationResolveViewModel
         {
-            ReportId        = report.Id,
-            PostId          = report.PostId,
-            ComponentId     = report.ComponentId,
-            Reason          = report.Reason,
+            ReportId        = detail.ReportId,
+            PostId          = detail.PostId,
+            ComponentId     = detail.ComponentId,
+            Reason          = detail.Reason,
             Status          = statusKey,
-            At              = report.At,
-            ReporterName    = reporter?.DisplayName,
-            PostTitle       = postTitle,
-            PostBody        = postBody,
-            ComponentName   = report.ComponentId is not null ? componentNames.GetValueOrDefault(report.ComponentId) : null,
-            PostAuthorName  = postAuthor?.DisplayName,
-            ReplyId         = replyId,
-            ReplyBody       = replyBody,
-            ReplyAuthorName = replyAuthorName,
-            TargetKind      = targetKind,
-            TargetId        = targetId,
-            TargetTitle     = targetTitle,
-            TargetAuthorName = targetAuthorId is null
-                ? null
-                : (await userInfo.GetProfileAsync(targetAuthorId).ConfigureAwait(false))?.DisplayName,
+            At              = detail.At,
+            ReporterName    = detail.ReporterName,
+            PostTitle       = detail.PostTitle,
+            PostBody        = detail.PostBody,
+            ComponentName   = detail.ComponentName,
+            PostAuthorName  = detail.PostAuthorName,
+            ReplyId         = detail.ReplyId,
+            ReplyBody       = detail.ReplyBody,
+            ReplyAuthorName = detail.ReplyAuthorName,
+            TargetKind      = detail.TargetKind,
+            TargetId        = detail.TargetId,
+            TargetTitle     = detail.TargetTitle,
+            TargetAuthorName = detail.TargetAuthorName,
             Moderators      = moderators,
 
             // Display-level predicates (the §2.3 item-2 four
@@ -566,38 +357,30 @@ public sealed class ModerationController(
 
         var admin = SubjectId(User) ?? string.Empty;
 
-        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
-
-        // Web-side defense-in-depth: the chosen id must be a
-        // standing-moderator on this report's component (A
-        // non-valid id would just be written as a
-        // ModeratorAssignment row for a non-moderator — a
-        // semantic error the §2.3 pins do not forbid but the
-        // UI should not invite); a report with no
-        // ComponentId is the C-M3b·4 "no fabricated component"
-        // defensive case (U5's AssignReportAsync would skip
-        // the upsert) — the form shouldn't have offered the
-        // choice, but we reject with a 404 either way (a
-        // report with no component on the queue would have
-        // been scoped out already, so this is the "stale
+        // Web-side defense-in-depth (IMPROVE-CODE C09 — the
+        // validation reads moved to the Core read seam, ADR
+        // 0006 §D): the chosen id must be a standing-moderator
+        // on this report's component (A non-valid id would just
+        // be written as a ModeratorAssignment row for a
+        // non-moderator — a semantic error the §2.3 pins do
+        // not forbid but the UI should not invite); a report
+        // with no ComponentId is the C-M3b·4 "no fabricated
+        // component" defensive case (the form shouldn't have
+        // offered the choice, but we reject with a 404 either
+        // way — a report with no component on the queue would
+        // have been scoped out already, so this is the "stale
         // form" shape — the report was edited between the GET
         // and the POST).
-        var report = await session.LoadAsync<Report>(id).ConfigureAwait(false);
-        if (report is null) return NotFound();
-
-        if (report.ComponentId is not null)
+        ModerationDetailReadModel detail;
+        try
         {
-            var valid = await session
-                .Query<ModeratorAssignment>()
-                .AnyAsync(a => a.ComponentId == report.ComponentId && a.UserId == assignedToModeratorId)
-                .ConfigureAwait(false);
-            if (!valid)
-            {
-                TempData["error"] = await this.FlashAsync("moderation.flash_not_moderator", "That account is not a standing moderator on this report's component. (The form may be out of sync — refresh.)");
-                return Redirect($"/moderation/{id}");
-            }
+            detail = await moderation.GetDetailAsync(id).ConfigureAwait(false);
         }
-        else
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        if (detail.ComponentId is null)
         {
             // C-M3b·4 "no fabricated component" — a report with
             // no component can't have a standing-moderator
@@ -606,14 +389,19 @@ public sealed class ModerationController(
             // invalid shape, the "stale form" shape).
             return NotFound();
         }
+        if (!await moderation.IsStandingModeratorOnComponentAsync(
+            detail.ComponentId, assignedToModeratorId).ConfigureAwait(false))
+        {
+            TempData["error"] = await this.FlashAsync("moderation.flash_not_moderator", "That account is not a standing moderator on this report's component. (The form may be out of sync — refresh.)");
+            return Redirect($"/moderation/{id}");
+        }
 
         try
         {
             await moderation.AssignReportAsync(
                 reportId:              id,
                 assignedToModeratorId: assignedToModeratorId,
-                globalAdminId:         admin,
-                session:               session)
+                globalAdminId:         admin)
                 .ConfigureAwait(false);
             TempData["info"] = await this.FlashAsync("moderation.flash_assigned", "Report assigned.");
         }
@@ -650,13 +438,14 @@ public sealed class ModerationController(
         if (string.IsNullOrEmpty(id)) return NotFound();
         var admin = SubjectId(User) ?? string.Empty;
 
-        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
         try
         {
+            // IMPROVE-CODE C09 — the committed lane (the Core's own
+            // session; the C5 flag-flip inside is unchanged, ADR
+            // 0006 §D).
             await moderation.UnlockAsync(
                 reportId:      id,
-                globalAdminId: admin,
-                session:       session)
+                globalAdminId: admin)
                 .ConfigureAwait(false);
             TempData["info"] = await this.FlashAsync("moderation.flash_unlocked", "Report unlocked (C5 activated on the component).");
         }
@@ -693,13 +482,14 @@ public sealed class ModerationController(
         if (string.IsNullOrEmpty(id)) return NotFound();
         var admin = SubjectId(User) ?? string.Empty;
 
-        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
         try
         {
+            // IMPROVE-CODE C09 — the committed lane (the Core's own
+            // session; the C5 flag-flip inside is unchanged, ADR
+            // 0006 §D).
             await moderation.ResolveReportAsync(
                 reportId:      id,
-                globalAdminId: admin,
-                session:       session)
+                globalAdminId: admin)
                 .ConfigureAwait(false);
             TempData["info"] = await this.FlashAsync("moderation.flash_resolved", "Report resolved.");
         }
@@ -708,52 +498,5 @@ public sealed class ModerationController(
             return NotFound();
         }
         return Redirect("/moderation");
-    }
-
-    // ── Private helpers ───────────────────────────────────────────────
-
-    /// <summary>
-    /// One round-trip to the <see cref="Component"/> table —
-    /// the component-name lookup used by both the
-    /// <c>Index</c> queue projection and the <c>Resolve</c>
-    /// detail projection (the M1 <see cref="AdminController"/>
-    /// Index shape: a
-    /// <c>session.Query&lt;Component&gt;()</c> join, no
-    /// <c>CanAsync</c> call — a <b>display</b> read, not an
-    /// access decision — ADR 0006-D).
-    /// </summary>
-    private static async Task<Dictionary<string, string>> BuildComponentNameLookupAsync(IDocumentSession session)
-    {
-        var components = await session
-            .Query<Component>()
-            .ToListAsync()
-            .ConfigureAwait(false);
-        return components.ToDictionary(c => c.Id, c => c.Name);
-    }
-
-    /// <summary>
-    /// The full scoped-read check (one report row): the actor
-    /// (a standing-moderator) has a
-    /// <see cref="ModeratorAssignment"/> row on the report's
-    /// <c>ComponentId</c> (the M1 <see cref="AdminController"/>'s
-    /// line 64 shape — the standing-moderator-scope read seam),
-    /// AND the component's <c>ModeratorAccess</c> flag is
-    /// <c>true</c> (the U6 handoff's "flag ON branch via the
-    /// read seam" note — the flag is a plain POCO field read,
-    /// NEVER via
-    /// <c>SetComponentModeratorAccessAsync</c> which is the
-    /// GlobalAdmin-only WRITE seam). A <c>null</c>
-    /// <c>ComponentId</c> is always <c>false</c> (a standing-
-    /// moderator has no scope on a global report — the C-M3b·4
-    /// "no fabricated component" shape).
-    /// </summary>
-    private async Task<bool> IsInActorScopeAsync(IDocumentSession session, string actor, string? componentId)
-    {
-        if (componentId is null) return false;   // C-M3b·4 "no fabricated component"
-        var assignments = await userInfo.GetAssignmentsAsync(actor).ConfigureAwait(false);
-        if (!assignments.Any(a => a.ComponentId == componentId))
-            return false;
-        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
-        return component?.ModeratorAccess == true;
     }
 }

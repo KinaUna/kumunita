@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
-using Marten;
 
 namespace Kumunita.Web.Controllers;
 
@@ -29,12 +28,16 @@ namespace Kumunita.Web.Controllers;
 /// no extra middleware needed.
 /// </para>
 /// </summary>
+// C3-05 (ADR 0295) — the document-store ctor param is gone. The one direct
+// read this controller used to perform itself (the verify-link token load) is
+// now the IdentityModule's <c>LoadVerifyTokenAsync</c> seam (the
+// <see cref="IIdentityService"/> owns the <c>IdentityToken</c> document), so
+// the controller retires its Marten session and its allowlist entry.
 public sealed class AccountController(
     SignInManager<User> signInManager,
     UserManager<User> userManager,
     IIdentityService identity,
-    IUserInfoService userInfo,
-    IDocumentStore store) : Controller
+    IUserInfoService userInfo) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
@@ -564,8 +567,12 @@ public sealed class AccountController(
     /// </summary>
     private async Task<(IdentityToken? token, VerifyViewModel? errorModel)> LoadUsableVerifyTokenAsync(string id)
     {
-        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
-        var token = await session.LoadAsync<IdentityToken>(id);
+        // C3-05 (ADR 0295) — the by-id read now runs through the IdentityModule
+        // seam (the <c>IdentityToken</c> document is the Identity's), so this
+        // controller no longer opens its own session. The usability decision
+        // (Kind + IsUsableAt) stays here — it is the Web's presentable-error
+        // concern.
+        var token = await identity.LoadVerifyTokenAsync(id);
         if (token is not null
             && token.Kind == IdentityToken.KindVerify
             && token.IsUsableAt(DateTimeOffset.UtcNow))

@@ -102,6 +102,19 @@ public interface IIdentityService
     Task<string?> FindSubjectByEmailAsync(string email);
 
     /// <summary>
+    /// C3-05 (ADR 0295) — load a single <see cref="IdentityToken"/> row by its
+    /// primary key (the Web verify-link lane's read, moved off the
+    /// <c>AccountController</c>'s own Marten session so the controller retires
+    /// its store seam). Returns <c>null</c> when no such row exists. A pure read
+    /// — the caller owns the usability decision (<see cref="IdentityToken
+    /// .Kind"/> + <see cref="IdentityToken.IsUsableAt"/>), which is the Web's
+    /// presentable-error concern, not the module's. ADR 0006-E compatible ADD
+    /// (the <c>VerifyWithTokenAsync</c> lane already loads <c>IdentityToken</c>
+    /// rows; this exposes the by-id read the verify link needs).
+    /// </summary>
+    Task<IdentityToken?> LoadVerifyTokenAsync(string tokenId);
+
+    /// <summary>
     /// Consume a verification link (the resident clicked the link — the handoff ends
     /// on-platform): set <see cref="Profile.Verified"/>, mark the token consumed, audit
     /// (<c>via: Owner</c> — the resident verifying their own account).

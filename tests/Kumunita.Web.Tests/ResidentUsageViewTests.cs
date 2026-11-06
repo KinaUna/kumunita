@@ -132,8 +132,9 @@ public class ResidentUsageViewTests
             signInManager: null!,
             userManager:   null!,
             identity:      null!,
-            userInfo:      null!,
-            store:         null!);
+            // C3-05 (ADR 0295) — the store arg is gone (the verify-token read
+            // is now the IIdentityService.LoadVerifyTokenAsync seam).
+            userInfo:      null!);
 
         var context = new DefaultHttpContext
         {

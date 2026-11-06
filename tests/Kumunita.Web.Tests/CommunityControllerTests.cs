@@ -52,21 +52,25 @@ public class CommunityControllerTests
     public async Task Manage_PlainMember_Returns404_NeverInvokesService()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        var controller = Build(userInfo, roles: [Kumunita.Core.Identity.Roles.Member], subjectId: MemberSubject);
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        var controller = Build(userInfo, roles: [Kumunita.Core.Identity.Roles.Member], subjectId: MemberSubject, community: community, profileSettings: profileSettings);
 
         var result = await controller.Manage(CompId, TestContext.Current.CancellationToken);
 
         Assert.IsType<NotFoundResult>(result);
-        await userInfo.DidNotReceive().GetCommunityMembersAsync(CompId);
-        await userInfo.DidNotReceive().GetProfilesAsync(true);
-        await userInfo.DidNotReceive().GetProfilesAsync(false);
+        await community.DidNotReceive().GetCommunityMembersAsync(CompId);
+        await profileSettings.DidNotReceive().GetProfilesAsync(true);
+        await profileSettings.DidNotReceive().GetProfilesAsync(false);
     }
 
     [Fact]
     public async Task SetMandatory_PlainMember_Returns404_NeverInvokesService()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        var controller = Build(userInfo, roles: [Kumunita.Core.Identity.Roles.Member], subjectId: MemberSubject);
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        var controller = Build(userInfo, roles: [Kumunita.Core.Identity.Roles.Member], subjectId: MemberSubject, community: community, profileSettings: profileSettings);
 
         var result = await controller.SetMandatory(CompId, true, TestContext.Current.CancellationToken);
 
@@ -81,9 +85,11 @@ public class CommunityControllerTests
         // call — the community moderator's own standing is not enough for
         // this lane (unlike add/remove, which are their surface).
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.Moderator, Roles.ModeratorComponent(CompId)],
-            subjectId: ModSubject);
+            subjectId: ModSubject, community: community, profileSettings: profileSettings);
 
         var result = await controller.SetMandatory(CompId, true, TestContext.Current.CancellationToken);
 
@@ -97,13 +103,15 @@ public class CommunityControllerTests
     public async Task Manage_Moderator_ReturnsViewWithMembersAndCandidates()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(enabledOnly: false)
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        profileSettings.GetComponentsAsync(enabledOnly: false)
             .Returns(new List<Component> { NewComponent(Mandatory: false, Enabled: true) });
-        userInfo.GetCommunityMembersAsync(CompId).Returns(new List<ComponentMembership>
+        community.GetCommunityMembersAsync(CompId).Returns(new List<ComponentMembership>
         {
             new() { ComponentId = CompId, UserId = "u-member-a" },
         });
-        userInfo.GetProfilesAsync(verifiedOnly: false).Returns(new List<Profile>
+        profileSettings.GetProfilesAsync(verifiedOnly: false).Returns(new List<Profile>
         {
             new() { SubjectId = ModSubject, DisplayName = "The Moderator" },
             new() { SubjectId = "u-member-a", DisplayName = "Member A" },
@@ -111,7 +119,7 @@ public class CommunityControllerTests
         });
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.Moderator, Roles.ModeratorComponent(CompId)],
-            subjectId: ModSubject);
+            subjectId: ModSubject, community: community, profileSettings: profileSettings);
 
         var view = (await controller.Manage(CompId, TestContext.Current.CancellationToken)) as ViewResult;
 
@@ -130,13 +138,15 @@ public class CommunityControllerTests
     public async Task Manage_GlobalAdmin_ReturnsView()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(enabledOnly: false)
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        profileSettings.GetComponentsAsync(enabledOnly: false)
             .Returns(new List<Component> { NewComponent(Mandatory: true, Enabled: true) });
-        userInfo.GetCommunityMembersAsync(CompId).Returns(new List<ComponentMembership>());
-        userInfo.GetProfilesAsync(verifiedOnly: false).Returns(new List<Profile>());
+        community.GetCommunityMembersAsync(CompId).Returns(new List<ComponentMembership>());
+        profileSettings.GetProfilesAsync(verifiedOnly: false).Returns(new List<Profile>());
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.GlobalAdmin],
-            subjectId: AdminSubject);
+            subjectId: AdminSubject, community: community, profileSettings: profileSettings);
 
         var view = (await controller.Manage(CompId, TestContext.Current.CancellationToken)) as ViewResult;
 
@@ -151,11 +161,13 @@ public class CommunityControllerTests
     public async Task SetMandatory_ServiceThrowsForMissingCommunity_DoesNotThrow_Redirects()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         userInfo.SetCommunityMandatoryAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException(new InvalidOperationException("gone")));
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.GlobalAdmin],
-            subjectId: AdminSubject);
+            subjectId: AdminSubject, community: community, profileSettings: profileSettings);
 
         // The NRE lands in the *catch* block's TempData["error"] write — it
         // only happens if the controller caught the InvalidOperationException
@@ -173,9 +185,11 @@ public class CommunityControllerTests
     public async Task AddMember_Moderator_Delegates()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.Moderator, Roles.ModeratorComponent(CompId)],
-            subjectId: ModSubject);
+            subjectId: ModSubject, community: community, profileSettings: profileSettings);
 
         try { await controller.AddMember(CompId, "u-target", TestContext.Current.CancellationToken); }
         catch (NullReferenceException) { /* expected: TempData write NRE — harness convention */ }
@@ -189,9 +203,11 @@ public class CommunityControllerTests
     public async Task RemoveMember_SelfTarget_RejectsAndDoesNotInvokeService()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.Moderator, Roles.ModeratorComponent(CompId)],
-            subjectId: ModSubject);
+            subjectId: ModSubject, community: community, profileSettings: profileSettings);
 
         await Assert.ThrowsAsync<NullReferenceException>(() => controller.RemoveMember(CompId, ModSubject, TestContext.Current.CancellationToken)); // the moderator removing themselves → refusal branch (its TempData write NREs, the shape pin)
 
@@ -202,9 +218,11 @@ public class CommunityControllerTests
     public async Task RemoveMember_Moderator_DelegatesOtherMember()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.Moderator, Roles.ModeratorComponent(CompId)],
-            subjectId: ModSubject);
+            subjectId: ModSubject, community: community, profileSettings: profileSettings);
 
         try { await controller.RemoveMember(CompId, "u-target", TestContext.Current.CancellationToken); }
         catch (NullReferenceException) { /* expected: TempData write NRE — harness convention */ }
@@ -220,11 +238,13 @@ public class CommunityControllerTests
     public async Task Leave_OptionalCommunity_CallsFrozenLaneWithSelfAsTargetAndActor()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(enabledOnly: false)
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        profileSettings.GetComponentsAsync(enabledOnly: false)
             .Returns(new List<Component> { NewComponent(Mandatory: false, Enabled: true) });
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.Member],
-            subjectId: MemberSubject);
+            subjectId: MemberSubject, community: community, profileSettings: profileSettings);
 
         try { await controller.Leave(CompId, TestContext.Current.CancellationToken); }
         catch (NullReferenceException) { /* expected: TempData write NRE — harness convention */ }
@@ -236,11 +256,13 @@ public class CommunityControllerTests
     public async Task Leave_MandatoryCommunity_RefusesAndNeverReachesService()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(enabledOnly: false)
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        profileSettings.GetComponentsAsync(enabledOnly: false)
             .Returns(new List<Component> { NewComponent(Mandatory: true, Enabled: true) });
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.Member],
-            subjectId: MemberSubject);
+            subjectId: MemberSubject, community: community, profileSettings: profileSettings);
 
         await Assert.ThrowsAsync<NullReferenceException>(() => controller.Leave(CompId, TestContext.Current.CancellationToken)); // refusal branch (its TempData["error"] write NREs — the shape pin)
 
@@ -251,10 +273,12 @@ public class CommunityControllerTests
     public async Task Leave_UnknownCommunity_Returns404()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(enabledOnly: false).Returns(new List<Component>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        profileSettings.GetComponentsAsync(enabledOnly: false).Returns(new List<Component>());
         var controller = Build(userInfo,
             roles: [Kumunita.Core.Identity.Roles.Member],
-            subjectId: MemberSubject);
+            subjectId: MemberSubject, community: community, profileSettings: profileSettings);
 
         var result = await controller.Leave(CompId, TestContext.Current.CancellationToken);
 
@@ -272,7 +296,8 @@ public class CommunityControllerTests
         Enabled = Enabled,
     };
 
-    private static CommunityController Build(IUserInfoService userInfo, string[] roles, string subjectId)
+    private static CommunityController Build(IUserInfoService userInfo, string[] roles, string subjectId,
+        ICommunityMembershipService? community = null, IProfileSettingsService? profileSettings = null)
     {
         // ADR 0026: the Manage lane now also reads the enabled language catalog
         // (ListLanguagesAsync) + the community's translation rows to seed the
@@ -283,10 +308,11 @@ public class CommunityControllerTests
         // empty list (its default would be null and NRE the .Select above).
         var localization = Substitute.For<Kumunita.Core.Localization.ILocalizationService>();
         localization.ListLanguagesAsync().Returns(new List<Kumunita.Core.Localization.LanguageCatalog>());
-        userInfo.GetCommunityTranslationsAsync(CompId).Returns(new List<Kumunita.Core.UserInfo.CommunityTranslation>());
-        var store = Substitute.For<Marten.IDocumentStore>();
-
-        var controller = new CommunityController(userInfo, localization, store);
+        community = community ?? Substitute.For<ICommunityMembershipService>();
+        community.GetCommunityTranslationsAsync(CompId).Returns(new List<Kumunita.Core.UserInfo.CommunityTranslation>());
+        // C2-04 — the controller no longer takes a document store (the service
+        // owns the session); drop the store arg from this construction.
+        var controller = new CommunityController(userInfo, community, profileSettings ?? Substitute.For<IProfileSettingsService>(), localization);
 
         // TempData writes need a Session — substitute (the /leave lane and the
         // form-refusal branches both touch TempData).

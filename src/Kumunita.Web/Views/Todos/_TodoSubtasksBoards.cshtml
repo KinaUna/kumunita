@@ -1,0 +1,66 @@
+@model Kumunita.Web.Models.TodoDetailViewModel
+
+@* IMPROVE-CODE C11 — the to-do detail's subtasks (F9) + board placements
+   (F2) sections (extracted from TodoDetail.cshtml; the served markup is
+   unchanged). References only <c>Model.Subtasks</c> / <c>Model.Placements</c>,
+   so it takes the parent view-model directly. *@
+
+@* F9 — the subtasks (each a full to-do — its own status / assignee /
+   audience; the service's per-subtask Read gate already ran). *@
+@if (Model.Subtasks.Count > 0)
+{
+    <section class="mb-4">
+        <h2 class="h5 mb-3"><kw-l key="projects.todo.subtasks">Subtasks</kw-l></h2>
+        <div class="airy-ann-list">
+            @foreach (var sub in Model.Subtasks)
+            {
+                <div class="airy-ann-row">
+                    <div>
+                        <h3 class="airy-ann-title">
+                            <a href="@($"/projects/todos/{sub.Id}")">@sub.Title</a>
+                        </h3>
+                        <div class="text-muted small mb-1">
+                            @sub.AuthorDisplayName
+                            @if (!string.IsNullOrWhiteSpace(sub.AssigneeDisplayName))
+                            {
+                                <span> · <kw-l key="projects.todo.assignee">Assignee</kw-l>: @sub.AssigneeDisplayName</span>
+                            }
+                            <span> · <kw-dt dt="@sub.Created" format="g"></kw-dt></span>
+                            @if (!string.IsNullOrWhiteSpace(sub.Status))
+                            {
+                                <partial name="_StatusChip" model="@(sub.Status ?? string.Empty)" />
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@* F2 — the board placements (a to-do appears on each board it is
+   placed on; the service's read surface, the view renders it). *@
+@if (Model.Placements.Count > 0)
+{
+    <section class="mb-4">
+        <h2 class="h5 mb-3"><kw-l key="projects.todo.boards">Boards</kw-l></h2>
+        <div class="kmb-member-list">
+            @foreach (var placement in Model.Placements)
+            {
+                <div class="kmb-member-row">
+                    <a href="@($"/projects/boards/{placement.BoardId}")">
+                        @placement.BoardTitle
+                        @if (string.IsNullOrWhiteSpace(placement.BoardTitle))
+                        {
+                            @placement.BoardId
+                        }
+                    </a>
+                    @if (!string.IsNullOrWhiteSpace(placement.LaneTitle))
+                    {
+                        <span class="text-muted small ms-2">· @placement.LaneTitle</span>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}

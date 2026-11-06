@@ -85,6 +85,7 @@ public class GuestClaimMintTests
             userManager,
             roleManager,
             userInfo,
+            Substitute.For<IProfileSettingsService>(),
             identity,
             Options.Create(new IdentityOptions()));
     }

@@ -2,7 +2,6 @@ using Kumunita.Core.Media;
 using Kumunita.Core.Usage;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -44,8 +43,7 @@ namespace Kumunita.Web.Controllers;
 public sealed class AdminStorageController(
     IStorageSettingsService settings,
     IStorageMetricsService metrics,
-    IOptions<MediaOptions> mediaOpts,
-    IDocumentStore store) : Controller
+    IOptions<MediaOptions> mediaOpts) : Controller
 {
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -99,11 +97,10 @@ public sealed class AdminStorageController(
     /// (C-UP·1), on the option-A route that shares U5's one controller / one
     /// route / one view (not the <c>POST /admin/storage/limits</c> name the unit
     /// plan originally carried). Reads the two admin values and delegates to
-    /// <see cref="IStorageSettingsService.SetAsync"/> — **one in-caller-session
-    /// write**: the controller owns the
-    /// <see cref="IDocumentStore.LightweightSession"/> (the C3 same-transaction
-    /// lane) and passes it to the service, so the settings doc commits atomically
-    /// in the caller's session.
+    /// <see cref="IStorageSettingsService.SetAsync"/> — **one write**: the
+    /// committed settings lane (IMPROVE-CODE C09) owns the
+    /// <c>LightweightSession</c> (the C3 same-transaction lane), so the
+    /// settings doc commits atomically in its session.
     /// <para>
     /// <b>Value semantics (C-UP·5):</b> inputs are in **MiB**, converted to
     /// bytes before persisting. A <b>blank</b> per-file limit ⇒ <c>null</c>
@@ -154,10 +151,9 @@ public sealed class AdminStorageController(
             quota = parsedQuotaMiB * 1024 * 1024L;
         }
 
-        // Session shape (C3): the controller owns the LightweightSession; the
-        // service's SaveChanges is the single in-caller-session write (C-UP·1).
-        await using var session = store.LightweightSession();
-        await settings.SetAsync(maxFileBytes, quota, actor, session);
+        // IMPROVE-CODE C09 — the committed settings-write lane (C-UP·1 single
+        // write) owns its own session; the controller no longer opens one.
+        await settings.SetAsync(maxFileBytes, quota, actor);
 
         TempData["info"] = await this.FlashAsync("admin.flash_storage_saved", "Upload limits saved.");
         return RedirectToAction(nameof(Index));

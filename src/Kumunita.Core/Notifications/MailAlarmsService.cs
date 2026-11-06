@@ -111,19 +111,14 @@ public static class MailAlarmsService
                 .CountAsync(ct);
         }
 
-        var total = bounces + complaints;
-        if (total < AlertThreshold)
+        // The T4 decision (pin §2/§3 — the threshold breach + the pin §3
+        // payload mapping, no PII, pin §5.8) is the pure
+        // <see cref="MailAlarmThresholdPolicy"/> surface (C2-06, the DoD #7
+        // unit-tested decision part — the <see cref="AlertEvent"/> is built
+        // there, over the three counts this method read).
+        var alert = MailAlarmThresholdPolicy.Build(bounces, complaints, deadLetters);
+        if (alert is null)
             return false;   // under the T4 threshold — no alert (the pin §6 "still broken, still loud" re-fire is the intended semantics while breached)
-
-        // The pin §3 payload mapping (fixed, U2 implements) — no PII (pin §5.8):
-        // counts + the Reason breakdown only; the suppressed e-mails stay in the
-        // DB. Attempts is null (the F11 pin: a non-retry alert carries no
-        // attempt count).
-        var alert = new AlertEvent(
-            Kind:     AlertKind,
-            Subject:  $"SuppressedAddress ingest: {total} new bounce/complaint rows in {WindowHours}h (threshold {AlertThreshold})",
-            Detail:   $"bounce: {bounces}, complaint: {complaints}; EmailDeadLetter count: {deadLetters}",
-            Attempts: null);
 
         // Best-effort at the boundary (the IAlertSink contract, F11 pin §2a /
         // pin §5.6): a channel failure never propagates — the

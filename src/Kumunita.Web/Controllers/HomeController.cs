@@ -72,10 +72,10 @@ public class HomeController : Controller
     /// (<see cref="Kumunita.Core.Events.IEventService.ListUpcomingAsync"/>),
     /// the same read the /events surface uses. Null in test constructions;
     /// the home "upcoming" events column degrades to empty.</param>
-    /// <param name="projects">Optional — the to-dos feed seam
-    /// (<see cref="Kumunita.Core.Projects.IProjectService.ListTodosAsync"/>),
-    /// the same read the /projects/todos surface uses. Null in test
-    /// constructions; the home "upcoming" to-dos column degrades to empty.</param>
+    /// <param name="todos">Optional — the to-dos feed seam
+    /// (<see cref="Kumunita.Core.Projects.ITodoService.ListTodosAsync"/>) —
+    /// C08 (ADR 0287) moved the read off <c>IProjectService</c>; the home
+    /// "upcoming" to-dos column degrades to empty when it is absent.</param>
     public HomeController(
         ILogger<HomeController> logger,
         IOptions<CommunityOptions> community,
@@ -85,11 +85,13 @@ public class HomeController : Controller
         IAuthorizationService? authz = null,
         ILocalizationService? localization = null,
         IUserInfoService? userInfo = null,
+        IProfileSettingsService? profileSettings = null,
+        ICommunityMembershipService? communityMembership = null,
         ITranslationProvider? translationProvider = null,
         ISiteContentService? siteContent = null,
         IErrorReportService? errorReports = null,
         Kumunita.Core.Events.IEventService? events = null,
-        Kumunita.Core.Projects.IProjectService? projects = null)
+        Kumunita.Core.Projects.ITodoService? todos = null)
     {
         _logger = logger;
         _community = community.Value;
@@ -99,11 +101,13 @@ public class HomeController : Controller
         Authz = authz;
         Localization = localization;
         UserInfo = userInfo;
+        ProfileSettings = profileSettings;
+        CommunityMembership = communityMembership;
         TranslationProvider = translationProvider;
-        SiteContentService = siteContent;
+        SiteContentSeam = siteContent;
         ErrorReports = errorReports;
         Events = events;
-        Projects = projects;
+        Todos = todos;
     }
 
     // The optional feed seams (internal so the tests can assert the
@@ -114,11 +118,16 @@ public class HomeController : Controller
     internal IAuthorizationService? Authz { get; }
     internal ILocalizationService? Localization { get; }
     internal IUserInfoService? UserInfo { get; }
+    internal IProfileSettingsService? ProfileSettings { get; }
+    internal ICommunityMembershipService? CommunityMembership { get; }
     internal ITranslationProvider? TranslationProvider { get; }
-    internal ISiteContentService? SiteContentService { get; }
+    internal ISiteContentService? SiteContentSeam { get; }
     internal IErrorReportService? ErrorReports { get; }
     internal Kumunita.Core.Events.IEventService? Events { get; }
-    internal Kumunita.Core.Projects.IProjectService? Projects { get; }
+    // C08 (ADR 0287) — the Projects split: the home "upcoming" to-dos column
+    // reads through the Todo seam (ListTodosAsync / GetTodoTranslationsAsync
+    // moved off IProjectService to ITodoService).
+    internal Kumunita.Core.Projects.ITodoService? Todos { get; }
 
     public async Task<IActionResult> Index()
     {
@@ -173,11 +182,11 @@ public class HomeController : Controller
         // always renders — never a blank page, never an error (SITE·1). This is a
         // *display* read only — it never gates anything.
         Kumunita.Core.SiteContent.SiteContent? site = null;
-        if (SiteContentService is not null)
+        if (SiteContentSeam is not null)
         {
             try
             {
-                site = await SiteContentService.GetAsync().ConfigureAwait(false);
+                site = await SiteContentSeam.GetAsync().ConfigureAwait(false);
             }
             catch
             {
@@ -399,11 +408,11 @@ public class HomeController : Controller
         // invariant C1), so the frozen Decide() has no "public" branch for
         // them. An anonymous visitor (subjectId is null) therefore never
         // sees any posts — the column is structurally empty, no service call.
-        if (Posts is null || UserInfo is null || subjectId is null)
+        if (Posts is null || UserInfo is null || ProfileSettings is null || CommunityMembership is null || subjectId is null)
             return [];
         try
         {
-            var components = await UserInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
+            var components = await ProfileSettings.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
             if (components.Count == 0)
                 return [];
 
@@ -416,7 +425,7 @@ public class HomeController : Controller
             {
                 foreach (var c in components)
                 {
-                    var translations = await UserInfo.GetCommunityTranslationsAsync(c.Id).ConfigureAwait(false);
+                    var translations = await CommunityMembership.GetCommunityTranslationsAsync(c.Id).ConfigureAwait(false);
                     var match = translations.FirstOrDefault(t =>
                         string.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
                     if (match is not null && !string.IsNullOrWhiteSpace(match.Name))
@@ -667,7 +676,10 @@ public class HomeController : Controller
     /// </summary>
     private async Task<IReadOnlyList<HomeUpcomingRow>> BuildUpcomingTodoRowsAsync(string subjectId, string? effLang, bool mineOnly)
     {
-        if (Projects is null)
+        // C08 (ADR 0287): the read now flows through the <see cref="ITodoService"/>
+        // seam (Todos), not <see cref="IProjectService"/> — guard on the seam
+        // actually used below.
+        if (Todos is null)
             return [];
         try
         {
@@ -680,7 +692,7 @@ public class HomeController : Controller
             //  - otherwise (the floor): the community's to-dos (assigneeId
             //    null). One page of 20 (the same generous quick-scan window as
             //    the events column).
-            var page = await Projects.ListTodosAsync(
+            var page = await Todos.ListTodosAsync(
                     null,
                     mineOnly ? subjectId : null,
                     subjectId,
@@ -696,7 +708,7 @@ public class HomeController : Controller
                 {
                     try
                     {
-                        var translations = await Projects.GetTodoTranslationsAsync(t.Id).ConfigureAwait(false);
+                        var translations = await Todos.GetTodoTranslationsAsync(t.Id).ConfigureAwait(false);
                         var match = translations.FirstOrDefault(tr =>
                             string.Equals(tr.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
                         if (match is not null)

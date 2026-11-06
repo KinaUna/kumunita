@@ -99,8 +99,8 @@ public interface ILocalizationService
     /// language). The baseline is the **code's** per-language source
     /// (<see cref="KnownTranslationKeys.DeValues"/> /
     /// <see cref="KnownTranslationKeys.FrValues"/>) for UI strings and
-    /// <see cref="Bootstrap.FirstBootSeeder.DeDefaultPages"/> /
-    /// <see cref="Bootstrap.FirstBootSeeder.FrDefaultPages"/>) — the exact text
+    /// <see cref="Bootstrap.SeededContentCatalog.DeDefaultPages"/> /
+    /// <see cref="Bootstrap.SeededContentCatalog.FrDefaultPages"/>) — the exact text
     /// the first-boot seeder writes on a pristine DB, so re-applying it to a
     /// warm instance is byte-identical to first-boot. No audit row (a read).
     /// </summary>
@@ -402,7 +402,7 @@ public interface ILocalizationService
 /// text per UI-string key (the <see cref="KnownTranslationKeys.DeValues"/> /
 /// <see cref="KnownTranslationKeys.FrValues"/> per-language source).</item>
 /// <item><see cref="PageBaselines"/> — one (slug, title, body) per seeded
-/// system page (the <c>FirstBootSeeder.DeDefaultPages</c> /
+/// system page (the <c>SeededContentCatalog.DeDefaultPages</c> /
 /// <c>FrDefaultPages</c> per-language source in
 /// <c>Kumunita.Core.Bootstrap</c>).</item>
 /// </list>

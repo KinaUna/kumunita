@@ -110,7 +110,7 @@ public sealed class BookmarkButtonTests
         bookmarks
             .ToggleAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<Marten.IDocumentSession>())
+                Arg.Any<CancellationToken>())
             .Returns(
                 // First call — row created.
                 new BookmarkToggleResult(BookmarkToggleStatus.Bookmarked),
@@ -118,11 +118,7 @@ public sealed class BookmarkButtonTests
                 // unique-index witness).
                 new BookmarkToggleResult(BookmarkToggleStatus.AlreadyBookmarked));
 
-        var store = Substitute.For<Marten.IDocumentStore>();
-        var session = Substitute.For<Marten.IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(bookmarks, store, subjectId: actor);
+        var controller = Build(bookmarks, subjectId: actor);
 
         // First call — Bookmarked; redirect to the surface's own URL.
         var first = await controller.Toggle(kind, id, returnUrl);
@@ -141,14 +137,11 @@ public sealed class BookmarkButtonTests
 
         // The seam's ToggleAsync was called twice, both with the actor's
         // SubjectId as the ownerId (C-M17·1: the controller never
-        // re-derives access, the seam is the sole writer).
+        // re-derives access, the seam is the sole writer). IMPROVE-CODE C09
+        // — the committed overload (the service owns the single write,
+        // ADR 0006 §D); the controller no longer owns the session/commit.
         await bookmarks.Received(2).ToggleAsync(
-            actor, kind, id, Arg.Any<Marten.IDocumentSession>());
-
-        // The caller owned the session (the C3 commit — the U02
-        // RunInSession shape: the service stores into the caller's
-        // session, the caller commits).
-        await session.Received(2).SaveChangesAsync(Arg.Any<CancellationToken>());
+            actor, kind, id, Arg.Any<CancellationToken>());
     }
 
     // ── 2 — F2_Invisible_Target_Refused_404_No_Row_Survives ────────────────
@@ -175,14 +168,10 @@ public sealed class BookmarkButtonTests
         bookmarks
             .ToggleAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<Marten.IDocumentSession>())
+                Arg.Any<CancellationToken>())
             .Returns(new BookmarkToggleResult(BookmarkToggleStatus.Refused));
 
-        var store = Substitute.For<Marten.IDocumentStore>();
-        var session = Substitute.For<Marten.IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(bookmarks, store, subjectId: actor);
+        var controller = Build(bookmarks, subjectId: actor);
         var result = await controller.Toggle(kind, id);
 
         // C-M17·3 / F2 — the non-leaky 404 (the D3 write-lane
@@ -194,9 +183,10 @@ public sealed class BookmarkButtonTests
         // The seam's ToggleAsync was called (the write lane ran), but
         // the seam's ListAsync was **not** called (the sole-reader pin —
         // C-M17·1: the controller never re-derives access; the write
-        // lane and the read lane are independent).
+        // lane and the read lane are independent). IMPROVE-CODE C09 — the
+        // committed overload (the service owns the single write).
         await bookmarks.Received(1).ToggleAsync(
-            actor, kind, id, Arg.Any<Marten.IDocumentSession>());
+            actor, kind, id, Arg.Any<CancellationToken>());
         await bookmarks.DidNotReceive().ListAsync(Arg.Any<string>());
     }
 
@@ -233,10 +223,11 @@ public sealed class BookmarkButtonTests
 
         // The seam's ToggleAsync was **not** called (the "operator has
         // no read standing" precedent — the controller returns the 404
-        // before delegating any write to the seam).
+        // before delegating any write to the seam). IMPROVE-CODE C09 —
+        // the committed overload shape (no session param).
         await bookmarks.DidNotReceive().ToggleAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<Marten.IDocumentSession>());
+            Arg.Any<CancellationToken>());
     }
 
     // ── 4 — F4_Unbookmark_On_Degraded_Row_Still_Works ──────────────────────
@@ -267,14 +258,10 @@ public sealed class BookmarkButtonTests
         bookmarks
             .RemoveAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<Marten.IDocumentSession>())
+                Arg.Any<CancellationToken>())
             .Returns(new BookmarkToggleResult(BookmarkToggleStatus.Removed));
 
-        var store = Substitute.For<Marten.IDocumentStore>();
-        var session = Substitute.For<Marten.IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(bookmarks, store, subjectId: actor);
+        var controller = Build(bookmarks, subjectId: actor);
         var result = await controller.Remove(targetKind, targetId);
 
         // The "redirect after write" precedent: the unbookmark commits +
@@ -290,15 +277,13 @@ public sealed class BookmarkButtonTests
         Assert.Equal("bm.toggle.removed", controller.TempData["info"]);
 
         // The seam's RemoveAsync was called with the actor's SubjectId
-        // as the ownerId + the targetKind / targetId verbatim + the
-        // caller's session (the C3 same-transaction lane — the D5 pin:
+        // as the ownerId + the targetKind / targetId verbatim (the D5 pin:
         // no target read at all, the row is keyed on the owner's own
-        // Bookmark row).
+        // Bookmark row). IMPROVE-CODE C09 — the committed overload (the
+        // service owns the single write, ADR 0006 §D); the controller no
+        // longer owns the session/commit.
         await bookmarks.Received(1).RemoveAsync(
-            actor, targetKind, targetId, Arg.Any<Marten.IDocumentSession>());
-
-        // The caller owned the session (the C3 commit).
-        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+            actor, targetKind, targetId, Arg.Any<CancellationToken>());
     }
 
     // ── 5 — BmButton_Partial_Renders_Correct_Lane_For_State ───────────────
@@ -435,19 +420,17 @@ public sealed class BookmarkButtonTests
     /// <summary>
     /// Builds a <see cref="BookmarksController"/> over NSubstitute seams
     /// (the <see cref="BookmarksControllerTests"/> harness shape — the
-    /// <see cref="IBookmarkService"/> is the sole seam, the
-    /// <see cref="Marten.IDocumentStore"/> is a plain substitute for the
-    /// write lane's <c>LightweightSession()</c>, a no-op
+    /// <see cref="IBookmarkService"/> is the sole seam, a no-op
     /// <see cref="ITempDataProvider"/> closes the <c>TempData</c> bag).
+    /// IMPROVE-CODE C09 — the controller drops the raw store (the write
+    /// lanes moved to the seam's committed overloads); the harness no
+    /// longer substitutes a <c>Marten.IDocumentStore</c>.
     /// </summary>
     private static BookmarksController Build(
         IBookmarkService bookmarks,
-        Marten.IDocumentStore? store = null,
         string? subjectId = null)
     {
-        store ??= Substitute.For<Marten.IDocumentStore>();
-
-        var controller = new BookmarksController(bookmarks, store);
+        var controller = new BookmarksController(bookmarks);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

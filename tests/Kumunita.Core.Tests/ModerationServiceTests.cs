@@ -615,15 +615,16 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         });
 
         string? createdReportId = null;
-        await RunInSession(store, async session =>
+        await svc.FileReportTargetAsync(
+            "event", "t1-event", ComponentId, "u-t1-author", reporter, "spam");
+
+        await using (var s1 = store.QuerySession())
         {
-            await svc.FileReportTargetAsync(
-                "event", "t1-event", ComponentId, "u-t1-author", reporter, "spam", session);
-            var filed = await session.Query<Report>()
+            var filed = await s1.Query<Report>()
                 .Where(r => r.TargetId == "t1-event")
                 .ToListAsync(TestContext.Current.CancellationToken);
             createdReportId = Assert.Single(filed).Id;
-        });
+        }
 
         await using (var s2 = store.QuerySession())
         {
@@ -666,9 +667,8 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var (_, _, svc) = Services(store);
         const string reporter = "u-t2-reporter";
 
-        await RunInSession(store, async session =>
-            await svc.FileReportTargetAsync(
-                kind, targetId, ComponentId, "u-t2-author", reporter, "reason", session));
+        await svc.FileReportTargetAsync(
+            kind, targetId, ComponentId, "u-t2-author", reporter, "reason");
 
         await using (var s2 = store.QuerySession())
         {
@@ -706,9 +706,8 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
             Start = DateTimeOffset.UtcNow, End = DateTimeOffset.UtcNow,
         });
 
-        await RunInSession(store, async session =>
-            await svc.FileReportTargetAsync(
-                "event", "t3-event", ComponentId, author, author, "self", session));
+        await svc.FileReportTargetAsync(
+            "event", "t3-event", ComponentId, author, author, "self");
 
         Assert.Empty(staged);
 
@@ -742,9 +741,8 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
             Start = DateTimeOffset.UtcNow, End = DateTimeOffset.UtcNow,
         });
 
-        await RunInSession(store, async session =>
-            await svc.FileReportTargetAsync(
-                "event", "t4-event", ComponentId, author, reporter, "harassment", session));
+        await svc.FileReportTargetAsync(
+            "event", "t4-event", ComponentId, author, reporter, "harassment");
 
         var email = Assert.Single(staged);
         Assert.StartsWith("notification:report.filed:", email.Key);
@@ -763,9 +761,9 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
 
-        await Assert.ThrowsAsync<ArgumentException>(() => RunInSession(store,
-            session => svc.FileReportTargetAsync(
-                "page", "t5-page", ComponentId, "u-t5-author", "u-t5-reporter", "x", session)));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            svc.FileReportTargetAsync(
+                "page", "t5-page", ComponentId, "u-t5-author", "u-t5-reporter", "x"));
 
         await using (var s2 = store.QuerySession())
         {
@@ -847,9 +845,10 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
 
         var userInfoReal = new UserInfoService(store);
         var authz = new AuthorizationService(store, userInfoReal);
+        var profileSettings = new ProfileSettingsService(store);
         var notifications = new NotificationService(
             store, userInfo, translator, mailer, null, null, null);
-        var moderation = new ModerationService(userInfoReal, authz, store, notifications);
+        var moderation = new ModerationService(profileSettings, authz, store, notifications);
 
         return (store, moderation, staged);
     }
@@ -891,7 +890,8 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
     {
         var userInfo = new UserInfoService(store);
         var authz = new AuthorizationService(store, userInfo);
-        var moderation = new ModerationService(userInfo, authz, store);
+        var profileSettings = new ProfileSettingsService(store);
+        var moderation = new ModerationService(profileSettings, authz, store);
         return (userInfo, authz, moderation);
     }
 

@@ -192,7 +192,7 @@ public sealed class GuardianDeleteChildTests(PostgresFixture fixture) : IClassFi
         var userInfo = new UserInfoService(store);
         var identity = Substitute.For<IIdentityService>();
 
-        var controller = new GuardianController(userInfo, identity, store);
+        var controller = new GuardianController(userInfo, Substitute.For<IGroupService>(), Substitute.For<IGuardianService>(), Substitute.For<IProfileSettingsService>(), identity, store);
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = new System.Security.Claims.ClaimsPrincipal(

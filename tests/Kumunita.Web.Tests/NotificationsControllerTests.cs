@@ -352,14 +352,16 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // The display-name seams: one member community, one owned group, one
         // parent page the resident has a page.child row for.
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         userInfo.GetCommunityIdsAsync(Actor)
             .Returns(Task.FromResult<IReadOnlyCollection<string>>(new[] { community }));
-        userInfo.GetComponentsAsync(true)
+        profileSettings.GetComponentsAsync(true)
             .Returns(Task.FromResult<IReadOnlyList<Component>>(new List<Component>
             {
                 new Component { Id = community, Name = "Safety" },
             }));
-        userInfo.GetGroupsForUserAsync(Actor)
+        groupService.GetGroupsForUserAsync(Actor)
             .Returns(Task.FromResult<IReadOnlyList<Group>>(new List<Group>
             {
                 new Group { Id = group, Name = "My Group" },
@@ -371,7 +373,7 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
                 new Page { Id = parentPage, Title = "Parent S1" },
             }));
 
-        var controller = Build(store, userInfo, pages);
+        var controller = Build(store, userInfo, pages, profileSettings, groupService);
         var result = await controller.Subscriptions();
 
         var view = Assert.IsType<ViewResult>(result);
@@ -497,13 +499,14 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
     /// don't NRE.
     /// </summary>
     private static NotificationsController Build(IDocumentStore store,
-        IUserInfoService? userInfo = null, IPageService? pages = null)
+        IUserInfoService? userInfo = null, IPageService? pages = null,
+        IProfileSettingsService? profileSettings = null, IGroupService? groupService = null)
     {
         var translator = Substitute.For<ITranslationProvider>();
         var mailer = Substitute.For<IMailerStage>();
 
         var service = new NotificationService(store, userInfo ?? Substitute.For<IUserInfoService>(), translator, mailer);
-        var controller = new NotificationsController(service, userInfo: userInfo, pages: pages);
+        var controller = new NotificationsController(service, userInfo: userInfo, pages: pages, profileSettings: profileSettings, groupService: groupService);
 
         controller.ControllerContext = new ControllerContext
         {

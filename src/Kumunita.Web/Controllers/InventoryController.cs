@@ -62,13 +62,15 @@ public sealed class InventoryController : Controller
 {
     private readonly IInventoryService inventory;
     private readonly IUserInfoService userInfo;
+    private readonly IProfileSettingsService profileSettings;
 
     public InventoryController(
         IInventoryService inventory,
-        IUserInfoService userInfo)
+        IUserInfoService userInfo, IProfileSettingsService profileSettings)
     {
         this.inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
         this.userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
     }
 
     private static string? SubjectId(ClaimsPrincipal user) =>
@@ -554,7 +556,7 @@ public sealed class InventoryController : Controller
     /// </summary>
     private async Task<IReadOnlyList<(string Id, string Name)>> SeedComponentsAsync()
     {
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var components = await profileSettings.GetComponentsAsync(enabledOnly: true);
         return components
             .Select(c => (Id: c.Id, Name: string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name))
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)

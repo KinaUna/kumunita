@@ -43,11 +43,12 @@ namespace Kumunita.Web.Controllers;
 public sealed class MessagingSettingsController(
     ILogger<MessagingSettingsController> logger,
     IMessagingService messaging,
-    IUserInfoService userInfo) : Controller
+    IUserInfoService userInfo, IProfileSettingsService profileSettings) : Controller
 {
     private readonly ILogger<MessagingSettingsController> _logger = logger;
     private readonly IMessagingService _messaging = messaging;
     private readonly IUserInfoService _userInfo = userInfo;
+    private readonly IProfileSettingsService _profileSettings = profileSettings;
 
     /// <summary>
     /// <c>GET /settings/messaging</c> — the resident's messaging opt-in
@@ -151,7 +152,7 @@ public sealed class MessagingSettingsController(
 
         try
         {
-            await _userInfo.SetMessagingOptInAsync(actorId, optIn, actorId);
+            await _profileSettings.SetMessagingOptInAsync(actorId, optIn, actorId);
             TempData["info"] = optIn
                 ? "Messaging enabled for your account."
                 : "Messaging disabled for your account.";

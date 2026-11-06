@@ -1,0 +1,12 @@
+{
+  "todo.blocked_by": "Waiting on",
+  "todo.blocked_by_none": "No blocker",
+  "todo.blocked_generic": "Another to-do (not visible to you)",
+  "todo.blocked_filter": "Waiting on something",
+  "todo.event_link": "Linked event",
+  "todo.set_event.label": "Link to event",
+  "todo.set_event.pick": "Choose an event",
+  "todo.set_event.create_new": "Create a new event\u2026",
+  "todo.set_event.create_hint": "Create a new event to link to this to-do. It is saved as a draft \u2014 you can publish it from the event\u0027s detail page.",
+  "todo.set_event.create_submit": "Create and link"
+}

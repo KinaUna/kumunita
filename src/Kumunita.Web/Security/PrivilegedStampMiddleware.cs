@@ -105,8 +105,8 @@ public sealed class PrivilegedStampMiddleware
         var currentModeratorScopes = new HashSet<string>();
         if (currentRoles.Contains(Roles.Moderator))
         {
-            var userInfo = requestServices.GetRequiredService<IUserInfoService>();
-            var assignments = await userInfo.GetAssignmentsAsync(subject);
+            var profileSettings = requestServices.GetRequiredService<IProfileSettingsService>();
+            var assignments = await profileSettings.GetAssignmentsAsync(subject);
             foreach (var a in assignments)
                 currentModeratorScopes.Add(Roles.ModeratorComponent(a.ComponentId));
         }

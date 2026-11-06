@@ -1,0 +1,18 @@
+{
+  "onboarding.title": "Dein Konto einrichten",
+  "onboarding.intro": "Ein kurzer gef\u00FChrter Rundgang durch die wenigen Dinge, die Kumunita f\u00FCr dich zum Laufen bringen. Alles f\u00FChrt in die Einstellung, die es bereits besitzt \u2014 du schlie\u00DFt in einer Minute ab oder kommst jederzeit wieder.",
+  "onboarding.step_displayname": "Dein Anzeigename",
+  "onboarding.step_avatar": "Dein Avatar",
+  "onboarding.step_language": "Deine Schnittstellensprache",
+  "onboarding.step_timezone": "Deine Zeitzone",
+  "onboarding.step_dateformat": "Dein Datums- und Zeitformat",
+  "onboarding.step_email": "Deine E-Mail- und Benachrichtigungssprache",
+  "onboarding.step_contact": "Deine Kontaktdaten \u0026 wer sie sehen kann",
+  "onboarding.step_messaging": "Ob Du Direktnachrichten nutzen kannst",
+  "onboarding.visit": "Zu dieser Einstellung",
+  "onboarding.finish": "Alles klar \u2014 Einrichtung abschlie\u00DFen",
+  "onboarding.skip": "Jetzt \u00FCberspringen",
+  "onboarding.flash_done": "Einrichtung abgeschlossen \u2014 willkommen in deiner Nachbarschaft.",
+  "onboarding.banner.text": "Dein Konto fertig einrichten?",
+  "onboarding.banner.action": "Einrichtung starten"
+}

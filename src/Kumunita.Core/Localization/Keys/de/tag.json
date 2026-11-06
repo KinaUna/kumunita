@@ -1,0 +1,8 @@
+{
+  "tag.suggest.remove_prefix": "Tag entfernen: ",
+  "tag.input.placeholder": "z. B. sanit\u00E4tsdienst, haushalt, maplestreet",
+  "tag.input.hint": "Tippe, um bestehende Tags zu finden, oder starte ein neues.",
+  "tag.suggest.empty": "Keine passenden Tags \u2014 weiter tippen oder ein neues starten.",
+  "tag.translate.heading": "\u00DCbersetzungen",
+  "tag.translate.save": "Speichern"
+}

@@ -20,7 +20,7 @@ namespace Kumunita.Core.Tests;
 /// deleted.
 /// <para>
 /// The single source the seeder and these tests both read is
-/// <see cref="FirstBootSeeder.GuidePages"/>() — the ADR 0042 D1 "the registry
+/// <see cref="SeededContentCatalog.GuidePages"/>() — the ADR 0042 D1 "the registry
 /// is the single source both the seeder and these tests read, so mirroring is
 /// exact" shape, applied to the guides. A lane that adds a feature without a
 /// guide row, or a guide row without a feature, is a red test (the drift
@@ -30,7 +30,7 @@ namespace Kumunita.Core.Tests;
 /// The <c>UG_*</c> family mirrors the <see cref="PageServiceTests"/>
 /// <c>PG5_*</c> seeder family (fresh scratch Postgres per test, the public
 /// static <see cref="FirstBootSeeder.SeedDefaultPagesAsync"/> + the public
-/// <see cref="FirstBootSeeder.GuidePages"/> page-data source), so it pins the
+/// <see cref="SeededContentCatalog.GuidePages"/> page-data source), so it pins the
 /// exact seeded set + idempotency across two live sessions, the `en`
 /// floor + the de/fr/da baselines, and the "guides under <c>help</c>, not
 /// under <c>system</c> and not new roots" shape — the invariants that keep
@@ -72,7 +72,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     {
         await using (var s = newSession(store))
         {
-            var defaultPages = FirstBootSeeder.EnDefaultPages();
+            var defaultPages = SeededContentCatalog.EnDefaultPages();
             var seededPageIds = await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
             await FirstBootSeeder.SeedPageTranslationsAsync(s, seededPageIds, DateTimeOffset.UtcNow, ct);
             if (seededPageIds.TryGetValue("help", out var helpId))
@@ -89,7 +89,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
-        var guideSlugs = FirstBootSeeder.GuidePages().Select(g => g.Slug).ToArray();
+        var guideSlugs = SeededContentCatalog.GuidePages().Select(g => g.Slug).ToArray();
 
         // Boot 1 — seed into one session, commit.
         await BootGuidesAsync(store, ct);
@@ -127,7 +127,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // GuideParentMap) is a child of its top-level parent guide. The
         // single source the test reads is GuidePages() + GuideParentMap() —
         // the ADR 0057 D4 drift pin, extended to the nesting shape.
-        var parentMap = FirstBootSeeder.GuideParentMap();
+        var parentMap = SeededContentCatalog.GuideParentMap();
         var topLevelSlugs = guideSlugs.Where(s => !parentMap.ContainsKey(s)).ToArray();
 
         // The direct children of `help` are EXACTLY the top-level guides —
@@ -178,7 +178,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
-        var guides = FirstBootSeeder.GuidePages();
+        var guides = SeededContentCatalog.GuidePages();
 
         await BootGuidesAsync(store, ct);
 
@@ -193,7 +193,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // ADR 0160 — a guide's parent is `help` (top-level) or its parent
         // guide (nested, per the closed GuideParentMap). Resolve the correct
         // parent id before asserting the shape.
-        var parentMap = FirstBootSeeder.GuideParentMap();
+        var parentMap = SeededContentCatalog.GuideParentMap();
 
         foreach (var (slug, title, body) in guides)
         {
@@ -245,7 +245,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // is preserved — the baselines are hand-curated, not machine output.
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
-        var guideSlugs = FirstBootSeeder.GuidePages().Select(g => g.Slug).ToArray();
+        var guideSlugs = SeededContentCatalog.GuidePages().Select(g => g.Slug).ToArray();
 
         await BootGuidesAsync(store, ct);
 
@@ -355,11 +355,11 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // deployment whose first boot predates the guide-translation lane).
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
-        var guideSlugs = FirstBootSeeder.GuidePages().Select(g => g.Slug).ToArray();
+        var guideSlugs = SeededContentCatalog.GuidePages().Select(g => g.Slug).ToArray();
 
         await using (var s = newSession(store))
         {
-            var defaultPages = FirstBootSeeder.EnDefaultPages();
+            var defaultPages = SeededContentCatalog.EnDefaultPages();
             var seededPageIds = await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
             await FirstBootSeeder.SeedPageTranslationsAsync(s, seededPageIds, DateTimeOffset.UtcNow, ct);
             if (seededPageIds.TryGetValue("help", out var helpId))
@@ -396,7 +396,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // Run the backfill.
         await using (var bf = newSession(store))
         {
-            await FirstBootSeeder.BackfillGuideTranslationsAsync(bf, ct);
+            await SeededContentCatalog.BackfillGuideTranslationsAsync(bf, ct);
             await bf.SaveChangesAsync(ct);
         }
 
@@ -450,7 +450,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // Re-run backfill — must be a no-op for the edited row.
         await using (var bf2 = newSession(store))
         {
-            await FirstBootSeeder.BackfillGuideTranslationsAsync(bf2, ct);
+            await SeededContentCatalog.BackfillGuideTranslationsAsync(bf2, ct);
             await bf2.SaveChangesAsync(ct);
         }
 
@@ -505,7 +505,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     {
         await using (var s = newSession(store))
         {
-            var defaultPages = FirstBootSeeder.EnDefaultPages();
+            var defaultPages = SeededContentCatalog.EnDefaultPages();
             var seededPageIds = await FirstBootSeeder.SeedDefaultPagesAsync(
                 s, defaultPages, DateTimeOffset.UtcNow, ct);
             await FirstBootSeeder.SeedPageTranslationsAsync(
@@ -558,7 +558,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
-        var guideSlugs = FirstBootSeeder.GuidePages().Select(g => g.Slug).ToArray();
+        var guideSlugs = SeededContentCatalog.GuidePages().Select(g => g.Slug).ToArray();
 
         // A first boot that predates the UG lane: the four-surface set only.
         var helpId = await BootHelpOnlyAsync(store, ct);
@@ -569,14 +569,14 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // nested under their top-level guide — ADR 0160).
         await using (var s = newSession(store))
         {
-            await FirstBootSeeder.BackfillUserGuidesAsync(s, ct);
+            await SeededContentCatalog.BackfillUserGuidesAsync(s, ct);
         }
 
         Assert.Equal(guideSlugs.Length, await CountGuidesInHelpSubtreeAsync(store, helpId, ct));
         // One per slug, no duplicates, and each slug is exactly where the
         // parent map places it (top-level under `help`, nested under its
         // parent guide).
-        var parentMap = FirstBootSeeder.GuideParentMap();
+        var parentMap = SeededContentCatalog.GuideParentMap();
         await using var q = store.QuerySession();
         var topLevelIds = await q.Query<Page>()
             .Where(p => p.ParentId == helpId && p.IsDeleted == false)
@@ -609,16 +609,16 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
 
         await using (var s1 = newSession(store))
         {
-            await FirstBootSeeder.BackfillUserGuidesAsync(s1, ct);
+            await SeededContentCatalog.BackfillUserGuidesAsync(s1, ct);
         }
         var afterFirst = await CountGuidesInHelpSubtreeAsync(store, helpId, ct);
-        Assert.Equal(FirstBootSeeder.GuidePages().Length, afterFirst);
+        Assert.Equal(SeededContentCatalog.GuidePages().Length, afterFirst);
 
         // A second warm boot (the same upgrade, e.g. a container restart) finds
         // every guide and skips — the create-if-missing path.
         await using (var s2 = newSession(store))
         {
-            await FirstBootSeeder.BackfillUserGuidesAsync(s2, ct);
+            await SeededContentCatalog.BackfillUserGuidesAsync(s2, ct);
         }
         Assert.Equal(afterFirst, await CountGuidesInHelpSubtreeAsync(store, helpId, ct));
     }
@@ -628,7 +628,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     {
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
-        var (slug, title, body) = FirstBootSeeder.GuidePages()[0];
+        var (slug, title, body) = SeededContentCatalog.GuidePages()[0];
         var communityBody = "A community-edited guide — this text must survive the backfill.";
 
         // Pre-existing page at the guide's slug under `help`: either a
@@ -661,14 +661,14 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // The backfill runs over a full registry that includes this slug.
         await using (var bf = newSession(store))
         {
-            await FirstBootSeeder.BackfillUserGuidesAsync(bf, ct);
+            await SeededContentCatalog.BackfillUserGuidesAsync(bf, ct);
         }
 
         // ADR 0160 — the pre-existing top-level guide was skipped
         // (create-if-missing; ADR 0042 D1) and the full guide subtree
         // (top-level + nested) was backfilled.
         Assert.Equal(
-            FirstBootSeeder.GuidePages().Length,
+            SeededContentCatalog.GuidePages().Length,
             await CountGuidesInHelpSubtreeAsync(store, helpId, ct));
         await using var q = store.QuerySession();
         var row = await q.Query<Page>().Where(p => p.Id == preexistingId).FirstAsync(ct);

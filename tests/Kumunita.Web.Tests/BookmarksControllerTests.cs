@@ -318,14 +318,10 @@ public sealed class BookmarksControllerTests
         var bookmarks = Substitute.For<IBookmarkService>();
         bookmarks.RemoveAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<Marten.IDocumentSession>())
+                Arg.Any<CancellationToken>())
             .Returns(new BookmarkToggleResult(BookmarkToggleStatus.Removed));
 
-        var store = Substitute.For<Marten.IDocumentStore>();
-        var session = Substitute.For<Marten.IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(bookmarks, store, subjectId: actor);
+        var controller = Build(bookmarks, subjectId: actor);
         var result = await controller.Remove(targetKind, targetId);
 
         // The "redirect after write" precedent (the M16 InventoryController
@@ -341,16 +337,13 @@ public sealed class BookmarksControllerTests
         Assert.Equal("bm.toggle.removed", controller.TempData["info"]);
 
         // The seam's RemoveAsync was called with the actor's SubjectId as
-        // the ownerId + the targetKind / targetId verbatim + the caller's
-        // session (the C3 same-transaction lane — the D5 pin: no target
-        // read at all, the row is keyed on the owner's own Bookmark row).
+        // the ownerId + the targetKind / targetId verbatim (the D5 pin: no
+        // target read at all, the row is keyed on the owner's own Bookmark
+        // row). IMPROVE-CODE C09 — the committed overload (the service
+        // owns the single write, ADR 0006 §D); the controller no longer
+        // owns the session/commit.
         await bookmarks.Received(1).RemoveAsync(
-            actor, targetKind, targetId, Arg.Any<Marten.IDocumentSession>());
-
-        // The caller owned the session (the C3 commit — the U02
-        // RunInSession shape: the service stores/deletes into the
-        // caller's session, the caller commits).
-        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+            actor, targetKind, targetId, Arg.Any<CancellationToken>());
     }
 
     // ── 5 — BmKeys_AreTheClosedTwentyThreeKeySet ──────────────────────────
@@ -413,24 +406,19 @@ public sealed class BookmarksControllerTests
     /// The <see cref="IBookmarkService"/> is the sole seam (C-M17·1 / C-M17·2
     /// — the controller composes **only** the bookmark service; no
     /// <c>IAuthorizationService</c>, no <c>IUserInfoService</c> — the
-    /// owner's list is a personal read, zero audit). The
-    /// <see cref="Marten.IDocumentStore"/> is a plain substitute for the
-    /// write lane's <c>LightweightSession()</c> (the C3 same-transaction
-    /// lane — <see cref="BookmarkService"/> never commits internally; the
-    /// caller owns the single write). A no-op
+    /// owner's list is a personal read, zero audit). IMPROVE-CODE C09 — the
+    /// controller drops the raw store (the write lanes moved to the seam's
+    /// committed overloads, ADR 0006 §D). A no-op
     /// <see cref="ITempDataProvider"/> closes the <c>TempData</c> bag so the
     /// write lane's success branch doesn't NRE
     /// (<c>DefaultHttpContext</c> leaves <c>Session</c> null by default).
     /// </summary>
     private static BookmarksController Build(
         IBookmarkService bookmarks,
-        Marten.IDocumentStore? store = null,
         string? subjectId = null,
         string[]? roles = null)
     {
-        store ??= Substitute.For<Marten.IDocumentStore>();
-
-        var controller = new BookmarksController(bookmarks, store);
+        var controller = new BookmarksController(bookmarks);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

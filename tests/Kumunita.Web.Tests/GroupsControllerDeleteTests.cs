@@ -32,77 +32,82 @@ public class GroupsControllerDeleteTests
     public async Task DeleteGroup_Owner_HappyPath_RedirectsToIndex_AndDeletes()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetGroupsForUserAsync("subj-owner").Returns(new List<Group>
+        var groupService = Substitute.For<IGroupService>();
+        groupService.GetGroupsForUserAsync("subj-owner").Returns(new List<Group>
         {
             new() { Id = GroupId, Name = "G", OwnerId = "subj-owner" },
         });
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-owner");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-owner");
 
         var result = await controller.DeleteGroup(GroupId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(GroupsController.Index), redirect.ActionName);
-        await userInfo.Received(1).DeleteGroupAsync(GroupId, "subj-owner");
+        await groupService.Received(1).DeleteGroupAsync(GroupId, "subj-owner");
     }
 
     [Fact]
     public async Task DeleteGroup_GlobalAdmin_HappyPath_RedirectsToIndex_AndDeletes()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var groupService = Substitute.For<IGroupService>();
         // The actor is a member (in the projection) but NOT the owner; the
         // GlobalAdmin standing is what clears the owner ∪ GlobalAdmin gate.
-        userInfo.GetGroupsForUserAsync("subj-admin").Returns(new List<Group>
+        groupService.GetGroupsForUserAsync("subj-admin").Returns(new List<Group>
         {
             new() { Id = GroupId, Name = "G", OwnerId = "subj-owner" },
         });
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member, Roles.GlobalAdmin }, subjectId: "subj-admin");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member, Roles.GlobalAdmin }, subjectId: "subj-admin");
 
         var result = await controller.DeleteGroup(GroupId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(GroupsController.Index), redirect.ActionName);
-        await userInfo.Received(1).DeleteGroupAsync(GroupId, "subj-admin");
+        await groupService.Received(1).DeleteGroupAsync(GroupId, "subj-admin");
     }
 
     [Fact]
     public async Task DeleteGroup_PlainMember_NotFound_NoDelete()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var groupService = Substitute.For<IGroupService>();
         // In the projection (a member) but neither owner nor GlobalAdmin.
-        userInfo.GetGroupsForUserAsync("subj-member").Returns(new List<Group>
+        groupService.GetGroupsForUserAsync("subj-member").Returns(new List<Group>
         {
             new() { Id = GroupId, Name = "G", OwnerId = "subj-owner" },
         });
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-member");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-member");
 
         var result = await controller.DeleteGroup(GroupId);
 
         Assert.IsType<NotFoundResult>(result);
-        await userInfo.DidNotReceive().DeleteGroupAsync(Arg.Any<string>(), Arg.Any<string>());
+        await groupService.DidNotReceive().DeleteGroupAsync(Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
     public async Task DeleteGroup_NonMember_NotFound_NoDelete()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var groupService = Substitute.For<IGroupService>();
         // Empty projection — the group is not in the actor's visible set.
-        userInfo.GetGroupsForUserAsync("subj-outside").Returns(new List<Group>());
+        groupService.GetGroupsForUserAsync("subj-outside").Returns(new List<Group>());
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-outside");
+        var controller = Build(userInfo, groupService, roles: new[] { Roles.Member }, subjectId: "subj-outside");
 
         var result = await controller.DeleteGroup(GroupId);
 
         Assert.IsType<NotFoundResult>(result);
-        await userInfo.DidNotReceive().DeleteGroupAsync(Arg.Any<string>(), Arg.Any<string>());
+        await groupService.DidNotReceive().DeleteGroupAsync(Arg.Any<string>(), Arg.Any<string>());
     }
 
     // ── Harness ─────────────────────────────────────────────────────────────
 
     private static GroupsController Build(
         IUserInfoService? userInfo = null,
+        IGroupService? groupService = null,
         string[]? roles = null,
         bool IsAuthenticated = false,
         string? subjectId = null)
@@ -119,7 +124,7 @@ public class GroupsControllerDeleteTests
 
         var events = Substitute.For<Kumunita.Core.Events.IEventService>();
 
-        var controller = new GroupsController(userInfoImpl, posts, localization, store, events);
+        var controller = new GroupsController(userInfoImpl, groupService ?? Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), posts, localization, store, events);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 

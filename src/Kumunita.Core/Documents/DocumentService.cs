@@ -42,7 +42,7 @@ namespace Kumunita.Core.Documents;
 /// The DI registration passes the live <see cref="ITagService"/>.
 /// </para>
 /// </summary>
-public sealed class DocumentService
+public sealed class DocumentService : IDocumentService
 {
     private static readonly int PageSize = 30;
 

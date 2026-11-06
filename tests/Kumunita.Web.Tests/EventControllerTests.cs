@@ -246,14 +246,18 @@ public class EventControllerTests
     {
         const string id = "ev-rsvp-denied";
         var events = Substitute.For<IEventService>();
-        events.RsvpAsync(id, Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>())
+        // C3-00 (ADR 0290 named seam) — the self-lane RSVP now lives on the
+        // IEventRsvpGuardian seam; mock the denial there (the service is the
+        // one that raises the 403, the Web maps it to a ForbidResult).
+        var rsvp = Substitute.For<IEventRsvpGuardian>();
+        rsvp.RsvpAsync(id, Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<EventRsvp>(new UnauthorizedAccessException($"Actor may not RSVP to event '{id}'.")));
-        var controller = Build(events, subjectId: "subj-resident-001");
+        var controller = Build(events, subjectId: "subj-resident-001", rsvpGuardian: rsvp);
 
         var result = await controller.Rsvp(id, RsvpStatus.Going);
 
         Assert.IsType<ForbidResult>(result);
-        await events.Received(1).RsvpAsync(id, Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>());
+        await rsvp.Received(1).RsvpAsync(id, Arg.Any<string>(), Arg.Any<RsvpStatus>(), Arg.Any<CancellationToken>());
     }
 
     // ── Feed (GET /events) ─────────────────────────────────────────────────────
@@ -270,15 +274,16 @@ public class EventControllerTests
     [Fact]
     public async Task Index_PassesComponentFilterAndPage_Verbatim_ToService()
     {
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync( "component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001", componentId: "component-A") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
-        userInfo.GetComponentsAsync(true).Returns(new List<Component> { new() { Id = "component-A", Name = "Community A" } });
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component> { new() { Id = "component-A", Name = "Community A" } });
 
-        var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
+        var controller = Build(events, userInfo: userInfo, profileSettings: profileSettings, subjectId: "subj-resident-001");
 
         var result = (await controller.Index(componentId: "component-A", page: 2)) as ViewResult;
 
@@ -303,13 +308,14 @@ public class EventControllerTests
     [Fact]
     public async Task Index_When_AuthorProfileMissing_FallsBackToSubjectId()
     {
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-1", authorId: "subj-ghost-001") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync("subj-ghost-001").Returns((Profile?)null);
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
 
@@ -333,6 +339,7 @@ public class EventControllerTests
     [Fact]
     public async Task Index_SurfacesMyEvents_WithDisplayNames()
     {
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-feed", authorId: "subj-author-001") }, false));
@@ -342,9 +349,9 @@ public class EventControllerTests
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
         userInfo.GetProfileAsync("subj-resident-001").Returns((Profile?)new Profile { SubjectId = "subj-resident-001", DisplayName = "Me" });
-        userInfo.GetComponentsAsync(true).Returns(new List<Component> { new() { Id = "component-A", Name = "Community A" } });
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component> { new() { Id = "component-A", Name = "Community A" } });
 
-        var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
+        var controller = Build(events, userInfo: userInfo, profileSettings: profileSettings, subjectId: "subj-resident-001");
 
         var result = (await controller.Index(componentId: null, page: 1)) as ViewResult;
 
@@ -369,6 +376,7 @@ public class EventControllerTests
     [Fact]
     public async Task Index_When_MyEventsEmpty_FeedUnchanged_And_MyEventsEmpty()
     {
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001") }, false));
@@ -377,7 +385,7 @@ public class EventControllerTests
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
 
@@ -429,13 +437,14 @@ public class EventControllerTests
     [Fact]
     public async Task Index_Past_RoutesToListPastAsync_AndSetsPastFlag()
     {
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         var events = Substitute.For<IEventService>();
         events.ListPastAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-past", authorId: "subj-author-001") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
 
@@ -463,6 +472,7 @@ public class EventControllerTests
     [Fact]
     public async Task Index_Past_CarriesPastSelectorInPagerFilterParams()
     {
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         var events = Substitute.For<IEventService>();
         // A full page (30 candidates, HasMore true) so the pager renders.
         var fullPage = Enumerable.Range(0, 30)
@@ -473,7 +483,7 @@ public class EventControllerTests
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
-        userInfo.GetComponentsAsync(true).Returns(new List<Component> { new() { Id = "component-A", Name = "Community A" } });
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component> { new() { Id = "component-A", Name = "Community A" } });
 
         var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
 
@@ -498,13 +508,14 @@ public class EventControllerTests
     [Fact]
     public async Task Index_Default_StillRoutesToListUpcomingAsync()
     {
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-up", authorId: "subj-author-001") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
 
@@ -858,6 +869,7 @@ public class EventControllerTests
         });
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Ada" });
         // RSVP-list display names: the author's row resolves to the profile's
         // name; the other residents' profiles are absent (NSubstitute null →
@@ -929,15 +941,20 @@ public class EventControllerTests
     {
         const string id = "ev-rsvp-post";
         var events = Substitute.For<IEventService>();
-        events.RsvpAsync(id, "subj-resident-001", RsvpStatus.Maybe, Arg.Any<CancellationToken>())
+        // C3-00 (ADR 0290 named seam) — the self-lane RSVP now lives on the
+        // IEventRsvpGuardian seam; the posted status passes to it verbatim
+        // (the last-write-wins write — the seam / the unique index converge a
+        // conflicting earlier row, not the Web).
+        var rsvp = Substitute.For<IEventRsvpGuardian>();
+        rsvp.RsvpAsync(id, "subj-resident-001", RsvpStatus.Maybe, Arg.Any<CancellationToken>())
             .Returns(new EventRsvp { Id = "rsvp-new", EventId = id, UserId = "subj-resident-001", Status = RsvpStatus.Maybe, At = DateTimeOffset.UnixEpoch });
-        var controller = Build(events, subjectId: "subj-resident-001");
+        var controller = Build(events, subjectId: "subj-resident-001", rsvpGuardian: rsvp);
 
         var result = await controller.Rsvp(id, RsvpStatus.Maybe);
 
         Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/events/{id}", ((RedirectResult)result).Url);
-        await events.Received(1).RsvpAsync(id, "subj-resident-001", RsvpStatus.Maybe, Arg.Any<CancellationToken>());
+        await rsvp.Received(1).RsvpAsync(id, "subj-resident-001", RsvpStatus.Maybe, Arg.Any<CancellationToken>());
     }
 
     // ── ADR 0059 — the event-translation lane (author ∪ Translator ∪ GlobalAdmin) ─
@@ -1872,6 +1889,8 @@ public class EventControllerTests
     [Fact]
     public async Task Calendar_Label_Uses_UserDefinedDateFormat()
     {
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         const string subject = "subj-dwm-label-userfmt";
         var zone = EffectiveTimezoneResolver.TryConvert("Europe/Berlin")!;
 
@@ -1884,7 +1903,7 @@ public class EventControllerTests
         // The viewer's Profile has a **date-only** custom format (the user's
         // defined date display format — directly applicable to a date value).
         var userInfoImpl = Substitute.For<IUserInfoService>();
-        userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
         userInfoImpl.GetProfileAsync(subject)
             .Returns(new Profile { DateFormat = "dd/MM/yyyy" });
 
@@ -1901,8 +1920,7 @@ public class EventControllerTests
         var timezone = new EffectiveTimezoneResolver(userInfoImpl, localization, httpContextAccessor);
         var dateFormat = new EffectiveDateFormatResolver(userInfoImpl, localization, httpContextAccessor);
 
-        var controller = new EventController(events, userInfoImpl, localization, Substitute.For<IDocumentStore>(), timezone,
-            translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
+        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone, translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
         controller.ControllerContext = new ControllerContext { HttpContext = sharedHttpContext };
         sharedHttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
             new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subject) },
@@ -1946,6 +1964,8 @@ public class EventControllerTests
     [Fact]
     public async Task Calendar_Label_DateTimeFormatStripsTimePortion()
     {
+        var groupService = Substitute.For<IGroupService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         const string subject = "subj-dwm-label-dtfmt";
         var zone = EffectiveTimezoneResolver.TryConvert("Europe/Berlin")!;
 
@@ -1958,7 +1978,7 @@ public class EventControllerTests
         // The viewer has no personal override; the platform default is the
         // ADR 0020 floor (a date-time format with HH:mm).
         var userInfoImpl = Substitute.For<IUserInfoService>();
-        userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
         userInfoImpl.GetProfileAsync(subject).Returns(new Profile { DateFormat = null });
 
         var localization = DefaultLocalization();
@@ -1974,8 +1994,7 @@ public class EventControllerTests
         var timezone = new EffectiveTimezoneResolver(userInfoImpl, localization, httpContextAccessor);
         var dateFormat = new EffectiveDateFormatResolver(userInfoImpl, localization, httpContextAccessor);
 
-        var controller = new EventController(events, userInfoImpl, localization, Substitute.For<IDocumentStore>(), timezone,
-            translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
+        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone, translationProvider: null, tags: null, projects: null, dateFormat: dateFormat);
         controller.ControllerContext = new ControllerContext { HttpContext = sharedHttpContext };
         sharedHttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
             new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subject) },
@@ -2252,13 +2271,15 @@ public class EventControllerTests
         string? subjectId)
     {
         var userInfoImpl = Substitute.For<IUserInfoService>();
-        userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
         var localization = DefaultLocalization();
         localization.GetDefaultTimezoneAsync().Returns(zoneId);
         var timezone = new EffectiveTimezoneResolver(userInfoImpl, localization, new HttpContextAccessor());
 
-        var controller = new EventController(events, userInfoImpl, localization, Substitute.For<IDocumentStore>(), timezone);
+        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();
@@ -2319,18 +2340,23 @@ public class EventControllerTests
     private static EventController Build(
         IEventService events,
         IUserInfoService? userInfo = null,
+        IProfileSettingsService? profileSettings = null,
         string[]? roles = null,
-        string? subjectId = null)
+        string? subjectId = null,
+        IEventRsvpGuardian? rsvpGuardian = null)
     {
         var userInfoImpl = userInfo ?? Substitute.For<IUserInfoService>();
+        var callerProfileSettings = profileSettings;
+        profileSettings ??= Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         // The picker / display-name seeding lanes default to empty candidate
         // sets (a valid shape); a caller-provided substitute's own setup wins.
-        if (userInfo is null)
+        if (callerProfileSettings is null)
         {
-            userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
-            userInfoImpl.GetProfilesAsync(true).Returns(new List<Profile>());
-            userInfoImpl.GetPublicGroupsAsync().Returns(new List<Group>());
+            profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+            profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
         }
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
         var localization = DefaultLocalization();
         // The composer's time-range default resolves the actor's effective time
@@ -2339,7 +2365,11 @@ public class EventControllerTests
         // a shape test only needs a non-throwing, non-null zone.
         var timezone = new EffectiveTimezoneResolver(
             userInfoImpl, localization, new HttpContextAccessor());
-        var controller = new EventController(events, userInfoImpl, localization, Substitute.For<IDocumentStore>(), timezone);
+        // C3-00 (ADR 0290 named seam) — the RSVP cluster now lives on the
+        // IEventRsvpGuardian seam; default a Substitute so the Rsvp action's
+        // null-guard passes, and the RSVP tests override it with their own.
+        rsvpGuardian ??= Substitute.For<IEventRsvpGuardian>();
+        var controller = new EventController(events, userInfoImpl, profileSettings, groupService, localization, timezone, rsvpGuardian: rsvpGuardian);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

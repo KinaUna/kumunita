@@ -1,0 +1,11 @@
+{
+  "sort.aria_label": "Sort order",
+  "sort.created": "Created",
+  "sort.modified": "Modified",
+  "sort.title": "Title",
+  "sort.size": "Size",
+  "sort.name": "Name",
+  "sort.start": "Start date",
+  "sort.due": "Due date",
+  "sort.status": "Status"
+}

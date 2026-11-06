@@ -1,0 +1,7 @@
+{
+  "email.verify_subject": "Verifiziere dein Kumunita-Konto",
+  "email.verify_body": "Hallo {0},\n\nDein Kumunita-Konto wird bei der ersten Anmeldung verifiziert. \u00D6ffne diesen einmaligen Link, um das Konto zu best\u00E4tigen (dabei wirst du auch angemeldet):\n\n{1}\n\nFalls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
+  "email.verify_child_body": "Hallo {0},\n\nDein Kumunita-Konto ist bereit. \u00D6ffne diesen einmaligen Link, um das Konto zu best\u00E4tigen und dein Passwort zu setzen (dabei wirst du auch angemeldet):\n\n{1}\n\nFalls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
+  "email.reminder_subject": "Erinnerung: {0}",
+  "email.reminder_body": "**{0}** steht bevor: {1}{2}."
+}

@@ -1,0 +1,12 @@
+{
+  "todo.blocked_by": "Venter p\u00E5",
+  "todo.blocked_by_none": "Ingen bloker",
+  "todo.blocked_generic": "En anden opgave (ikke synlig for dig)",
+  "todo.blocked_filter": "Venter p\u00E5 noget",
+  "todo.event_link": "Knyttet arrangement",
+  "todo.set_event.label": "Knyt til arrangement",
+  "todo.set_event.pick": "V\u00E6lg et arrangement",
+  "todo.set_event.create_new": "Opret et nyt arrangement\u2026",
+  "todo.set_event.create_hint": "Opret et nyt arrangement, der skal knyttes til denne to-do. Det gemmes som udkast \u2014 du kan publicere det fra arrangementets detailside.",
+  "todo.set_event.create_submit": "Opret og knyt"
+}

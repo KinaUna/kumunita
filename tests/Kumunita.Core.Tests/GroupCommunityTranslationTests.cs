@@ -99,6 +99,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string author = "u-a026-owner";
 
         await Plant(store, NewGroup(author));
@@ -119,7 +121,7 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
             Name = "elsewhere", AuthorId = author, Created = DateTimeOffset.UtcNow
         });
 
-        var rows = await svc.GetGroupTranslationsAsync(GroupId);
+        var rows = await groupService.GetGroupTranslationsAsync(GroupId);
         var codes = rows.Select(t => t.LanguageCode).OrderBy(c => c).ToList();
         Assert.Equal(new[] { "fr", "pl" }, codes);
 
@@ -133,6 +135,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string author = "u-a026-admin";
 
         await Plant(store, NewComponent());
@@ -147,7 +151,7 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
             Name = "elsewhere", AuthorId = author, Created = DateTimeOffset.UtcNow
         });
 
-        var rows = await svc.GetCommunityTranslationsAsync(ComponentId);
+        var rows = await communityService.GetCommunityTranslationsAsync(ComponentId);
         var codes = rows.Select(t => t.LanguageCode).OrderBy(c => c).ToList();
         Assert.Equal(new[] { "pl" }, codes);
 
@@ -161,18 +165,20 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
 
         await Plant(store, NewGroup(owner));
 
         var created = await RunInSession(store, s =>
-            svc.AddGroupTranslationAsync(GroupId, "pl", "Wolontariusze rowerów", null, owner, RoleSet(), s));
+            groupService.AddGroupTranslationAsync(GroupId, "pl", "Wolontariusze rowerów", null, owner, RoleSet(), s));
 
         Assert.Equal("pl", created.LanguageCode);
         Assert.Equal("Wolontariusze rowerów", created.Name);
         Assert.Null(created.Description); // the at-least-one rule: name alone is enough
 
-        var rows = await svc.GetGroupTranslationsAsync(GroupId);
+        var rows = await groupService.GetGroupTranslationsAsync(GroupId);
         Assert.Single(rows);
 
         var audit = Assert.Single(await AuditsFor(store, "grouptranslation.add"));
@@ -187,13 +193,15 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
         const string translator = "u-a026-translator";
 
         await Plant(store, NewGroup(owner));
 
         await RunInSession(store, s =>
-            svc.AddGroupTranslationAsync(GroupId, "pl", null, "opis", translator, RoleSet(Roles.Translator), s));
+            groupService.AddGroupTranslationAsync(GroupId, "pl", null, "opis", translator, RoleSet(Roles.Translator), s));
 
         var audit = Assert.Single(await AuditsFor(store, "grouptranslation.add"));
         Assert.Equal(AccessVia.Admin, audit.Via);
@@ -205,13 +213,15 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
         const string admin = "u-a026-admin";
 
         await Plant(store, NewGroup(owner));
 
         await RunInSession(store, s =>
-            svc.AddGroupTranslationAsync(GroupId, "pl", "Wolontariusze rowerów", "opis", admin, RoleSet(Roles.GlobalAdmin), s));
+            groupService.AddGroupTranslationAsync(GroupId, "pl", "Wolontariusze rowerów", "opis", admin, RoleSet(Roles.GlobalAdmin), s));
 
         var audit = Assert.Single(await AuditsFor(store, "grouptranslation.add"));
         Assert.Equal(AccessVia.Admin, audit.Via);
@@ -222,6 +232,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
         const string member = "u-a026-member";
 
@@ -229,9 +241,9 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
 
         await Assert.ThrowsAnyAsync<UnauthorizedAccessException>(() =>
             RunInSession(store, s =>
-                svc.AddGroupTranslationAsync(GroupId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
+                groupService.AddGroupTranslationAsync(GroupId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
 
-        Assert.Empty(await svc.GetGroupTranslationsAsync(GroupId));
+        Assert.Empty(await groupService.GetGroupTranslationsAsync(GroupId));
         Assert.Empty(await AuditsFor(store, "grouptranslation.add"));
     }
 
@@ -240,6 +252,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
         const string mod = "u-a026-mod";
 
@@ -249,11 +263,11 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         // group lane has no component-moderator standing, ADR 0007/0012).
         await Assert.ThrowsAnyAsync<UnauthorizedAccessException>(() =>
             RunInSession(store, s =>
-                svc.AddGroupTranslationAsync(
+                groupService.AddGroupTranslationAsync(
                     GroupId, "pl", "X", null, mod,
                     RoleSet(Roles.Moderator, Roles.ModeratorComponent(ComponentId)), s)));
 
-        Assert.Empty(await svc.GetGroupTranslationsAsync(GroupId));
+        Assert.Empty(await groupService.GetGroupTranslationsAsync(GroupId));
         Assert.Empty(await AuditsFor(store, "grouptranslation.add"));
     }
 
@@ -262,15 +276,17 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
 
         await Plant(store, NewGroup(owner));
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             RunInSession(store, s =>
-                svc.AddGroupTranslationAsync(GroupId, "pl", "   ", null, owner, RoleSet(), s)));
+                groupService.AddGroupTranslationAsync(GroupId, "pl", "   ", null, owner, RoleSet(), s)));
 
-        Assert.Empty(await svc.GetGroupTranslationsAsync(GroupId));
+        Assert.Empty(await groupService.GetGroupTranslationsAsync(GroupId));
         Assert.Empty(await AuditsFor(store, "grouptranslation.add"));
     }
 
@@ -279,10 +295,12 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             RunInSession(store, s =>
-                svc.AddGroupTranslationAsync("a026-missing-grp", "pl", "X", null, "u-a026", RoleSet(Roles.GlobalAdmin), s)));
+                groupService.AddGroupTranslationAsync("a026-missing-grp", "pl", "X", null, "u-a026", RoleSet(Roles.GlobalAdmin), s)));
 
         Assert.Empty(await AuditsFor(store, "grouptranslation.add"));
     }
@@ -294,12 +312,14 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string admin = "u-a026-admin";
 
         await Plant(store, NewComponent());
 
         var created = await RunInSession(store, s =>
-            svc.AddCommunityTranslationAsync(ComponentId, "pl", "Osiedle", null, admin, RoleSet(Roles.GlobalAdmin), s));
+            communityService.AddCommunityTranslationAsync(ComponentId, "pl", "Osiedle", null, admin, RoleSet(Roles.GlobalAdmin), s));
 
         Assert.Equal("pl", created.LanguageCode);
         Assert.Equal("Osiedle", created.Name);
@@ -315,12 +335,14 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string translator = "u-a026-translator";
 
         await Plant(store, NewComponent());
 
         await RunInSession(store, s =>
-            svc.AddCommunityTranslationAsync(ComponentId, "pl", null, "opis", translator, RoleSet(Roles.Translator), s));
+            communityService.AddCommunityTranslationAsync(ComponentId, "pl", null, "opis", translator, RoleSet(Roles.Translator), s));
 
         var audit = Assert.Single(await AuditsFor(store, "communitytranslation.add"));
         Assert.Equal(AccessVia.Admin, audit.Via);
@@ -332,6 +354,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string mod = "u-a026-mod";
 
         await Plant(store, NewComponent());
@@ -341,11 +365,11 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         // does not qualify.
         await Assert.ThrowsAnyAsync<UnauthorizedAccessException>(() =>
             RunInSession(store, s =>
-                svc.AddCommunityTranslationAsync(
+                communityService.AddCommunityTranslationAsync(
                     ComponentId, "pl", "X", null, mod,
                     RoleSet(Roles.Moderator, Roles.ModeratorComponent(ComponentId)), s)));
 
-        Assert.Empty(await svc.GetCommunityTranslationsAsync(ComponentId));
+        Assert.Empty(await communityService.GetCommunityTranslationsAsync(ComponentId));
         Assert.Empty(await AuditsFor(store, "communitytranslation.add"));
     }
 
@@ -354,15 +378,17 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string member = "u-a026-member";
 
         await Plant(store, NewComponent());
 
         await Assert.ThrowsAnyAsync<UnauthorizedAccessException>(() =>
             RunInSession(store, s =>
-                svc.AddCommunityTranslationAsync(ComponentId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
+                communityService.AddCommunityTranslationAsync(ComponentId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
 
-        Assert.Empty(await svc.GetCommunityTranslationsAsync(ComponentId));
+        Assert.Empty(await communityService.GetCommunityTranslationsAsync(ComponentId));
         Assert.Empty(await AuditsFor(store, "communitytranslation.add"));
     }
 
@@ -371,10 +397,12 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             RunInSession(store, s =>
-                svc.AddCommunityTranslationAsync("a026-missing-comp", "pl", "X", null, "u-a026", RoleSet(Roles.GlobalAdmin), s)));
+                communityService.AddCommunityTranslationAsync("a026-missing-comp", "pl", "X", null, "u-a026", RoleSet(Roles.GlobalAdmin), s)));
 
         Assert.Empty(await AuditsFor(store, "communitytranslation.add"));
     }
@@ -386,6 +414,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
 
         await Plant(store, NewGroup(owner));
@@ -396,7 +426,7 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         });
 
         var updated = await RunInSession(store, s =>
-            svc.UpdateGroupTranslationAsync(GroupId, "pl", "Nowa nazwa", null, owner, RoleSet(), s));
+            groupService.UpdateGroupTranslationAsync(GroupId, "pl", "Nowa nazwa", null, owner, RoleSet(), s));
 
         Assert.Equal("a026-t1", updated.Id);
         Assert.Equal("Nowa nazwa", updated.Name);
@@ -404,7 +434,7 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
 
         // A single row (in-place update — the unique index on (GroupId,
         // LanguageCode) would have blocked a second row).
-        var rows = await svc.GetGroupTranslationsAsync(GroupId);
+        var rows = await groupService.GetGroupTranslationsAsync(GroupId);
         Assert.Single(rows);
 
         var audit = Assert.Single(await AuditsFor(store, "grouptranslation.update"));
@@ -419,6 +449,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
         const string translator = "u-a026-translator";
 
@@ -430,7 +462,7 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         });
 
         await RunInSession(store, s =>
-            svc.UpdateGroupTranslationAsync(GroupId, "pl", null, "nowy opis", translator, RoleSet(Roles.Translator), s));
+            groupService.UpdateGroupTranslationAsync(GroupId, "pl", null, "nowy opis", translator, RoleSet(Roles.Translator), s));
 
         var audit = Assert.Single(await AuditsFor(store, "grouptranslation.update"));
         Assert.Equal(AccessVia.Admin, audit.Via);
@@ -442,6 +474,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
         const string member = "u-a026-member";
 
@@ -454,9 +488,9 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             RunInSession(store, s =>
-                svc.UpdateGroupTranslationAsync(GroupId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
+                groupService.UpdateGroupTranslationAsync(GroupId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
 
-        Assert.Single(await svc.GetGroupTranslationsAsync(GroupId)); // untouched
+        Assert.Single(await groupService.GetGroupTranslationsAsync(GroupId)); // untouched
         Assert.Empty(await AuditsFor(store, "grouptranslation.update"));
     }
 
@@ -465,13 +499,15 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
 
         await Plant(store, NewGroup(owner));
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             RunInSession(store, s =>
-                svc.UpdateGroupTranslationAsync(GroupId, "pl", "X", null, owner, RoleSet(), s)));
+                groupService.UpdateGroupTranslationAsync(GroupId, "pl", "X", null, owner, RoleSet(), s)));
 
         Assert.Empty(await AuditsFor(store, "grouptranslation.update"));
     }
@@ -481,6 +517,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
 
         await Plant(store, NewGroup(owner));
@@ -491,9 +529,9 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         });
 
         await RunInSession(store, s =>
-            svc.RemoveGroupTranslationAsync(GroupId, "pl", owner, RoleSet(), s));
+            groupService.RemoveGroupTranslationAsync(GroupId, "pl", owner, RoleSet(), s));
 
-        Assert.Empty(await svc.GetGroupTranslationsAsync(GroupId));
+        Assert.Empty(await groupService.GetGroupTranslationsAsync(GroupId));
 
         // The trail survives the hard delete — the audit row is the record.
         var audit = Assert.Single(await AuditsFor(store, "grouptranslation.remove"));
@@ -507,6 +545,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string owner = "u-a026-owner";
         const string member = "u-a026-member";
 
@@ -519,9 +559,9 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             RunInSession(store, s =>
-                svc.RemoveGroupTranslationAsync(GroupId, "pl", member, RoleSet(Roles.Member), s)));
+                groupService.RemoveGroupTranslationAsync(GroupId, "pl", member, RoleSet(Roles.Member), s)));
 
-        Assert.Single(await svc.GetGroupTranslationsAsync(GroupId)); // untouched
+        Assert.Single(await groupService.GetGroupTranslationsAsync(GroupId)); // untouched
         Assert.Empty(await AuditsFor(store, "grouptranslation.remove"));
     }
 
@@ -530,6 +570,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string admin = "u-a026-admin";
 
         await Plant(store, NewComponent());
@@ -540,12 +582,12 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         });
 
         var updated = await RunInSession(store, s =>
-            svc.UpdateCommunityTranslationAsync(ComponentId, "pl", "Nowa nazwa", null, admin, RoleSet(Roles.GlobalAdmin), s));
+            communityService.UpdateCommunityTranslationAsync(ComponentId, "pl", "Nowa nazwa", null, admin, RoleSet(Roles.GlobalAdmin), s));
 
         Assert.Equal("a026-c1", updated.Id);
         Assert.Equal("Nowa nazwa", updated.Name);
 
-        var rows = await svc.GetCommunityTranslationsAsync(ComponentId);
+        var rows = await communityService.GetCommunityTranslationsAsync(ComponentId);
         Assert.Single(rows);
 
         var audit = Assert.Single(await AuditsFor(store, "communitytranslation.update"));
@@ -560,6 +602,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string translator = "u-a026-translator";
 
         await Plant(store, NewComponent());
@@ -570,7 +614,7 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         });
 
         await RunInSession(store, s =>
-            svc.UpdateCommunityTranslationAsync(ComponentId, "pl", null, "nowy opis", translator, RoleSet(Roles.Translator), s));
+            communityService.UpdateCommunityTranslationAsync(ComponentId, "pl", null, "nowy opis", translator, RoleSet(Roles.Translator), s));
 
         var audit = Assert.Single(await AuditsFor(store, "communitytranslation.update"));
         Assert.Equal(AccessVia.Admin, audit.Via);
@@ -582,6 +626,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string member = "u-a026-member";
 
         await Plant(store, NewComponent());
@@ -593,9 +639,9 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             RunInSession(store, s =>
-                svc.UpdateCommunityTranslationAsync(ComponentId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
+                communityService.UpdateCommunityTranslationAsync(ComponentId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
 
-        Assert.Single(await svc.GetCommunityTranslationsAsync(ComponentId)); // untouched
+        Assert.Single(await communityService.GetCommunityTranslationsAsync(ComponentId)); // untouched
         Assert.Empty(await AuditsFor(store, "communitytranslation.update"));
     }
 
@@ -604,6 +650,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string admin = "u-a026-admin";
 
         await Plant(store, NewComponent());
@@ -614,9 +662,9 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         });
 
         await RunInSession(store, s =>
-            svc.RemoveCommunityTranslationAsync(ComponentId, "pl", admin, RoleSet(Roles.GlobalAdmin), s));
+            communityService.RemoveCommunityTranslationAsync(ComponentId, "pl", admin, RoleSet(Roles.GlobalAdmin), s));
 
-        Assert.Empty(await svc.GetCommunityTranslationsAsync(ComponentId));
+        Assert.Empty(await communityService.GetCommunityTranslationsAsync(ComponentId));
 
         var audit = Assert.Single(await AuditsFor(store, "communitytranslation.remove"));
         Assert.Equal(AccessVia.Admin, audit.Via);
@@ -629,6 +677,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
     {
         var store = await BootStoreAsync();
         var svc = Services(store);
+        var groupService = new GroupService(store);
+        var communityService = new CommunityMembershipService(store);
         const string translator = "u-a026-translator";
 
         await Plant(store, NewComponent());
@@ -639,9 +689,9 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         });
 
         await RunInSession(store, s =>
-            svc.RemoveCommunityTranslationAsync(ComponentId, "pl", translator, RoleSet(Roles.Translator), s));
+            communityService.RemoveCommunityTranslationAsync(ComponentId, "pl", translator, RoleSet(Roles.Translator), s));
 
-        Assert.Empty(await svc.GetCommunityTranslationsAsync(ComponentId));
+        Assert.Empty(await communityService.GetCommunityTranslationsAsync(ComponentId));
 
         var audit = Assert.Single(await AuditsFor(store, "communitytranslation.remove"));
         Assert.Equal(AccessVia.Admin, audit.Via);
@@ -659,6 +709,8 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         // The probe is pure (it delegates to the static standing resolver,
         // which never touches the store) — a null store is fine.
         var svc = new UserInfoService(store: null!);
+        var groupService = new GroupService(store: null!);
+        var communityService = new CommunityMembershipService(store: null!);
         const string owner = "u-a026-owner";
         var actor = isOwner ? owner : "u-a026-actor";
 
@@ -667,35 +719,43 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
             : RoleSet(Roles.Member);
 
         var expected = isOwner || hasQualifyingRole;
-        Assert.Equal(expected, svc.CanTranslateGroup(owner, actor, roles));
+        Assert.Equal(expected, groupService.CanTranslateGroup(owner, actor, roles));
     }
 
     [Fact]
     public void CanTranslateCommunity_GlobalAdmin_Allows()
     {
-        var svc = new UserInfoService(store: null!); // the probe is pure
-        Assert.True(svc.CanTranslateCommunity("u-a026", RoleSet(Roles.GlobalAdmin)));
+        var svc = new UserInfoService(store: null!);
+        var groupService = new GroupService(store: null!);
+        var communityService = new CommunityMembershipService(store: null!); // the probe is pure
+        Assert.True(communityService.CanTranslateCommunity("u-a026", RoleSet(Roles.GlobalAdmin)));
     }
 
     [Fact]
     public void CanTranslateCommunity_Translator_Allows()
     {
-        var svc = new UserInfoService(store: null!); // the probe is pure
-        Assert.True(svc.CanTranslateCommunity("u-a026", RoleSet(Roles.Translator)));
+        var svc = new UserInfoService(store: null!);
+        var groupService = new GroupService(store: null!);
+        var communityService = new CommunityMembershipService(store: null!); // the probe is pure
+        Assert.True(communityService.CanTranslateCommunity("u-a026", RoleSet(Roles.Translator)));
     }
 
     [Fact]
     public void CanTranslateCommunity_ComponentModerator_Denied()
     {
-        var svc = new UserInfoService(store: null!); // the probe is pure
-        Assert.False(svc.CanTranslateCommunity(
+        var svc = new UserInfoService(store: null!);
+        var groupService = new GroupService(store: null!);
+        var communityService = new CommunityMembershipService(store: null!); // the probe is pure
+        Assert.False(communityService.CanTranslateCommunity(
             "u-a026", RoleSet(Roles.Moderator, Roles.ModeratorComponent(ComponentId))));
     }
 
     [Fact]
     public void CanTranslateCommunity_PlainMember_Denied()
     {
-        var svc = new UserInfoService(store: null!); // the probe is pure
-        Assert.False(svc.CanTranslateCommunity("u-a026", RoleSet(Roles.Member)));
+        var svc = new UserInfoService(store: null!);
+        var groupService = new GroupService(store: null!);
+        var communityService = new CommunityMembershipService(store: null!); // the probe is pure
+        Assert.False(communityService.CanTranslateCommunity("u-a026", RoleSet(Roles.Member)));
     }
 }

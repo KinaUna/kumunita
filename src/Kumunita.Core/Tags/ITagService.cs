@@ -180,7 +180,7 @@ public interface ITagService
 
     // ── Standing probes (C-TG·5; a display pin, not a gate — the real deny
     //    is the write-lane re-check, the <c>PostService.CanAddTranslation</c>
-    //    / <c>PageService.CanTranslatePage</c> idiom) ──
+    //    / <c>PageStandingPolicy.CanTranslatePage</c> idiom) —
 
     /// <summary>
     /// True if the actor is the post's author or a GlobalAdmin

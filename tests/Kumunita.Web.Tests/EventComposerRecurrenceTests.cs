@@ -279,9 +279,11 @@ public class EventComposerRecurrenceTests
         string? subjectId = null)
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
         var localization = Substitute.For<ILocalizationService>();
         localization.ListLanguagesAsync().Returns(new List<LanguageCatalog>());
@@ -290,7 +292,7 @@ public class EventComposerRecurrenceTests
 
         var timezone = new EffectiveTimezoneResolver(userInfo, localization, new HttpContextAccessor());
 
-        var controller = new EventController(events, userInfo, localization, Substitute.For<IDocumentStore>(), timezone);
+        var controller = new EventController(events, userInfo, profileSettings, groupService, localization, timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

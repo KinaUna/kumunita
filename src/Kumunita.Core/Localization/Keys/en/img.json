@@ -1,0 +1,14 @@
+{
+  "img.edit.close": "Close",
+  "img.edit.crop_area": "Crop area",
+  "img.edit.width": "Width",
+  "img.edit.output": "Output",
+  "img.edit.reset_crop": "Reset crop",
+  "img.edit.use_original": "Use original",
+  "img.edit.apply": "Apply",
+  "img.edit.title": "Crop your avatar",
+  "img.edit.err_edit": "Edit failed.",
+  "img.edit.err_could": "Could not edit the image.",
+  "img.edit.err_load": "Could not load the image for editing.",
+  "img.edit.err_export": "Image export failed."
+}

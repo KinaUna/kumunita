@@ -343,7 +343,7 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
     public async Task ListVisiblePagedAsync_Announcements_Page1_Full_HasMoreTrue()
     {
         var store = await BootAnnouncementsStoreAsync();
-        var announcements = new AnnouncementService(store, new UserInfoService(store));
+        var announcements = new AnnouncementService(store, new UserInfoService(store), new ProfileSettingsService(store));
 
         var baseCreated = DateTimeOffset.UtcNow;
         for (var i = 0; i < 31; i++)

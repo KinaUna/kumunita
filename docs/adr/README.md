@@ -11,7 +11,7 @@ related:
 updated: 2026-11-02
 ---
 
-> **Abstract:** the index of the 285 architecture decision records (ADRs) —
+> **Abstract:** the index of the 289 architecture decision records (ADRs) —
 > one row per ADR (number, title, status), generated from the ADRs'
 > front-matter. **Who is it for:** anyone finding or adding an ADR.
 > **When to read the rest:** before writing a new ADR (start from
@@ -315,3 +315,15 @@ Decision / Consequences. New decisions take the next number.
 | 0283 | Icons on tab strips and button-group switches | Accepted |
 | 0284 | Home \"What's new\" feed for anonymous visitors | Accepted |
 | 0285 | Kiosk playlist: any item, per-entry duration, scroll and comments | Accepted |
+| 0286 | IUserInfoService back to the access core: four sibling interfaces for groups, community, guardian, and profile settings | Accepted |
+| 0287 | Projects module split: IProjectService (projects + goals), IBoardService (boards, lanes, placements), ITodoService (todos, comments, claim/assign) | Accepted |
+| 0288 | One shared translation-variant lane: the Core contract plus the Web action helper that every translatable surface uses | Accepted |
+| 0289 | Data as embedded resources: translation keys, guide pages, and the sample corpus are embedded resources, not C# literals | Accepted |
+| 0290 | IMPROVE-CODE-2 C2-00: the 30 baseline raises — 4 named seams (pending split) + 26 intended-coupling edges (C2-03 to extract where accidental) | Proposed |
+| 0291 | IMPROVE-CODE-2 C2-03: the 9 remaining Web→concrete-*Service crossings — 7 static-utility services (C2-06) + NotificationService (Wolverine binding) + PostService (C2-05 god-surface) | Proposed |
+| 0292 | IMPROVE-CODE-3 C3-02: the SampleDataSeeder per-entity decomposition — the 2 god-method retires + the 1 files-entry honest raise (1633 → 2060) | Proposed |
+| 0293 | IMPROVE-CODE-3 C3-03: the god-service seam extractions — the honest boundary-edge count raises (the new named-seam file lands on an already-existing module edge) + the `GroupsController` seam-injection collateral | Proposed |
+| 0294 | IMPROVE-CODE-3 C3-04: the still-large-file tail — 15 partial-class splits (files 23→8) + 31 boundary-edge raises (partial files land on already-existing module edges) | Proposed |
+| 0295 | IMPROVE-CODE-3 C3-05: the two clean Marten-allowlist retirements (Goals, Account) + the `IIdentityService` interface raise (33→34, the `LoadVerifyTokenAsync` seam) + 5 honest keeps (Announcement, Document, Tag, Posts, Guardian) | Proposed |
+| 0296 | IMPROVE-CODE-3 C3-06: the Marten-allowlist remainder — the 1 clean retirement (ReportTargets, the `FileReportTargetAsync` self-session seam) + the honest-17 floor (the DoD #6 ≤5 line not met; the remainder is the no-service / edge-minting / diagnostics / C08-frozen class) | Proposed |
+| 0297 | IMPROVE-CODE-3 C3-07: the 3 flagged-accidental boundary edges — 2 contract extractions (`IInstanceBaseUrlReader`, `IIdentityPrincipalStore`) + the 4 name-collision retires (the Web `TagSlugs`→`TagSlugParser` rename) → boundary_violations 465→459 | Proposed |

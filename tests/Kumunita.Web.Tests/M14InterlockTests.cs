@@ -69,8 +69,9 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         // ── Direction A: the write lane maps through (C-M14·3 shape) ─────────
         // The set-event POST hands the posted eventId verbatim to the frozen
         // seam and redirects back to the to-do (the write side of the loop).
-        var writeProjects = Substitute.For<IProjectService>();
-        writeProjects.SetTodoEventAsync(todoId, actor, Arg.Any<IReadOnlySet<string>>(), eventId, Arg.Any<CancellationToken>())
+        var writeProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService writeProjects_T = (ITodoService)writeProjects; IBoardService writeProjects_B = (IBoardService)writeProjects;
+        writeProjects_T.SetTodoEventAsync(todoId, actor, Arg.Any<IReadOnlySet<string>>(), eventId, Arg.Any<CancellationToken>())
             .Returns(new TodoItem { Id = todoId, Title = "Water the tomatoes", AuthorId = actor, EventId = eventId });
         var writeEvents = Substitute.For<IEventService>();
         var writeController = BuildProjects(writeProjects, writeEvents, Substitute.For<IDocumentStore>(), actor);
@@ -78,7 +79,7 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         var writeResult = await writeController.TodoSetEvent(todoId, eventId);
         var redirect = Assert.IsType<RedirectResult>(writeResult);
         Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
-        await writeProjects.Received(1).SetTodoEventAsync(
+        await writeProjects_T.Received(1).SetTodoEventAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(), eventId, Arg.Any<CancellationToken>());
 
         // ── Direction B: the to-do detail's event chip (real store) ───────────
@@ -88,10 +89,11 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
             EventId = eventId,
             Created = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero),
         };
-        var projects = Substitute.For<IProjectService>();
-        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
             .Returns(new TodoDetailResult { Todo = todo, Subtasks = [] });
-        projects.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
+        projects_T.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
         var ev = SampleEvent(eventId, actor);
         var events = Substitute.For<IEventService>();
         events.GetAsync(eventId, actor, Arg.Any<CancellationToken>()).Returns(ev);
@@ -109,13 +111,14 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal(eventId, todoVm.EventPicker.CurrentEventId);
 
         // ── Direction C: the event detail's linked-to-dos section ─────────────
-        var detailProjects = Substitute.For<IProjectService>();
-        detailProjects.ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>())
+        var detailProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService detailProjects_T = (ITodoService)detailProjects; IBoardService detailProjects_B = (IBoardService)detailProjects;
+        detailProjects_T.ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new TodoPage(new List<TodoItem> { todo }, false));
         // The M14 interlock's board sibling — no boards are linked to the
         // event in this closed-loop test, so the reverse read seam returns an
         // empty page (the section renders nothing — C-M14·2).
-        detailProjects.ListBoardsForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>())
+        detailProjects_B.ListBoardsForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new BoardPage(Array.Empty<Kumunita.Core.Projects.KanbanBoard>(), false));
         var detailEvents = Substitute.For<IEventService>();
         detailEvents.GetAsync(eventId, actor, Arg.Any<CancellationToken>()).Returns(ev);
@@ -128,7 +131,7 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal(todoId, row.TodoId);
         Assert.Equal(todo.Title, row.Title);
         Assert.Equal($"/projects/todos/{todoId}", row.LinkPath);
-        await detailProjects.Received(1).ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>());
+        await detailProjects_T.Received(1).ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>());
     }
 
     /// <summary>
@@ -164,36 +167,38 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         // (2) The write lane: a blank post clears (posts null), a value sets —
         // the seam is the standing authority; the controller does no standing
         // math (C-M14·4). The write resolves through the seam, not a gate.
-        var projects = Substitute.For<IProjectService>();
-        projects.SetTodoEventAsync(todoId, actor, Arg.Any<IReadOnlySet<string>>(), eventId, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.SetTodoEventAsync(todoId, actor, Arg.Any<IReadOnlySet<string>>(), eventId, Arg.Any<CancellationToken>())
             .Returns(new TodoItem { Id = todoId, Title = "Set up the bench", AuthorId = actor, EventId = eventId });
         var events = Substitute.For<IEventService>();
         var setController = BuildProjects(projects, events, Substitute.For<IDocumentStore>(), actor);
         Assert.IsType<RedirectResult>(await setController.TodoSetEvent(todoId, eventId));
-        await projects.Received(1).SetTodoEventAsync(
+        await projects_T.Received(1).SetTodoEventAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(), eventId, Arg.Any<CancellationToken>());
 
         // A blank post is a **clear** (null) — the same seam, the inverse write.
-        projects.ClearReceivedCalls();
-        projects.SetTodoEventAsync(todoId, actor, Arg.Any<IReadOnlySet<string>>(), null, Arg.Any<CancellationToken>())
+        projects_T.ClearReceivedCalls();
+        projects_T.SetTodoEventAsync(todoId, actor, Arg.Any<IReadOnlySet<string>>(), null, Arg.Any<CancellationToken>())
             .Returns(new TodoItem { Id = todoId, Title = "Set up the bench", AuthorId = actor, EventId = null });
         Assert.IsType<RedirectResult>(await setController.TodoSetEvent(todoId, null));
-        await projects.Received(1).SetTodoEventAsync(
+        await projects_T.Received(1).SetTodoEventAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(), null, Arg.Any<CancellationToken>());
 
         // (3) The both-direction read composes over the same frozen seams —
         // EventId is carried as a **field** and resolved through the read
         // lanes; it is never consulted as an authorization input.
         var ev = SampleEvent(eventId, actor);
-        var readProjects = Substitute.For<IProjectService>();
-        readProjects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+        var readProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService readProjects_T = (ITodoService)readProjects; IBoardService readProjects_B = (IBoardService)readProjects;
+        readProjects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
             .Returns(new TodoDetailResult
             {
                 Todo = new TodoItem { Id = todoId, Title = "Set up the bench", AuthorId = actor, EventId = eventId,
                     Created = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero) },
                 Subtasks = [],
             });
-        readProjects.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
+        readProjects_T.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
         var readEvents = Substitute.For<IEventService>();
         readEvents.GetAsync(eventId, actor, Arg.Any<CancellationToken>()).Returns(ev);
         readEvents.ListMineAsync(actor, Arg.Any<CancellationToken>()).Returns(new List<Event> { ev });
@@ -230,9 +235,10 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // Case 1 — denied: the seam 403s the event, but the to-do still renders.
         {
-            var projects = Substitute.For<IProjectService>();
-            projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>()).Returns(Detail(eventId));
-            projects.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
+            var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+            projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>()).Returns(Detail(eventId));
+            projects_T.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
             var events = Substitute.For<IEventService>();
             events.GetAsync(eventId, actor, Arg.Any<CancellationToken>())
                 .Returns(Task.FromException<Event>(new UnauthorizedAccessException("denied")));
@@ -247,9 +253,10 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // Case 2 — absent: the seam 404s the event, but the to-do still renders.
         {
-            var projects = Substitute.For<IProjectService>();
-            projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>()).Returns(Detail(eventId));
-            projects.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
+            var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+            projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>()).Returns(Detail(eventId));
+            projects_T.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
             var events = Substitute.For<IEventService>();
             events.GetAsync(eventId, actor, Arg.Any<CancellationToken>())
                 .Returns(Task.FromException<Event>(new KeyNotFoundException("gone")));
@@ -267,9 +274,10 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             var ev = SampleEvent(eventId, actor);
             ev.IsDeleted = true;
-            var projects = Substitute.For<IProjectService>();
-            projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>()).Returns(Detail(eventId));
-            projects.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
+            var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+            projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>()).Returns(Detail(eventId));
+            projects_T.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
             var events = Substitute.For<IEventService>();
             events.GetAsync(eventId, actor, Arg.Any<CancellationToken>()).Returns(ev);
             var controller = BuildProjects(projects, events, await BuildRealStoreAsync(), actor);
@@ -283,9 +291,10 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // Case 4 — no association at all: the seam is never consulted.
         {
-            var projects = Substitute.For<IProjectService>();
-            projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>()).Returns(Detail(null));
-            projects.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
+            var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+            projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>()).Returns(Detail(null));
+            projects_T.GetTodoTranslationsAsync(todoId).Returns(new List<TodoTranslation>());
             var events = Substitute.For<IEventService>();
             var controller = BuildProjects(projects, events, await BuildRealStoreAsync(), actor);
 
@@ -314,8 +323,9 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         const string todoId = "todo-m14";
         const string newEventId = "event-m14-new";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.SetTodoEventAsync(todoId, actor, Arg.Any<IReadOnlySet<string>>(), newEventId, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.SetTodoEventAsync(todoId, actor, Arg.Any<IReadOnlySet<string>>(), newEventId, Arg.Any<CancellationToken>())
             .Returns(new TodoItem { Id = todoId, Title = "Set up the bench", AuthorId = actor, EventId = newEventId });
 
         CreateEventRequest? capturedCreate = null;
@@ -352,7 +362,7 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.True(request.Audience!.Community); // ADR 0036 floor
 
         // (2) The to-do was linked to the new event through the frozen seam.
-        await projects.Received(1).SetTodoEventAsync(
+        await projects_T.Received(1).SetTodoEventAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(), newEventId, Arg.Any<CancellationToken>());
 
         // (3) The flash message confirms success.
@@ -370,7 +380,8 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         const string actor = "subj-m14-create-blank";
         const string todoId = "todo-m14";
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         var events = Substitute.For<IEventService>();
         var controller = BuildProjects(projects, events, Substitute.For<IDocumentStore>(), actor);
         var start = new DateTime(2026, 10, 13, 10, 0, 0);
@@ -381,7 +392,7 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
         await events.DidNotReceiveWithAnyArgs().CreateAsync(default!, default!, default!);
-        await projects.DidNotReceiveWithAnyArgs().SetTodoEventAsync(default!, default!, default!, default!, default!);
+        await projects_T.DidNotReceiveWithAnyArgs().SetTodoEventAsync(default!, default!, default!, default!, default!);
         Assert.NotNull(controller.TempData["error"]);
     }
 
@@ -395,7 +406,8 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         const string actor = "subj-m14-create-end";
         const string todoId = "todo-m14";
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         var events = Substitute.For<IEventService>();
         var controller = BuildProjects(projects, events, Substitute.For<IDocumentStore>(), actor);
         var start = new DateTime(2026, 10, 13, 11, 0, 0);
@@ -468,18 +480,24 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
     /// would be skipped — this one supplies it to exercise the interlock). The
     /// <c>store</c> is either a real scratch-Postgres store (the detail read
     /// lane) or a plain substitute (the write lane, which never opens a session).
+    /// The C08 split moved the to-do actions into <see cref="TodosController"/>;
+    /// this builder returns that child and wires the shared multi-interface mock
+    /// into the <c>boards</c> / <c>todos</c> sibling seams so the interlock
+    /// read seams resolve against them.
     /// </summary>
-    private static ProjectsController BuildProjects(
+    private static TodosController BuildProjects(
         IProjectService projects,
         IEventService events,
         IDocumentStore store,
         string subjectId)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
         userInfo.GetGroupIdsAsync(Arg.Any<string>()).Returns(new HashSet<string>(StringComparer.Ordinal));
         userInfo.GetCommunityIdsAsync(Arg.Any<string>()).Returns(Array.Empty<string>());
 
@@ -490,8 +508,7 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
         localization.GetDefaultLanguageCodeAsync().Returns("en");
 
-        var controller = new ProjectsController(
-            projects, userInfo, localization, store, events: events);
+        var controller = new TodosController(projects, userInfo, Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), localization, store, events: events, boards: (IBoardService)projects, todos: (ITodoService)projects);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim> { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId) };
@@ -516,19 +533,19 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         string subjectId)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
         var localization = Substitute.For<ILocalizationService>();
         localization.ListLanguagesAsync().Returns(new List<LanguageCatalog>());
         localization.GetDefaultLanguageCodeAsync().Returns("en");
         var timezone = new EffectiveTimezoneResolver(userInfo, localization, new HttpContextAccessor());
 
-        var controller = new EventController(
-            events, userInfo, localization, Substitute.For<IDocumentStore>(), timezone,
-            projects: projects);
+        var controller = new EventController(events, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, timezone, projects: projects, todos: (ITodoService)projects, boards: (IBoardService)projects);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim> { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId) };

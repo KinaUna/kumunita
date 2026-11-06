@@ -94,14 +94,54 @@ public static class PortabilityValidate
 
         // ── Pre-pass — read the target sets (the §validate note: the
         //    `LanguageCode` target set is read <em>before</em> the docs
-        //    integrity loop). ──────────────────────────────────────────
-        // The target sets (the §validate note: the `LanguageCode` target
-        // set is read <em>before</em> the docs integrity loop). A
-        // malformed / absent principals or config section yields an empty
-        // target set (the §inventory integrity loop will then reject any
-        // dangling `→ principal` / `→ LanguageCatalog` reference — the
-        // closed failure set is the authority, the U07 pin asserts
-        // <em>exactly</em> it).
+        //    integrity loop; C10 — extracted into ReadTargetSets, the
+        //    four locked checks' shared input). ────────────────────────
+        var (principalIds, languageCodes, mediaManifestIds) = ReadTargetSets(data);
+
+        // ── Check (b) — per-type sanity + deserialize for check (c) ───
+        // The deserialized rows (doc type → boxed List<object>) feed the
+        // referential-integrity loop below. A type that fails to
+        // deserialize is a check (b) failure <em>and</em> has no id set
+        // for check (c) to resolve against (a dangling ref on a malformed
+        // type is subsumed by the check (b) failure — the archive is
+        // already rejected).
+        // Check (b) — per-type sanity (C-M11·4) + deserialize for check (c)
+        // (C10 — extracted into CheckDocs, the per-entity-kind strategy: one
+        // uniform pass over the closed §inventory, not per-type code).
+        var (rowsByType, typeSetById) = CheckDocs(data, failures);
+
+        // ── Check (c) — referential integrity (C10 — extracted into
+        //    CheckReferences, the data-driven loop over the closed
+        //    §inventory's reference map). ─────────────────────────────
+        CheckReferences(rowsByType, typeSetById, principalIds, languageCodes, mediaManifestIds, failures);
+
+        // ── Check (d) — media verification (C-M11·3; C10 — extracted into
+        //    CheckMedia, the byte-verification leg). Every MediaObject listed
+        //    in the media_manifest has its bytes present in
+        //    media/{Id[0..2]}/{Id} AND the byte content matches (the size +
+        //    the content hash implied by the path). A missing / mismatched
+        //    byte ⇒ reject. ─────────────────────────────────────────────
+        CheckMedia(data, failures);
+
+        return failures.Count == 0
+            ? PortabilityValidationResult.Success
+            : new PortabilityValidationResult(Ok: false, failures);
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the §validate <b>pre-pass</b> (extracted from
+    /// <see cref="Run"/> along its "read the target sets" seam): the four
+    /// target sets the closed-failure-set checks resolve against. A
+    /// malformed / absent principals or config section yields an empty
+    /// target set (the §inventory integrity loop then rejects any dangling
+    /// <c>→ principal</c> / <c>→ LanguageCatalog</c> reference — the
+    /// closed failure set is the authority, the U07 pin asserts
+    /// <em>exactly</em> it). The <c>LanguageCode</c> set is read
+    /// <em>before</em> the docs integrity loop (the §validate note).
+    /// </summary>
+    private static (HashSet<string> PrincipalIds, HashSet<string> LanguageCodes, HashSet<string> MediaManifestIds)
+        ReadTargetSets(KumunitaArchiveData data)
+    {
         var principalIds = new HashSet<string>(StringComparer.Ordinal);
         try
         {
@@ -111,7 +151,7 @@ public static class PortabilityValidate
                     if (!string.IsNullOrEmpty(p.SubjectId))
                         principalIds.Add(p.SubjectId);
         }
-        catch (JsonException) { /* malformed → empty set (dangling refs reject below) */ }
+        catch (JsonException) { /* malformed → empty set (dangling refs reject) */ }
 
         var languageCodes = new HashSet<string>(StringComparer.Ordinal);
         try
@@ -122,7 +162,7 @@ public static class PortabilityValidate
                     if (!string.IsNullOrEmpty(lang.Id))
                         languageCodes.Add(lang.Id);
         }
-        catch (JsonException) { /* malformed → empty set (dangling refs reject below) */ }
+        catch (JsonException) { /* malformed → empty set (dangling refs reject) */ }
 
         var mediaManifestIds = new HashSet<string>(StringComparer.Ordinal);
         var mediaManifest = data.Manifest.MediaManifest;
@@ -131,13 +171,28 @@ public static class PortabilityValidate
                 if (!string.IsNullOrEmpty(m.Id))
                     mediaManifestIds.Add(m.Id);
 
-        // ── Check (b) — per-type sanity + deserialize for check (c) ───
-        // The deserialized rows (doc type → boxed List<object>) feed the
-        // referential-integrity loop below. A type that fails to
-        // deserialize is a check (b) failure <em>and</em> has no id set
-        // for check (c) to resolve against (a dangling ref on a malformed
-        // type is subsumed by the check (b) failure — the archive is
-        // already rejected).
+        return (principalIds, languageCodes, mediaManifestIds);
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — §validate <b>check (b)</b> per-type sanity
+    /// (C-M11·4), extracted from <see cref="Run"/> along its per-entity-kind
+    /// strategy seam: one uniform pass over the closed §inventory
+    /// (<see cref="PortabilityDocTypes.Entries"/>) — each
+    /// <c>docs/{Type}.json</c> deserializes into its declared POCO set
+    /// (a malformed / missing / unexpected file ⇒ a
+    /// <c>docs.malformed:{Type}</c> / <c>docs.missing:{Type}</c> failure),
+    /// and the deserialized rows feed the id set <see cref="CheckReferences"/>
+    /// (check (c)) resolves <c>→ {DocType}</c> references against. Returns
+    /// the rows-by-type map + the id-set-by-type map (the check (c) inputs).
+    /// A type that fails to deserialize has no id set for check (c) — a
+    /// dangling ref on a malformed type is subsumed by the check (b)
+    /// failure (the archive is already rejected).
+    /// </summary>
+    private static (Dictionary<string, System.Collections.IEnumerable> RowsByType,
+        Dictionary<string, HashSet<string>> TypeSetById)
+        CheckDocs(KumunitaArchiveData data, List<string> failures)
+    {
         var rowsByType = new Dictionary<string, System.Collections.IEnumerable>(StringComparer.Ordinal);
         var typeSetById = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
 
@@ -177,9 +232,7 @@ public static class PortabilityValidate
             // <c>→ {DocType}</c> target). The identity field is
             // conventionally <c>Id</c> (the Marten default) — except
             // <c>Profile</c> (its identity is <c>SubjectId</c>, CoreDocTypes
-            // §B.1). The <c>MediaObject</c> id set is the
-            // <c>media_manifest</c> set (C-M11·3: the doc + the bytes are
-            // a pair; check (d) verifies the bytes).
+            // §B.1).
             var idSet = new HashSet<string>(StringComparer.Ordinal);
             foreach (var row in rows)
             {
@@ -209,69 +262,105 @@ public static class PortabilityValidate
             if (!PortabilityDocTypes.ByType.ContainsKey(type))
                 failures.Add($"docs.malformed:{type}");
 
-        // ── Check (c) — referential integrity (data-driven loop) ───────
+        return (rowsByType, typeSetById);
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — §validate <b>check (c)</b> referential integrity
+    /// (C-M11·4), extracted from <see cref="Run"/> along its per-entity-kind
+    /// strategy seam: a data-driven loop over the closed §inventory's
+    /// reference map (<see cref="PortabilityDocTypes.InOrder"/> — not
+    /// per-type code). Every id referenced by an in-archive row resolves to
+    /// a row within the archive (<c>→ principal</c> against the principals
+    /// set; <c>→ {DocType}</c> against that type's id set; <c>→
+    /// MediaObject</c> against the media_manifest set; <c>→
+    /// LanguageCatalog</c> against the config languages set). A dangling
+    /// reference ⇒ <c>ref.dangling:{Type}.{field}</c> (one per (type,
+    /// field) — the closed shape).
+    /// </summary>
+    private static void CheckReferences(
+        Dictionary<string, System.Collections.IEnumerable> rowsByType,
+        Dictionary<string, HashSet<string>> typeSetById,
+        HashSet<string> principalIds,
+        HashSet<string> languageCodes,
+        HashSet<string> mediaManifestIds,
+        List<string> failures)
+    {
         foreach (var entry in PortabilityDocTypes.InOrder())
         {
             if (!rowsByType.TryGetValue(entry.Type, out var rows))
                 continue; // a check (b) failure already rejected the type
             foreach (var row in rows)
+                CheckRowReferences(row, entry, typeSetById, principalIds, languageCodes, mediaManifestIds, failures);
+        }
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the per-row leg of §validate check (c), extracted
+    /// from <see cref="CheckReferences"/> along its per-entity seam: resolve
+    /// each of <paramref name="row"/>'s reference fields (the closed
+    /// §inventory's <paramref name="entry"/> reference map) against the
+    /// archive's target sets. An absent / null field is a satisfied reference
+    /// (the U01 note: nullable in §inventory = skip, not dangling); a dangling
+    /// reference ⇒ <c>ref.dangling:{Type}.{field}</c> (one per (type, field) —
+    /// the closed shape).
+    /// </summary>
+    private static void CheckRowReferences(
+        object row,
+        PortabilityDocEntry entry,
+        Dictionary<string, HashSet<string>> typeSetById,
+        HashSet<string> principalIds,
+        HashSet<string> languageCodes,
+        HashSet<string> mediaManifestIds,
+        List<string> failures)
+    {
+        var rowType = row.GetType();
+        foreach (var refField in entry.ReferenceFields)
+        {
+            var value = ReadFieldValue(rowType, refField.Field, row);
+            if (value is null)
+                continue; // an absent / null field is a satisfied reference
+
+            var targetSet = ResolveTargetSet(refField, typeSetById, principalIds, languageCodes, mediaManifestIds);
+
+            if (refField.IsArray)
             {
-                var rowType = row.GetType();
-                foreach (var refField in entry.ReferenceFields)
+                if (value is not System.Collections.IList list)
+                    continue;
+                foreach (var item in list)
                 {
-                    var value = ReadFieldValue(rowType, refField.Field, row);
-                    if (value is null)
-                        continue; // an absent / null field is a satisfied
-                                 // reference (the U01 note: nullable in
-                                 // §inventory = skip, not dangling)
-
-                    // Resolve the target set for this field (the D7
-                    // reference map, data-driven — not per-type code).
-                    HashSet<string>? targetSet = refField.Target switch
+                    if (item is not string id || string.IsNullOrEmpty(id))
+                        continue;
+                    if (!ReferenceResolves(id, refField, targetSet, typeSetById))
                     {
-                        PortabilityReferenceField.PrincipalTarget => principalIds,
-                        PortabilityReferenceField.LanguageCatalogTarget => languageCodes,
-                        PortabilityReferenceField.MultiKindTarget => null,
-                        "MediaObject" => mediaManifestIds,
-                        _ when typeSetById.TryGetValue(refField.Target, out var ts) => ts,
-                        _ => null, // an unknown target is a registry
-                                   // integrity issue — skip (the type is
-                                   // already rejected by check (b) if
-                                   // malformed).
-                    };
-
-                    if (refField.IsArray)
-                    {
-                        if (value is not System.Collections.IList list)
-                            continue;
-                        foreach (var item in list)
-                        {
-                            if (item is not string id || string.IsNullOrEmpty(id))
-                                continue;
-                            if (!ReferenceResolves(id, refField, targetSet, typeSetById))
-                            {
-                                failures.Add($"ref.dangling:{entry.Type}.{refField.Field}");
-                                break; // one failure per (type, field) is
-                                       // the closed shape
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (value is not string id || string.IsNullOrEmpty(id))
-                            continue;
-                        if (!ReferenceResolves(id, refField, targetSet, typeSetById))
-                            failures.Add($"ref.dangling:{entry.Type}.{refField.Field}");
+                        failures.Add($"ref.dangling:{entry.Type}.{refField.Field}");
+                        break; // one failure per (type, field) is the closed shape
                     }
                 }
             }
+            else
+            {
+                if (value is not string id || string.IsNullOrEmpty(id))
+                    continue;
+                if (!ReferenceResolves(id, refField, targetSet, typeSetById))
+                    failures.Add($"ref.dangling:{entry.Type}.{refField.Field}");
+            }
         }
+    }
 
-        // ── Check (d) — media verification (C-M11·3) ───────────────────
-        // Every <c>MediaObject</c> listed in the <c>media_manifest</c>
-        // has its bytes present in <c>media/{Id[0..2]}/{Id}</c> AND the
-        // byte content matches (the size + the content hash implied by
-        // the path). A missing / mismatched byte ⇒ reject.
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — §validate <b>check (d)</b> media verification
+    /// (C-M11·3), extracted from <see cref="Run"/> along its
+    /// byte-verification seam: every <c>MediaObject</c> listed in the
+    /// <c>media_manifest</c> has its bytes present in
+    /// <c>media/{Id[0..2]}/{Id}</c> AND the byte content matches (the size
+    /// + the content hash implied by the path — the
+    /// <c>MediaObject.Id</c> is the lowercase-hex SHA-256 of the payload,
+    /// the <c>LocalVolumeMediaStore.Sha256Hex</c> convention). A missing /
+    /// mismatched byte ⇒ <c>media.missing:{id}</c> / <c>media.mismatch:{id}</c>.
+    /// </summary>
+    private static void CheckMedia(KumunitaArchiveData data, List<string> failures)
+    {
         foreach (var m in data.Manifest.MediaManifest)
         {
             if (string.IsNullOrEmpty(m.Id))
@@ -281,11 +370,6 @@ public static class PortabilityValidate
                 failures.Add($"media.missing:{m.Id}");
                 continue;
             }
-            // The content-hash pin: the <c>MediaObject.Id</c> is the
-            // lowercase-hex SHA-256 of the payload (the
-            // <c>LocalVolumeMediaStore.Sha256Hex</c> convention — the
-            // C-M11·3 "content-hash matches the path" pin). A mismatch is
-            // a corrupted / tampered byte (the C-M11·3 reject).
             var sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             if (sha != m.Id)
             {
@@ -298,10 +382,38 @@ public static class PortabilityValidate
                 continue;
             }
         }
+    }
 
-        return failures.Count == 0
-            ? PortabilityValidationResult.Success
-            : new PortabilityValidationResult(Ok: false, failures);
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the per-field target-set resolution of §validate
+    /// check (c), extracted from <see cref="CheckRowReferences"/> along its
+    /// D7-reference-map seam: resolves one reference field's target (data-
+    /// driven, not per-type code) — <c>→ principal</c> against the principals
+    /// set, <c>→ LanguageCatalog</c> against the config languages set, the
+    /// <c>MultiKindTarget</c> (Notification / NotificationSubscription's
+    /// kind-dependent <c>TargetId</c>) against <c>null</c> (the union is
+    /// resolved in <see cref="ReferenceResolves"/>), <c>→ MediaObject</c>
+    /// against the media_manifest set, and any <c>→ {DocType}</c> against
+    /// that type's id set. An unknown target is a registry integrity issue
+    /// (the type is already rejected by check (b) if malformed) and resolves
+    /// to <c>null</c> (treated as satisfied — a skip, not a dangling ref).
+    /// </summary>
+    private static HashSet<string>? ResolveTargetSet(
+        PortabilityReferenceField field,
+        Dictionary<string, HashSet<string>> typeSetById,
+        HashSet<string> principalIds,
+        HashSet<string> languageCodes,
+        HashSet<string> mediaManifestIds)
+    {
+        return field.Target switch
+        {
+            PortabilityReferenceField.PrincipalTarget => principalIds,
+            PortabilityReferenceField.LanguageCatalogTarget => languageCodes,
+            PortabilityReferenceField.MultiKindTarget => null,
+            "MediaObject" => mediaManifestIds,
+            _ when typeSetById.TryGetValue(field.Target, out var ts) => ts,
+            _ => null,
+        };
     }
 
     /// <summary>

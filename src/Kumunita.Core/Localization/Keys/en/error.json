@@ -1,0 +1,7 @@
+{
+  "error.title": "Error.",
+  "error.subtitle": "An error occurred while processing your request.",
+  "error.development_title": "Development Mode",
+  "error.development_hint": "Swapping to the Development environment will display more detailed information about the error that occurred. The Development environment shouldn\u0027t be enabled for deployed applications \u2014 it can reveal sensitive information from exceptions to end users.",
+  "error.request_id": "Request ID:"
+}

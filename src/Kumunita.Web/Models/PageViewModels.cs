@@ -175,7 +175,7 @@ public sealed record PageShowViewModel(
     string? CommunityDisplayName,
     /// <summary>
     /// The ADR 0029 "add a translation" affordance flag (the display pin —
-    /// <see cref="Kumunita.Core.Pages.PageService.CanTranslatePage"/>, the
+    /// <see cref="Kumunita.Core.Pages.PageStandingPolicy.CanTranslatePage"/>, the
     /// same rule the <c>AddTranslationAsync</c> write-lane gate re-checks
     /// server-side): a GlobalAdmin / a Translator may add a translation of
     /// any page, and — since ADR 0161 — the <b>author</b> of a

@@ -1,0 +1,17 @@
+{
+  "translations.bulk.export": "\u00DCbersetzungen herunterladen (CSV)",
+  "translations.bulk.import": "\u00DCbersetzungen hochladen (CSV)",
+  "translations.bulk.import_hint": "Leere Felder werden \u00FCbersprungen (sie l\u00F6schen niemals eine \u00DCbersetzung); eine Datei mit einem unbekannten Schl\u00FCssel oder einer unbekannten Sprache wird unver\u00E4ndert abgelehnt.",
+  "translations.bulk.save_all": "Alle speichern",
+  "translations.bulk.mode_batch": "Stapelbearbeitung",
+  "translations.bulk.mode_single": "Einzelne Bearbeitung",
+  "translations.editor.back": "\u2190 Zur\u00FCck zu den Sprachen",
+  "translations.editor.title": "UI-Strings f\u00FCr {0}",
+  "translations.editor.lede": "Die vollst\u00E4ndige Liste der Strings, die die Plattform ihren Bewohnern zeigt. Jede Zeile zeigt den Schl\u00FCssel, seinen englischen Referenztext und den aktuellen Wert in {0}. Das Speichern einer Zeile f\u00FCgt ihre \u00DCbersetzung hinzu oder aktualisiert sie \u2014 sichtbar ab der n\u00E4chsten Anfrage.",
+  "translations.editor.mode_label": "Bearbeitungsmodus",
+  "translations.editor.th_key": "Schl\u00FCssel",
+  "translations.editor.th_en_reference": "Englische Referenz",
+  "translations.editor.th_value": "Wert in {0}",
+  "translations.editor.value_aria": "Wert f\u00FCr {0} in {1}",
+  "translations.bulk.export_title": "Lade die UI-Strings dieser Sprache als CSV-Datei herunter"
+}

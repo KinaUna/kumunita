@@ -77,13 +77,15 @@ public class MLUI_FacesTests
         localization.ListLanguagesAsync()
             .Returns(Task.FromResult<IReadOnlyList<LanguageCatalog>>(catalog.ToList()));
 
-        var store = Substitute.For<IDocumentStore>();
-        var readSession = Substitute.For<IQuerySession>();
-        readSession.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(settings));
-        store.QuerySession().Returns(readSession);
+        // IMPROVE-CODE C09 — the controller reads the instance default through
+        // ILocalizationService.GetDefaultLanguageCodeAsync (the `en`-floor
+        // seam), so the fake is on the localization seam, not the store.
+        string? defaultCode = settings is null
+            ? "en"
+            : string.IsNullOrWhiteSpace(settings.DefaultLanguageCode) ? "en" : settings.DefaultLanguageCode;
+        localization.GetDefaultLanguageCodeAsync().Returns(Task.FromResult(defaultCode));
 
-        var controller = new PublicLocaleController(localization, store);
+        var controller = new PublicLocaleController(localization);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         // D8-4: the U7 deferral — the harness has no ITempDataProvider, so
         // Save's TempData["info"] write NREs before the cookie is observable.

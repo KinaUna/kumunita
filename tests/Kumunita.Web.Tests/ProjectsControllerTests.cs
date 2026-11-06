@@ -58,13 +58,14 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task Todos_List_AudienceFiltered()
     {
         const string actor = "subj-todos-actor";
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         var todo = new TodoItem
         {
             Id = "todo-1", Title = "Feed to-do", AuthorId = "subj-author",
             Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
         };
-        projects.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+        projects_T.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new TodoPage([todo], false));
 
         // The feed's copy-to / move-to pickers read each to-do's placement
@@ -75,7 +76,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // clean ForbidResult before reaching that query, so it can stay on
         // the plain substitute.
         var store = await BuildRealStoreAsync();
-        var controller = Build(projects, store: store, subjectId: actor);
+        var controller = BuildTodos(projects, store: store, subjectId: actor);
         var result = await controller.TodosIndex(componentId: null, assigneeId: null, page: 1);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -83,14 +84,15 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Single(vm.Todos);
         Assert.Equal("todo-1", vm.Todos[0].Id);
         Assert.Equal("subj-author", vm.Todos[0].AuthorDisplayName); // no profile → raw id
-        await projects.Received(1).ListTodosAsync( null, null, actor, 1, false, null, false, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
+        await projects_T.Received(1).ListTodosAsync( null, null, actor, 1, false, null, false, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
 
         // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
-        deniedProjects.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
+        deniedProjects_T.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(Task.FromException<TodoPage>(
                 new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildTodos(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(
             await deniedController.TodosIndex(null, null, page: 1));
     }
@@ -200,7 +202,8 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             await w.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         var parent = new TodoItem
         {
             Id = todoId, Title = "Parent to-do", AuthorId = actor,
@@ -212,10 +215,10 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             ParentId = todoId,
             Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
         };
-        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+        projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
             .Returns(new TodoDetailResult { Todo = parent, Subtasks = [sub] });
 
-        var controller = Build(projects, store: store, subjectId: actor);
+        var controller = BuildTodos(projects, store: store, subjectId: actor);
         var result = await controller.TodoDetail(todoId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -228,7 +231,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("place-detail", vm.Placements[0].PlacementId);
         Assert.Equal("Board", vm.Placements[0].BoardTitle);
         Assert.Equal("Lane", vm.Placements[0].LaneTitle);
-        await projects.Received(1).GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>());
+        await projects_T.Received(1).GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>());
     }
 
     // ── 3 — Board_Detail_LanesAndCards (real store) ──────────────────────────
@@ -275,13 +278,14 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             await w.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         var card = new TodoItem
         {
             Id = cardId, Title = "Card to-do", AuthorId = actor,
             Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
         };
-        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+        projects_B.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
             .Returns(new BoardDetailResult
             {
                 Board = new KanbanBoard
@@ -297,7 +301,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new ProjectPage([], false));
 
-        var controller = Build(projects, store: store, subjectId: actor);
+        var controller = BuildBoards(projects, store: store, subjectId: actor);
         var result = await controller.BoardDetail(boardId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -308,7 +312,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal(cardId, vm.Lanes[0].Cards[0].TodoId);
         Assert.Equal("place-board", vm.Lanes[0].Cards[0].PlacementId); // resolved from the real store
         Assert.Equal(3, vm.Lanes[0].Cards[0].Order);
-        await projects.Received(1).GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>());
+        await projects_B.Received(1).GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>());
     }
 
     // ── 4 — Board_MoveLeftRight_TriggerStatusUpdate ──────────────────────────
@@ -335,11 +339,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
 
         foreach (var direction in new[] { "left", "right" })
         {
-            var projects = Substitute.For<IProjectService>();
-            projects.MoveTodoToAdjacentLaneAsync(
+            var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+            projects_B.MoveTodoToAdjacentLaneAsync(
                     placementId, direction, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
                 .Returns(placement);
-            var controller = Build(projects, subjectId: actor);
+            var controller = BuildBoards(projects, subjectId: actor);
 
             var result = direction == "left"
                 ? await controller.MoveLeftPost(boardId, "lane-move", placementId)
@@ -348,7 +353,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             var redirect = Assert.IsType<RedirectResult>(result);
             Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
             Assert.Equal($"Card moved {direction}.", controller.TempData["info"] as string);
-            await projects.Received(1).MoveTodoToAdjacentLaneAsync(
+            await projects_B.Received(1).MoveTodoToAdjacentLaneAsync(
                 placementId, direction, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
         }
     }
@@ -369,18 +374,19 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string boardId = "board-max";
         const string placementId = "place-max";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.MoveTodoToAdjacentLaneAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.MoveTodoToAdjacentLaneAsync(
                 placementId, "right", actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<BoardItemPlacement>(new InvalidOperationException("Lane is full")));
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildBoards(projects, subjectId: actor);
 
         var result = await controller.MoveRightPost(boardId, "lane-max", placementId);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
         Assert.Equal("Lane is full", controller.TempData["error"] as string);
-        await projects.Received(1).MoveTodoToAdjacentLaneAsync(
+        await projects_B.Received(1).MoveTodoToAdjacentLaneAsync(
             placementId, "right", actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
     }
 
@@ -405,17 +411,18 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
-        projects.CopyTodoToBoardAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.CopyTodoToBoardAsync(
                 todoId, target, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(copy);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildTodos(projects, subjectId: actor);
 
         var result = await controller.CopyToBoardPost(todoId, target);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/boards/{target}", redirect.Url);
-        await projects.Received(1).CopyTodoToBoardAsync(
+        await projects_B.Received(1).CopyTodoToBoardAsync(
             todoId, target, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
     }
 
@@ -441,17 +448,18 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
-        projects.MoveTodoToBoardAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.MoveTodoToBoardAsync(
                 todoId, target, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(placement);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildTodos(projects, subjectId: actor);
 
         var result = await controller.MoveToBoardPost(todoId, target);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/boards/{target}", redirect.Url);
-        await projects.Received(1).MoveTodoToBoardAsync(
+        await projects_B.Received(1).MoveTodoToBoardAsync(
             todoId, target, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
     }
 
@@ -478,26 +486,28 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
-        projects.AssignTodoAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.AssignTodoAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), assignee, Arg.Any<CancellationToken>())
             .Returns(updated);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildTodos(projects, subjectId: actor);
 
         var result = await controller.AssignPost(todoId, assignee);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
         Assert.Equal("To-do assigned.", controller.TempData["info"] as string);
-        await projects.Received(1).AssignTodoAsync(
+        await projects_T.Received(1).AssignTodoAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(), assignee, Arg.Any<CancellationToken>());
 
         // The C3 403 split: a refused assign is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
-        deniedProjects.AssignTodoAsync(
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
+        deniedProjects_T.AssignTodoAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), assignee, Arg.Any<CancellationToken>())
             .Returns(Task.FromException<TodoItem>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildTodos(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.AssignPost(todoId, assignee));
     }
 
@@ -525,47 +535,51 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
-        projects.SetTodoStatusAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.SetTodoStatusAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), "in-progress", Arg.Any<CancellationToken>())
             .Returns(updated);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildTodos(projects, subjectId: actor);
 
         var result = await controller.TodoSetStatus(todoId, "in-progress");
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
         Assert.Equal("Status updated.", controller.TempData["info"] as string);
-        await projects.Received(1).SetTodoStatusAsync(
+        await projects_T.Received(1).SetTodoStatusAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(), "in-progress", Arg.Any<CancellationToken>());
 
         // A blank choice posts null (the clear intent) — the controller
         // normalizes the whitespace to the seam's null-clears rule.
-        var clearProjects = Substitute.For<IProjectService>();
-        clearProjects.SetTodoStatusAsync(
+        var clearProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService clearProjects_T = (ITodoService)clearProjects; IBoardService clearProjects_B = (IBoardService)clearProjects;
+        clearProjects_T.SetTodoStatusAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), null, Arg.Any<CancellationToken>())
             .Returns(new TodoItem { Id = todoId, AuthorId = actor, Created = default });
-        var clearController = Build(clearProjects, subjectId: actor);
+        var clearController = BuildTodos(clearProjects, subjectId: actor);
         var clearResult = await clearController.TodoSetStatus(todoId, "   ");
         var clearRedirect = Assert.IsType<RedirectResult>(clearResult);
         Assert.Equal("Status cleared.", clearController.TempData["info"] as string);
-        await clearProjects.Received(1).SetTodoStatusAsync(
+        await clearProjects_T.Received(1).SetTodoStatusAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(), null, Arg.Any<CancellationToken>());
 
         // The C3 403 split: a refused status change is a clean ForbidResult.
-        var deniedProjects = Substitute.For<IProjectService>();
-        deniedProjects.SetTodoStatusAsync(
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
+        deniedProjects_T.SetTodoStatusAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), "done", Arg.Any<CancellationToken>())
             .Returns(Task.FromException<TodoItem>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildTodos(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.TodoSetStatus(todoId, "done"));
 
         // The C3 404 split: a missing to-do is a clean NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
-        missingProjects.SetTodoStatusAsync(
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
+        missingProjects_T.SetTodoStatusAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), "done", Arg.Any<CancellationToken>())
             .Returns(Task.FromException<TodoItem>(new KeyNotFoundException("no to-do")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildTodos(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.TodoSetStatus(todoId, "done"));
     }
 
@@ -587,15 +601,16 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string todoId = "todo-assign-url";
         const string assignee = "subj-assignee-url";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.AssignTodoAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.AssignTodoAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), assignee, Arg.Any<CancellationToken>())
             .Returns(new TodoItem
             {
                 Id = todoId, Title = "Assigned", AuthorId = actor, AssigneeId = assignee,
                 Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
             });
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildTodos(projects, subjectId: actor);
 
         // The activator normally sets Url from DI; stand in a local-url
         // check so both the same-site and external branches are exercised.
@@ -640,39 +655,42 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string actor = "subj-claim-actor";
         const string todoId = "todo-claim";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.ClaimTodoAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.ClaimTodoAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(new TodoItem
             {
                 Id = todoId, Title = "Claimed", AuthorId = actor, AssigneeId = actor,
                 Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
             });
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildTodos(projects, subjectId: actor);
 
         var result = await controller.ClaimPost(todoId);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
         Assert.Equal("You claimed this to-do.", controller.TempData["info"] as string);
-        await projects.Received(1).ClaimTodoAsync(
+        await projects_T.Received(1).ClaimTodoAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
 
         // The C3 403 split: a refused claim (already assigned, or no standing)
         // is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
-        deniedProjects.ClaimTodoAsync(
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
+        deniedProjects_T.ClaimTodoAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<TodoItem>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildTodos(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.ClaimPost(todoId));
 
         // The C3 404 split: a missing to-do is a clean NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
-        missingProjects.ClaimTodoAsync(
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
+        missingProjects_T.ClaimTodoAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<TodoItem>(new KeyNotFoundException("no to-do")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildTodos(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.ClaimPost(todoId));
     }
 
@@ -702,46 +720,50 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Order = 2, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
-        projects.CreateLaneAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.CreateLaneAsync(
                 boardId, "New lane", actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(lane);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildBoards(projects, subjectId: actor);
 
         var result = await controller.LaneCreatePost(boardId, "New lane");
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
         Assert.Equal("Lane added.", controller.TempData["info"] as string);
-        await projects.Received(1).CreateLaneAsync(
+        await projects_B.Received(1).CreateLaneAsync(
             boardId, "New lane", actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
 
         // The C3 404 split: a missing board is a clean NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
-        missingProjects.CreateLaneAsync(
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
+        missingProjects_B.CreateLaneAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<KanbanLane>(new KeyNotFoundException("no board")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildBoards(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.LaneCreatePost(boardId, "New lane"));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
-        deniedProjects.CreateLaneAsync(
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
+        deniedProjects_B.CreateLaneAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<KanbanLane>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildBoards(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.LaneCreatePost(boardId, "New lane"));
 
         // A blank title is a form error: the seam is never called at all.
-        var blankProjects = Substitute.For<IProjectService>();
-        var blankController = Build(blankProjects, subjectId: actor);
+        var blankProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService blankProjects_T = (ITodoService)blankProjects; IBoardService blankProjects_B = (IBoardService)blankProjects;
+        var blankController = BuildBoards(blankProjects, subjectId: actor);
         var blankResult = await blankController.LaneCreatePost(boardId, "   ");
         var blankRedirect = Assert.IsType<RedirectResult>(blankResult);
         Assert.Equal($"/projects/boards/{boardId}", blankRedirect.Url);
         Assert.Equal("A lane title is required.", blankController.TempData["error"] as string);
-        await blankProjects.DidNotReceive()
+        await blankProjects_B.DidNotReceive()
             .CreateLaneAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
     }
@@ -769,36 +791,39 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
-        projects.MoveLaneToPositionAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.MoveLaneToPositionAsync(
                 laneId, 0, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(lane);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildBoards(projects, subjectId: actor);
 
         var result = await controller.MoveLanePost(boardId, laneId, 0);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
         Assert.Equal("Lane moved.", controller.TempData["info"] as string);
-        await projects.Received(1).MoveLaneToPositionAsync(
+        await projects_B.Received(1).MoveLaneToPositionAsync(
             laneId, 0, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
 
         // The C3 404 split: a missing lane is a clean NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
-        missingProjects.MoveLaneToPositionAsync(
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
+        missingProjects_B.MoveLaneToPositionAsync(
                 Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<KanbanLane>(new KeyNotFoundException("no lane")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildBoards(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.MoveLanePost(boardId, laneId, 0));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
-        deniedProjects.MoveLaneToPositionAsync(
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
+        deniedProjects_B.MoveLaneToPositionAsync(
                 Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<KanbanLane>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildBoards(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.MoveLanePost(boardId, laneId, 0));
     }
 
@@ -820,36 +845,39 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string boardId = "board-deletelane";
         const string laneId = "lane-deletelane";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.DeleteLaneAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.DeleteLaneAsync(
                 laneId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildBoards(projects, subjectId: actor);
 
         var result = await controller.LaneDeletePost(boardId, laneId);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
         Assert.Equal("Lane deleted.", controller.TempData["info"] as string);
-        await projects.Received(1).DeleteLaneAsync(
+        await projects_B.Received(1).DeleteLaneAsync(
             laneId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
 
         // The C3 404 split: a missing lane is a clean NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
-        missingProjects.DeleteLaneAsync(
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
+        missingProjects_B.DeleteLaneAsync(
                 Arg.Any<string>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new KeyNotFoundException("no lane")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildBoards(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.LaneDeletePost(boardId, laneId));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
-        deniedProjects.DeleteLaneAsync(
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
+        deniedProjects_B.DeleteLaneAsync(
                 Arg.Any<string>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildBoards(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.LaneDeletePost(boardId, laneId));
     }
 
@@ -880,50 +908,54 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
-        projects.MoveTodoToLanePositionAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.MoveTodoToLanePositionAsync(
                 placementId, targetLaneId, 1, actor,
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(placement);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildBoards(projects, subjectId: actor);
 
         var result = await controller.MoveCardPost(boardId, targetLaneId, placementId, 1);
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
         Assert.Equal("Card moved.", controller.TempData["info"] as string);
-        await projects.Received(1).MoveTodoToLanePositionAsync(
+        await projects_B.Received(1).MoveTodoToLanePositionAsync(
             placementId, targetLaneId, 1, actor,
             Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
 
         // The C3 404 split: a missing placement is a clean NotFoundResult.
-        var missingProjects = Substitute.For<IProjectService>();
-        missingProjects.MoveTodoToLanePositionAsync(
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
+        missingProjects_B.MoveTodoToLanePositionAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<BoardItemPlacement>(new KeyNotFoundException("no placement")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildBoards(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(
             await missingController.MoveCardPost(boardId, targetLaneId, placementId, 1));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
-        deniedProjects.MoveTodoToLanePositionAsync(
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
+        deniedProjects_B.MoveTodoToLanePositionAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<BoardItemPlacement>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildBoards(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(
             await deniedController.MoveCardPost(boardId, targetLaneId, placementId, 1));
 
         // A lane-limit refusal is a form error: ex.Message on TempData["error"],
         // redirect back to the board — never a ForbidResult, never a 500.
-        var limitProjects = Substitute.For<IProjectService>();
-        limitProjects.MoveTodoToLanePositionAsync(
+        var limitProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService limitProjects_T = (ITodoService)limitProjects; IBoardService limitProjects_B = (IBoardService)limitProjects;
+        limitProjects_B.MoveTodoToLanePositionAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
                 Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<BoardItemPlacement>(new InvalidOperationException("Full lane")));
-        var limitController = Build(limitProjects, subjectId: actor);
+        var limitController = BuildBoards(limitProjects, subjectId: actor);
         var limitResult = await limitController.MoveCardPost(boardId, targetLaneId, placementId, 1);
         var limitRedirect = Assert.IsType<RedirectResult>(limitResult);
         Assert.Equal($"/projects/boards/{boardId}", limitRedirect.Url);
@@ -938,7 +970,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     /// <see cref="IProjectService.ListProjectsForGoalAsync"/> (the per-parent
     /// list — a denied project is dropped, not the whole set); the author
     /// display name resolves as a *read* (falling back to the raw id when the
-    /// profile row is absent — the Build() default); the <see cref="ForbidResult"/>
+    /// profile row is absent — the BuildBoards() default); the <see cref="ForbidResult"/>
     /// / <see cref="NotFoundResult"/> C3 split is the controller's (a denied
     /// actor 403, a missing goal 404 — not a 500).
     /// </summary>
@@ -960,12 +992,13 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>()).Returns(goal);
         projects.ListProjectsForGoalAsync(goalId, actor, Arg.Any<CancellationToken>())
             .Returns(new List<Project> { project });
 
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildGoals(projects, subjectId: actor);
         var result = await controller.GoalDetail(goalId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -980,17 +1013,19 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         await projects.Received(1).ListProjectsForGoalAsync(goalId, actor, Arg.Any<CancellationToken>());
 
         // The C3 404 split: a missing goal is a clean NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
         missingProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new KeyNotFoundException("no goal")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildGoals(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.GoalDetail(goalId));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildGoals(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.GoalDetail(goalId));
     }
 
@@ -1013,11 +1048,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.CreateGoalAsync(
                 actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>())
             .Returns(created);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildGoals(projects, subjectId: actor);
 
         var model = new GoalComposerViewModel
         {
@@ -1034,8 +1070,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>());
 
         // A blank title is a form error: the seam is never called at all.
-        var blankProjects = Substitute.For<IProjectService>();
-        var blankController = Build(blankProjects, subjectId: actor);
+        var blankProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService blankProjects_T = (ITodoService)blankProjects; IBoardService blankProjects_B = (IBoardService)blankProjects;
+        var blankController = BuildGoals(blankProjects, subjectId: actor);
         var blankModel = new GoalComposerViewModel
         {
             Title = "   ",
@@ -1047,11 +1084,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             .CreateGoalAsync(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>());
 
         // A denied actor is a form error (the C3 403 → re-render split), not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.CreateGoalAsync(
                 Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildGoals(deniedProjects, subjectId: actor);
         var deniedModel = new GoalComposerViewModel
         {
             Title = "Goal",
@@ -1079,9 +1117,10 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>()).Returns(goal);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildGoals(projects, subjectId: actor);
 
         var result = await controller.GoalEdit(goalId);
 
@@ -1093,17 +1132,19 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         await projects.Received(1).GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>());
 
         // The C3 404 split: a missing goal is a clean NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
         missingProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new KeyNotFoundException("no goal")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildGoals(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.GoalEdit(goalId));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildGoals(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.GoalEdit(goalId));
     }
 
@@ -1124,11 +1165,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string other = "subj-goal-upd-other";
         const string goalId = "goal-upd";
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.UpdateGoalAsync(
                 goalId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateGoalRequest>(), Arg.Any<CancellationToken>())
             .Returns(new ProjectGoal { Id = goalId, Title = "New title" });
-        var controller = Build(projects, subjectId: creator);
+        var controller = BuildGoals(projects, subjectId: creator);
 
         var model = new GoalComposerViewModel { Title = "New title", Description = "new body" };
         var result = await controller.GoalUpdate(goalId, model);
@@ -1140,8 +1182,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             goalId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateGoalRequest>(), Arg.Any<CancellationToken>());
 
         // A blank title is a form error: the seam is never called at all.
-        var blankProjects = Substitute.For<IProjectService>();
-        var blankController = Build(blankProjects, subjectId: creator);
+        var blankProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService blankProjects_T = (ITodoService)blankProjects; IBoardService blankProjects_B = (IBoardService)blankProjects;
+        var blankController = BuildGoals(blankProjects, subjectId: creator);
         var blankResult = await blankController.GoalUpdate(goalId, new GoalComposerViewModel { Title = "   " });
         Assert.IsType<ViewResult>(blankResult);
         await blankProjects.DidNotReceive()
@@ -1149,11 +1192,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
 
         // A non-creator (no GlobalAdmin role) is a clean ForbidResult — the
         // service's standing gate, surfaced by the controller as the C3 403.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.UpdateGoalAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateGoalRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: other, roles: []);
+        var deniedController = BuildGoals(deniedProjects, subjectId: other, roles: []);
         var deniedResult = await deniedController.GoalUpdate(goalId, new GoalComposerViewModel { Title = "New title" });
         Assert.IsType<ForbidResult>(deniedResult);
     }
@@ -1198,15 +1242,16 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 3, 9, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>()).Returns(project);
         projects.GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>()).Returns(goal);
-        projects.ListTodosAsync(null, null, actor, 1, false, projectId, false, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
+        projects_T.ListTodosAsync(null, null, actor, 1, false, projectId, false, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
             .Returns(new TodoPage(new List<TodoItem> { todo }, false));
-        projects.ListBoardsAsync(null, actor, 1, projectId, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
+        projects_B.ListBoardsAsync(null, actor, 1, projectId, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
             .Returns(new BoardPage(new List<KanbanBoard> { board }, false));
 
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildProjects(projects, subjectId: actor);
         var result = await controller.ProjectDetail(projectId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -1228,21 +1273,23 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
 
         await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
         await projects.Received(1).GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>());
-        await projects.Received(1).ListTodosAsync(null, null, actor, 1, false, projectId, false, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
-        await projects.Received(1).ListBoardsAsync(null, actor, 1, projectId, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
+        await projects_T.Received(1).ListTodosAsync(null, null, actor, 1, false, projectId, false, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
+        await projects_B.Received(1).ListBoardsAsync(null, actor, 1, projectId, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
 
         // The C3 404 split: a missing project is a clean NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
         missingProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<Project>(new KeyNotFoundException("no project")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildProjects(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.ProjectDetail(projectId));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildProjects(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.ProjectDetail(projectId));
     }
 
@@ -1265,7 +1312,8 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.CreateProjectAsync(
                 actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>())
             .Returns(created);
@@ -1273,7 +1321,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // empty candidate set (a valid shape) so the picker card hides (C-PL·3).
         projects.ListGoalsAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new GoalPage([], false));
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildProjects(projects, subjectId: actor);
 
         var model = new ProjectComposerViewModel
         {
@@ -1290,12 +1338,13 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>());
 
         // A blank title is a form error: the seam is never called at all.
-        var blankProjects = Substitute.For<IProjectService>();
+        var blankProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService blankProjects_T = (ITodoService)blankProjects; IBoardService blankProjects_B = (IBoardService)blankProjects;
         // The goal picker (ProjectCreate re-seeds it before the validity check)
         // reads ListGoalsAsync — an empty candidate set (a valid shape).
         blankProjects.ListGoalsAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new GoalPage([], false));
-        var blankController = Build(blankProjects, subjectId: actor);
+        var blankController = BuildProjects(blankProjects, subjectId: actor);
         var blankModel = new ProjectComposerViewModel
         {
             Title = "   ",
@@ -1307,7 +1356,8 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             .CreateProjectAsync(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>());
 
         // A denied actor is a form error (the C3 403 → re-render split), not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.CreateProjectAsync(
                 Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
@@ -1315,7 +1365,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // ListGoalsAsync — an empty candidate set (a valid shape).
         deniedProjects.ListGoalsAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new GoalPage([], false));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildProjects(deniedProjects, subjectId: actor);
         var deniedModel = new ProjectComposerViewModel
         {
             Title = "Project",
@@ -1347,13 +1397,14 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>()).Returns(project);
         // The goal picker (ProjectEdit re-seeds it) reads ListGoalsAsync — an
         // empty candidate set (a valid shape) so the picker card hides (C-PL·3).
         projects.ListGoalsAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new GoalPage([], false));
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildProjects(projects, subjectId: actor);
 
         var result = await controller.ProjectEdit(projectId);
 
@@ -1371,17 +1422,19 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
 
         // The C3 404 split: a missing project is a clean NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
         missingProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<Project>(new KeyNotFoundException("no project")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildProjects(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.ProjectEdit(projectId));
 
         // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildProjects(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.ProjectEdit(projectId));
     }
 
@@ -1402,11 +1455,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string other = "subj-project-upd-other";
         const string projectId = "project-upd";
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.UpdateProjectAsync(
                 projectId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>())
             .Returns(new Project { Id = projectId, Title = "New title" });
-        var controller = Build(projects, subjectId: creator);
+        var controller = BuildProjects(projects, subjectId: creator);
 
         var model = new ProjectComposerViewModel { Title = "New title", Description = "new body", Status = "Done" };
         var result = await controller.ProjectUpdate(projectId, model);
@@ -1418,8 +1472,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             projectId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>());
 
         // A blank title is a form error: the seam is never called at all.
-        var blankProjects = Substitute.For<IProjectService>();
-        var blankController = Build(blankProjects, subjectId: creator);
+        var blankProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService blankProjects_T = (ITodoService)blankProjects; IBoardService blankProjects_B = (IBoardService)blankProjects;
+        var blankController = BuildProjects(blankProjects, subjectId: creator);
         var blankResult = await blankController.ProjectUpdate(projectId, new ProjectComposerViewModel { Title = "   " });
         Assert.IsType<ViewResult>(blankResult);
         await blankProjects.DidNotReceive()
@@ -1427,11 +1482,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
 
         // A non-creator (no GlobalAdmin role) is a clean ForbidResult — the
         // service's standing gate, surfaced by the controller as the C3 403.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.UpdateProjectAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: other, roles: []);
+        var deniedController = BuildProjects(deniedProjects, subjectId: other, roles: []);
         var deniedResult = await deniedController.ProjectUpdate(projectId, new ProjectComposerViewModel { Title = "New title" });
         Assert.IsType<ForbidResult>(deniedResult);
     }
@@ -1453,8 +1509,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string todoId = "todo-edit";
         const string projectId = "proj-edit";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
             .Returns(new TodoDetailResult
             {
                 Todo = new TodoItem
@@ -1474,15 +1531,15 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // The blocker picker (TodoEditGet re-seeds it) reads
         // ListPickerTodosAsync — an empty candidate set (a valid shape) so the
         // picker card hides (C-TBD·4).
-        projects.ListPickerTodosAsync(
+        projects_T.ListPickerTodosAsync(
                 Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new TodoPage([], false));
         // The parent picker (TodoEditGet re-seeds it) reads ListTodosAsync — an
         // empty candidate set (a valid shape) so the picker card hides (F9).
-        projects.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+        projects_T.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new TodoPage([], false));
 
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildTodos(projects, subjectId: actor);
         var result = await controller.TodoEditGet(todoId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -1514,8 +1571,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string projectId = "proj-detail";
 
         // Readable: the association resolves to a project title.
-        var projects = Substitute.For<IProjectService>();
-        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
             .Returns(new TodoDetailResult
             {
                 Todo = new TodoItem
@@ -1532,7 +1590,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 Id = projectId, Title = "The Project", AuthorId = actor, Created = default,
             });
 
-        var controller = Build(projects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var controller = BuildTodos(projects, store: await BuildRealStoreAsync(), subjectId: actor);
         var result = await controller.TodoDetail(todoId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -1544,8 +1602,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // Dangling: the association points at a project the actor can no longer
         // read (the soft-deleted / denied case — F6 / F8) → the link fields are
         // null (the view hides the line) and the detail is still 200.
-        var danglingProjects = Substitute.For<IProjectService>();
-        danglingProjects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+        var danglingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService danglingProjects_T = (ITodoService)danglingProjects; IBoardService danglingProjects_B = (IBoardService)danglingProjects;
+        danglingProjects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
             .Returns(new TodoDetailResult
             {
                 Todo = new TodoItem
@@ -1559,7 +1618,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         danglingProjects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>())
             .Returns(Task.FromException<Project>(new KeyNotFoundException("gone")));
 
-        var danglingController = Build(danglingProjects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var danglingController = BuildTodos(danglingProjects, store: await BuildRealStoreAsync(), subjectId: actor);
         var danglingResult = await danglingController.TodoDetail(todoId);
 
         var danglingView = Assert.IsType<ViewResult>(danglingResult);
@@ -1582,8 +1641,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string boardId = "board-edit";
         const string projectId = "proj-edit";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
             .Returns(new BoardDetailResult
             {
                 Board = new KanbanBoard
@@ -1601,7 +1661,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 new() { Id = projectId, Title = "Alpha project", AuthorId = actor, Created = default },
             }, false));
 
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildBoards(projects, subjectId: actor);
         var result = await controller.BoardEditGet(boardId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -1629,8 +1689,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string boardId = "board-edit-aud";
         const string granteeId = "subj-board-edit-aud-grantee";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
             .Returns(new BoardDetailResult
             {
                 Board = new KanbanBoard
@@ -1648,7 +1709,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new ProjectPage([], false));
 
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildBoards(projects, subjectId: actor);
         var result = await controller.BoardEditGet(boardId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -1692,10 +1753,11 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string granteeId = "subj-board-edit-post-grantee";
 
         UpdateBoardRequest? sent = null;
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new ProjectPage([], false));
-        projects.UpdateBoardAsync(
+        projects_B.UpdateBoardAsync(
                 Arg.Is(boardId), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
                 Arg.Do<UpdateBoardRequest>(c => sent = c), Arg.Any<CancellationToken>())
             .Returns(new KanbanBoard
@@ -1706,7 +1768,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
             });
 
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildBoards(projects, subjectId: actor);
 
         var model = new BoardUpdateModel
         {
@@ -1750,8 +1812,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string boardId = "board-detail";
         const string projectId = "proj-detail";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
             .Returns(new BoardDetailResult
             {
                 Board = new KanbanBoard
@@ -1773,7 +1836,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new ProjectPage([], false));
 
-        var controller = Build(projects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var controller = BuildBoards(projects, store: await BuildRealStoreAsync(), subjectId: actor);
         var result = await controller.BoardDetail(boardId);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -1783,8 +1846,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
 
         // Dangling → the link fields are null and the detail is still 200.
-        var danglingProjects = Substitute.For<IProjectService>();
-        danglingProjects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+        var danglingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService danglingProjects_T = (ITodoService)danglingProjects; IBoardService danglingProjects_B = (IBoardService)danglingProjects;
+        danglingProjects_B.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
             .Returns(new BoardDetailResult
             {
                 Board = new KanbanBoard
@@ -1803,7 +1867,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         danglingProjects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new ProjectPage([], false));
 
-        var danglingController = Build(danglingProjects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var danglingController = BuildBoards(danglingProjects, store: await BuildRealStoreAsync(), subjectId: actor);
         var danglingResult = await danglingController.BoardDetail(boardId);
 
         var danglingView = Assert.IsType<ViewResult>(danglingResult);
@@ -1831,8 +1895,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string actor = "subj-285-list";
         const string boardId = "board-285-list";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_B.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
             .Returns(new BoardDetailResult
             {
                 Board = new KanbanBoard
@@ -1845,12 +1910,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new ProjectPage([], false));
 
-        var controller = Build(projects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var controller = BuildBoards(projects, store: await BuildRealStoreAsync(), subjectId: actor);
         var result = await controller.BoardDetail(boardId, view);
 
         var vm = Assert.IsType<BoardDetailViewModel>(Assert.IsType<ViewResult>(result).ViewData.Model);
         Assert.Equal(expected, vm.ListView);
-        await projects.Received(1).GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>());
+        await projects_B.Received(1).GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>());
     }
 
     // ── PL delete lanes (U09 — ADR 0086 / the design doc §9.6 Web names) ─────
@@ -1875,11 +1940,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string actor = "subj-goal-delete-actor";
         const string goalId = "goal-delete";
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.DeleteGoalAsync(
                 goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildGoals(projects, subjectId: actor);
 
         var result = await controller.GoalDelete(goalId);
 
@@ -1891,20 +1957,22 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
 
         // The C3 404 split: a missing / soft-deleted goal is a clean
         // NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
         missingProjects.DeleteGoalAsync(
                 goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new KeyNotFoundException("no goal")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildGoals(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.GoalDelete(goalId));
 
         // The C3 403 split: a denied actor (not creator ∪ GlobalAdmin) is a
         // clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.DeleteGoalAsync(
                 goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor, roles: []);
+        var deniedController = BuildGoals(deniedProjects, subjectId: actor, roles: []);
         Assert.IsType<ForbidResult>(await deniedController.GoalDelete(goalId));
     }
 
@@ -1928,11 +1996,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string actor = "subj-project-delete-actor";
         const string projectId = "project-delete";
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.DeleteProjectAsync(
                 projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildProjects(projects, subjectId: actor);
 
         var result = await controller.ProjectDelete(projectId);
 
@@ -1944,20 +2013,22 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
 
         // The C3 404 split: a missing / soft-deleted project is a clean
         // NotFoundResult, not a 500.
-        var missingProjects = Substitute.For<IProjectService>();
+        var missingProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService missingProjects_T = (ITodoService)missingProjects; IBoardService missingProjects_B = (IBoardService)missingProjects;
         missingProjects.DeleteProjectAsync(
                 projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new KeyNotFoundException("no project")));
-        var missingController = Build(missingProjects, subjectId: actor);
+        var missingController = BuildProjects(missingProjects, subjectId: actor);
         Assert.IsType<NotFoundResult>(await missingController.ProjectDelete(projectId));
 
         // The C3 403 split: a denied actor (not creator ∪ GlobalAdmin) is a
         // clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.DeleteProjectAsync(
                 projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor, roles: []);
+        var deniedController = BuildProjects(deniedProjects, subjectId: actor, roles: []);
         Assert.IsType<ForbidResult>(await deniedController.ProjectDelete(projectId));
     }
 
@@ -1974,11 +2045,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task TodosIndex_BlockedOnlyTrue_PassesFilterToService()
     {
         const string actor = "subj-tbd-index-actor";
-        var projects = Substitute.For<IProjectService>();
-        projects.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new TodoPage([], false));
         var store = await BuildRealStoreAsync();
-        var controller = Build(projects, store: store, subjectId: actor);
+        var controller = BuildTodos(projects, store: store, subjectId: actor);
 
         var result = await controller.TodosIndex(
             componentId: null, assigneeId: null, blockedOnly: true, page: 1);
@@ -1987,7 +2059,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Assert.IsType<ViewResult>(result).ViewData.Model);
         Assert.True(vm.BlockedOnly);
         // blockedOnly=true is the 7th positional argument (before ct).
-        await projects.Received(1).ListTodosAsync( null, null, actor, 1, false, null, true, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
+        await projects_T.Received(1).ListTodosAsync( null, null, actor, 1, false, null, true, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     /// <summary>
@@ -2006,8 +2078,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // scratch store (empty placements = an empty list).
         var store = await BuildRealStoreAsync();
 
-        var projects = Substitute.For<IProjectService>();
-        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
             .Returns(new TodoDetailResult
             {
                 Todo = new TodoItem
@@ -2025,7 +2098,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 },
             });
 
-        var controller = Build(projects, store: store, subjectId: actor);
+        var controller = BuildTodos(projects, store: store, subjectId: actor);
         var vm = Assert.IsType<TodoDetailViewModel>(
             Assert.IsType<ViewResult>(await controller.TodoDetail(todoId)).ViewData.Model);
 
@@ -2052,8 +2125,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // scratch store (empty placements = an empty list).
         var store = await BuildRealStoreAsync();
 
-        var projects = Substitute.For<IProjectService>();
-        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
             .Returns(new TodoDetailResult
             {
                 Todo = new TodoItem
@@ -2065,7 +2139,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 Blocker = new BlockerChip { TodoId = "tbd-detail-generic-blocker", Generic = true },
             });
 
-        var controller = Build(projects, store: store, subjectId: actor);
+        var controller = BuildTodos(projects, store: store, subjectId: actor);
         var vm = Assert.IsType<TodoDetailViewModel>(
             Assert.IsType<ViewResult>(await controller.TodoDetail(todoId)).ViewData.Model);
 
@@ -2087,10 +2161,11 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     {
         const string actor = "subj-new-forms-audience";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new TodoPage([], false));
-        projects.ListPickerTodosAsync(
+        projects_T.ListPickerTodosAsync(
                 Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new TodoPage([], false));
         projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
@@ -2099,18 +2174,24 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
             .Returns(new GoalPage([], false));
 
-        var controller = Build(projects, subjectId: actor);
+        var todosController = BuildTodos(projects, subjectId: actor);
 
         var todo = Assert.IsType<TodoEditorModel>(
-            Assert.IsType<ViewResult>(await controller.CreateGet()).ViewData.Model);
+            Assert.IsType<ViewResult>(await todosController.CreateGet()).ViewData.Model);
         Assert.True(todo.Audience.CommunityVisible);
 
+        // C2-05 D5 split — the goal composer now lives on the GoalsController
+        // (the C08 twin child), so the two "new form" lanes build two controllers.
+        var goalController = BuildGoals(projects, subjectId: actor);
+
         var goal = Assert.IsType<GoalComposerViewModel>(
-            Assert.IsType<ViewResult>(await controller.GoalNew()).ViewData.Model);
+            Assert.IsType<ViewResult>(await goalController.GoalNew()).ViewData.Model);
         Assert.True(goal.Audience.CommunityVisible);
 
+        var projController = BuildProjects(projects, subjectId: actor);
+
         var project = Assert.IsType<ProjectComposerViewModel>(
-            Assert.IsType<ViewResult>(await controller.ProjectNew()).ViewData.Model);
+            Assert.IsType<ViewResult>(await projController.ProjectNew()).ViewData.Model);
         Assert.True(project.Audience.CommunityVisible);
     }
 
@@ -2125,12 +2206,13 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     {
         const string actor = "subj-tbd-create-actor";
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         // The parent picker (F9) reads ListTodosAsync — an empty candidate set
         // (a valid shape) so the lane doesn't NRE.
-        projects.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
+        projects_T.ListTodosAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new TodoPage([], false));
-        projects.ListPickerTodosAsync(
+        projects_T.ListPickerTodosAsync(
                 Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new TodoPage(new List<TodoItem>
             {
@@ -2142,7 +2224,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new ProjectPage([], false));
 
-        var controller = Build(projects, subjectId: actor); // no real store needed (all reads are substituted)
+        var controller = BuildTodos(projects, subjectId: actor); // no real store needed (all reads are substituted)
         var vm = Assert.IsType<TodoEditorModel>(
             Assert.IsType<ViewResult>(await controller.CreateGet()).ViewData.Model);
 
@@ -2153,7 +2235,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("tbd-opt-b", vm.BlockerOptions[1].Id);
         // A new to-do has no blocker yet.
         Assert.Null(vm.BlockedByTodoId);
-        await projects.Received(1).ListPickerTodosAsync(
+        await projects_T.Received(1).ListPickerTodosAsync(
             actor, 1, Arg.Any<CancellationToken>(), Arg.Any<int?>());
     }
 
@@ -2171,12 +2253,13 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string todoId = "tbd-update";
         const string blockerId = "tbd-update-blocker";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.UpdateTodoAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.UpdateTodoAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(),
                 Arg.Any<UpdateTodoRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new TodoItem { Id = todoId, Title = "Edited title", AuthorId = actor }));
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildTodos(projects, subjectId: actor);
 
         var model = new TodoEditorModel
         {
@@ -2187,7 +2270,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
 
         Assert.IsType<RedirectResult>(await controller.UpdatePost(todoId, model));
 
-        await projects.Received(1).UpdateTodoAsync(
+        await projects_T.Received(1).UpdateTodoAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(),
             Arg.Is<UpdateTodoRequest>(r =>
                 r.BlockedByTodoId == blockerId && !r.ClearBlockedBy),
@@ -2206,12 +2289,13 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         const string actor = "subj-tbd-clear-actor";
         const string todoId = "tbd-clear";
 
-        var projects = Substitute.For<IProjectService>();
-        projects.UpdateTodoAsync(
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
+        projects_T.UpdateTodoAsync(
                 todoId, actor, Arg.Any<IReadOnlySet<string>>(),
                 Arg.Any<UpdateTodoRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new TodoItem { Id = todoId, Title = "Edited title", AuthorId = actor }));
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildTodos(projects, subjectId: actor);
 
         var model = new TodoEditorModel
         {
@@ -2223,7 +2307,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
 
         Assert.IsType<RedirectResult>(await controller.UpdatePost(todoId, model));
 
-        await projects.Received(1).UpdateTodoAsync(
+        await projects_T.Received(1).UpdateTodoAsync(
             todoId, actor, Arg.Any<IReadOnlySet<string>>(),
             Arg.Is<UpdateTodoRequest>(r =>
                 r.BlockedByTodoId == null && r.ClearBlockedBy),
@@ -2241,27 +2325,141 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     /// the write lanes' success branches don't NRE (<c>DefaultHttpContext</c>
     /// leaves <c>Session</c> null by default).
     /// </summary>
-    private static ProjectsController Build(
+    private static ProjectsController BuildProjects(
         IProjectService projects,
         IDocumentStore? store = null,
         string? subjectId = null,
         string[]? roles = null)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
         // The display-name / picker-read lanes default to empty candidate sets
         // (a valid shape): a missing profile row falls back to the raw id, and
         // the component picker is empty.
         userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
         // The goal composer (U06) seeds the shared _GrantPickers option lists
         // via SeedGrantPickerOptionsAsync — these two reads are null-safe
         // defaults (empty candidate sets — a valid shape) so the new/create
         // goal lanes don't NRE on the .Where/.Select projection.
-        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
-        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
 
-        var controller = new ProjectsController(
-            projects, userInfo, DefaultLocalization(), store ?? Substitute.For<IDocumentStore>());
+        var controller = new ProjectsController(projects, userInfo, Substitute.For<IGroupService>(), Substitute.For<IProfileSettingsService>(), DefaultLocalization(), store ?? Substitute.For<IDocumentStore>(), boards: (IBoardService)projects, todos: (ITodoService)projects);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var claims = new List<Claim>();
+        if (subjectId is not null)
+            claims.Add(new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId));
+        if (roles is { Length: > 0 })
+            claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
+
+        if (claims.Count > 0)
+            controller.ControllerContext.HttpContext.User =
+                new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
+
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+        return controller;
+    }
+
+    /// <summary>
+    /// Builds a <see cref="GoalsController"/> over NSubstitute seams (the C2-05
+    /// D5 split moved the Goals route family into this C08 child — the same
+    /// shape as <see cref="TodosController"/> / <see cref="BoardsController"/>).
+    /// </summary>
+    private static GoalsController BuildGoals(
+        IProjectService projects,
+        IDocumentStore? store = null,
+        string? subjectId = null,
+        string[]? roles = null)
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
+
+        // C3-05 (ADR 0295) — GoalsController no longer takes a store (its goal
+        // actions route through IProjectService); the base's tag-slug helper
+        // gets null + null-guards (the goal actions never call it).
+        var controller = new GoalsController(projects, userInfo, groupService, profileSettings, DefaultLocalization(), boards: (IBoardService)projects, todos: (ITodoService)projects);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var claims = new List<Claim>();
+        if (subjectId is not null)
+            claims.Add(new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId));
+        if (roles is { Length: > 0 })
+            claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
+
+        if (claims.Count > 0)
+            controller.ControllerContext.HttpContext.User =
+                new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
+
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+        return controller;
+    }
+
+    /// <summary>
+    /// Builds a <see cref="TodosController"/> over NSubstitute seams (the C08
+    /// split moved todo actions into this child). The multi-interface mock
+    /// is cast to <c>ITodoService</c> / <c>IBoardService</c> for the sibling
+    /// seams so the todo actions resolve correctly.
+    /// </summary>
+    private static TodosController BuildTodos(
+        IProjectService projects,
+        IDocumentStore? store = null,
+        string? subjectId = null,
+        string[]? roles = null)
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
+
+        var controller = new TodosController(projects, userInfo, groupService, profileSettings, DefaultLocalization(), store ?? Substitute.For<IDocumentStore>(), boards: (IBoardService)projects, todos: (ITodoService)projects);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var claims = new List<Claim>();
+        if (subjectId is not null)
+            claims.Add(new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId));
+        if (roles is { Length: > 0 })
+            claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
+
+        if (claims.Count > 0)
+            controller.ControllerContext.HttpContext.User =
+                new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
+
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+        return controller;
+    }
+
+    /// <summary>
+    /// Builds a <see cref="BoardsController"/> over NSubstitute seams (the C08
+    /// split moved board actions into this child). The multi-interface mock
+    /// is cast to <c>ITodoService</c> / <c>IBoardService</c> for the sibling
+    /// seams so the board actions resolve correctly.
+    /// </summary>
+    private static BoardsController BuildBoards(
+        IProjectService projects,
+        IDocumentStore? store = null,
+        string? subjectId = null,
+        string[]? roles = null)
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var groupService = Substitute.For<IGroupService>();
+        userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetProfilesAsync(true).Returns(new List<Profile>());
+        groupService.GetPublicGroupsAsync().Returns(new List<Group>());
+
+        var controller = new BoardsController(projects, userInfo, groupService, profileSettings, DefaultLocalization(), store ?? Substitute.For<IDocumentStore>(), boards: (IBoardService)projects, todos: (ITodoService)projects);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();
@@ -2337,7 +2535,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     /// <see cref="IProjectService.ListProjectsAsync"/> with
     /// <c>goalId = null</c> — the D8 / design doc §5 second section). Both
     /// resolve author display names as *reads* (falling back to the raw id
-    /// when the profile row is absent — the Build() default). A denied actor
+    /// when the profile row is absent — the BuildTodos() default). A denied actor
     /// is a clean <see cref="ForbidResult"/> (C3 403).
     /// </summary>
     [Fact]
@@ -2355,13 +2553,14 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
         };
 
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.ListGoalsAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new GoalPage(new List<ProjectGoal> { goal }, false));
         projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new ProjectPage(new List<Project> { project }, false));
 
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildProjects(projects, subjectId: actor);
         var result = await controller.ProjectsIndex(componentId: null, page: 1);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -2379,10 +2578,11 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         await projects.Received(1).ListProjectsAsync( null, null, actor, 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
 
         // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
-        var deniedProjects = Substitute.For<IProjectService>();
+        var deniedProjects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService deniedProjects_T = (ITodoService)deniedProjects; IBoardService deniedProjects_B = (IBoardService)deniedProjects;
         deniedProjects.ListGoalsAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(Task.FromException<GoalPage>(new UnauthorizedAccessException("denied")));
-        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedController = BuildProjects(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.ProjectsIndex(null, page: 1));
     }
 
@@ -2401,13 +2601,14 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     public async Task ProjectsTabs_ProjectsTab_ActiveOnIndex()
     {
         const string actor = "subj-tabs-active";
-        var projects = Substitute.For<IProjectService>();
+        var projects = Substitute.For<IProjectService, ITodoService, IBoardService>();
+        ITodoService projects_T = (ITodoService)projects; IBoardService projects_B = (IBoardService)projects;
         projects.ListGoalsAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new GoalPage(new List<ProjectGoal>(), false));
         projects.ListProjectsAsync( Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new ProjectPage(new List<Project>(), false));
 
-        var controller = Build(projects, subjectId: actor);
+        var controller = BuildProjects(projects, subjectId: actor);
         var result = await controller.ProjectsIndex(componentId: null, page: 1);
 
         var view = Assert.IsType<ViewResult>(result);

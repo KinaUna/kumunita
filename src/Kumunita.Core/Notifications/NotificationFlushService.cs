@@ -19,7 +19,7 @@ namespace Kumunita.Core.Notifications;
 /// <see cref="QuietScheduleEvaluator.IsQuietNow"/> (D3) at the **run** instant,
 /// (3) for each that is **no longer quiet**, stage the held email via the
 /// **frozen** <see cref="IMailerStage"/> with the deferred idempotency key
-/// (<see cref="NotificationService.DeferredKey"/>, D4) and flip that row's
+/// (<see cref="NotificationKeys.DeferredKey"/>, D4) and flip that row's
 /// <c>EmailDeferred = false</c>, (4) leave each still-quiet row
 /// <c>EmailDeferred = true</c> (re-checked next run). It commits **once per
 /// run** (C3).
@@ -42,7 +42,7 @@ namespace Kumunita.Core.Notifications;
 /// **Re-runnable / idempotent (C-M20·4):** the flip to <c>EmailDeferred =
 /// false</c> is committed in the same run, so a second run does not re-query
 /// the already-cleared row (the §6.2 "existing-row check" guard) — and even if
-/// it did, the <see cref="NotificationService.DeferredKey"/> outbox dedup
+/// it did, the <see cref="NotificationKeys.DeferredKey"/> outbox dedup
 /// (F10) makes a second stage of the same key a no-op. A still-quiet row stays
 /// <c>EmailDeferred = true</c> across consecutive runs.
 /// </para>
@@ -166,7 +166,7 @@ public static class NotificationFlushService
         {
             if (profile is not null && !string.IsNullOrWhiteSpace(profile.Email))
             {
-                var key = NotificationService.DeferredKey(row.Kind, row.SourceId ?? string.Empty);
+                var key = NotificationKeys.DeferredKey(row.Kind, row.SourceId ?? string.Empty);
                 await mailer.StageAsync(
                     session,
                     key,

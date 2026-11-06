@@ -85,12 +85,12 @@ public class M7NewlyPagedTests
             .Returns(new AnnouncementPage(Items: items, HasMore: true));
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         userInfo.GetProfileAsync("subj-author-001")
             .Returns((Profile?)new() { SubjectId = "subj-author-001", DisplayName = "Admin" });
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
-        var controller = new AnnouncementController(
-            announcements, userInfo, DefaultLocalization(), Substitute.For<IDocumentStore>());
+        var controller = new AnnouncementController(announcements, userInfo, Substitute.For<IProfileSettingsService>(), DefaultLocalization(), Substitute.For<IDocumentStore>());
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var result = (await controller.Index(page: page)) as ViewResult;
@@ -242,9 +242,10 @@ public class M7NewlyPagedTests
             .Returns(new List<Event>());
 
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         userInfo.GetProfileAsync("subj-author-001")
             .Returns((Profile?)new() { SubjectId = "subj-author-001", DisplayName = "Ada" });
-        userInfo.GetComponentsAsync(true)
+        profileSettings.GetComponentsAsync(true)
             .Returns(new List<Component> { new() { Id = componentId, Name = "Safety" } });
 
         var localization = Substitute.For<ILocalizationService>();
@@ -252,8 +253,7 @@ public class M7NewlyPagedTests
         localization.GetDefaultLanguageCodeAsync().Returns("en");
 
         var timezone = new EffectiveTimezoneResolver(userInfo, localization, new HttpContextAccessor());
-        var controller = new EventController(
-            iEvents, userInfo, localization, Substitute.For<IDocumentStore>(), timezone);
+        var controller = new EventController(iEvents, userInfo, Substitute.For<IProfileSettingsService>(), Substitute.For<IGroupService>(), localization, timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
         controller.ControllerContext.HttpContext.User =
             new ClaimsPrincipal(

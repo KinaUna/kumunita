@@ -33,23 +33,22 @@ public static class PrincipalsExport
     /// fields per user; the credential columns are never read — the
     /// C-M11·2 source boundary).
     /// </summary>
-    /// <param name="appDbContext">The frozen EF Core <c>identity</c>-schema seam (the user source — <see cref="AppDbContext.Users"/>).</param>
+    /// <param name="users">The Identity principals (the <c>identity</c>-schema user source — read through the C3-07 <see cref="IIdentityPrincipalStore"/> contract, so this extractor codes against the contract, not the EF Core <c>AppDbContext</c> context type).</param>
     /// <param name="userManager">The frozen Identity seam (the roles source — <see cref="UserManager{TUser}.GetRolesAsync(TUser)"/>).</param>
     /// <param name="documentStore">The frozen Marten seam (the <see cref="Profile"/> source for <c>DisplayName</c> / <c>Verified</c> / <c>Blocked</c>).</param>
     /// <param name="ct">Cancellation.</param>
     /// <returns>The <c>identity/principals.json</c> payload bytes (a JSON array of <see cref="PortabilityPrincipal"/>).</returns>
     public static async Task<byte[]> ExportAsync(
-        AppDbContext appDbContext,
+        IReadOnlyList<User> users,
         UserManager<User> userManager,
         IDocumentStore documentStore,
         CancellationToken ct = default)
     {
-        // The principal source — AppDbContext.Users (the identity schema's
-        // user table; the EF Core context is the principal store, not a
-        // domain-doc read). Fully-qualified EF Core ToListAsync to avoid
-        // the ambiguity with Marten.QueryableExtensions.ToListAsync<T>.
-        var users = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-            .ToListAsync(appDbContext.Users, ct);
+        // The principal source — the identity-schema user list, read by the
+        // caller through the C3-07 IIdentityPrincipalStore contract (ADR 0297),
+        // so this extractor codes against the contract, not the EF Core
+        // AppDbContext context type (the EF Core context stays a private
+        // detail of the Identity module, ADR 0004 §B).
 
         // Load all Profile docs in one query (the DisplayName / Verified /
         // Blocked source — keyed by SubjectId = User.Id).

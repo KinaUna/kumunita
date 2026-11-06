@@ -8,7 +8,9 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - docs/archive/README.md
   - docs/DOCS-CONVENTIONS.md
-updated: 2026-11-02
+  - docs/archive/lanes/improve-code/plan-improve-code-3.md
+  - docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md
+updated: 2026-11-06
 ---
 
 > **Abstract:** where the *current* lane's register and in-progress unit plans
@@ -37,10 +39,22 @@ to live here are in
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
 
-There is **no in-flight lane at this moment** — the `IMPROVE-DOCS` lane
-(the last shipped) moved to
-[`archive/lanes/improve-docs/`](../archive/lanes/improve-docs/) at its close
-(2026-11-02), so the only entry in this folder is this `README.md`.
+**The lane register is empty.** The most recent lane, `IMPROVE-CODE-3`
+(`C3-00`–`C3-08`), **shipped on 2026-11-06** — it finished the two lines its
+predecessor held and landed the six-member "shipped" flip — and its register,
+the `C2-00`–`C3-08` unit prompts, and the two handoff notes
+(`improve-code-2-handoff-notes.md`, `improve-code-3-handoff-notes.md`) all now
+live in the archive at
+[`archive/lanes/improve-code/`](../archive/lanes/improve-code/) (register
+[plan-improve-code-3](../archive/lanes/improve-code/plan-improve-code-3.md),
+closing log
+[improve-code-3-handoff-notes.md](../archive/lanes/improve-code/improve-code-3-handoff-notes.md)).
+When a new lane starts, its register + unit prompts land here first and move to
+that archive folder at its close.
+
+The full code-quality history — `IMPROVE-CODE` (round 1), `IMPROVE-CODE-2`
+(round 2), and `IMPROVE-CODE-3` (round 3) — is archived together under
+[`archive/lanes/improve-code/`](../archive/lanes/improve-code/).
 
 ## The three-tier contract (per lane)
 

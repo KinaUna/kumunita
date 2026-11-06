@@ -770,13 +770,14 @@ public sealed class InventoryControllerTests
         string[]? roles = null)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
         // The display-name / picker-read lanes default to empty candidate
         // sets (a valid shape): a missing profile row falls back to the raw
         // id, and the component picker is empty.
         userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
-        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        profileSettings.GetComponentsAsync(true).Returns(new List<Component>());
 
-        var controller = new InventoryController(inventory, userInfo);
+        var controller = new InventoryController(inventory, userInfo, profileSettings);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

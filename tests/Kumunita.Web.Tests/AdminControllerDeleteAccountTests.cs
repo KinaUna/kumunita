@@ -175,12 +175,7 @@ public class AdminControllerDeleteAccountTests
                 .UseNpgsql("Host=localhost;Database=_test_never_opened;Username=_;******")
                 .Options);
 
-        var controller = new AdminController(
-            identities: db,
-            store:      Substitute.For<IDocumentStore>(),
-            identity:   identity,
-            userInfo:   Substitute.For<IUserInfoService>(),
-            pages:      Substitute.For<IPageService>());
+        var controller = new AdminController(identities: db, store:      Substitute.For<IDocumentStore>(), identity:   identity, userInfo:   Substitute.For<IUserInfoService>(), Substitute.For<ICommunityMembershipService>(), Substitute.For<IProfileSettingsService>(), pages:      Substitute.For<IPageService>());
 
         var ctx = new DefaultHttpContext();
         ctx.RequestServices = new ServiceCollection().BuildServiceProvider();
@@ -224,8 +219,9 @@ public class AdminControllerDeleteAccountTests
                 Substitute.For<IUserConfirmation<User>>()),
             userManager:   userManager,
             identity:      identity,
-            userInfo:      Substitute.For<IUserInfoService>(),
-            store:         Substitute.For<IDocumentStore>());
+            // C3-05 (ADR 0295) — the store arg is gone (the verify-token read
+            // is now the IIdentityService.LoadVerifyTokenAsync seam).
+            userInfo:      Substitute.For<IUserInfoService>());
 
         var ctx = new DefaultHttpContext();
         ctx.RequestServices = new ServiceCollection().BuildServiceProvider();

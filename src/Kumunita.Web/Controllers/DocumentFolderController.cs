@@ -1,7 +1,6 @@
 using Kumunita.Web.Security;
 using Kumunita.Core.Documents;
 using Kumunita.Web.Models;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -27,8 +26,7 @@ namespace Kumunita.Web.Controllers;
 /// </para>
 /// </summary>
 public sealed class DocumentFolderController(
-    DocumentFolderService folders,
-    IDocumentStore store,
+    IDocumentFolderService folders,
     Kumunita.Core.Localization.ILocalizationService? localization = null,
     Kumunita.Core.Localization.ITranslationProvider? translationProvider = null) : Controller
 {
@@ -92,10 +90,9 @@ public sealed class DocumentFolderController(
         if (string.IsNullOrWhiteSpace(form.Name))
             return BadRequest(await this.FlashAsync("validation.folder_name_required", "A folder name is required."));
 
-        await using var session = store.LightweightSession();
         try
         {
-            var folder = await folders.CreateAsync(form.Name, form.ParentId, subject, session);
+            var folder = await folders.CreateAsync(form.Name, form.ParentId, subject);
             TempData["info"] = await T("documents.folder_flash_created");
             return Redirect("/documents");
         }
@@ -121,10 +118,9 @@ public sealed class DocumentFolderController(
         if (string.IsNullOrWhiteSpace(form.Name))
             return BadRequest(await this.FlashAsync("validation.folder_name_required", "A folder name is required."));
 
-        await using var session = store.LightweightSession();
         try
         {
-            await folders.RenameAsync(id, form.Name, subject, roles, session);
+            await folders.RenameAsync(id, form.Name, subject, roles);
             TempData["info"] = await T("documents.folder_flash_renamed");
             return Redirect("/documents");
         }
@@ -152,10 +148,9 @@ public sealed class DocumentFolderController(
         var roles = Kumunita.Web.Security.KumunitaPrincipal.RoleSet(User)
             ;
 
-        await using var session = store.LightweightSession();
         try
         {
-            await folders.MoveAsync(id, form.NewParentId, subject, roles, session);
+            await folders.MoveAsync(id, form.NewParentId, subject, roles);
             TempData["info"] = await T("documents.folder_flash_moved");
             return Redirect("/documents");
         }
@@ -188,10 +183,9 @@ public sealed class DocumentFolderController(
         var roles = Kumunita.Web.Security.KumunitaPrincipal.RoleSet(User)
             ;
 
-        await using var session = store.LightweightSession();
         try
         {
-            await folders.DeleteAsync(id, subject, roles, session);
+            await folders.DeleteAsync(id, subject, roles);
             TempData["info"] = await T("documents.folder_flash_deleted");
             return Redirect("/documents");
         }
@@ -222,10 +216,9 @@ public sealed class DocumentFolderController(
 
         // The owner-only gate (the ADR 0125 owner-reading — the same standing
         // that governs the edit lane). The Core lane re-checks it.
-        await using var session = store.LightweightSession();
         try
         {
-            await folders.MoveDocumentAsync(id, form.NewFolderId, subject, session);
+            await folders.MoveDocumentAsync(id, form.NewFolderId, subject);
             TempData["info"] = await T("documents.flash_moved");
             return Redirect($"/documents/{id}");
         }

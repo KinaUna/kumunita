@@ -271,6 +271,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     {
         var store = await BootStoreAsync();
         var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string owner = "u-u9-f5-owner";
         const string member = "u-u9-f5-member";
         const string groupId = "g-u9-f5";
@@ -318,6 +319,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     {
         var store = await BootStoreAsync();
         var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string owner = "u-u9-f6-owner";
         const string delegatee = "u-u9-f6-dev";
 
@@ -361,6 +363,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     {
         var store = await BootStoreAsync();
         var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string owner = "u-u9-f7-owner";
         const string delegatee = "u-u9-f7-dev";
 
@@ -459,6 +462,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     {
         var store = await BootStoreAsync();
         var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
         await Plant(store, new Component { Id = "c-u9-off", Name = "Safety-off", Enabled = false });
@@ -473,8 +477,8 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Assert.Empty(await AllAudits(store));
 
         // (b) `GetComponentsAsync` — the candidate read is not a decision.
-        var enabledOnly = await userInfo.GetComponentsAsync(enabledOnly: true);
-        var all = await userInfo.GetComponentsAsync(enabledOnly: false);
+        var enabledOnly = await profileSettings.GetComponentsAsync(enabledOnly: true);
+        var all = await profileSettings.GetComponentsAsync(enabledOnly: false);
         Assert.Contains(enabledOnly, c => c.Id == ComponentId);
         Assert.DoesNotContain(enabledOnly, c => c.Id == "c-u9-off");
         Assert.Contains(all, c => c.Id == "c-u9-off");
@@ -697,6 +701,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     {
         var store = await BootStoreAsync();
         var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string owner = "u-u9-f14-owner";
         const string delegatee = "u-u9-f14-dev";
 
@@ -1223,6 +1228,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Services(IDocumentStore store)
     {
         var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
         var authz = new AuthorizationService(store, userInfo);
         var posts = new PostService(userInfo, authz, store);
         return (userInfo, authz, posts);
@@ -1286,6 +1292,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     {
         var store = await BootStoreAsync();
         var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string author = "u-gate-member";
         const string comp   = "c-gate-a";
 
@@ -1778,6 +1785,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         // placeholder shape — replies remain visible).
         var store = await BootStoreAsync();
         var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
         const string author = "u-del-feed";
 
         await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });

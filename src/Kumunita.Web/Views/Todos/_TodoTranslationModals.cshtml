@@ -1,0 +1,119 @@
+@*
+    _TodoTranslationModals — the to-do's translation add / edit modals (the
+    ADR 0082 lane), extracted from <c>Views/Projects/TodoDetail.cshtml</c>
+    (IMPROVE-CODE C11). One modal per existing translation (edit — title +
+    body, plain textarea) and one per enabled-but-missing language (add —
+    title prefilled from the original + an rc-editor body, the ADR 0025
+    rich-body lane; data-rich-editor-no-image keeps the to-do translation
+    body text-only, mirroring the Project/Announcement translation lanes).
+    Gated on CanTranslate (ADR 0088). The routes / form actions / field names
+    are the ADR 0088 U09/U10/U11 lanes — only the presentation moved from
+    <details> to a modal.
+    The ids / routes / LangName / ariaClose all come through the view model
+    (the partial does not re-resolve them).
+*@
+@model Kumunita.Web.Models.TodoTranslationModalsModel
+@if (Model.CanTranslate)
+{
+    @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+    {
+        <div class="modal fade" id="@($"todo-trans-edit-{existing.LanguageCode}")" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="post" action="@Model.EditAction"
+                          id="@($"todo-trans-edit-form-{existing.LanguageCode}")">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="@($"todo-trans-edit-label-{existing.LanguageCode}")">
+                                <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@Model.LangName(existing.LanguageCode)</b>
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Model.AriaClose"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label" for="@($"todo-trans-edit-title-{existing.LanguageCode}")">
+                                    <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                </label>
+                                <input class="form-control" type="text" name="title"
+                                       id="@($"todo-trans-edit-title-{existing.LanguageCode}")"
+                                       maxlength="120" value="@existing.Title" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="@($"todo-trans-edit-body-{existing.LanguageCode}")">
+                                    <kw-l key="posts.translation_body_label">Body</kw-l>
+                                </label>
+                                <textarea class="form-control" name="body" rows="4"
+                                          id="@($"todo-trans-edit-body-{existing.LanguageCode}")"
+                                          placeholder="…">@existing.Body</textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <kw-l key="common.cancel">Cancel</kw-l>
+                            </button>
+                            <button type="submit" class="btn btn-primary" form="@($"todo-trans-edit-form-{existing.LanguageCode}")">
+                                <kw-l key="posts.translation_save">Save translation</kw-l>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+    @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
+    {
+        <div class="modal fade" id="@($"todo-trans-add-{lang.Code}")" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="post" action="@Model.AddAction"
+                          id="@($"todo-trans-add-form-{lang.Code}")">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="languageCode" value="@lang.Code" />
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="@($"todo-trans-add-label-{lang.Code}")">
+                                <kw-l key="posts.translation_add">Add</kw-l> — <b>@Model.LangName(lang.Code)</b>
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Model.AriaClose"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label" for="@($"todo-trans-add-title-{lang.Code}")">
+                                    <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                </label>
+                                <input class="form-control" type="text" name="title"
+                                       id="@($"todo-trans-add-title-{lang.Code}")"
+                                       maxlength="120" value="@Model.OriginalTitle" />
+                            </div>
+                            <div>
+                                <label class="form-label" for="@($"todo-trans-add-body-{lang.Code}")">
+                                    <kw-l key="posts.translation_body_label">Body</kw-l>
+                                </label>
+                                <div class="rc-editor">
+                                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                        <partial name="_RichEditorToggle" />
+                                    </div>
+                                    <textarea class="form-control" name="body" id="@($"todo-trans-add-body-{lang.Code}")" data-rich-editor></textarea>
+                                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <kw-l key="common.cancel">Cancel</kw-l>
+                            </button>
+                            <button type="submit" class="btn btn-primary" form="@($"todo-trans-add-form-{lang.Code}")">
+                                <kw-l key="posts.translation_save">Save translation</kw-l>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+}

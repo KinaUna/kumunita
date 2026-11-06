@@ -54,6 +54,7 @@ public class UserInfoServiceGroupDescriptionTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-desc-owner";
 
@@ -61,19 +62,19 @@ public class UserInfoServiceGroupDescriptionTests(PostgresFixture fixture) : ICl
         Assert.Equal("Residents of Building 4", group.Description);
 
         // The write is live on the very next single-group read.
-        await svc.UpdateGroupDescriptionAsync(
+        await groupService.UpdateGroupDescriptionAsync(
             group.Id, "Residents of Building 4 — all floors", owner);
-        var after = await svc.GetGroupAsync(group.Id);
+        var after = await groupService.GetGroupAsync(group.Id);
         Assert.Equal("Residents of Building 4 — all floors", after?.Description);
 
         // …and on the owner ∪ member projection read (the /groups list lane).
-        var forUser = await svc.GetGroupsForUserAsync(owner);
+        var forUser = await groupService.GetGroupsForUserAsync(owner);
         Assert.Equal("Residents of Building 4 — all floors",
             forUser.Single(g => g.Id == group.Id).Description);
 
         // Null clears (the Web's "blank clears" mapping; C4 on that lane too).
-        await svc.UpdateGroupDescriptionAsync(group.Id, null, owner);
-        Assert.Null((await svc.GetGroupAsync(group.Id))?.Description);
+        await groupService.UpdateGroupDescriptionAsync(group.Id, null, owner);
+        Assert.Null((await groupService.GetGroupAsync(group.Id))?.Description);
     }
 
     // ── Test 2 — owner update: audit row, Via Owner, effective = owner ─────
@@ -82,11 +83,12 @@ public class UserInfoServiceGroupDescriptionTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-desc-audit-owner";
         var group = await svc.CreateGroupAsync(owner, "Volunteers", null);
 
-        await svc.UpdateGroupDescriptionAsync(group.Id, "Runs the tool library", owner);
+        await groupService.UpdateGroupDescriptionAsync(group.Id, "Runs the tool library", owner);
 
         await using var session = store.QuerySession();
         var audits = await session.Query<AccessAudit>()
@@ -114,12 +116,13 @@ public class UserInfoServiceGroupDescriptionTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         const string owner = "u-desc-admin-owner";
         const string admin = "u-desc-globaladmin";
         var group = await svc.CreateGroupAsync(owner, "Bike owners", null);
 
-        await svc.UpdateGroupDescriptionAsync(group.Id, "Pump your tires here", admin);
+        await groupService.UpdateGroupDescriptionAsync(group.Id, "Pump your tires here", admin);
 
         await using var session = store.QuerySession();
         var audit = await session.Query<AccessAudit>()
@@ -132,7 +135,7 @@ public class UserInfoServiceGroupDescriptionTests(PostgresFixture fixture) : ICl
 
         // The change landed for both reads (C4: the admin's write is the
         // owner's group's visible state).
-        Assert.Equal("Pump your tires here", (await svc.GetGroupAsync(group.Id))?.Description);
+        Assert.Equal("Pump your tires here", (await groupService.GetGroupAsync(group.Id))?.Description);
     }
 
     // ── Test 4 — unknown group id throws (the lane's fail-safe shape) ──────
@@ -141,9 +144,10 @@ public class UserInfoServiceGroupDescriptionTests(PostgresFixture fixture) : ICl
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var groupService = new GroupService(store);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.UpdateGroupDescriptionAsync("u-desc-missing-group", "text", "u-desc-any"));
+            () => groupService.UpdateGroupDescriptionAsync("u-desc-missing-group", "text", "u-desc-any"));
 
         // No audit row for a write that never landed (invariant C3: the row
         // is committed *with* the change, not for the attempt).

@@ -27,7 +27,7 @@ namespace Kumunita.Core.Notifications;
 /// emitted for an inbox read (F11).
 /// </para>
 /// </summary>
-public sealed class NotificationService
+public sealed class NotificationService : INotificationEmitter
 {
     /// <summary>The inbox cap (D8) — the most recent 50 rows, newest-first.</summary>
     public const int InboxCap = 50;
@@ -46,12 +46,13 @@ public sealed class NotificationService
     // default: a schedule is still evaluated against UTC, never throws).
     private readonly ILocalizationService? _localization;
     private readonly bool _suppressSampleAccounts;
-    // The instance's public base URL (the VerificationOptions.BaseUrl
-    // absolute-link precedent — the M1 verification email builds its link the
-    // same way). Used to turn the same-origin relative LinkPath into the
-    // absolute link the email carries. Absence (null options, e.g. test
-    // harnesses) → empty (the email carries the relative path, a dev-only
-    // shape — a human can still copy it into the browser bar).
+    // The instance's public base URL (the C3-07 IInstanceBaseUrlReader seam —
+    // the read contract over the VerificationOptions.BaseUrl value, so this
+    // module codes against a contract, not the concrete Identity policy type).
+    // Used to turn the same-origin relative LinkPath into the absolute link the
+    // email carries. Absence (null reader, e.g. test harnesses) → empty (the
+    // email carries the relative path, a dev-only shape — a human can still
+    // copy it into the browser bar).
     private readonly string _baseUrl;
 
     public NotificationService(
@@ -60,10 +61,13 @@ public sealed class NotificationService
         ITranslationProvider translator,
         IMailerStage mailer,
         IOptions<NotificationOptions>? options = null,
-        // The instance base URL for the email's absolute link. Optional
-        // (CS1736 trailing-param idiom) so the existing test-construction
-        // sites that pass only the four frozen seams keep compiling unchanged.
-        IOptions<Identity.VerificationOptions>? baseUrlOptions = null,
+        // The instance base URL for the email's absolute link (C3-07, ADR 0297 —
+        // the IInstanceBaseUrlReader read contract over the Identity
+        // VerificationOptions.BaseUrl value; this module codes against the
+        // contract, not the concrete policy type). Optional (CS1736
+        // trailing-param idiom) so the existing test-construction sites that
+        // pass only the four frozen seams keep compiling unchanged.
+        IInstanceBaseUrlReader? baseUrlReader = null,
         // M20 (ADR 0121, D4) — the ADR 0019 platform-default zone read the
         // quiet gate's effective-zone chain uses. Optional (CS1736 trailing
         // param) so the eight existing construction sites (seven test
@@ -81,7 +85,10 @@ public sealed class NotificationService
         // accounts behave like real residents; in Production/Staging they are
         // silently skipped. Absence (null options, e.g. test harnesses) → false.
         _suppressSampleAccounts = options?.Value.SuppressForSampleAccountsInProduction ?? false;
-        _baseUrl = baseUrlOptions?.Value.BaseUrl ?? string.Empty;
+        // C3-07 (ADR 0297) — the instance base URL via the IInstanceBaseUrlReader
+        // contract (null reader, e.g. a test harness that omits the seam → the
+        // empty-string relative-path fallback, the M1 verification link shape).
+        _baseUrl = baseUrlReader?.BaseUrl ?? string.Empty;
     }
 
     /// <summary>
@@ -179,10 +186,7 @@ public sealed class NotificationService
         string? declinePath = null,
         CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(session);
-        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
-        if (string.IsNullOrWhiteSpace(kind)) throw new ArgumentException("A kind is required.", nameof(kind));
-        if (string.IsNullOrWhiteSpace(idempotencyKey)) throw new ArgumentException("An idempotency key is required.", nameof(idempotencyKey));
+        ValidateEmitArguments(session, recipientId, kind, idempotencyKey);
 
         // (0) ADR 0084 — the per-target subscription gate. Consulted **
         //     first** (before dedup, before the profile read, before the
@@ -225,30 +229,16 @@ public sealed class NotificationService
         //     and appends the UGC content.
         var profile = await _userInfo.GetProfileAsync(recipientId).ConfigureAwait(false);
 
-        // (2a) ADR 0078 — sample-account suppression gate (production only).
-        //      The host binds this to !IsDevelopment(); in Development the
-        //      flag is false so sample accounts behave like real residents
-        //      (Mailpit collects their mail). In Production / Staging the
-        //      flag is true and any recipient whose profile e-mail matches a
-        //      code-owned sample address (SampleDataSeeder.SampleAccountEmails)
-        //      is a no-op: no inbox row stored, no email staged, no
-        //      translation lookup. The gate is a pure return-null — the
-        //      caller's transaction is unaffected (the caller still runs its
-        //      own SaveChangesAsync for the domain write it is performing).
-        if (_suppressSampleAccounts
-            && profile is not null
-            && !string.IsNullOrWhiteSpace(profile.Email)
-            && SampleDataSeeder.SampleAccountEmails.Contains(profile.Email.Trim()))
-        {
+        // (2a) ADR 0078 — sample-account suppression gate (production only):
+        //      a recipient whose profile e-mail matches a code-owned sample
+        //      address is a no-op (see <see cref="IsSampleAccountSuppressed"/>).
+        if (IsSampleAccountSuppressed(profile))
             return null;   // ADR 0078 — sample account in production: suppress
-        }
 
-        var lang = profile?.EmailLanguage;                    // the ADR 0061 per-recipient resolution input
-        var subject = await _translator.GetAsync($"notification.{kind}.subject", lang).ConfigureAwait(false);
-        var bodyTemplate = await _translator.GetAsync($"notification.{kind}.body", lang).ConfigureAwait(false);
-        var composedBody = string.IsNullOrWhiteSpace(body)
-            ? bodyTemplate
-            : bodyTemplate + " " + body;                      // localized template + UGC snippet (sender's language, ADR 0018)
+        // (2) Compose the localized subject + body from the recipient's
+        //     profile and the per-kind templates (ADR 0061 / C-M6·6) — see
+        //     <see cref="ComposeContentAsync"/>.
+        var (lang, subject, composedBody) = await ComposeContentAsync(profile, kind, body, ct).ConfigureAwait(false);
 
         // (3) The inbox row is stored **unconditionally** (D7 — the inbox is
         //     the durable record; the email is the best-effort nudge).
@@ -274,6 +264,41 @@ public sealed class NotificationService
         };
         session.Store(notification);
 
+        // (4)–(5) The email nudge decision + staging — the D7 email-kind
+        //     gate, the M4 event-reminder hand-off, the M20 quiet-hours
+        //     deferral, and the IMailerStage nudge itself (the view /
+        //     accept / decline absolute links + the F17 bounce gate). The
+        //     inbox row is already stored (D7); this phase either stages the
+        //     email or defers / skips it and returns the same row — see
+        //     <see cref="StageEmailNudgeAsync"/>.
+        return await StageEmailNudgeAsync(
+            session, recipientId, kind, idempotencyKey, subject, composedBody,
+            lang, notification, profile, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the email nudge phase of <see
+    /// cref="EmitAsync"/> extracted along the (4)–(5) phase seam the method
+    /// already comments. Takes the **stored** inbox row (D7 — it is the
+    /// durable record, returned in every branch) and either stages the email
+    /// via <see cref="IMailerStage"/> or defers / skips it, always returning
+    /// the same <paramref name="notification"/>. Behaviour is unchanged: the
+    /// D7 email-kind gate, the M4 <c>event.reminder</c> hand-off, the M20
+    /// quiet-hours deferral, the view / accept / decline absolute links, and
+    /// the F17 bounce gate all run in the same order with the same gates.
+    /// </summary>
+    private async Task<Notification> StageEmailNudgeAsync(
+        IDocumentSession session,
+        string recipientId,
+        string kind,
+        string idempotencyKey,
+        string subject,
+        string composedBody,
+        string? lang,
+        Notification notification,
+        Profile? profile,
+        CancellationToken ct)
+    {
         // (4) The D7 email gate — resolved on the caller's session **before**
         //     deciding to stage: a non-null, non-empty <c>KindsEnabled</c>
         //     that omits <paramref name="kind"/> suppresses the email (F9);
@@ -381,6 +406,62 @@ public sealed class NotificationService
         // contract).
         await _mailer.StageAsync(session, idempotencyKey, profile!.Email!, subject, emailBody, ct).ConfigureAwait(false);
         return notification;
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the content-composition phase of <see
+    /// cref="EmitAsync"/> extracted along the (2) phase seam the method
+    /// already comments: resolves the recipient's <c>Profile.EmailLanguage</c>
+    /// (ADR 0061) and the per-kind subject + body templates (C-M6·6) and
+    /// appends the UGC snippet (sender's authored language, ADR 0018). Pure
+    /// <c>(lang,
+    /// subject, body)</c> tuple. Behaviour is unchanged — the same two
+    /// <see cref="ITranslationProvider"/> lookups and the same template +
+    /// snippet composition the inline code performed.
+    /// </summary>
+    private async Task<(string? Lang, string Subject, string Body)> ComposeContentAsync(
+        Profile? profile, string kind, string? body, CancellationToken ct)
+    {
+        var lang = profile?.EmailLanguage;                    // the ADR 0061 per-recipient resolution input
+        var subject = await _translator.GetAsync($"notification.{kind}.subject", lang).ConfigureAwait(false);
+        var bodyTemplate = await _translator.GetAsync($"notification.{kind}.body", lang).ConfigureAwait(false);
+        var composedBody = string.IsNullOrWhiteSpace(body)
+            ? bodyTemplate
+            : bodyTemplate + " " + body;                      // localized template + UGC snippet (sender's language, ADR 0018)
+        return (lang, subject, composedBody);
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the argument-guard phase of <see cref="EmitAsync"/>
+    /// extracted along the method's leading guard seam. Throws the same
+    /// <see cref="ArgumentException"/>s (same messages / parameter names) the
+    /// inline guards produced; <c>null</c> <paramref name="session"/> is
+    /// still refused by <see cref="ArgumentNullException.ThrowIfNull"/>.
+    /// Behaviour is unchanged.
+    /// </summary>
+    private static void ValidateEmitArguments(
+        IDocumentSession session, string recipientId, string kind, string idempotencyKey)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+        if (string.IsNullOrWhiteSpace(kind)) throw new ArgumentException("A kind is required.", nameof(kind));
+        if (string.IsNullOrWhiteSpace(idempotencyKey)) throw new ArgumentException("An idempotency key is required.", nameof(idempotencyKey));
+    }
+
+    /// <summary>
+    /// C10 (IMPROVE-CODE) — the ADR 0078 sample-account suppression gate
+    /// extracted along the (2a) phase seam of <see cref="EmitAsync"/>. The
+    /// host binds <c>SuppressForSampleAccountsInProduction</c> to
+    /// !IsDevelopment(); a recipient whose profile e-mail matches a code-owned
+    /// sample address (<see cref="SampleDataSeeder.SampleAccountEmails"/>) is a
+    /// no-op (no inbox row, no email, no translation lookup). Pure read — the
+    /// caller's transaction is unaffected. Behaviour is unchanged.
+    /// </summary>
+    private bool IsSampleAccountSuppressed(Profile? profile)
+    {
+        if (!_suppressSampleAccounts || profile is null || string.IsNullOrWhiteSpace(profile.Email))
+            return false;
+        return SampleDataSeeder.SampleAccountEmails.Contains(profile.Email.Trim());
     }
 
     /// <summary>
@@ -767,21 +848,6 @@ public sealed class NotificationService
             return null;
         }
     }
-
-    /// <summary>
-    /// M20 (ADR 0121, D4) — the **deferred-email idempotency key form**.
-    /// Distinct from the emit-time key
-    /// (<c>notification:{kind}:{source-id}</c>) so the outbox dedup (F10)
-    /// does **not** collide with an earlier emit-time stage; the flush job
-    /// (D5, U04) stages the held email under this key, so a cleared email is
-    /// delivered **exactly once** (C-M20·4). <paramref name="sourceId"/> is
-    /// the row's stable source id (the <see cref="Notification.SourceId"/>
-    /// field). This form is **recorded here (U03)** and **consumed by U04 /
-    /// U05** — the flush job reuses this exact shape; it must not be re-derived
-    /// (a different form would break the once-delivered guarantee).
-    /// </summary>
-    public static string DeferredKey(string kind, string sourceId) =>
-        $"notification:{kind}:{sourceId}:deferred";
 
     /// <summary>
     /// The D7 gate, on the caller's session: <c>true</c> when the recipient's

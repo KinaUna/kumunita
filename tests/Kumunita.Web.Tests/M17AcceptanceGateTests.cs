@@ -50,7 +50,7 @@ public sealed class M17AcceptanceGateTests
         bookmarks
             .ToggleAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<Marten.IDocumentSession>())
+                Arg.Any<CancellationToken>())
             .Returns(
                 new BookmarkToggleResult(BookmarkToggleStatus.Bookmarked),
                 new BookmarkToggleResult(BookmarkToggleStatus.Bookmarked));
@@ -74,14 +74,10 @@ public sealed class M17AcceptanceGateTests
         bookmarks
             .RemoveAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<Marten.IDocumentSession>())
+                Arg.Any<CancellationToken>())
             .Returns(new BookmarkToggleResult(BookmarkToggleStatus.Removed));
 
-        var store = Substitute.For<Marten.IDocumentStore>();
-        var session = Substitute.For<Marten.IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(bookmarks, store, subjectId: actor);
+        var controller = Build(bookmarks, subjectId: actor);
 
         // 1 — Toggle (bookmark the visible post → Bookmarked, one row
         //    created). Obs-2 (ADR 0118 amendment): redirect to the
@@ -119,18 +115,15 @@ public sealed class M17AcceptanceGateTests
         Assert.Equal(returnUrl, reRedirect.Url);
 
         // The seam's ToggleAsync was called exactly twice (the initial
-        // bookmark + the re-bookmark after removal).
+        // bookmark + the re-bookmark after removal). IMPROVE-CODE C09 — the
+        // committed overload (the service owns the single write, ADR
+        // 0006 §D).
         await bookmarks.Received(2).ToggleAsync(
-            actor, kind, id, Arg.Any<Marten.IDocumentSession>());
+            actor, kind, id, Arg.Any<CancellationToken>());
 
         // The seam's RemoveAsync was called once (the physical removal).
         await bookmarks.Received(1).RemoveAsync(
-            actor, kind, id, Arg.Any<Marten.IDocumentSession>());
-
-        // The caller owned the session commits (the C3 same-transaction
-        // lane — the controller commits, the service never does).
-        // toggle×2 (each commits) + remove×1 (commits) = 3 commits.
-        await session.Received(3).SaveChangesAsync(Arg.Any<CancellationToken>());
+            actor, kind, id, Arg.Any<CancellationToken>());
     }
 
     // ── (b) Handoff authorization boundary ────────────────────────────────
@@ -148,14 +141,10 @@ public sealed class M17AcceptanceGateTests
     {
         var bookmarks = Substitute.For<IBookmarkService>();
 
-        var store = Substitute.For<Marten.IDocumentStore>();
-        var session = Substitute.For<Marten.IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
         // A caller with **no** SubjectId (a GlobalAdmin who is not the
         // owner, or any operator without read standing) — the ADR 0105
         // "operator has no read standing" precedent.
-        var controller = Build(bookmarks, store, subjectId: null);
+        var controller = Build(bookmarks, subjectId: null);
 
         // 1 — GET /bookmarks: non-leaky 404, no AccessAudit row, the seam
         //    is **not** called.
@@ -164,16 +153,13 @@ public sealed class M17AcceptanceGateTests
         await bookmarks.DidNotReceive().ListAsync(Arg.Any<string>());
 
         // 2 — POST /bookmarks/toggle: non-leaky 404, no AccessAudit row,
-        //    the seam is **not** called.
+        //    the seam is **not** called (IMPROVE-CODE C09 — the committed
+        //    overload shape, no session param).
         var toggleResult = await controller.Toggle("post", "p-some-post");
         Assert.IsType<NotFoundResult>(toggleResult);
         await bookmarks.DidNotReceive().ToggleAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<Marten.IDocumentSession>());
-
-        // No session created at all (the 404 short-circuits before any
-        // write — LightweightSession is synchronous, no await).
-        store.DidNotReceive().LightweightSession();
+            Arg.Any<CancellationToken>());
     }
 
     // ── (c) Part-vs-whole audit completeness ───────────────────────────────
@@ -204,7 +190,7 @@ public sealed class M17AcceptanceGateTests
         bookmarks
             .ToggleAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-                Arg.Any<Marten.IDocumentSession>())
+                Arg.Any<CancellationToken>())
             .Returns(new BookmarkToggleResult(BookmarkToggleStatus.Refused));
 
         // The owner's list: empty (the row was never created). Zero
@@ -214,11 +200,7 @@ public sealed class M17AcceptanceGateTests
             .ListAsync(actor)
             .Returns(new BookmarkListResult([], []));
 
-        var store = Substitute.For<Marten.IDocumentStore>();
-        var session = Substitute.For<Marten.IDocumentSession>();
-        store.LightweightSession().Returns(session);
-
-        var controller = Build(bookmarks, store, subjectId: actor);
+        var controller = Build(bookmarks, subjectId: actor);
 
         // 1 — Toggle a non-visible target → 404 (Refused), no row survives.
         var toggleResult = await controller.Toggle(kind, id);
@@ -227,13 +209,10 @@ public sealed class M17AcceptanceGateTests
         // The seam's ToggleAsync was called (the write lane ran), and it
         // returned Refused (the D3 write-lane check is the target's own
         // frozen Read decision — C-M17·3: one decision, the target's own
-        // row, not a bookmark row).
+        // row, not a bookmark row). IMPROVE-CODE C09 — the committed
+        // overload (the service owns the single write).
         await bookmarks.Received(1).ToggleAsync(
-            actor, kind, id, Arg.Any<Marten.IDocumentSession>());
-
-        // No session commit (the Refused path does not commit — the row
-        // was never created).
-        await session.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+            actor, kind, id, Arg.Any<CancellationToken>());
 
         // 2 — The owner's list loads with zero rows (the row was never
         //    created) and commits zero AccessAudit rows (C-M17·2: the
@@ -256,12 +235,9 @@ public sealed class M17AcceptanceGateTests
 
     private static BookmarksController Build(
         IBookmarkService bookmarks,
-        Marten.IDocumentStore? store = null,
         string? subjectId = null)
     {
-        store ??= Substitute.For<Marten.IDocumentStore>();
-
-        var controller = new BookmarksController(bookmarks, store);
+        var controller = new BookmarksController(bookmarks);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();

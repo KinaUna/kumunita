@@ -50,14 +50,15 @@ public sealed class OnboardingCompletionLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-onboard-fresh";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
         // Both the existing GetProfileAsync read and the new read seam agree:
         // a new profile is *not* completed (the floor — the banner shows).
         Assert.Null((await svc.GetProfileAsync(subject))?.OnboardingCompletedAt);
-        Assert.Null(await svc.GetOnboardingCompletedAsync(subject));
+        Assert.Null(await profileSettings.GetOnboardingCompletedAsync(subject));
     }
 
     // ── Write stamps, read returns it (strong consistency C4) ────────────
@@ -66,22 +67,23 @@ public sealed class OnboardingCompletionLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-onboard-complete";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
         // Fresh seed ⇒ not completed (GATE-1 floor).
-        Assert.Null(await svc.GetOnboardingCompletedAsync(subject));
+        Assert.Null(await profileSettings.GetOnboardingCompletedAsync(subject));
 
         var before = DateTimeOffset.UtcNow;
-        await svc.CompleteOnboardingAsync(subject, subject);
+        await profileSettings.CompleteOnboardingAsync(subject, subject);
         var after = DateTimeOffset.UtcNow;
 
         // The write is live on the very next read — both the new read seam and
         // the existing GetProfileAsync read see the same non-null stamp. The
         // fresh read through the service's own read lane is what proves the
         // save landed — not an in-memory assertion.
-        var viaSeam = await svc.GetOnboardingCompletedAsync(subject);
+        var viaSeam = await profileSettings.GetOnboardingCompletedAsync(subject);
         var viaProfile = (await svc.GetProfileAsync(subject))!.OnboardingCompletedAt;
 
         Assert.NotNull(viaSeam);
@@ -101,17 +103,18 @@ public sealed class OnboardingCompletionLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         // The ADR 0132 pin: KeyNotFoundException (the same pinned type as the
         // timezone lane — load-throw-stamp-save, never load-or-create).
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.CompleteOnboardingAsync("u-onboard-missing", "u-onboard-any"));
+            () => profileSettings.CompleteOnboardingAsync("u-onboard-missing", "u-onboard-any"));
 
         // Fail closed = fail *without side effects*: no profile row was created
         // (the lane never loads or creates on this path) — and the read seam
         // returns the floor (null) for a non-existent profile.
         Assert.Null(await svc.GetProfileAsync("u-onboard-missing"));
-        Assert.Null(await svc.GetOnboardingCompletedAsync("u-onboard-missing"));
+        Assert.Null(await profileSettings.GetOnboardingCompletedAsync("u-onboard-missing"));
     }
 
     // ── C-M22·3 — the completion stamp writes no AccessAudit row ─────────
@@ -120,11 +123,12 @@ public sealed class OnboardingCompletionLaneTests(PostgresFixture fixture)
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
 
         const string subject = "u-onboard-audit";
-        await SeedProfileAsync(svc, subject);
+        await SeedProfileAsync(store, subject);
 
-        await svc.CompleteOnboardingAsync(subject, subject);
+        await profileSettings.CompleteOnboardingAsync(subject, subject);
 
         // C-M22·3 (D2) — a profile-field write, not an access decision (the
         // UpsertProfileAsync shape): the completion stamp appends *no*
@@ -140,7 +144,7 @@ public sealed class OnboardingCompletionLaneTests(PostgresFixture fixture)
     /// <summary>Seed a bootstrap profile through the service's own
     /// <c>UpsertProfileAsync</c> (all-null patch ⇒ the record supplies every
     /// field — the exact idiom at <c>ProfileTimezoneLaneTests</c>).</summary>
-    private static async Task SeedProfileAsync(IUserInfoService svc, string subject)
+    private static async Task SeedProfileAsync(IDocumentStore store, string subject)
     {
         var profile = new Profile
         {
@@ -148,7 +152,7 @@ public sealed class OnboardingCompletionLaneTests(PostgresFixture fixture)
             DisplayName = "Resident " + subject,
             Verified = true,
         };
-        await svc.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
+        await new ProfileSettingsService(store).UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
     }
 
     /// <summary>One scratch Postgres DB + a <c>mt</c> schema over the M1 docs

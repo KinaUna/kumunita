@@ -112,7 +112,7 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
     {
         var boot = await BootAsync();
 
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
 
         var rows = await NotificationsFor(boot.Store, InvitedResident, NotificationKinds.GroupInvite);
         var row = Assert.Single(rows);
@@ -144,7 +144,7 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
         const string baseUrl = "http://localhost:5123";
         var boot = await BootAsync(baseUrl);
 
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
 
         var rows = await NotificationsFor(boot.Store, InvitedResident, NotificationKinds.GroupInvite);
         var row = Assert.Single(rows);
@@ -172,8 +172,8 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
         // updated, ResolvedAt/ResolvedBy cleared), and the emitter fires
         // again with the SAME idempotency key → the F10 dedup collapses the
         // second emission.
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
 
         var rows = await NotificationsFor(boot.Store, InvitedResident, NotificationKinds.GroupInvite);
         Assert.Single(rows);
@@ -186,7 +186,7 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
         var boot = await BootAsync();
 
         await boot.UserInfo.AddGroupMemberAsync(GroupId, AddedResident, OwnerId);
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
 
         Assert.Single(await NotificationsFor(boot.Store, AddedResident, NotificationKinds.GroupAdded));
         Assert.Single(await NotificationsFor(boot.Store, InvitedResident, NotificationKinds.GroupInvite));
@@ -206,7 +206,7 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
         var boot = await BootAsyncWithoutNotifications();
 
         await boot.UserInfo.AddGroupMemberAsync(GroupId, AddedResident, OwnerId);
-        await boot.UserInfo.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
+        await boot.GroupService.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
 
         Assert.Empty(await NotificationsFor(boot.Store, AddedResident, null));
         Assert.Empty(await NotificationsFor(boot.Store, InvitedResident, null));
@@ -219,6 +219,7 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
     {
         public required IDocumentStore Store { get; init; }
         public required UserInfoService UserInfo { get; init; }
+        public required GroupService GroupService { get; init; }
         public required List<(string Key, string Recipient, string Subject, string Body)> Staged { get; init; }
     }
 
@@ -309,26 +310,28 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
         // store (GetProfileAsync is a pure document read).
         var userInfoForNs = new UserInfoService(store);
         // ADR 0095 — the accept/decline lane: when a BaseUrl is supplied, bind
-        // it to VerificationOptions so the service appends the two action
-        // links to the email as absolute links (the
-        // <see cref="Kumunita.Core.Identity.VerificationOptions.BaseUrl"/>
-        // precedent). null = no BaseUrl (the relative-path fallback).
-        Microsoft.Extensions.Options.IOptions<Kumunita.Core.Identity.VerificationOptions>? baseUrlOptions =
+        // it to the IInstanceBaseUrlReader seam (C3-07, ADR 0297) so the
+        // service appends the two action links to the email as absolute links
+        // (the VerificationOptions.BaseUrl precedent, now read through the
+        // contract). null = no BaseUrl (the relative-path fallback).
+        Kumunita.Core.Identity.IInstanceBaseUrlReader? baseUrlReader =
             baseUrl is null
                 ? null
-                : Microsoft.Extensions.Options.Options.Create(new Kumunita.Core.Identity.VerificationOptions { BaseUrl = baseUrl });
-        var ns = new NotificationService(store, userInfoForNs, translator, mailer, null, baseUrlOptions);
+                : new Kumunita.Core.Identity.InstanceBaseUrlReader(
+                    Microsoft.Extensions.Options.Options.Create(new Kumunita.Core.Identity.VerificationOptions { BaseUrl = baseUrl }));
+        var ns = new NotificationService(store, userInfoForNs, translator, mailer, null, baseUrlReader);
 
         // The IServiceProvider the UserInfoService resolves the
         // NotificationService from at emission time (the ADR 0083
         // circular-dependency avoidance).
         var sc = new ServiceCollection();
-        sc.AddSingleton(ns);
+        sc.AddSingleton<Kumunita.Core.Notifications.INotificationEmitter>(ns);
         var sp = sc.BuildServiceProvider();
 
         var userInfo = new UserInfoService(store, sp);
+        var groupService = new GroupService(store, sp);
 
-        return new Boot { Store = store, UserInfo = userInfo, Staged = staged };
+        return new Boot { Store = store, UserInfo = userInfo, Staged = staged, GroupService = groupService };
     }
 
     /// <summary>
@@ -366,12 +369,14 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
         }
 
         var userInfo = new UserInfoService(store);   // services = null → no emission
+        var groupService = new GroupService(store);
 
         return new Boot
         {
             Store = store,
             UserInfo = userInfo,
             Staged = [],
+            GroupService = groupService,
         };
     }
 

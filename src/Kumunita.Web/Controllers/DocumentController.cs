@@ -35,7 +35,7 @@ namespace Kumunita.Web.Controllers;
 /// </para>
 /// </summary>
 public sealed class DocumentController(
-    DocumentService documents,
+    IDocumentService documents,
     IMediaStore media,
     IOptions<MediaOptions> mediaOpts,
     IDocumentStore store,
@@ -396,16 +396,13 @@ public sealed class DocumentController(
 
         if (form.File is not null && form.File.Length > 0)
         {
-            // M25 (U8) — the edit lane calls media.PutAsync (a genuine upload), so it
-            // adopts the same Web-only IUploadGate as the Upload lane (C-UP·3: a
-            // single 413 producer; a second inline guard here would be the second).
-            // Runs BEFORE PutAsync → a reject writes no byte (C-UP·2). The
-            // optional-file wrapper (above) and the allowlist (below) are untouched.
-            var requestServices = HttpContext.RequestServices;
-            var settingsSvc = requestServices.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
-            var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
-            var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
-            var reject = await uploadGate.CheckUpload(form.File.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
+            // M25 (U8) — the edit lane calls media.PutAsync (a genuine upload), so
+            // it adopts the shared UploadGateHandler (the one UploadHandler,
+            // IMPROVE-CODE C11) as the single 413 producer (C-UP·3: a second
+            // inline guard here would be the second). Runs BEFORE PutAsync → a
+            // reject writes no byte (C-UP·2). The optional-file wrapper (above)
+            // and the allowlist (below) are untouched.
+            var reject = await UploadGateHandler.CheckGateAsync(this, form.File.Length, subject, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
             if (reject is StatusCodeResult gateStatus)
                 return await RejectFormAsync("Edit", form, gateStatus.StatusCode, "File", "documents.err_too_large");
             if (reject is not null) return reject;
@@ -413,27 +410,11 @@ public sealed class DocumentController(
             if (!mediaOpts.Value.IsDocumentAllowed(form.File.ContentType))
                 return await RejectFormAsync("Edit", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
-            // SEC U22 (owner decision, 2026-10-31) — magic-byte sniffer wire.
-            // Reject on **`Mismatch`** only (declared type whose known signature
-            // is contradicted by the bytes); `Match` and `Unknown` pass through.
-            // The wire reads the leading 16 bytes via `OpenReadStream` so it
-            // works for every `IFormFile` implementation without materialising
-            // the payload twice; the read is bounded to 16 bytes so it cannot
-            // leak a full upload into memory.
-            var head = new byte[Math.Min(16L, form.File.Length)];
-            if (head.Length > 0)
-            {
-                await using var rs = form.File.OpenReadStream();
-                var n = 0;
-                while (n < head.Length)
-                {
-                    var got = await rs.ReadAsync(head.AsMemory(n));
-                    if (got == 0) break;
-                    n += got;
-                }
-                if (n < head.Length) Array.Resize(ref head, n);
-            }
-            if (UploadSignatureSniffer.Classify(form.File.ContentType, head) == UploadSignatureSniffer.SniffVerdict.Mismatch)
+            // SEC U22 (owner decision, 2026-10-31) — the magic-byte sniffer wire
+            // (the shared UploadGateHandler.SniffAsync): reject on **`Mismatch`**
+            // only (a declared type whose known signature the bytes contradict);
+            // `Match` and `Unknown` pass through.
+            if (await UploadGateHandler.SniffAsync(form.File, form.File.ContentType) == UploadSignatureSniffer.SniffVerdict.Mismatch)
                 return await RejectFormAsync("Edit", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
             using var stream = new MemoryStream();
@@ -465,7 +446,7 @@ public sealed class DocumentController(
             // document's existing tags; a present value (even an empty
             // <c>[]</c>) is authoritative ⇒ empty detaches all, non-empty
             // attaches.
-            TagSlugs: form.TagIds is null ? null : TagSlugs.Parse(form.TagIds));
+            TagSlugs: form.TagIds is null ? null : TagSlugParser.Parse(form.TagIds));
 
         await using var session = store.LightweightSession();
         try
@@ -653,43 +634,24 @@ public sealed class DocumentController(
             return await RejectFormAsync("New", form, StatusCodes.Status400BadRequest, "Title", "documents.err_title_required");
         if (file is null || file.Length == 0)
             return await RejectFormAsync("New", form, StatusCodes.Status400BadRequest, "File", "documents.err_file_required");   // empty → 400
-        // M25 (U8) — the size/over-quota guard is now the Web-only
-        // IUploadGate (C-UP·3): the single 413 producer, running the pure Core
-        // StorageLimits.Decide over the admin doc + the subject's usage. Runs
-        // BEFORE PutAsync, so a reject writes no byte (C-UP·2). Allowlist +
-        // empty-file checks untouched, same positions.
-        var requestServices = HttpContext.RequestServices;
-        var settingsSvc = requestServices.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
-        var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
-        var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
-        var reject = await uploadGate.CheckUpload(file.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
+        // M25 (U8) — the size/over-quota guard (C-UP·3): the single 413
+        // producer, now the shared UploadGateHandler (the one UploadHandler,
+        // IMPROVE-CODE C11) running the pure Core StorageLimits.Decide over
+        // the admin doc + the subject's usage. Runs BEFORE PutAsync, so a
+        // reject writes no byte (C-UP·2). Allowlist + empty-file checks
+        // untouched, same positions.
+        var reject = await UploadGateHandler.CheckGateAsync(this, file.Length, subject, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
         if (reject is StatusCodeResult gateStatus)                          // oversize/over-quota → 413 (the gate)
             return await RejectFormAsync("New", form, gateStatus.StatusCode, "File", "documents.err_too_large");
         if (reject is not null) return reject;
         if (!mediaOpts.Value.IsDocumentAllowed(file.ContentType))           // disallowed type → 415
             return await RejectFormAsync("New", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
-        // SEC U22 (owner decision, 2026-10-31) — magic-byte sniffer wire.
-        // Reject on **`Mismatch`** only (declared type whose known signature
-        // is contradicted by the bytes); `Match` and `Unknown` pass through.
-        // The wire reads the leading 16 bytes via `OpenReadStream` so it
-        // works for every `IFormFile` implementation without materialising
-        // the payload twice; the read is bounded to 16 bytes so it cannot
-        // leak a full upload into memory.
-        var head = new byte[Math.Min(16L, file.Length)];
-        if (head.Length > 0)
-        {
-            await using var rs = file.OpenReadStream();
-            var n = 0;
-            while (n < head.Length)
-            {
-                var got = await rs.ReadAsync(head.AsMemory(n));
-                if (got == 0) break;
-                n += got;
-            }
-            if (n < head.Length) Array.Resize(ref head, n);
-        }
-        if (UploadSignatureSniffer.Classify(file.ContentType, head) == UploadSignatureSniffer.SniffVerdict.Mismatch)
+        // SEC U22 (owner decision, 2026-10-31) — the magic-byte sniffer wire
+        // (the shared UploadGateHandler.SniffAsync): reject on **`Mismatch`**
+        // only (a declared type whose known signature the bytes contradict);
+        // `Match` and `Unknown` pass through.
+        if (await UploadGateHandler.SniffAsync(file, file.ContentType) == UploadSignatureSniffer.SniffVerdict.Mismatch)
             return await RejectFormAsync("New", form, StatusCodes.Status415UnsupportedMediaType, "File", "documents.err_type_not_allowed");
 
         // D3 — store-first (orphan-safe, C-MED·7): the bytes land on the frozen
@@ -718,7 +680,7 @@ public sealed class DocumentController(
             // The TG-lane slugs (the client posts a JSON array of label strings;
             // the server parses + normalizes). A blank / absent value is the
             // "no tags" state (the M3/M7 default-empty idiom).
-            TagSlugs: form.TagIds is null ? Array.Empty<string>() : TagSlugs.Parse(form.TagIds));
+            TagSlugs: form.TagIds is null ? Array.Empty<string>() : TagSlugParser.Parse(form.TagIds));
 
         await using var session = store.LightweightSession();
         var doc = await documents.UploadAsync(draft, subject, session);

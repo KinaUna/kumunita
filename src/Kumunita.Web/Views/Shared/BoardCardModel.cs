@@ -1,4 +1,3 @@
-using Kumunita.Core.Projects;
 using Kumunita.Web.Models;
 
 namespace Kumunita.Web.Views.Shared;
@@ -8,8 +7,11 @@ namespace Kumunita.Web.Views.Shared;
 /// <see cref="TodoCardRow"/>) plus the minimum lane / board / sibling-board
 /// context the card's markup needs (the card's effective status falls back
 /// to the lane's <c>Status</c>; the reorder routes name the lane id + board
-/// id; the copy-to / move-to pickers list the actor's other boards — a
-/// display convenience, never a gate).
+/// id; the copy-to / move-to pickers list the actor's other boards as
+/// <c>(Id, Title)</c> pairs — a display convenience, never a gate, and the
+/// <c>Id</c> is the value the picker <c>&lt;option&gt;</c> posts). The model
+/// carries no <c>KanbanBoard</c> domain type, so it adds no
+/// <c>Web → Projects</c> boundary edge.
 /// <para>
 /// The partial declares locals <c>card</c> / <c>lane</c> / <c>otherBoards</c>
 /// and re-injects its own localization services + re-resolves <c>_kwL</c>
@@ -24,4 +26,4 @@ public sealed record BoardCardModel(
     BoardRow Board,
     string LaneId,
     string? LaneStatus,
-    IReadOnlyList<KanbanBoard> OtherBoards);
+    IReadOnlyList<(string Id, string Title)> OtherBoards);

@@ -1,0 +1,7 @@
+{
+  "error.title": "Erreur.",
+  "error.subtitle": "Une erreur s\u0027est produite lors du traitement de votre demande.",
+  "error.development_title": "Mode d\u00E9veloppement",
+  "error.development_hint": "Passer en environnement D\u00E9veloppement affiche plus de d\u00E9tails sur l\u0027erreur survenue. Cet environnement ne devrait pas \u00EAtre activ\u00E9 pour des applications d\u00E9ploy\u00E9es \u2014 il peut r\u00E9v\u00E9ler des informations sensibles aux utilisateurs finaux.",
+  "error.request_id": "Identifiant de la demande :"
+}

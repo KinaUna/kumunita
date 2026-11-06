@@ -3,6 +3,8 @@
 @using Kumunita.Web.Models
 @using Kumunita.Core.Authorization
 @inject Kumunita.Core.UserInfo.IUserInfoService UserInfo
+@inject Kumunita.Core.UserInfo.IProfileSettingsService ProfileSettings
+@inject Kumunita.Core.UserInfo.IGroupService GroupService
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
@@ -25,7 +27,7 @@
 
     // Seed the shared "Who to grant to" option lists (the M2 / M3 / M4
     // composer idiom — the same candidate source the New form uses).
-    var profiles = await UserInfo.GetProfilesAsync(verifiedOnly: true);
+    var profiles = await ProfileSettings.GetProfilesAsync(verifiedOnly: true);
     var selfId = User is not null ? KumunitaPrincipal.SubjectId(User) : null;
     ViewData["Audience_Users"] = profiles
         .Where(p => !p.Blocked)
@@ -41,7 +43,7 @@
 
     // ADR 0010: the audience = public groups only (a private group is an
     // organizing unit, never granted as an audience).
-    var groups = await UserInfo.GetPublicGroupsAsync();
+    var groups = await GroupService.GetPublicGroupsAsync();
     ViewData["Audience_Groups"] = groups
         .Select(g => new GrantOption
         {

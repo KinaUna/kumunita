@@ -127,7 +127,7 @@ public sealed class GuardianRemoveMyselfSteeringTests(PostgresFixture fixture) :
         // other GU actions that do are out of scope here).
         var identity = Substitute.For<IIdentityService>();
 
-        var controller = new GuardianController(userInfo, identity, store);
+        var controller = new GuardianController(userInfo, Substitute.For<IGroupService>(), Substitute.For<IGuardianService>(), Substitute.For<IProfileSettingsService>(), identity, store);
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = new System.Security.Claims.ClaimsPrincipal(

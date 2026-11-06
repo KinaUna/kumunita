@@ -48,7 +48,7 @@ public sealed class DocumentUploadViewModel
     /// The TG-lane tag labels the uploader typed (the client
     /// <c>client/lib/tag-suggest.ts</c> posts a JSON array of label strings,
     /// e.g. <c>["bylaws", "budget"]</c>, into this one field; the server
-    /// parses + normalizes via <see cref="TagSlugs.Parse"/>). The Core write
+    /// parses + normalizes via <see cref="TagSlugParser.Parse"/>). The Core write
     /// lane resolves them to <c>Tag</c> ids through
     /// <see cref="Kumunita.Core.Tags.ITagService.AttachToDocumentAsync"/>
     /// (the <c>AttachToPostAsync</c> / <c>AttachToPageAsync</c> precedent).

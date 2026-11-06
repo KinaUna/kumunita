@@ -241,6 +241,68 @@ public sealed record BoardDetailViewModel(
     bool ListView = false);
 
 /// <summary>
+/// The model the <c>Views/Projects/_BoardTranslationModals</c> partial
+/// renders (IMPROVE-CODE C11 — extracted from <c>BoardDetail.cshtml</c>).
+/// Carries the view-local resolution the board's translation add / edit
+/// modals needed (the <c>CanTranslate</c> gate, the board id + title, the
+/// <c>LangName</c> resolver, the a11y <c>AriaClose</c>) so the partial is
+/// self-contained and the parent view no longer inlines the ~118-line block.
+/// Mirrors the to-do / project translation lanes (ADR 0082 / 0088) — the only
+/// difference is the <c>BoardTranslation</c> row type + the board's own
+/// translation routes.
+/// </summary>
+public sealed record BoardTranslationModalsModel(
+    bool CanTranslate,
+    string BoardId,
+    string BoardTitle,
+    IReadOnlyList<Kumunita.Core.Projects.BoardTranslation>? Translations,
+    IReadOnlyList<LanguageOption>? Languages,
+    string AriaClose,
+    Func<string, string> LangName);
+
+/// <summary>
+/// The model the <c>Views/Projects/_BoardLinkModals</c> partial renders
+/// (IMPROVE-CODE C11 — extracted from <c>BoardDetail.cshtml</c>). Carries the
+/// board's <c>ProjectId</c> / <c>Projects</c> picker options (the ADR 0086 D9
+/// "Add to Project…" modal) + the <see cref="BoardEventPicker"/> (the ADR
+/// 0115 D3 "Link to event…" modal) + the a11y <c>AriaClose</c>, so the partial
+/// is self-contained and the parent view no longer inlines the ~105-line
+/// modal pair. Both are display surfaces (never gates); the service's write
+/// re-check is the authority.
+/// </summary>
+public sealed record BoardLinkModalsModel(
+    string BoardId,
+    string? ProjectId,
+    IReadOnlyList<(string Id, string Name)>? Projects,
+    BoardEventPicker? EventPicker,
+    string AriaClose);
+
+/// <summary>
+/// The model the <c>Views/Boards/_BoardLanes</c> partial renders
+/// (IMPROVE-CODE C11 — extracted from <c>BoardDetail.cshtml</c>). Carries the
+/// board's lanes + the view-local resolution the Kanban lane surface needed:
+/// the <c>BoardId</c> the lane routes POST to, the <c>CanEdit</c> gate, the
+/// *other* boards (the copy-to / move-to picker source, a read-only display
+/// convenience — never a gate) projected to the <c>(Id, Title)</c> pairs the
+/// picker renders (so the model carries no <c>KanbanBoard</c> domain type),
+/// the ADR 0072 add-to-do / add-lane placeholders, and the a11y strings. The
+/// status glyph / label-key mapping is the shared <c>BoardCardStatuses</c>
+/// helper (available to the partial directly). The per-card prefill is
+/// threaded through <c>BoardCardModel</c>.
+/// </summary>
+public sealed record BoardLanesModel(
+    string BoardId,
+    BoardRow Board,
+    bool CanEdit,
+    IReadOnlyList<LaneDetailRow> Lanes,
+    IReadOnlyList<(string Id, string Title)> OtherBoards,
+    string AddTodoPlaceholder,
+    string AddLanePlaceholder,
+    string AriaClose,
+    string AriaActionsFor,
+    string AriaSetLimit);
+
+/// <summary>
 /// The **event picker** affordance on the board detail (ADR 0115 D3, the M14
 /// interlock carried to the board surface — the <c>set-event</c> lane's UI).
 /// Carries the actor's visible events (<see cref="Options"/>) + the board's
@@ -357,7 +419,7 @@ public sealed class BoardEditorModel
     /// <summary>The composer's **tag** input (ADR 0044 / 0147) — a
     /// <see cref="string"/> form field (JSON array of labels or a CSV
     /// fallback), parsed server-side by <see
-    /// cref="Kumunita.Web.Security.TagSlugs.Parse"/> (the M4 idiom — the
+    /// cref="Kumunita.Web.Security.TagSlugParser.Parse"/> (the M4 idiom — the
     /// client never posts a structured shape).</summary>
     public string? TagIds { get; set; }
 
@@ -438,7 +500,7 @@ public sealed class BoardUpdateModel
     /// <summary>The edit form's **tag** input (ADR 0044 / 0147) — a
     /// <see cref="string"/> form field (JSON array of labels or a CSV
     /// fallback), parsed server-side by <see
-    /// cref="Kumunita.Web.Security.TagSlugs.Parse"/> (the M4 idiom — the
+    /// cref="Kumunita.Web.Security.TagSlugParser.Parse"/> (the M4 idiom — the
     /// client never posts a structured shape).</summary>
     public string? TagIds { get; set; }
 

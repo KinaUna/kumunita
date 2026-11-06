@@ -36,42 +36,48 @@ public class CommunityControllerTranslationTests
     public async Task UpdateTranslation_GlobalAdmin_HappyPath_Redirects()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
 
-        var controller = Build(userInfo, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
+        var controller = Build(userInfo, community, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
 
         var result = await controller.UpdateTranslation(CompId, "fr", "Nouveau", "Desc");
 
         Assert.IsType<RedirectToActionResult>(result);
-        await userInfo.Received(1).UpdateCommunityTranslationAsync(
+        await community.Received(1).UpdateCommunityTranslationAsync(
             CompId, "fr", "Nouveau", "Desc", "subj-admin",
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)));
     }
 
     [Fact]
     public async Task UpdateTranslation_Translator_HappyPath_Redirects()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
 
-        var controller = Build(userInfo, roles: new[] { Roles.Translator }, subjectId: "subj-translator");
+        var controller = Build(userInfo, community, roles: new[] { Roles.Translator }, subjectId: "subj-translator");
 
         var result = await controller.UpdateTranslation(CompId, "fr", "Nouveau", "Desc");
 
         Assert.IsType<RedirectToActionResult>(result);
-        await userInfo.Received(1).UpdateCommunityTranslationAsync(
+        await community.Received(1).UpdateCommunityTranslationAsync(
             CompId, "fr", "Nouveau", "Desc", "subj-translator",
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Translator)), Arg.Any<IDocumentSession>());
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Translator)));
     }
 
     [Fact]
     public async Task UpdateTranslation_Member_Forbid()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.UpdateCommunityTranslationAsync(
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        community.UpdateCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException<CommunityTranslation>(new UnauthorizedAccessException("Denied.")));
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-member");
+        var controller = Build(userInfo, community, roles: new[] { Roles.Member }, subjectId: "subj-member");
 
         var result = await controller.UpdateTranslation(CompId, "fr", "X", "Desc");
 
@@ -82,12 +88,14 @@ public class CommunityControllerTranslationTests
     public async Task UpdateTranslation_MissingRow_NotFound()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.UpdateCommunityTranslationAsync(
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        community.UpdateCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException<CommunityTranslation>(new KeyNotFoundException("No row.")));
 
-        var controller = Build(userInfo, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
+        var controller = Build(userInfo, community, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
 
         var result = await controller.UpdateTranslation(CompId, "fr", "X", "Desc");
 
@@ -98,56 +106,64 @@ public class CommunityControllerTranslationTests
     public async Task UpdateTranslation_Anonymous_Forbid_NoWrite()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         var controller = Build(userInfo, IsAuthenticated: false);
 
         var result = await controller.UpdateTranslation(CompId, "fr", "X", "Desc");
 
         Assert.IsType<ForbidResult>(result);
-        await userInfo.DidNotReceive().UpdateCommunityTranslationAsync(
+        await community.DidNotReceive().UpdateCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>());
     }
 
     [Fact]
     public async Task RemoveTranslation_GlobalAdmin_HappyPath_Redirects()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
 
-        var controller = Build(userInfo, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
+        var controller = Build(userInfo, community, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
 
         var result = await controller.RemoveTranslation(CompId, "fr");
 
         Assert.IsType<RedirectToActionResult>(result);
-        await userInfo.Received(1).RemoveCommunityTranslationAsync(
+        await community.Received(1).RemoveCommunityTranslationAsync(
             CompId, "fr", "subj-admin",
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)));
     }
 
     [Fact]
     public async Task RemoveTranslation_Translator_HappyPath_Redirects()
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
 
-        var controller = Build(userInfo, roles: new[] { Roles.Translator }, subjectId: "subj-translator");
+        var controller = Build(userInfo, community, roles: new[] { Roles.Translator }, subjectId: "subj-translator");
 
         var result = await controller.RemoveTranslation(CompId, "fr");
 
         Assert.IsType<RedirectToActionResult>(result);
-        await userInfo.Received(1).RemoveCommunityTranslationAsync(
+        await community.Received(1).RemoveCommunityTranslationAsync(
             CompId, "fr", "subj-translator",
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Translator)), Arg.Any<IDocumentSession>());
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Translator)));
     }
 
     [Fact]
     public async Task RemoveTranslation_Member_Forbid()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.RemoveCommunityTranslationAsync(
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        community.RemoveCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException(new UnauthorizedAccessException("Denied.")));
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-member");
+        var controller = Build(userInfo, community, roles: new[] { Roles.Member }, subjectId: "subj-member");
 
         var result = await controller.RemoveTranslation(CompId, "fr");
 
@@ -158,12 +174,14 @@ public class CommunityControllerTranslationTests
     public async Task RemoveTranslation_MissingRow_NotFound()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.RemoveCommunityTranslationAsync(
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        community.RemoveCommunityTranslationAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            Arg.Any<IReadOnlySet<string>>())
             .Returns(Task.FromException(new KeyNotFoundException("No row.")));
 
-        var controller = Build(userInfo, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
+        var controller = Build(userInfo, community, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
 
         var result = await controller.RemoveTranslation(CompId, "fr");
 
@@ -175,9 +193,9 @@ public class CommunityControllerTranslationTests
     [Fact]
     public async Task Translations_Translator_CanTranslateTrue_View()
     {
-        var userInfo = BuildForGet(canTranslate: true, component: true);
+        var (userInfo, community, profileSettings) = BuildForGet(canTranslate: true, component: true);
 
-        var controller = Build(userInfo, roles: new[] { Roles.Translator }, subjectId: "subj-translator");
+        var controller = Build(userInfo, community, profileSettings, roles: new[] { Roles.Translator }, subjectId: "subj-translator");
 
         var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
 
@@ -189,9 +207,9 @@ public class CommunityControllerTranslationTests
     [Fact]
     public async Task Translations_GlobalAdmin_CanTranslateTrue_View()
     {
-        var userInfo = BuildForGet(canTranslate: true, component: true);
+        var (userInfo, community, profileSettings) = BuildForGet(canTranslate: true, component: true);
 
-        var controller = Build(userInfo, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
+        var controller = Build(userInfo, community, profileSettings, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
 
         var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
 
@@ -204,9 +222,9 @@ public class CommunityControllerTranslationTests
     {
         // The manage standing (moderator) admits the page, but the translation
         // standing is denied — CanTranslate must be false (view-only).
-        var userInfo = BuildForGet(canTranslate: false, component: true);
+        var (userInfo, community, profileSettings) = BuildForGet(canTranslate: false, component: true);
 
-        var controller = Build(userInfo,
+        var controller = Build(userInfo, community, profileSettings,
             roles: new[] { Roles.ModeratorComponent(CompId) }, subjectId: "subj-mod");
 
         var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
@@ -222,23 +240,25 @@ public class CommunityControllerTranslationTests
     {
         // Neither manage nor translation standing — fail-closed 404, and the
         // read seam is never reached (the page gate is the reach decision).
-        var userInfo = BuildForGet(canTranslate: false, component: true);
+        var (userInfo, community, _) = BuildForGet(canTranslate: false, component: true);
 
-        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-member");
+        var controller = Build(userInfo, community, roles: new[] { Roles.Member }, subjectId: "subj-member");
 
         var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
 
         Assert.IsType<NotFoundResult>(result);
-        await userInfo.DidNotReceive().GetCommunityTranslationsAsync(Arg.Any<string>());
+        await community.DidNotReceive().GetCommunityTranslationsAsync(Arg.Any<string>());
     }
 
     [Fact]
     public async Task Translations_UnknownCommunity_NotFound()
     {
         var userInfo = Substitute.For<IUserInfoService>();
-        userInfo.GetComponentsAsync(enabledOnly: false).Returns(new List<Component>());
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
+        profileSettings.GetComponentsAsync(enabledOnly: false).Returns(new List<Component>());
 
-        var controller = Build(userInfo, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
+        var controller = Build(userInfo, community, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
 
         var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
 
@@ -247,23 +267,27 @@ public class CommunityControllerTranslationTests
 
     // ── Harness ─────────────────────────────────────────────────────────────
 
-    private static IUserInfoService BuildForGet(bool canTranslate, bool component)
+    private static (IUserInfoService userInfo, ICommunityMembershipService community, IProfileSettingsService profileSettings) BuildForGet(bool canTranslate, bool component)
     {
         var userInfo = Substitute.For<IUserInfoService>();
+        var profileSettings = Substitute.For<IProfileSettingsService>();
+        var community = Substitute.For<ICommunityMembershipService>();
         if (component)
         {
-            userInfo.GetComponentsAsync(enabledOnly: false).Returns(new List<Component>
+            profileSettings.GetComponentsAsync(enabledOnly: false).Returns(new List<Component>
             {
                 new() { Id = CompId, Name = "The Club", Enabled = true },
             });
         }
-        userInfo.CanTranslateCommunity(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>()).Returns(canTranslate);
-        userInfo.GetCommunityTranslationsAsync(CompId).Returns(new List<CommunityTranslation>());
-        return userInfo;
+        community.CanTranslateCommunity(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>()).Returns(canTranslate);
+        community.GetCommunityTranslationsAsync(CompId).Returns(new List<CommunityTranslation>());
+        return (userInfo, community, profileSettings);
     }
 
     private static CommunityController Build(
         IUserInfoService userInfo,
+        ICommunityMembershipService community = null,
+        IProfileSettingsService profileSettings = null,
         string[]? roles = null,
         bool IsAuthenticated = false,
         string? subjectId = null)
@@ -271,10 +295,9 @@ public class CommunityControllerTranslationTests
         var localization = Substitute.For<ILocalizationService>();
         localization.ListLanguagesAsync().Returns(new List<LanguageCatalog>());
 
-        var store = Substitute.For<IDocumentStore>();
-        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
-
-        var controller = new CommunityController(userInfo, localization, store);
+        // C2-04 — the controller no longer opens its own session; the service
+        // owns the write, so the test no longer fakes a document store.
+        var controller = new CommunityController(userInfo, community ?? Substitute.For<ICommunityMembershipService>(), profileSettings ?? Substitute.For<IProfileSettingsService>(), localization);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 

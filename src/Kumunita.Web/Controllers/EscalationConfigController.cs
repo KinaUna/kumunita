@@ -1,9 +1,7 @@
-using Kumunita.Core.Authorization;
 using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,12 +20,13 @@ namespace Kumunita.Web.Controllers;
 /// <b>ESC·4 — the read seam.</b> The design doc §2.1.3 names "the read seam
 /// the U03 design pins"; U03 added the <see cref="IEscalationTokenService"/>
 /// 4-method token seam but **not** an outbound-config read/write seam (the
-/// U05 Deliverables list is 6 Web files, no new Core file). This controller
-/// therefore reads + writes the <see cref="EscalationOutboundConfig"/>
-/// singleton directly through the host-registered Marten
-/// <see cref="IDocumentStore"/> (the <see cref="AdminStorageController"/>
-/// precedent — the controller owns the write session, the C3 same-transaction
-/// lane). The M32·6 env var <c>KUMUNITA_ESCALATION_ENDPOINT</c> remains the
+/// U05 Deliverables list is 6 Web files, no new Core file). IMPROVE-CODE C09
+/// moves the <see cref="EscalationOutboundConfig"/> singleton read + the
+/// single-write-lane save behind the owning module's seam
+/// <see cref="IEscalationOutboundConfigService"/> (ADR 0006 §D "route +
+/// authz + shape"); this controller validates the bound form (route + shape)
+/// and delegates the read + write to the seam (the served HTML is unchanged).
+/// The M32·6 env var <c>KUMUNITA_ESCALATION_ENDPOINT</c> remains the
 /// unauthenticated operator-override / fallback the Web-layer
 /// <see cref="IEscalationForwarder"/> (U06) uses when this row is absent or
 /// disabled.
@@ -53,13 +52,14 @@ namespace Kumunita.Web.Controllers;
 [Route("admin/escalation")]
 [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
 public sealed class EscalationConfigController(
-    // The host-registered Marten store (the AdminStorageController /
-    // BookmarksController precedent). The EscalationOutboundConfig singleton
-    // is read via a QuerySession and written via an OpenSession (the
-    // EscalationTokenService shape) — the U05 deliverables list is 6 Web files
-    // (no new Core seam), so the Web layer owns the read + the single-write-
-    // lane directly (the design doc §2.1.3 read-seam resolution).
-    IDocumentStore store,
+    // IMPROVE-CODE C09 — the EscalationOutboundConfig singleton's read +
+    // the single-write-lane save moved behind the owning module's seam
+    // (ADR 0006 §D "route + authz + shape"). The U05 deliverables list was
+    // 6 Web files (no new Core seam — the design doc §2.1.3 read-seam
+    // resolution left the read/write in the Web layer); C09 moves it off
+    // the controller (the controller validates the bound form — route +
+    // shape — and delegates the read + the single-write-lane).
+    IEscalationOutboundConfigService outboundConfig,
     // The per-request localization read seams — used to render the
     // escalation.outbound.saved flash in the admin's effective language
     // (the ErrorReportAdminController.FlashAsync idiom, admin-scope).
@@ -70,13 +70,6 @@ public sealed class EscalationConfigController(
     ILocalizationService? localization = null,
     ITranslationProvider? translationProvider = null) : Controller
 {
-    /// <summary>
-    /// The fixed singleton id for the <see cref="EscalationOutboundConfig"/>
-    /// row (the ESC·4 pin — one row per instance; the Web layer sets it, the
-    /// U03 doc comment "a fixed singleton id, e.g. outbound-config").
-    /// </summary>
-    private const string SingletonId = "outbound-config";
-
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
 
@@ -115,11 +108,11 @@ public sealed class EscalationConfigController(
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        EscalationOutboundConfig? existing;
-        using (var session = store.QuerySession())
-        {
-            existing = await session.LoadAsync<EscalationOutboundConfig>(SingletonId);
-        }
+        // IMPROVE-CODE C09 — the read moved to the owning module's seam
+        // (ADR 0006 §D): a missing row reads as null (the
+        // AdminStorageController create-if-missing sentinel shape — the
+        // form below renders blank).
+        var existing = await outboundConfig.GetAsync();
 
         var model = new EscalationConfigFormModel
         {
@@ -192,43 +185,17 @@ public sealed class EscalationConfigController(
             }
         }
 
-        // Load-or-create the singleton (the AdminStorageController create-if-
-        // missing sentinel shape — a missing row is written as a fresh doc).
-        // (The read session is named readSession to avoid colliding with the
-        // write session below — the CS0136 idiom.)
-        EscalationOutboundConfig config;
-        using (var readSession = store.QuerySession())
-        {
-            var existing = await readSession.LoadAsync<EscalationOutboundConfig>(SingletonId);
-            config = existing ?? new EscalationOutboundConfig { Id = SingletonId };
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        config.Endpoint  = model.Endpoint ?? string.Empty;
-        config.Token     = model.Token ?? string.Empty;
-        config.Enabled   = model.Enabled;
-        config.Updated   = now;
-        config.UpdatedBy = actor;
-
-        // The single-write-lane (ESC·4 / the ADR 0006 C3 shape): the
-        // EscalationOutboundConfig doc + exactly one AccessAudit row commit
-        // in one write session (the EscalationTokenService.GenerateAsync /
-        // RevokeAsync idiom — the M32 MarkResolvedAsync precedent).
-        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
-        session.Store(config);
-        session.Store(new AccessAudit
-        {
-            Id                   = Guid.NewGuid().ToString("N"),
-            At                   = now,
-            ActorId              = actor,
-            EffectivePrincipalId = actor,
-            Action               = "escalation.outbound.save",
-            TargetKind           = "escalation-outbound-config",
-            TargetId             = SingletonId,
-            Via                  = AccessVia.Admin,
-            Outcome              = AccessOutcome.Allow
-        });
-        await session.SaveChangesAsync();
+        // IMPROVE-CODE C09 — the load-or-create + the single-write-lane
+        // (ESC·4 / the ADR 0006 C3 shape: the doc + exactly one AccessAudit
+        // row in one write session) moved to the owning module's seam
+        // (ADR 0006 §D "route + authz + shape"). The controller stays thin:
+        // it validates the bound form (route + shape) and delegates the
+        // read + write to the seam.
+        await outboundConfig.SaveAsync(
+            endpoint: model.Endpoint ?? string.Empty,
+            token:    model.Token ?? string.Empty,
+            enabled:  model.Enabled,
+            actorId:  actor);
 
         model.Saved = true;
         TempData["info"] = await FlashAsync("escalation.outbound.saved");

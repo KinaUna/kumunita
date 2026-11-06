@@ -156,7 +156,7 @@ public sealed class GuardianMessagingRestrictionTests(PostgresFixture fixture) :
 
         var userInfo = new UserInfoService(store);
         var identity = Substitute.For<IIdentityService>();   // unused in these tests
-        var controller = new GuardianController(userInfo, identity, store);
+        var controller = new GuardianController(userInfo, Substitute.For<IGroupService>(), new GuardianService(store), Substitute.For<IProfileSettingsService>(), identity, store);
 
         // The ClaimsPrincipal — the actor's subject id via the Kumunita.Sub
         // claim (KumunitaPrincipal.SubjectId reads this).

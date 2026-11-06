@@ -1,0 +1,23 @@
+{
+  "myportability.index.lede": "Your own authored content \u2014 the posts, events, projects, documents, pages, messages, and media you created \u2014 as one portable *.kumunita archive. Export it as a file, or import one of your archives back into this community. Nothing here ever carries your password, and only your own rows travel.",
+  "myportability.export_desc": "One *.kumunita archive \u2014 your own authored content and media (never your password, and only your rows).",
+  "myportability.import_desc": "Bring one of your *.kumunita archives back. We\u0027ll check what fits this community and what needs your call \u2014 you decide, item by item, where each piece goes.",
+  "myportability.resolve.summary_lead": "Your archive was checked against this community.",
+  "myportability.resolve.summary_counts": "Rows that fit and will be imported: {0}. Duplicates that already exist and will be skipped: {1}.",
+  "myportability.resolve.summary_tail": "The ones below reference a group that does not exist here \u2014 you decide, one by one, where each goes.",
+  "myportability.resolve.nothing": "Nothing to resolve \u2014 every row in your archive fits this community or already exists.",
+  "myportability.resolve.archive_label": "Your *.kumunita archive",
+  "myportability.resolve.archive_hint": "The same archive you imported above \u2014 your choices are applied to its contents.",
+  "myportability.resolve.reason": "This {0} references {1} {2}, which does not exist here.",
+  "myportability.resolve.reason_unknown": "A reference this row points to does not exist here.",
+  "myportability.resolve.target_label": "Target group (for \u201CAdd elsewhere\u201D)",
+  "myportability.resolve.choose_group": "\u2014 choose a group \u2014",
+  "myportability.resolve.no_groups": "You have no member-of groups here \u2014 you can discard this row.",
+  "myportability.index.title": "My data",
+  "myportability.export": "Export",
+  "myportability.import": "Import",
+  "myportability.import.resolve": "Apply my choices",
+  "myportability.resolve.add_elsewhere": "Add elsewhere",
+  "myportability.resolve.discard": "Discard",
+  "myportability.status": "Status"
+}

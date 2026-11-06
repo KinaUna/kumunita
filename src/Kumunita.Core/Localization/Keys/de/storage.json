@@ -1,0 +1,12 @@
+{
+  "storage.trend.title": "Speichertrend",
+  "storage.trend.window.30": "30 Tage",
+  "storage.trend.window.90": "90 Tage",
+  "storage.trend.window.180": "180 Tage",
+  "storage.trend.window.365": "365 Tage",
+  "storage.trend.col.date": "Datum",
+  "storage.trend.col.used": "Gesamt belegt",
+  "storage.trend.col.free": "Frei",
+  "storage.trend.legend.used": "Gesamt belegt \u00FCber das Fenster",
+  "storage.trend.empty": "Noch kein Speichertrend \u2014 die t\u00E4gliche Erfassung hat f\u00FCr dieses Fenster noch keine Aufnahmen gespeichert."
+}

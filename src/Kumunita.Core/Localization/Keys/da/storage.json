@@ -1,0 +1,12 @@
+{
+  "storage.trend.title": "Lagringstrend",
+  "storage.trend.window.30": "30 dage",
+  "storage.trend.window.90": "90 dage",
+  "storage.trend.window.180": "180 dage",
+  "storage.trend.window.365": "365 dage",
+  "storage.trend.col.date": "Dato",
+  "storage.trend.col.used": "I alt brugt",
+  "storage.trend.col.free": "Fri",
+  "storage.trend.legend.used": "I alt brugt over vinduet",
+  "storage.trend.empty": "Ingen lagringstrend endnu \u2014 den daglige optagelse har ikke gemt noen pr\u00F8ver for dette vindue."
+}
