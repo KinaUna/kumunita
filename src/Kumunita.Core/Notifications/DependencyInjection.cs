@@ -26,7 +26,10 @@ public static class NotificationsModule
             sp.GetRequiredService<ITranslationProvider>(),
             sp.GetRequiredService<IMailerStage>(),
             sp.GetService<Microsoft.Extensions.Options.IOptions<Notifications.NotificationOptions>>(),
-            sp.GetService<Microsoft.Extensions.Options.IOptions<VerificationOptions>>(),
+            // C3-07 (ADR 0297) — the instance base URL via the IInstanceBaseUrlReader
+            // read contract (the Identity module owns + registers the seam), so this
+            // module codes against a contract, not the concrete VerificationOptions.
+            sp.GetService<IInstanceBaseUrlReader>(),
             sp.GetRequiredService<ILocalizationService>()));
 
         services.AddTransient<Notifications.ISuppressionService>(sp => new Notifications.SuppressionService(

@@ -1478,13 +1478,14 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             .Returns(ci => PlantProfileReadAsync(store, (string)ci[0]));
 
         // ADR 0085 — the item-link lane: when a BaseUrl is supplied, bind it
-        // to VerificationOptions so the service prefixes each notification's
-        // LinkPath (the email's absolute view link). null = no BaseUrl (the
-        // relative-path fallback the M1 verification link uses).
-        IOptions<Identity.VerificationOptions>? baseUrlOptions = baseUrl is null
+        // to the IInstanceBaseUrlReader seam (C3-07, ADR 0297) so the service
+        // prefixes each notification's LinkPath (the email's absolute view
+        // link). null = no BaseUrl (the relative-path fallback the M1
+        // verification link uses).
+        IInstanceBaseUrlReader? baseUrlReader = baseUrl is null
             ? null
-            : Options.Create(new Identity.VerificationOptions { BaseUrl = baseUrl });
-        var svc = new NotificationService(store, userInfo, translator, mailer, null, baseUrlOptions);
+            : new InstanceBaseUrlReader(Options.Create(new VerificationOptions { BaseUrl = baseUrl }));
+        var svc = new NotificationService(store, userInfo, translator, mailer, null, baseUrlReader);
         return (store, svc, translator, staged);
     }
 

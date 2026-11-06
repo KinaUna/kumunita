@@ -446,7 +446,7 @@ public sealed class DocumentController(
             // document's existing tags; a present value (even an empty
             // <c>[]</c>) is authoritative ⇒ empty detaches all, non-empty
             // attaches.
-            TagSlugs: form.TagIds is null ? null : TagSlugs.Parse(form.TagIds));
+            TagSlugs: form.TagIds is null ? null : TagSlugParser.Parse(form.TagIds));
 
         await using var session = store.LightweightSession();
         try
@@ -680,7 +680,7 @@ public sealed class DocumentController(
             // The TG-lane slugs (the client posts a JSON array of label strings;
             // the server parses + normalizes). A blank / absent value is the
             // "no tags" state (the M3/M7 default-empty idiom).
-            TagSlugs: form.TagIds is null ? Array.Empty<string>() : TagSlugs.Parse(form.TagIds));
+            TagSlugs: form.TagIds is null ? Array.Empty<string>() : TagSlugParser.Parse(form.TagIds));
 
         await using var session = store.LightweightSession();
         var doc = await documents.UploadAsync(draft, subject, session);

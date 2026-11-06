@@ -419,7 +419,7 @@ public sealed class BoardEditorModel
     /// <summary>The composer's **tag** input (ADR 0044 / 0147) — a
     /// <see cref="string"/> form field (JSON array of labels or a CSV
     /// fallback), parsed server-side by <see
-    /// cref="Kumunita.Web.Security.TagSlugs.Parse"/> (the M4 idiom — the
+    /// cref="Kumunita.Web.Security.TagSlugParser.Parse"/> (the M4 idiom — the
     /// client never posts a structured shape).</summary>
     public string? TagIds { get; set; }
 
@@ -500,7 +500,7 @@ public sealed class BoardUpdateModel
     /// <summary>The edit form's **tag** input (ADR 0044 / 0147) — a
     /// <see cref="string"/> form field (JSON array of labels or a CSV
     /// fallback), parsed server-side by <see
-    /// cref="Kumunita.Web.Security.TagSlugs.Parse"/> (the M4 idiom — the
+    /// cref="Kumunita.Web.Security.TagSlugParser.Parse"/> (the M4 idiom — the
     /// client never posts a structured shape).</summary>
     public string? TagIds { get; set; }
 

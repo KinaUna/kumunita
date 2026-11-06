@@ -590,7 +590,7 @@ public partial class PageController(
             // shape as ContentImageIds / AttachmentIds). Null/empty ⇒ no
             // tags (the additive default-empty pin). A bad slug is an
             // ArgumentException from DeriveSlug (C-TG·4) — mapped below.
-            TagIds = TagSlugs.Parse(model.TagIds),
+            TagIds = TagSlugParser.Parse(model.TagIds),
         };
 
         await using var session = store.LightweightSession();
@@ -762,7 +762,7 @@ public partial class PageController(
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
             // TG (ADR 0044, U8b) — same shape as the create lane.
-            TagIds = TagSlugs.Parse(model.TagIds),
+            TagIds = TagSlugParser.Parse(model.TagIds),
         };
 
         await using var session2 = store.LightweightSession();

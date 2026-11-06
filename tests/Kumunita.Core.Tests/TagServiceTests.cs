@@ -1192,7 +1192,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     //
     // U8b (the register patch to U8's closed deliverable set) wires the
     // composer's <c>TagIds</c> form field through the Web layer (the
-    // <c>TagSlugs.Parse</c> helper) into <c>PostDraft.TagSlugs</c>, which
+    // <c>TagSlugParser.Parse</c> helper) into <c>PostDraft.TagSlugs</c>, which
     // <see cref="PostService.CreatePostAsync"/> hands to
     // <see cref="TagService.AttachToPostAsync"/> on the **same**
     // <c>IDocumentSession</c> (C3 single-transaction idiom). This test
@@ -1233,7 +1233,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         var postsSvc = new PostService(userInfo, authz, store, tagSvc);
 
         // The Web layer would parse the form's TagIds JSON string via
-        // TagSlugs.Parse; at the Core level we pass the slug list directly
+        // TagSlugParser.Parse; at the Core level we pass the slug list directly
         // (the PostDraft.TagSlugs parameter).
         var draft = new PostDraft(
             comp,

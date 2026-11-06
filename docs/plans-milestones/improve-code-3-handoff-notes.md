@@ -12,13 +12,24 @@ related:
   - docs/plans-milestones/improve-code-2-handoff-notes.md
   - docs/adr/0290-improve-code-2-baseline-raises-and-seams.md
   - docs/adr/0294-improve-code-3-c3-04-partial-class-splits-boundary-raises.md
-updated: 2026-07-11
+  - docs/adr/0297-improve-code-3-c3-07-flagged-accidental-boundary-edges.md
+updated: 2026-11-06
 ---
 
 > **Abstract:** the running handoff log for the IMPROVE-CODE-3 lane.
-> **Current state (C3-06 done, 2026-11-06):** C3-00…C3-06 are all done and
-> green. The `files` 23 → ≤ 8 line is **met: `files` is 8** (C3-00…C3-04, ADR
-> 0292/0294). **C3-05 retired the two clean `controllers_marten_allowlist`
+> **Current state (C3-07 done, 2026-11-06):** C3-00…C3-07 are all done and
+> green; only **C3-08 the close** remains. **C3-07 retired the 3
+> flagged-accidental boundary edges** named in ADR 0290 for C2-03 (never landed
+> because C2 closed held): two contract extractions (`IInstanceBaseUrlReader`,
+> `IIdentityPrincipalStore` — ADR 0297) + the Web `TagSlugs`→`TagSlugParser`
+> rename that breaks the name-collision false positive. **`boundary_violations`
+> is 465 → 459; no baseline line is raised** (the new contracts are interfaces —
+> an allowed target — and under every ceiling). The `files` 8 · `classes` 3 ·
+> `interfaces` 8 · `methods` 89 · `allowlist` 17 lines are all **unchanged** —
+> DoD #3/#4 `files` 8 (≤ 8, **met**) · DoD #6 allowlist 17 (≤ 5, **not met** —
+> the honest floor, ADR 0296). The 5 carrying lines that hold are untouched.
+> The per-unit history follows, C3-00 first. (C3-00…C3-06, before this unit:
+> the `files` 23 → 8 line met; **C3-05 retired the two clean `controllers_marten_allowlist`
 > entries — `GoalsController` (0 ops of its own, all via `IProjectService`) +
 > `AccountController` (the 1 verify-token read → the new
 > `IIdentityService.LoadVerifyTokenAsync` seam, ADR 0295) — so `allowlist` is
@@ -900,3 +911,72 @@ recording the ones you can't — not on hitting 5 at any cost."*
   decision (ADR the minted edge + route the op through the owning service, or
   extract the contract) — each is a deliberate cross-module decision, not a
   forced service.
+
+## C3-07 — the 3 flagged-accidental boundary edges (D5) — **DONE**
+
+C3-07 works the 3 flagged-accidental boundary edges named in ADR 0290 for
+C2-03 and never landed (C2 closed held). Each is a concrete cross-module type
+where a contract extraction retires it. **Two are real concrete-type crossings**
+(resolved by an interface in the source module); **the third is a name-collision
+false positive** (the gate's syntax-only name heuristic conflates the ubiquitous
+Core `TagSlugs` *property* with the Web `TagSlugs` *parse-helper type* — resolved
+by a distinct name). **`boundary_violations` 465 → 459; no baseline line is
+raised.** Only C3-08 (the close) remains.
+
+### The result: 6 edge entries retire (465 → 459); the 3 flagged edges are gone
+
+| Edge | Resolution | Retires |
+|---|---|---|
+| `Notifications → Identity : VerificationOptions` (2, `adr: 0290`) | **Contract extraction** — `IInstanceBaseUrlReader` (Identity) + `InstanceBaseUrlReader` adapter. `NotificationService` ctor `IOptions<VerificationOptions>?` → `IInstanceBaseUrlReader?`; DI resolves the contract; the Identity module registers the adapter (source module). 2 test sites re-pointed. | the 2 Notifications files (interface = allowed target, no edge) |
+| `Portability → Identity : AppDbContext` (3, `adr: 0290`) | **Contract extraction** — `IIdentityPrincipalStore` (Identity: `GetUsersAsync` + `WipeIdentityPrincipalsAsync`) + `IdentityPrincipalStore` adapter wrapping `AppDbContext` (the ADR 0193 dependent-order wipe + tracker clear move verbatim into the adapter). `PrincipalsExport` takes a pre-fetched `IReadOnlyList<User>`; `PortabilityService` ctor seam + the `WipeForCleanSlateImportAsync` identity block → the contract; 1 test site re-pointed. | the 3 Portability files (no new edge — the `Portability→Identity:User` edge (ADR 0293) already covers the returned type) |
+| `Projects → Web : TagSlugs` (4, `adr: 0290`) | **Break the name collision** — the plan's "Core→Web concrete type" framing is inaccurate: the 4 Projects refs are the `TagSlugs` **DTO property**, not the Web parse-helper **type** (verified: no `using Kumunita.Web` in Core, no `TagSlugs.Parse` call from Core). The honest fix retires **all four** `*→Web:TagSlugs` false positives at once and leaves the Core DTO property name untouched: rename the Web type `TagSlugs` → **`TagSlugParser`** (definition + 8 call sites + file rename + doc/TS/JS/CSHTML prose). | the flagged `Projects` edge **+** the bonus non-flagged `Bootstrap`/`Documents`/`Posts` `→Web:TagSlugs` collisions |
+
+**Boundary before → after:** 465 → **459**. The 6 retired entries (the 3 flagged +
+the 3 bonus name-collision false positives) are removed from
+`tools/code/code-baseline.json`; the `adr: 0290` field on each is dropped with the
+edge (the gate's stale-entry check passes: the edge is gone, not tightened).
+**No baseline line is raised** — the two new contracts are *interfaces* (an
+allowed target; add no `classes`/`methods` line; mint no edge) and are under the
+interface ceiling; the two adapters are under every ceiling. `files` 8 ·
+`classes` 3 · `interfaces` 8 · `methods` 89 · `allowlist` 17 are **all unchanged**.
+
+### The DI changes (the source module owns each binding — D5)
+
+- `IdentityModule.AddIdentity` (Identity, the source module) registers both
+  contracts: `IInstanceBaseUrlReader` → `InstanceBaseUrlReader` (reads the
+  host-bound `IOptions<VerificationOptions>`) and `IIdentityPrincipalStore` →
+  `IdentityPrincipalStore` (wraps `AppDbContext`). The `VerificationOptions`
+  bind + the `AppDbContext` registration both stay in the host's `Program.cs` /
+  Identity DI — this unit only adds the contract seams over them.
+- `NotificationsModule.AddNotifications` resolves `IInstanceBaseUrlReader`
+  (was `IOptions<VerificationOptions>`); `PortabilityModule.AddPortability`
+  resolves `IIdentityPrincipalStore` (was `AppDbContext`).
+
+### Verification (all green, 2026-11-06)
+
+- [x] **`dotnet build` — 0 errors** (Core + Web + the Core test project).
+- [x] **Affected tests pass** — `NotificationServiceTests` +
+  `UserInfoServiceGroupNotificationTests` (Edge 1) + `PortabilityRoundTripTests`
+  (Edge 2): **62 total, 0 errors, 0 failed** (Testcontainers harness).
+- [x] **`pwsh tools/code/code-check.ps1` — OK (0 violations)** (the 6 entries are
+  gone; no entry is raised; the gate's stale-entry + NEW checks pass).
+- [x] **`pwsh tools/docs/improve-check.ps1` — ALL GATES PASS** (gate (b): the
+  `0297` index row present; file count == index row count).
+- [x] **The baseline's `reason` texts (the 4 literal `<`) survived** (the
+  boundary edits were textual object deletions; no `\u003C` escapes exist in the
+  current baseline — the C3-06 "36" note is stale for this tree).
+
+### Honest notes for C3-08 (the close)
+
+- **C3-07 is a pure reduction unit** (the boundary line moves **down** 465 → 459;
+  no raise, no new ceiling line, no new edge). It retires the last named
+  flagged-accidental edges from ADR 0290 / C2-03.
+- **The 5 carried-in DoD lines that hold are untouched** by this unit (#1 ratchet
+  honest · #5 translation 39 ≤ 40 · #6 concrete-edges 9 named ADR 0291 · #7 the
+  two untested services · #8 both E11 SEC pointers). The 2 that don't are
+  unchanged: #3/#4 `files` 8 (≤ 8, **met**) · #6 allowlist **17** (≤ 5, **not
+  met** — the honest floor, ADR 0296).
+- **The six-member flip is still not landed** (DoD #6's `≤ 5` allowlist target
+  is 17). **C3-08 the close** re-verifies every DoD line from a clean state and
+  decides the flip on the true number — this unit hands it a green, 465 → 459,
+  all-5-holding / 2-not-met position.

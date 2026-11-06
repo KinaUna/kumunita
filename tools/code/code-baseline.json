@@ -1023,12 +1023,6 @@
       "count": 1
     },
     {
-      "from": "Bootstrap",
-      "to": "Web",
-      "symbol": "TagSlugs",
-      "count": 2
-    },
-    {
       "from": "Documents",
       "to": "Authorization",
       "symbol": "AccessAudit",
@@ -1063,12 +1057,6 @@
       "to": "Query",
       "symbol": "PageSizer",
       "count": 1
-    },
-    {
-      "from": "Documents",
-      "to": "Web",
-      "symbol": "TagSlugs",
-      "count": 3
     },
     {
       "from": "ErrorReports",
@@ -1744,13 +1732,6 @@
     },
     {
       "from": "Notifications",
-      "to": "Identity",
-      "symbol": "VerificationOptions",
-      "count": 2,
-      "adr": "0290"
-    },
-    {
-      "from": "Notifications",
       "to": "Posts",
       "symbol": "PostReply",
       "count": 1
@@ -1889,13 +1870,6 @@
       "to": "Events",
       "symbol": "EventTranslation",
       "count": 1
-    },
-    {
-      "from": "Portability",
-      "to": "Identity",
-      "symbol": "AppDbContext",
-      "count": 3,
-      "adr": "0290"
     },
     {
       "from": "Portability",
@@ -2245,12 +2219,6 @@
       "adr": "0293"
     },
     {
-      "from": "Posts",
-      "to": "Web",
-      "symbol": "TagSlugs",
-      "count": 2
-    },
-    {
       "from": "Projects",
       "to": "Authorization",
       "symbol": "AccessAuditFactory",
@@ -2334,13 +2302,6 @@
       "to": "Web",
       "symbol": "AttachmentIds",
       "count": 2
-    },
-    {
-      "from": "Projects",
-      "to": "Web",
-      "symbol": "TagSlugs",
-      "count": 4,
-      "adr": "0290"
     },
     {
       "from": "Search",

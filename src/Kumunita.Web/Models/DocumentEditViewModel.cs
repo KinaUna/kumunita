@@ -68,7 +68,7 @@ public sealed class DocumentEditViewModel
     /// The TG-lane tag labels the owner typed (the client
     /// <c>client/lib/tag-suggest.ts</c> posts a JSON array of label strings,
     /// e.g. <c>["bylaws", "budget"]</c>, into this one field; the server
-    /// parses + normalizes via <see cref="TagSlugs.Parse"/>). <c>null</c>
+    /// parses + normalizes via <see cref="TagSlugParser.Parse"/>). <c>null</c>
     /// (the form did not post the field — the U8b "leave existing" shape)
     /// leaves the document's existing tags; a present value (even an empty
     /// <c>[]</c> when the owner removed every chip) is authoritative ⇒

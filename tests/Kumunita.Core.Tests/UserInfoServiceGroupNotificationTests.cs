@@ -310,15 +310,16 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
         // store (GetProfileAsync is a pure document read).
         var userInfoForNs = new UserInfoService(store);
         // ADR 0095 — the accept/decline lane: when a BaseUrl is supplied, bind
-        // it to VerificationOptions so the service appends the two action
-        // links to the email as absolute links (the
-        // <see cref="Kumunita.Core.Identity.VerificationOptions.BaseUrl"/>
-        // precedent). null = no BaseUrl (the relative-path fallback).
-        Microsoft.Extensions.Options.IOptions<Kumunita.Core.Identity.VerificationOptions>? baseUrlOptions =
+        // it to the IInstanceBaseUrlReader seam (C3-07, ADR 0297) so the
+        // service appends the two action links to the email as absolute links
+        // (the VerificationOptions.BaseUrl precedent, now read through the
+        // contract). null = no BaseUrl (the relative-path fallback).
+        Kumunita.Core.Identity.IInstanceBaseUrlReader? baseUrlReader =
             baseUrl is null
                 ? null
-                : Microsoft.Extensions.Options.Options.Create(new Kumunita.Core.Identity.VerificationOptions { BaseUrl = baseUrl });
-        var ns = new NotificationService(store, userInfoForNs, translator, mailer, null, baseUrlOptions);
+                : new Kumunita.Core.Identity.InstanceBaseUrlReader(
+                    Microsoft.Extensions.Options.Options.Create(new Kumunita.Core.Identity.VerificationOptions { BaseUrl = baseUrl }));
+        var ns = new NotificationService(store, userInfoForNs, translator, mailer, null, baseUrlReader);
 
         // The IServiceProvider the UserInfoService resolves the
         // NotificationService from at emission time (the ADR 0083

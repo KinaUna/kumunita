@@ -26,7 +26,9 @@ public static class PortabilityModule
     {
         services.AddTransient<IPortabilityService>(sp => new PortabilityService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
-            sp.GetRequiredService<AppDbContext>(),
+            // C3-07 (ADR 0297) — the identity-principal store contract (the EF
+            // Core AppDbContext stays a private detail of the Identity module).
+            sp.GetRequiredService<IIdentityPrincipalStore>(),
             sp.GetRequiredService<UserManager<User>>(),
             sp.GetRequiredService<RoleManager<IdentityRole>>(),
             sp.GetRequiredService<IOptions<CommunityOptions>>(),

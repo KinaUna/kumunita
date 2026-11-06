@@ -948,7 +948,7 @@ public sealed class PostsController(
             ImageIds: ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 — server-side parse of the body's /content-image/{id} links; the client never sends the ids (a form field would be spoofable).
             AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (a form field would be spoofable).
             IsDraft: model.SaveAsDraft, // ADR 0037 — draft mode: saved but invisible to all but the author until published.
-            TagSlugs: TagSlugs.Parse(model.TagIds)); // TG (ADR 0044, U8b) — the tag input (client/lib/tag-suggest.ts posts a JSON array of label strings; the server parses + normalizes).
+            TagSlugs: TagSlugParser.Parse(model.TagIds)); // TG (ADR 0044, U8b) — the tag input (client/lib/tag-suggest.ts posts a JSON array of label strings; the server parses + normalizes).
 
         // C3 same-transaction lane: the controller opens the
         // <c>IDocumentStore.LightweightSession()</c>, the
@@ -1187,9 +1187,9 @@ public sealed class PostsController(
                 // a **present** field (even an empty `[]` when the author removed
                 // every chip) is authoritative ⇒ empty detaches all, non-empty
                 // attaches (the U8b register patch's detach semantics in
-                // PostService.UpdatePostAsync). TagSlugs.Parse still normalizes
+                // PostService.UpdatePostAsync). TagSlugParser.Parse still normalizes
                 // (trim / dedup / drop-blank) the present case.
-                model.TagIds is null ? null : TagSlugs.Parse(model.TagIds));
+                model.TagIds is null ? null : TagSlugParser.Parse(model.TagIds));
             TempData["info"] = await this.FlashAsync("posts.flash_updated", "Post updated.");
             return Redirect($"/posts/{id}");
         }

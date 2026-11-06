@@ -365,7 +365,7 @@ public sealed record CommentRow(
 /// time (the service's <c>ResolveLanguageCodeAsync</c> shape).</item>
 /// <item><see cref="TagIds"/> — a <see cref="string"/> form field (the
 /// <c>tag-suggest.ts</c> JSON-array / CSV shape), parsed server-side by
-/// <see cref="Kumunita.Web.Security.TagSlugs.Parse"/> (the M4 body-parse
+/// <see cref="Kumunita.Web.Security.TagSlugParser.Parse"/> (the M4 body-parse
 /// idiom — the client never posts a structured shape).</item>
 /// </list>
 /// </para>
@@ -505,7 +505,7 @@ public sealed class TodoEditorModel
 
     /// <summary>The composer's **tag** input — a <see cref="string"/>
     /// form field (JSON array of labels or a CSV fallback), parsed
-    /// server-side by <see cref="Kumunita.Web.Security.TagSlugs.Parse"/>
+    /// server-side by <see cref="Kumunita.Web.Security.TagSlugParser.Parse"/>
     /// (the M4 idiom — the client never posts a structured shape).</summary>
     public string? TagIds { get; set; }
 

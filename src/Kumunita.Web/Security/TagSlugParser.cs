@@ -32,7 +32,7 @@ namespace Kumunita.Web.Security;
 /// <see cref="AttachmentIds.ExtractAttachmentIds"/> (the body-parsed id
 /// idiom, U4 precedent).
 /// </summary>
-public static class TagSlugs
+public static class TagSlugParser
 {
     /// <summary>
     /// Parse the composer's <c>TagIds</c> form field (a JSON array of label

@@ -22,7 +22,7 @@
  *   3. Populates the form's fields (title / status / assignee / parent /
  *      blocked-by / start / due / community / language / tags / body).
  *      The tags field is a plain comma-separated text input (the
- *      server's `TagSlugs.Parse` accepts a JSON array **or** a raw CSV
+ *      server's `TagSlugParser.Parse` accepts a JSON array **or** a raw CSV
  *      string — the documented fallback), so no chip component is needed.
  *   4. Shows the modal (Bootstrap's `Modal` — the same idiom the card's
  *      Add-subtask / Assign-to modals use, the `rich-editor.ts`'s
@@ -232,7 +232,7 @@
       if (prefill.componentId) selectValue('bce-component', prefill.componentId);
       if (prefill.languageCode) selectValue('bce-language', prefill.languageCode);
       if (prefill.tagSlugs && prefill.tagSlugs.length > 0) {
-        // The CSV shape (the server's `TagSlugs.Parse` accepts a JSON array
+        // The CSV shape (the server's `TagSlugParser.Parse` accepts a JSON array
         // **or** a raw CSV string — the documented fallback). A comma
         // within a slug is the slug charset's excluded set (lowercase
         // letters / digits / hyphen / underscore — the

@@ -587,7 +587,7 @@ public partial class BoardsController : ProjectsBaseController
             // leave stored tags untouched (the tag-suggest form always posts
             // the field, so `null` is the "field absent" edge); `[]` = detach
             // all; non-empty = replace.
-            TagSlugs = model.TagIds is null ? null : TagSlugs.Parse(model.TagIds),
+            TagSlugs = model.TagIds is null ? null : TagSlugParser.Parse(model.TagIds),
         };
 
         try
@@ -808,7 +808,7 @@ public partial class BoardsController : ProjectsBaseController
             // (the <see cref="Kumunita.Web.Security.TagSlugs"/> parse — null /
             // empty ⇒ no attach; non-empty ⇒ resolved to <c>Tag</c> ids by
             // the <c>AttachToBoardAsync</c> lane).
-            TagSlugs = TagSlugs.Parse(model.TagIds),
+            TagSlugs = TagSlugParser.Parse(model.TagIds),
             Lanes = model.Lanes
                 .Where(l => !string.IsNullOrWhiteSpace(l.Title))
                 .Select((l, i) => new CreateLaneRequest

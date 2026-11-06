@@ -179,7 +179,10 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         });
 
         var service = new PortabilityService(
-            store, db, userManager, roleManager, options, mediaStore, fileStore);
+            // C3-07 (ADR 0297) — the identity-principal store contract over the
+            // EF Core identity-schema context (the service codes against the
+            // interface, not the AppDbContext context type).
+            store, new IdentityPrincipalStore(db), userManager, roleManager, options, mediaStore, fileStore);
 
         return (store, db, userManager, roleManager, mediaStore, options, service);
     }

@@ -29,6 +29,28 @@ public static class IdentityModule
     public static IServiceCollection AddIdentity(this IServiceCollection services)
     {
         services.AddTransient<IIdentityService, IdentityService>();
+        // C3-07 (ADR 0297, D5 contract extraction) — the IInstanceBaseUrlReader
+        // read contract over the host-bound VerificationOptions.BaseUrl value.
+        // The Identity module owns both the source options and the contract, so
+        // the binding stays here (the source module). This retires the
+        // Notifications→Identity:VerificationOptions boundary edge — the
+        // Notifications e-mail lane now codes against the interface, not the
+        // concrete VerificationOptions policy type.
+        // GetService (not GetRequiredService) — preserve the pre-C3-07 shape:
+        // the host configures VerificationOptions, but a test harness that
+        // composes the Core DI without that section resolves null (the
+        // InstanceBaseUrlReader reports null → the relative-path fallback).
+        services.AddTransient<IInstanceBaseUrlReader>(sp => new InstanceBaseUrlReader(
+            sp.GetService<Microsoft.Extensions.Options.IOptions<VerificationOptions>>()));
+        // C3-07 (ADR 0297, D5 contract extraction) — the IIdentityPrincipalStore
+        // read + wipe contract over the EF Core identity-schema context (ADR 0004
+        // §B — the only EF surface in the tree). The Identity module owns both
+        // the AppDbContext and the contract, so the binding stays here; the
+        // Portability module now codes against the interface, retiring the
+        // Portability→Identity:AppDbContext boundary edge (the EF Core context
+        // stays a private detail of the source module).
+        services.AddTransient<IIdentityPrincipalStore>(sp => new IdentityPrincipalStore(
+            sp.GetRequiredService<AppDbContext>()));
         // C3-03 (ADR 0293) — the platform-gate seam (the C08 test-compat facade
         // shape; the IIdentityService gate methods are thin forwarders to it and
         // keep compiling unchanged).

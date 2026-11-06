@@ -654,7 +654,7 @@ public sealed class TodosController : ProjectsBaseController
     /// precedent). The audience's <see
     /// cref="AudienceEditorModel.BuildAudience()"/> is the single
     /// deserialization site (the M2 single-source pin, ADR 0001-B); the
-    /// <c>TagIds</c> are the server-side <see cref="TagSlugs.Parse"/> (TG,
+    /// <c>TagIds</c> are the server-side <see cref="TagSlugParser.Parse"/> (TG,
     /// ADR 0044).
     /// </summary>
     [HttpPost("/projects/todos")]
@@ -717,7 +717,7 @@ public sealed class TodosController : ProjectsBaseController
             DueAt   = model.DueAt   is not null ? new DateTimeOffset(model.DueAt.Value,   zone.GetUtcOffset(model.DueAt.Value)).UtcDateTime   : null,
             Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
-            TagSlugs = TagSlugs.Parse(model.TagIds), // ADR 0044 / 0147 — server-side parse + normalize (the request carries slugs; the doc stores ids).
+            TagSlugs = TagSlugParser.Parse(model.TagIds), // ADR 0044 / 0147 — server-side parse + normalize (the request carries slugs; the doc stores ids).
         };
 
         TodoItem todo;
@@ -827,7 +827,7 @@ public sealed class TodosController : ProjectsBaseController
             StartAt = model.StartAt is not null ? new DateTimeOffset(model.StartAt.Value, zone.GetUtcOffset(model.StartAt.Value)).UtcDateTime : null,
             DueAt   = model.DueAt   is not null ? new DateTimeOffset(model.DueAt.Value,   zone.GetUtcOffset(model.DueAt.Value)).UtcDateTime   : null,
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
-            TagSlugs = model.TagIds is null ? null : TagSlugs.Parse(model.TagIds), // ADR 0044 / 0147 — null = leave stored tags untouched; empty = detach all.
+            TagSlugs = model.TagIds is null ? null : TagSlugParser.Parse(model.TagIds), // ADR 0044 / 0147 — null = leave stored tags untouched; empty = detach all.
         };
 
         try

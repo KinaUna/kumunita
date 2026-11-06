@@ -1444,7 +1444,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
     /// single deserialization site (the M2 single-source pin, ADR 0001-B); the
     /// <c>ImageIds</c> / <c>AttachmentIds</c> are the server-side body parse
     /// (RC R·3 / ATT U5 — the client never sends them); the <c>TagIds</c> are
-    /// the server-side <see cref="TagSlugs.Parse"/> (TG, ADR 0044).
+    /// the server-side <see cref="TagSlugParser.Parse"/> (TG, ADR 0044).
     /// </summary>
     [HttpPost("/events/new")]
     [ValidateAntiForgeryToken]
@@ -1523,7 +1523,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
             ReminderEnabled = model.ReminderEnabled,
             IsDraft = model.SaveAsDraft, // ADR 0037 — the composer's save-as-draft toggle.
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
-            TagIds = TagSlugs.Parse(model.TagIds), // TG (ADR 0044) — server-side parse + normalize.
+            TagIds = TagSlugParser.Parse(model.TagIds), // TG (ADR 0044) — server-side parse + normalize.
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 — server-side body parse.
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U5 — server-side body parse.
             // M18 (ADR 0119, D2 / D7) — the composer's recurrence picker, mapped
@@ -1733,7 +1733,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
             Audience = model.Audience.BuildAudience(),
             ReminderEnabled = model.ReminderEnabled,
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
-            TagIds = TagSlugs.Parse(model.TagIds),
+            TagIds = TagSlugParser.Parse(model.TagIds),
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
             // M18 (ADR 0119, D2 / D4) — the composer's recurrence picker, mapped

@@ -106,7 +106,10 @@ public interface IPortabilityService
 /// </summary>
 public sealed class PortabilityService(
     Marten.IDocumentStore documentStore,
-    Identity.AppDbContext appDbContext,
+    // C3-07 (ADR 0297) — the identity-principal store contract (read + wipe),
+    // so this service codes against the contract, not the EF Core AppDbContext
+    // context type (the context stays a private detail of the Identity module).
+    IIdentityPrincipalStore identityPrincipals,
     UserManager<Identity.User> userManager,
     RoleManager<IdentityRole> roleManager,
     IOptions<CommunityOptions> communityOptions,
@@ -118,7 +121,12 @@ public sealed class PortabilityService(
     {
         // U02 — the docs + the no-secret principals + the config.
         var (docs, docCounts) = await PortabilityExportDocuments.ExportAsync(documentStore, ct);
-        var principals = await PrincipalsExport.ExportAsync(appDbContext, userManager, documentStore, ct);
+        // C3-07 (ADR 0297) — the principal source read through the
+        // IIdentityPrincipalStore contract (the extractor now takes the user
+        // list, not the EF Core context).
+        var principals = await PrincipalsExport.ExportAsync(
+            await identityPrincipals.GetUsersAsync(ct).ConfigureAwait(false),
+            userManager, documentStore, ct);
         var config = await ConfigExport.ExportAsync(documentStore, communityOptions, ct);
 
         // U03 (this unit) — the media bytes (the `media/` section, the
@@ -324,56 +332,16 @@ public sealed class PortabilityService(
     private async Task WipeForCleanSlateImportAsync(
         KumunitaArchiveData data, CancellationToken ct)
     {
-        // 1. The Identity principals (the EF Core identity schema). The
-        //    user-dependent tables are wiped <em>first, in the dependent-
-        //    order</em> (AspNetUserRoles / Claims / Logins / Tokens, then
-        //    AspNetUsers) — this is deliberate and not left to cascade:
-        //    <see cref="Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ExecuteDeleteAsync"/>
-        //    does not reliably cascade the dependent rows, and a surviving
-        //    AspNetUserRoles row for a re-created subjectId would collide
-        //    with the apply's <c>AddToRoleAsync</c> (a duplicate
-        //    (userId, roleId) — the exact class of 500 the ADR 0193 lane
-        //    exists to remove). The AspNetRoles / AspNetRoleClaims rows are
-        //    the standing definitions (Member / Moderator / GlobalAdmin /
-        //    Translator) — left in place; the re-creator's
-        //    roleManager.FindByNameAsync / CreateAsync ensures existence
-        //    and the archive's roles re-attach onto the fresh principals.
-        var users = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-            .ToListAsync(appDbContext.Users, ct).ConfigureAwait(false);
-        if (users.Count > 0)
-        {
-            var userIds = users.Select(u => u.Id).ToList();
-            // The four user-dependent tables (the stock Identity schema,
-            // all keyed by the principal id). Each is a flat delete of the
-            // rows for the to-be-deleted principals — one ExecuteDelete per
-            // table, no cascade reliance.
-            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-                .ExecuteDeleteAsync(appDbContext.UserRoles
-                    .Where(r => userIds.Contains(r.UserId)), ct).ConfigureAwait(false);
-            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-                .ExecuteDeleteAsync(appDbContext.UserClaims
-                    .Where(c => userIds.Contains(c.UserId)), ct).ConfigureAwait(false);
-            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-                .ExecuteDeleteAsync(appDbContext.UserLogins
-                    .Where(l => userIds.Contains(l.UserId)), ct).ConfigureAwait(false);
-            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-                .ExecuteDeleteAsync(appDbContext.UserTokens
-                    .Where(t => userIds.Contains(t.UserId)), ct).ConfigureAwait(false);
-            // The principals themselves.
-            await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-                .ExecuteDeleteAsync(appDbContext.Users
-                    .Where(u => userIds.Contains(u.Id)), ct).ConfigureAwait(false);
-            // ExecuteDeleteAsync bypasses the change tracker — any User /
-            // dependent entities already attached to this context's tracker
-            // (e.g. a principal read earlier in the same scoped request) stay
-            // tracked, and the apply's re-CreateAsync of the same subjectId
-            // would then throw an EF identity conflict ("another instance with
-            // the same key value … is already being tracked"). A clean-slate
-            // import wipes every principal, so dropping the whole tracker is
-            // the correct fresh-slate semantic and keeps the re-create clean
-            // regardless of what was previously tracked in this context.
-            appDbContext.ChangeTracker.Clear();
-        }
+        // 1. The Identity principals (the EF Core identity schema). C3-07
+        //    (ADR 0297) — the dependent-order wipe (AspNetUserRoles / Claims /
+        //    Logins / Tokens, then AspNetUsers; no cascade reliance; the
+        //    standing AspNetRoles / AspNetRoleClaims rows left in place; the
+        //    change tracker cleared for a clean fresh-slate re-create) is now
+        //    the IIdentityPrincipalStore.WipeIdentityPrincipalsAsync contract —
+        //    this service codes against the contract, not the EF Core
+        //    AppDbContext context type (the context stays a private detail of
+        //    the Identity module, ADR 0004 §B).
+        await identityPrincipals.WipeIdentityPrincipalsAsync(ct).ConfigureAwait(false);
 
         // 2. The media bytes (the volume) — for every MediaObject listed in
         //    the archive's media manifest, the byte file. DeleteIfExists is

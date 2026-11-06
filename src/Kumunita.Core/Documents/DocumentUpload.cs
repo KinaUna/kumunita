@@ -25,7 +25,7 @@ public sealed record DocumentUpload(
     // shape-violating folder is a form error at the Web boundary, never here.
     string? FolderId,
     // The TG-lane tag slugs the uploader typed (the client posts a JSON array
-    // of label strings; the Web parses via TagSlugs.Parse — trim / dedup /
+    // of label strings; the Web parses via TagSlugParser.Parse — trim / dedup /
     // drop-blank). The Core write lane (DocumentService.UploadAsync) resolves
     // them to Tag ids through ITagService.AttachToDocumentAsync (the
     // AttachToPostAsync / AttachToPageAsync precedent) and stores the resolved

@@ -46,12 +46,13 @@ public sealed class NotificationService : INotificationEmitter
     // default: a schedule is still evaluated against UTC, never throws).
     private readonly ILocalizationService? _localization;
     private readonly bool _suppressSampleAccounts;
-    // The instance's public base URL (the VerificationOptions.BaseUrl
-    // absolute-link precedent — the M1 verification email builds its link the
-    // same way). Used to turn the same-origin relative LinkPath into the
-    // absolute link the email carries. Absence (null options, e.g. test
-    // harnesses) → empty (the email carries the relative path, a dev-only
-    // shape — a human can still copy it into the browser bar).
+    // The instance's public base URL (the C3-07 IInstanceBaseUrlReader seam —
+    // the read contract over the VerificationOptions.BaseUrl value, so this
+    // module codes against a contract, not the concrete Identity policy type).
+    // Used to turn the same-origin relative LinkPath into the absolute link the
+    // email carries. Absence (null reader, e.g. test harnesses) → empty (the
+    // email carries the relative path, a dev-only shape — a human can still
+    // copy it into the browser bar).
     private readonly string _baseUrl;
 
     public NotificationService(
@@ -60,10 +61,13 @@ public sealed class NotificationService : INotificationEmitter
         ITranslationProvider translator,
         IMailerStage mailer,
         IOptions<NotificationOptions>? options = null,
-        // The instance base URL for the email's absolute link. Optional
-        // (CS1736 trailing-param idiom) so the existing test-construction
-        // sites that pass only the four frozen seams keep compiling unchanged.
-        IOptions<Identity.VerificationOptions>? baseUrlOptions = null,
+        // The instance base URL for the email's absolute link (C3-07, ADR 0297 —
+        // the IInstanceBaseUrlReader read contract over the Identity
+        // VerificationOptions.BaseUrl value; this module codes against the
+        // contract, not the concrete policy type). Optional (CS1736
+        // trailing-param idiom) so the existing test-construction sites that
+        // pass only the four frozen seams keep compiling unchanged.
+        IInstanceBaseUrlReader? baseUrlReader = null,
         // M20 (ADR 0121, D4) — the ADR 0019 platform-default zone read the
         // quiet gate's effective-zone chain uses. Optional (CS1736 trailing
         // param) so the eight existing construction sites (seven test
@@ -81,7 +85,10 @@ public sealed class NotificationService : INotificationEmitter
         // accounts behave like real residents; in Production/Staging they are
         // silently skipped. Absence (null options, e.g. test harnesses) → false.
         _suppressSampleAccounts = options?.Value.SuppressForSampleAccountsInProduction ?? false;
-        _baseUrl = baseUrlOptions?.Value.BaseUrl ?? string.Empty;
+        // C3-07 (ADR 0297) — the instance base URL via the IInstanceBaseUrlReader
+        // contract (null reader, e.g. a test harness that omits the seam → the
+        // empty-string relative-path fallback, the M1 verification link shape).
+        _baseUrl = baseUrlReader?.BaseUrl ?? string.Empty;
     }
 
     /// <summary>

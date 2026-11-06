@@ -41,7 +41,7 @@ public sealed record DocumentEdit(
     // (the ADR 0125 D2 "editable alongside" shape, the owner-only lane).
     string? FolderId,
     // The TG-lane tag slugs the owner typed (the client posts a JSON array of
-    // label strings; the Web parses via TagSlugs.Parse — trim / dedup /
+    // label strings; the Web parses via TagSlugParser.Parse — trim / dedup /
     // drop-blank). <c>null</c> = "leave the document's existing tags"
     // (the M3/M7 default-empty idiom, the U8b register patch's detach
     // semantics: a **present** field — even an empty <c>[]</c> when the
