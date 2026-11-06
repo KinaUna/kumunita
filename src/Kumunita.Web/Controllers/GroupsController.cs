@@ -73,7 +73,17 @@ public sealed class GroupsController(
     // missing seam is a 404 — the <see cref="GuardianController"/> idiom).
     // Appended **last** so the existing positional call sites keep their shape.
     // DI always supplies the live <c>EventRsvpGuardianService</c> in the app.
-    IEventRsvpGuardian? rsvpGuardian = null) : Controller
+    IEventRsvpGuardian? rsvpGuardian = null,
+    // C3-03 (ADR 0013 named seam) — the group-post lane (the 4-method surface
+    // <c>ListGroupFeedAsync</c> / <c>GetGroupPostAsync</c> /
+    // <c>CreateGroupPostAsync</c> / <c>UpdateGroupPostAsync</c> now lives on
+    // this seam, extracted from <c>PostService</c>). **Optional** (null
+    // default) so the pre-seam test construction sites keep compiling; the
+    // group-post actions null-guard (a missing seam is a 404 — the
+    // <see cref="GuardianController"/> idiom). Appended **last** so the
+    // existing positional call sites keep their shape. DI always supplies the
+    // live <c>GroupPostService</c> in the app.
+    IGroupPostService? groupPosts = null) : Controller
 {
     private readonly EffectiveTimezoneResolver? _timezone = timezone;
 
@@ -368,16 +378,17 @@ public sealed class GroupsController(
         // platform default. Passed to the seam (the Skip/Take window) and the
         // pager's PageSize.
         int pageSize = await FeedPaging.PageSizeAsync(userInfo, actor);
-        var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: page, sort: postSort, pageSize: pageSize);
+        if (groupPosts is null) return NotFound();
+        var feed = await groupPosts.ListGroupFeedAsync(group.Id, actor, page: page, sort: postSort, pageSize: pageSize);
 
         // ADR 0226 — one batched read for the page's reply counts (the feed card footer).
         var replyCounts = await posts.CountRepliesAsync(feed.Visible.Select(p => p.Id).ToList());
-        var groupPosts = new List<PostListItem>(feed.Visible.Count);
+        var postItems = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
         {
             var profile = await userInfo.GetProfileAsync(post.AuthorId);
             var preview = MarkdownRenderer.PlainTextPreview(post.Body, 200);
-            groupPosts.Add(new PostListItem(
+            postItems.Add(new PostListItem(
                 post.Id,
                 post.Title,
                 preview,
@@ -502,7 +513,7 @@ public sealed class GroupsController(
             residentCandidates,
             group.IsPrivate)
         {
-            GroupPosts = groupPosts,
+            GroupPosts = postItems,
             GroupPostsTotal = feed.Total,
             CanPost = canPost,
             GroupEvents = groupEvents,
@@ -1556,7 +1567,8 @@ public sealed class GroupsController(
         if (group is null)
             return NotFound();
 
-        var result = await posts.GetGroupPostAsync(id, postId, actor);
+        if (groupPosts is null) return NotFound();
+        var result = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (result.Post is null)
             return NotFound();
 
@@ -1748,7 +1760,8 @@ public sealed class GroupsController(
         Post post;
         try
         {
-            post = await posts.CreateGroupPostAsync(draft, actor, session);
+            if (groupPosts is null) return NotFound();
+            post = await groupPosts.CreateGroupPostAsync(draft, actor, session);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1877,7 +1890,8 @@ public sealed class GroupsController(
         Post post;
         try
         {
-            post = await posts.UpdateGroupPostAsync(
+            if (groupPosts is null) return NotFound();
+            post = await groupPosts.UpdateGroupPostAsync(
                 postId, actor,
                 string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
                 model.Body.Trim(),
@@ -1945,7 +1959,7 @@ public sealed class GroupsController(
         // lane mismatch" and "membership denied" (Core doesn't
         // distinguish; the audit row does) — both map to the 404 fail-
         // closed shape (the register's non-member-404 pin).
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2000,7 +2014,7 @@ public sealed class GroupsController(
         // it) is the pre-write gate: a non-member, a missing post, or a lane
         // mismatch all return Post = null → 404 (the group lane's non-leaky
         // fail-closed shape, the register's non-member-404 pin).
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2062,7 +2076,7 @@ public sealed class GroupsController(
         // The parent's single group-lane decision (G·7) is the pre-write gate:
         // a non-member, a missing post, or a lane mismatch all return Post =
         // null → 404 (the group lane's non-leaky fail-closed shape).
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2117,7 +2131,7 @@ public sealed class GroupsController(
         // a non-member, a missing post, a lane mismatch, or a draft the actor
         // is not the author of all return Post = null → 404 (the group lane's
         // non-leaky fail-closed shape, the ADR 0037 author-only draft gate).
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2163,7 +2177,7 @@ public sealed class GroupsController(
 
         // The parent's single group-lane decision (G·7 — the reply inherits it)
         // is the pre-write gate (the <see cref="EditGroupPostReply"/> precedent).
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2712,7 +2726,7 @@ public sealed class GroupsController(
 
         // The parent's single group-lane decision (G·7) is the precondition:
         // non-member, missing post, or lane mismatch all return Post = null → 404.
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2776,7 +2790,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
         if (parent.Replies.All(r => r.Id != replyId))
@@ -2836,7 +2850,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2886,7 +2900,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2938,7 +2952,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
         if (parent.Replies.All(r => r.Id != replyId))
@@ -2987,7 +3001,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
         if (parent.Replies.All(r => r.Id != replyId))

@@ -48,6 +48,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
     private readonly IAnnouncementService? announcements;
     private readonly PostService? posts;
     private readonly IAuthorizationService? authz;
+    private readonly IGroupPostService? groupPosts;
 
     public KioskItemCatalog(
         ISearchService search,
@@ -61,7 +62,14 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         IPageService? pages = null,
         IAnnouncementService? announcements = null,
         PostService? posts = null,
-        IAuthorizationService? authz = null)
+        IAuthorizationService? authz = null,
+        // C3-03 (ADR 0013 named seam) — the group-post lane (GetGroupPostAsync
+        // now lives on this seam, extracted from PostService). **Optional**
+        // (null default) so the pre-seam test construction sites keep
+        // compiling; the ResolveGroupPostAsync null-guards (a missing seam is
+        // a Hidden — the posts-is-null idiom). DI always supplies the live
+        // GroupPostService in the app.
+        IGroupPostService? groupPosts = null)
     {
         this.search = search ?? throw new ArgumentNullException(nameof(search));
         this.userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
@@ -75,6 +83,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         this.announcements = announcements;
         this.posts = posts;
         this.authz = authz;
+        this.groupPosts = groupPosts;
     }
 
     /// <inheritdoc />
@@ -341,8 +350,8 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
     private async Task<KioskResolvedItem> ResolveGroupPostAsync(KioskEntry entry, string id, string actorId)
     {
-        if (posts is null || string.IsNullOrWhiteSpace(entry.GroupId)) return KioskResolvedItem.Hidden;
-        var detail = await posts.GetGroupPostAsync(entry.GroupId, id, actorId).ConfigureAwait(false);
+        if (groupPosts is null || string.IsNullOrWhiteSpace(entry.GroupId)) return KioskResolvedItem.Hidden;
+        var detail = await groupPosts.GetGroupPostAsync(entry.GroupId, id, actorId).ConfigureAwait(false);
         var post = detail.Post;
         if (post is null || post.DeletedAt is not null)
             return KioskResolvedItem.Hidden;

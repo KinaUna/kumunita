@@ -26,6 +26,17 @@ public static class PostsModule
             sp.GetRequiredService<INotificationEmitter>(),
             sp.GetRequiredService<IMentionService>()));
 
+        // C3-03 — the group-post lane (ADR 0013) extracted from PostService as a
+        // real part-vs-whole surface (the C3-00 EventRsvpGuardianService pattern).
+        // The 4 group-post methods (ListGroupFeedAsync / GetGroupPostAsync /
+        // CreateGroupPostAsync / UpdateGroupPostAsync) live here; the Posts
+        // consumers (GroupsController, KioskItemCatalog) resolve this seam.
+        services.AddTransient<Posts.IGroupPostService>(sp => new Posts.GroupPostService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Core.Authorization.IAuthorizationService>(),
+            sp.GetRequiredService<INotificationEmitter>(),
+            sp.GetRequiredService<IMentionService>()));
+
         return services;
     }
 }

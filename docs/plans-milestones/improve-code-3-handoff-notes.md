@@ -456,3 +456,116 @@ over the ceiling; a class-level split cannot get a file under 600"*), not a
 failure of the unit. The 0292 entry is the one carry in the baseline the close
 must account for when it re-verifies every carried-in DoD line from a clean
 state.
+
+## C3-03 — the 5 god-services: PostService seam landed + green (in progress) (2026-11-06)
+
+> **Status: 1 of 5 services landed and verified green; the other 4 are
+> pending.** This is a partial entry written so the verified PostService work
+> is protected and the next agent can pick up the remaining 4 without re-doing
+> the analysis. See the "Pending" list below for the exact seams, the measured
+> counts, and the baseline entries each must resolve.
+
+### What landed (PostService — the required-first, the only allowlist-unblock candidate)
+
+The **group-post lane** (ADR 0013 / ADR 0016) was extracted out of
+`PostService` into a **real part-vs-whole seam** (the C3-00
+`EventRsvpGuardianService` pattern):
+
+| New type | What it owns | Under ceiling |
+|---|---|---|
+| `IGroupPostService` | the 4-method surface (ListGroupFeed / GetGroupPost / CreateGroupPost / UpdateGroupPost) | 4 methods · < 20 |
+| `GroupPostService` | the 4 implementations + the `OrderByPostSort` / `TruncateUgcSnippet` / `ResolveLanguageCodeAsync` helpers | < 25 public methods · < 600 code lines |
+
+Both new types are **under every ceiling** (no baseline entries of their own).
+`PostService` keeps the 4 non-group-post public methods it owned (the read
+lanes, the write lanes, the draft lanes, the translation lane, the image /
+attachment finders) and **4 thin forwarders** delegating to `GroupPostService`
+(the C08 test-compat facade — the existing `GroupPostServiceTests` + the
+forwarder-path callers keep compiling unchanged). `IGroupPostService` is
+registered in `Posts/DependencyInjection.cs`; the 3 Web consumers
+(`GroupsController`, `KioskItemCatalog`, `ReportTargetsController`) get an
+**optional ctor param** `IGroupPostService? groupPosts = null` (appended last)
++ null-guards, and re-point their group-lane calls to the named seam.
+
+**Its own unit test** (`tests/Kumunita.Core.Tests/GroupPostServiceSeamTests.cs`,
+the `PostgresFixture` harness — the C3-00 / C3-01 precedent for a DB-dependent
+seam) constructs the seam **directly** (not through the forwarders): the feed
+read (G1), the detail read + replies (G7), the non-member create gate (G3), and
+the author-only edit lane (ADR 0016) — **4/4 pass**.
+
+### The honest finding (per the DoD's "say which line fails and why")
+
+**None of the DoD numbers move for PostService — and that is the honest limit of
+this service, the same limit C3-00 (EventService 997 → 709) and C3-01
+(PageService 917 → 852) hit:**
+
+| Line | Before (C3-02 close) | After (PostService seam) | Why |
+|---|---:|---:|---|
+| **files** (over 600) | **23** | **23** | `PostService.cs` went 821 → **631** code lines (the group-post lane extracted), still **over the 600 ceiling** → the `files` entry is **tightened** (max 821 → 631), **not retired**. |
+| **classes** (over 25) | **5** | **5** | `PostService` is **not** on the `classes` baseline (it is ≤ 25 public methods — the 4 forwarders keep it at the ceiling, the C3-00 shape). No entry to retire. |
+| **interfaces** (over 20) | **8** | **8** | `IPostService` does not exist on the baseline; `IGroupPostService` (4 methods) is under the 20 ceiling → no new entry. |
+| **methods** (over 80/cc15) | 89 | 89 | The 2 over-ceiling `PostService` methods (`CreatePostAsync` 90/cc17, `CreateReplyAsync` 65/cc16) **stay in PostService** (the seam extracted the *group-post* lane, not those) → their entries are **unchanged**. |
+| **Marten allowlist** (DoD #6) | **20** | **20** | The `PostsController` group-(a) keep **stays** — the reason text is updated to name C3-03's measurement (821 → 631, still over). The DoD #6 line does **not** move (20 → 20, not 20 → 19). |
+
+**The total over-ceiling surface is strictly smaller:** the `GroupPostService`
+seam is under every ceiling (a named type, not a block inside the god-file);
+`PostService` shrank 821 → 631. The ratchet only moved down; the one *honest
+raise* (the 7 boundary edges + the `GroupsController` seam-injection collateral,
+the `Detail` action) is **named with ADR 0293** (0 silent raises).
+
+### The baseline changes (textual only; the `\u003C` escapes survived — 36 before and after)
+
+| Entry | Change | Reason |
+|---|---|---|
+| `files` · `PostService.cs` | `max` 821 → **631** | tightened (the group-post lane extracted; still over 600 → kept, not retired) |
+| `files` · `GroupsController.cs` | `max` 1639 → **1641**, `adr: 0293` **added** | collateral: the +optional ctor param `IGroupPostService? groupPosts` + the null-guard on the `Detail` action (the C3-00 `EventController` collateral shape) |
+| `methods` · `GroupsController.Detail` | `max` 153 → **154**, `cc_max` 33 → **34**, `adr: 0293` **added** | collateral: the `Detail` action's `if (groupPosts is null) return NotFound();` guard |
+| `boundary_violations` · 7 `Posts→*` edges | counts raised by 1 each, `adr: 0293` **added** | honest grow: the new `Posts/GroupPostService.cs` lands on 7 *already-existing* edges (Audience 4→5 · LocaleSettings 1→2 · MentionTokens 1→2 · UgcSnippets 1→2 · Page 2→3 · PageSizer 1→2 · AttachmentIds 5→6) — the C3-01 `Pages→Identity:Roles` 2→3 precedent |
+| `controllers_marten_allowlist` · `PostsController` | reason text updated | names C3-03's 821 → 631 measurement (still over 600 → the keep holds, not a forced retirement) |
+| `docs/adr/0293-…` + `README.md` row | **added** | the `adr:` field the 7 boundary raises + the `GroupsController` collateral name (the ADR-index gate (b) needed the row) |
+
+### Verification (all green, 2026-11-06)
+
+- [x] **`dotnet build Kumunita.slnx -c Debug` — 0 errors, 0 warnings.**
+- [x] **`GroupPostServiceSeamTests` — 4/4 pass** (the `PostgresFixture` harness).
+- [x] **`pwsh tools/code/code-check.ps1` — OK (0 violations).**
+- [x] **`pwsh tools/docs/improve-check.ps1` — ALL GATES PASS** (the ADR-index row for 0293 added).
+- [x] **The `\u003C` escapes survived** (36 before and after — the baseline was edited textually).
+
+### PENDING — the other 4 services (the next agent's work)
+
+Each needs: a real part-vs-whole seam + `I*Service` + DI registration + the Web
+consumer re-point + **its own unit test** + the baseline entries resolved
+against the gate. The seams to pick (a C13 cold read of each passes on its own):
+
+| Service | `files` (measured, still over 600) | `classes` / `interfaces` entries | over-ceiling `methods` (14 total) | A clean seam |
+|---|---:|---|---|---|
+| `IdentityService` | 989 | class **33** (over 25) · `IIdentityService` **33** (over 20) | 0 | the **platform-gates cluster**: `IsSignupOpenAsync` / `SetSignupOpenAsync` (ADR 0050) + the sample-data locks (`IsSampleDataEnabledAsync` / `IsSamplePasswordChangeLockedAsync` / `SetSamplePasswordChangeLockedAsync` / `IsChangePasswordLockedForAsync` / `IsSampleMfaLockedAsync` / `SetSampleMfaLockedAsync` / `IsMfaLockedForAsync` / `IsSampleDataAccountAsync`, ADR 0138/0194) + `IsNotifyAdminsOnSignupAsync` / `SetNotifyAdminsOnSignupAsync` (ADR 0077) — 9–10 methods, all `LocaleSettings`-singleton reads/writes with the admin audit row. Move ≥ 9 to retire the **class** entry (33 → < 25); the **interface** (33) needs ≥ 14 moved to drop under 20 — a second seam or the honest-tighten (record it). |
+| `UserPortabilityService` | 922 | — | 6 (ApplyMediaAsync 66/cc19 · ClassifyTargetPrepassAsync 46/cc16 · DeriveOwnershipGuardInputs 38/cc20 · ResolveGuardInputsAsync 43/cc20 · ScopeRowHoldsSeat 39/cc20 · StandingComponentAsync 24/cc16) | the **ownership-guard / classify cluster** (`ImportOwnershipGuard` / `ClassifyPrepass` / `OwnershipGuardInputs` shapes) — the 6 over-cc methods are a named domain concept (the import guard decision). |
+| `BoardService` | 1017 | `IBoardService` **21** (over 20) | 3 (MoveTodoToAdjacentLaneAsync 62/cc19 · MoveTodoToLanePositionAsync 77/cc22 · UpdateLaneAsync 33/cc17) | the **todo-movement cluster** (the 3 over-cc methods + `MoveTodoWithinLaneAsync` + `MoveTodoToBoardAsync` + the `RefuseIfLaneAtLimitAsync` helper + `CheckTodoStanding` / `CheckBoardStanding`) — move ≥ 1 method off `IBoardService` (21 → < 20) to **retire the interface entry**, and the 3 over-cc methods retire as their seam takes them. |
+| `TodoService` | 828 | — | 3 (BuildTodoAssignBodyAsync 28/cc17 · ComputeTodoEditChanged 20/cc20 · CreateTodoCommentAsync 68/cc18) | the **comment cluster** (`CreateTodoCommentAsync` + `DeleteTodoCommentAsync` + the mention-emitter block + the standing read) — the 3 over-cc methods are a named domain concept. |
+
+**The measured counts (probed against the gate — the `--report` top-10 hides
+rank 11, so use the `--check` oracle or a `max`→1 probe):** `PostService.cs`
+**631** (was 821) · `IdentityService.cs` **989** · `UserPortabilityService.cs`
+**922** · `BoardService.cs` **1017** · `TodoService.cs` **828**. **All five are
+still over the 600 `cs_file` ceiling after their planned seams** — so each
+`files` entry **tightens, not retires** (the C3-00/C3-01/C3-02 honest limit).
+The DoD #3/#4 "files" line stays 23 for the whole unit (the "23 → ≤ 8" target
+is C3-04's tail, not this unit's — the prompt's own words).
+
+**The one DoD line that genuinely moves in this unit is `methods`** (the 14
+over-ceiling method entries retire or tighten as their service drops under the
+ceiling) **and, if any service drops under 600, the DoD #6 allowlist line**
+(20 → 19, the `PostsController` keep) — **neither of which moves here** (all
+5 stay over 600; the 14 methods re-point or tighten but the line does not
+retire them all). The `classes` line moves **5 → 4** (the `IdentityService`
+class entry retires, if the seam moves ≥ 9 methods) and the `interfaces` line
+moves **8 → 7** (the `IBoardService` entry retires, if the seam moves ≥ 1
+method off the interface). **That is the honest, measurable, gate-verified
+reduction for the unit** — not the plan's "files 23 → 22…" claim, which the
+gate confirms does not hold for any of the 5 (they all stay over 600).
+
+**The `\u003C` escapes in the baseline survived** (the baseline was edited
+textually, never `json.load`/`dump`). The ADR 0293 row is in the
+`docs/adr/README.md` index.

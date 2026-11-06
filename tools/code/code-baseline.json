@@ -49,7 +49,7 @@
     },
     {
       "id": "src/Kumunita.Core/Posts/PostService.cs",
-      "max": 821
+      "max": 631
     },
     {
       "id": "src/Kumunita.Core/Projects/BoardService.cs",
@@ -90,7 +90,8 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/GroupsController.cs",
-      "max": 1639
+      "max": 1641,
+      "adr": "0293"
     },
     {
       "id": "src/Kumunita.Web/Controllers/GuardianController.cs",
@@ -403,8 +404,9 @@
     },
     {
       "id": "src/Kumunita.Web/Controllers/GroupsController.cs::Kumunita.Web.Controllers.GroupsController.Detail(string,int,string?,string?)",
-      "max": 153,
-      "cc_max": 33
+      "max": 154,
+      "cc_max": 34,
+      "adr": "0293"
     },
     {
       "id": "src/Kumunita.Web/Controllers/GroupsController.cs::Kumunita.Web.Controllers.GroupsController.GroupEventDetail(string,string)",
@@ -2232,7 +2234,8 @@
       "from": "Posts",
       "to": "Authorization",
       "symbol": "Audience",
-      "count": 4
+      "count": 5,
+      "adr": "0293"
     },
     {
       "from": "Posts",
@@ -2245,31 +2248,36 @@
       "from": "Posts",
       "to": "Localization",
       "symbol": "LocaleSettings",
-      "count": 1
+      "count": 2,
+      "adr": "0293"
     },
     {
       "from": "Posts",
       "to": "Mentions",
       "symbol": "MentionTokens",
-      "count": 1
+      "count": 2,
+      "adr": "0293"
     },
     {
       "from": "Posts",
       "to": "Notifications",
       "symbol": "UgcSnippets",
-      "count": 1
+      "count": 2,
+      "adr": "0293"
     },
     {
       "from": "Posts",
       "to": "Pages",
       "symbol": "Page",
-      "count": 2
+      "count": 3,
+      "adr": "0293"
     },
     {
       "from": "Posts",
       "to": "Query",
       "symbol": "PageSizer",
-      "count": 1
+      "count": 2,
+      "adr": "0293"
     },
     {
       "from": "Posts",
@@ -2287,7 +2295,8 @@
       "from": "Posts",
       "to": "Web",
       "symbol": "AttachmentIds",
-      "count": 5
+      "count": 6,
+      "adr": "0293"
     },
     {
       "from": "Posts",
@@ -3597,7 +3606,7 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/PostsController.cs",
-      "reason": "the post/reply create/edit/delete lanes write the Post + its Translation + moderation rows in one aggregate across Posts + Moderation. The owning PostService (src/Kumunita.Core/Posts/PostService.cs, 1722 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the lanes in would raise the ratchet, which is C2-05's scope (C2-04's own constraint: do not pre-empt C2-05's god-surface shrink of PostService). Kept on the store."
+      "reason": "the post/reply create/edit/delete lanes write the Post + its Translation + moderation rows in one aggregate across Posts + Moderation. The owning PostService (src/Kumunita.Core/Posts/PostService.cs) was 821 code lines and dropped to 631 under C3-03's group-post seam extraction (Posts/GroupPostService.cs), still over the 600 cs_file ceiling - moving these lanes in would raise the ratchet, which is C3-04's tail scope. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsController.cs",

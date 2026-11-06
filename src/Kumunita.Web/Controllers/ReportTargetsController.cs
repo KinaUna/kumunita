@@ -53,7 +53,14 @@ public sealed class ReportTargetsController(
     // (GetBoardAsync / GetTodoAsync) moved off IProjectService to the sibling
     // seams; the project read (GetProjectAsync) stays on IProjectService.
     Kumunita.Core.Projects.IBoardService boards,
-    Kumunita.Core.Projects.ITodoService todos) : Controller
+    Kumunita.Core.Projects.ITodoService todos,
+    // C3-03 (ADR 0013 named seam) — the group-post lane (GetGroupPostAsync
+    // now lives on this seam, extracted from PostService). **Optional**
+    // (null default) so the pre-seam test construction sites keep
+    // compiling; the group report intake null-guards (a missing seam is a
+    // 404 — the posts-is-null idiom). DI always supplies the live
+    // GroupPostService in the app.
+    Kumunita.Core.Posts.IGroupPostService? groupPosts = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -297,7 +304,9 @@ public sealed class ReportTargetsController(
         // ADR 0013 membership read + the post's audience check; a
         // missing post, a lane mismatch, or a membership Deny all
         // return Post = null (the group lane's fail-closed shape).
-        var result = await posts.GetGroupPostAsync(groupId, postId, actor);
+        if (groupPosts is null)
+            return Forbid();
+        var result = await groupPosts.GetGroupPostAsync(groupId, postId, actor);
         if (result.Post is null)
             return Forbid();
 
