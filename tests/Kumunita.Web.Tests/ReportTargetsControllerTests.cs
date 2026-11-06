@@ -40,7 +40,6 @@ public sealed class ReportTargetsControllerTests
             store);
 
         var controller = new ReportTargetsController(
-            store: store,
             moderation: moderation,
             events: NSubstitute.Substitute.For<IEventService>(),
             projects: NSubstitute.Substitute.For<IProjectService>(),

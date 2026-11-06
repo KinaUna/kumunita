@@ -187,24 +187,33 @@ public partial class ModerationService
     /// <param name="reason">Optional free-text reason (the reporter's
     /// words, never forwarded to the author — the 2026-09-25
     /// disclosure fix, same as the post-report lane).</param>
-    /// <param name="session">The caller-owned write session (the C3
-    /// same-transaction shape; this lane performs the single
-    /// <c>SaveChangesAsync</c>).</param>
+    /// <remarks>
+    /// C3-06 (IMPROVE-CODE-3) — this lane now **opens its own** write
+    /// session (the service's <c>IDocumentStore</c>, the
+    /// <see cref="FileReportAsync"/> / <see cref="FileReplyReportAsync"/>
+    /// "the service opens its own session" precedent), so the caller no
+    /// longer owns the transaction. The C3 / ADR 0006-C no-partial-write
+    /// discipline is unchanged: the <see cref="Report"/> row and the
+    /// filing <see cref="AccessAudit"/> row are still staged into the same
+    /// session and committed in **one** <c>SaveChangesAsync</c>.
+    /// </remarks>
     public async Task<int> FileReportTargetAsync(
         string targetKind,
         string targetId,
         string? componentId,
         string? authorId,
         string actorId,
-        string? reason,
-        IDocumentSession session)
+        string? reason)
     {
         if (string.IsNullOrEmpty(targetKind)) throw new ArgumentException("A target kind is required.", nameof(targetKind));
         if (string.IsNullOrEmpty(targetId))   throw new ArgumentException("A target id is required.",  nameof(targetId));
         if (string.IsNullOrEmpty(actorId))    throw new ArgumentException("A resident actor is required.", nameof(actorId));
-        if (session is null)                  throw new ArgumentNullException(nameof(session));
         if (targetKind is not ("event" or "project" or "board" or "todo" or "grouppost"))
             throw new ArgumentException($"Unknown report target kind '{targetKind}'.", nameof(targetKind));
+
+        // C3-06 — the service owns the write session (the controller's
+        // caller-owns-transaction shape is retired with this lane).
+        await using var session = _store.LightweightSession();
 
         var now = DateTimeOffset.UtcNow;
 

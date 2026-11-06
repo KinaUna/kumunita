@@ -3,7 +3,6 @@ using Kumunita.Core.Moderation;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
 using Kumunita.Web.Security;
-using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -30,12 +29,11 @@ namespace Kumunita.Web.Controllers;
 /// the read seam returns <c>null</c> for both "missing" and "denied",
 /// mapping to <c>Forbid()</c> 403).
 /// <para>
-/// **Session shape (C3 / ADR 0006-C):** the controller opens its own
-/// <see cref="IDocumentStore.LightweightSession"/> and passes it to
-/// <see cref="ModerationService.FileReportTargetAsync"/>; that service
-/// performs the single <c>SaveChangesAsync</c>, so the <see
-/// cref="Report"/> row and the filing <c>AccessAudit</c> row commit or
-/// roll back atomically.
+/// **Session shape (C3-06 / ADR 0006-C):** the controller no longer owns
+/// the transaction — <see cref="ModerationService.FileReportTargetAsync"/>
+/// opens its own write session and performs the single
+/// <c>SaveChangesAsync</c>, so the <see cref="Report"/> row and the
+/// filing <c>AccessAudit</c> row commit or roll back atomically.
 /// <para>
 /// **Rate limiting:** the same <c>"report"</c> policy (10/hour/IP)
 /// applies to every endpoint in this controller (the SECURITY.md
@@ -44,7 +42,6 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 public sealed class ReportTargetsController(
-    IDocumentStore store,
     IModerationService moderation,
     Kumunita.Core.Events.IEventService events,
     Kumunita.Core.Projects.IProjectService projects,
@@ -105,15 +102,13 @@ public sealed class ReportTargetsController(
             return Forbid();
         }
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "event",
             targetId:    ev.Id,
             componentId: ev.ComponentId,
             authorId:    ev.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/events/{id}");
@@ -155,15 +150,13 @@ public sealed class ReportTargetsController(
             return Forbid();
         }
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "project",
             targetId:    project.Id,
             componentId: project.ComponentId,
             authorId:    project.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/projects/projects/{id}");
@@ -207,15 +200,13 @@ public sealed class ReportTargetsController(
             return Forbid();
         }
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "board",
             targetId:    board.Id,
             componentId: board.ComponentId,
             authorId:    board.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/projects/boards/{id}");
@@ -258,15 +249,13 @@ public sealed class ReportTargetsController(
             return Forbid();
         }
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "todo",
             targetId:    todo.Id,
             componentId: todo.ComponentId,
             authorId:    todo.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/projects/todos/{id}");
@@ -310,15 +299,13 @@ public sealed class ReportTargetsController(
         if (result.Post is null)
             return Forbid();
 
-        await using var session = store.LightweightSession();
         await moderation.FileReportTargetAsync(
             targetKind:  "grouppost",
             targetId:    result.Post.Id,
             componentId: result.Post.ComponentId,
             authorId:    result.Post.AuthorId,
             actorId:     actor,
-            reason:      reason,
-            session:     session);
+            reason:      reason);
 
         TempData["info"] = await this.FlashAsync("flash.report_submitted", "Report submitted. A moderator may review it.");
         return Redirect($"/groups/{groupId}/posts/{postId}");

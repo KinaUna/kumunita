@@ -193,10 +193,12 @@ public interface IModerationService
     /// The resident-facing report-on-a-target intake lane (IMPROVE-CODE-2
     /// C2-03 — added to the seam so the <c>ReportTargets</c> controller codes
     /// against the interface, not the <see cref="ModerationService"/>
-    /// concrete). The <c>ModerationService</c> implementation is unchanged.
+    /// concrete). The <c>ModerationService</c> opens its own write session and
+    /// performs the single <c>SaveChangesAsync</c> (the C3 / ADR 0006-C
+    /// no-partial-write discipline is unchanged — the <c>Report</c> row and the
+    /// filing <c>AccessAudit</c> row still commit or roll back atomically).
     /// Returns the row count filed. Throws <see cref="ArgumentException"/>
-    /// on an empty target id / actor, <see cref="System.ArgumentNullException"/>
-    /// on a null session.
+    /// on an empty target id / actor.
     /// </summary>
     Task<int> FileReportTargetAsync(
         string targetKind,
@@ -204,8 +206,7 @@ public interface IModerationService
         string? componentId,
         string? authorId,
         string actorId,
-        string? reason,
-        IDocumentSession session);
+        string? reason);
 
     /// <summary>
     /// The resident-facing report-on-a-reply intake lane (IMPROVE-CODE-2

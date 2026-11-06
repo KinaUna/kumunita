@@ -3516,7 +3516,7 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/AdminController.cs",
-      "reason": "first-run setup + seed-user creation are multi-document writes spanning Identity + UserInfo + Authorization. There is NO Admin module in Core (src/Kumunita.Core/Admin/ is empty) and no IAdminService - minting one to carry a 3-module aggregate write is a ceremony type, and the writes span modules no single service owns. Kept on the store."
+      "reason": "C3-06 (ADR 0296) — honest keep. The two store ops are READS, not writes (the prior reason text was stale): the admin audit-log list (Query<AccessAudit> paged) + the break-glass candidate list (Query<AdminOverride>). AccessAudit is an Authorization-module concrete type and AdminOverride is Authorization-owned (src/Kumunita.Core/Authorization/) - there is NO Admin module in Core (src/Kumunita.Core/Admin/ is empty) and no IAdminService; minting one to carry two single-module reads (the access-audit log + the override list) is a ceremony type for a Web-layer admin view-model projection. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/AnnouncementController.cs",
@@ -3540,7 +3540,7 @@
     },
     {
       "file": "src/Kumunita.Web/Controllers/GroupsController.cs",
-      "reason": "the group create/edit/leave lanes write the Group + its Translations + membership in one aggregate. Group is a UserInfo document (src/Kumunita.Core/UserInfo/Group.cs) but there is NO Groups module in Core (src/Kumunita.Core/Groups/ is empty) and no IGroupService - minting one for a UserInfo-doc aggregate write is a ceremony type. Kept on the store."
+      "reason": "C3-06 (ADR 0296) — honest keep (the prior reason was stale: IGroupService now EXISTS, C07 ADR 0286, 25 methods). The group create/edit/leave + membership-write lanes (19 store sessions) write the Group + its Translations + membership in one aggregate; Group is a UserInfo document (src/Kumunita.Core/UserInfo/Group.cs) and the group-translation lanes already route through IGroupService.AddGroupTranslationAsync/UpdateGroupTranslationAsync (the controller's store usage is the caller-owns-transaction shape - it opens store.LightweightSession() and passes it to the group lanes). The remaining write lanes (create/edit/leave + membership) are a 3-row aggregate the IGroupService seam does not own (its 25 methods are the description/translation/membership-read lanes, not the write lanes). Moving them in would require either reshaping IGroupService to a write-seam (a part-vs-whole change beyond this unit) or a new GroupWriteService ceremony type. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/GuardianController.cs",
@@ -3561,10 +3561,6 @@
     {
       "file": "src/Kumunita.Web/Controllers/ProjectsController.cs",
       "reason": "C08 Projects cluster: the BoardDetail/TodoDetail builders + the ProjectsBase store reads are C08's frozen surface - the builder extraction was deferred as C08's exit, not C2-04's scope. ProjectService (src/Kumunita.Core/Projects/ProjectService.cs, 579 lines) does not own these builder reads. Kept on the store."
-    },
-    {
-      "file": "src/Kumunita.Web/Controllers/ReportTargetsController.cs",
-      "reason": "the report-target lanes read the Post/Reply + its Translations across Posts + Moderation. The owning ModerationService (src/Kumunita.Core/Moderation/ModerationService.cs, 1281 lines) is a god-file at its ratchet ceiling (cs_file 600) - moving the read lane in would raise the ratchet, which is C2-05's scope. Kept on the store."
     },
     {
       "file": "src/Kumunita.Web/Controllers/TagController.cs",

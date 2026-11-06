@@ -16,19 +16,23 @@ updated: 2026-07-11
 ---
 
 > **Abstract:** the running handoff log for the IMPROVE-CODE-3 lane.
-> **Current state (C3-05 done, 2026-11-06):** C3-00…C3-05 are all done and
+> **Current state (C3-06 done, 2026-11-06):** C3-00…C3-06 are all done and
 > green. The `files` 23 → ≤ 8 line is **met: `files` is 8** (C3-00…C3-04, ADR
 > 0292/0294). **C3-05 retired the two clean `controllers_marten_allowlist`
 > entries — `GoalsController` (0 ops of its own, all via `IProjectService`) +
 > `AccountController` (the 1 verify-token read → the new
 > `IIdentityService.LoadVerifyTokenAsync` seam, ADR 0295) — so `allowlist` is
-> 20 → 18**; the 5 honest keeps (`Announcement`/`Document`/`Tag`/`Posts`/
-> `Guardian`) are recorded with their measured reasons (no headroom or
-> edge-minting) and handed to C3-06, which lands the `18 → ≤ 5` remainder.
-> `classes` 3, `interfaces` 8 (the `IIdentityService` entry raised 33 → 34,
-> `adr: 0295`), `boundary` 465, `files` 8, `allowlist` 18. The six-member
-> flip is **still not landed** (DoD #6's `≤ 5` target is 18 — C3-06/C3-08's).
-> The per-unit honest findings are recorded below, C3-00 first.
+> 20 → 18**. **C3-06 retired the remaining clean entry —
+> `ReportTargetsController` (the `FileReportTargetAsync` self-session
+> seam-reshape, ADR 0296) — so `allowlist` is 18 → 17**; the 17 honest keeps
+> are recorded with their measured reasons (no headroom / no-service aggregate /
+> edge-minting / request-context / C08-frozen / diagnostics). **DoD #6's `≤ 5`
+> target is NOT met — the honest floor is 17** (the remainder is precisely the
+> no-service / edge-minting / diagnostics / C08-frozen class the plan expected
+> to be hard). `classes` 3, `interfaces` 8, `boundary` 465, `files` 8,
+> `allowlist` 17. The six-member flip is **still not landed** (DoD #6's `≤ 5`
+> target is 17 — C3-08 the close decides the flip on the true number). The
+> per-unit honest findings are recorded below, C3-00 first.
 > C3-00 adopted the ADR 0290 named seam `EventRsvpGuardianService` — the
 > 6-method RSVP cluster extracted from `EventService` into a real
 > part-vs-whole surface (`IEventRsvpGuardian` / `EventRsvpGuardianService`),
@@ -805,3 +809,94 @@ number."*
   No behavior change for any existing route (the helper null-guards to an empty
   chip set only when a child has no store *and* asks for tag slugs — the
   siblings that ask all supply a store).
+
+## C3-06 — the Marten-allowlist remainder (the `18 → ≤ 5` remainder) — **DONE**
+
+C3-06 works the 18 `controllers_marten_allowlist` entries C3-05 left, retiring
+every genuinely-retire-able one and honestly recording the rest. Per the
+prompt: *"judged on retiring every genuinely-retire-able entry and honestly
+recording the ones you can't — not on hitting 5 at any cost."*
+
+### The result: `allowlist` 18 → 17 (1 clean retirement; the honest floor is 17)
+
+**RETIRE (1) — verified clean, not assumed:**
+
+| Controller | Why clean (measured) |
+|---|---|
+| `ReportTargetsController` | **The keep reason was stale.** C3-05's reason claimed *"the owning ModerationService (1281 lines) is a god-file at its ceiling"* — but C3-03 (ADR 0293) / C3-04 (ADR 0294) split it; `ModerationService` is now **398 code lines** and the report-intake lane extracted to `ModerationService.ReportIntake.cs` (**363 code lines**). The no-headroom keep no longer stands. **The seam-reshape:** the 5 report-target actions used the caller-owns-transaction shape (the controller opened `store.LightweightSession()` and passed it to `FileReportTargetAsync(..., session)`). C3-06 dropped the `IDocumentSession session` param from `IModerationService.FileReportTargetAsync` + made the impl open `await using var session = _store.LightweightSession();` (the `FileReportAsync` / `FileReplyReportAsync` "the service opens its own session" precedent — the ADR 0006-C no-partial-write discipline is unchanged: the `Report` + `AccessAudit` rows still commit in one `SaveChangesAsync`). The controller drops the `store` ctor param + `using Marten;` + the 5 session opens + 5 `session:` args; the gate's pure-text scan finds **none** of the three tokens in the file. **No new boundary edge** (the service already references `Report` / `AccessAudit` / `INotificationEmitter`); `IModerationService` is under the interfaces ceiling (11 methods), so no baseline line moves. |
+
+**KEEP (17) — honest findings, each code-verified this tree:**
+
+| Controller | Owning surface (measured) | The keep class + reason |
+|---|---|---|
+| `AnnouncementController` | `AnnouncementService` 518 | no-headroom: caller-owns-transaction write lanes (~152 lines) → 518 + 152 > 600; reshaping the frozen `IAnnouncementService` seam is a larger seam change |
+| `PostsController` | `PostService` 582 | no-headroom: post/reply write lanes (~98+ lines) → 582 + lanes > 600; the C3-04 media split already retired the media lane |
+| `GuardianController` | `GuardianService` 554 | no-headroom: the 4 `GuardianLink` read helpers (the standing gate, 8+ actions) join UserInfo + Guardian; 554 + ~50 > 600 |
+| `TagController` | `TagService` 528 | no-headroom (write lane) + register-pin (the `SeedTranslationFormAsync` read — the U8c "no new seam" pin forbids an `ITagService` "get translations" method) |
+| `PageController` | `PageService` **851** | still a god-file over the `cs_file` 600 ceiling; the entry retires only when `PageService` drops under 600 (a later C3 unit) |
+| `AdminController` | no Admin module (reads) | **reason refreshed** — the 2 ops are **reads** (the `AccessAudit` audit-log list + the `AdminOverride` break-glass candidates), both Authorization-module concrete types; minting an `IAdminService` for two single-module admin reads is a ceremony type |
+| `GroupsController` | `IGroupService` (exists) | **reason refreshed** — `IGroupService` now exists (C07, ADR 0286, 25 methods); the group create/edit/leave + membership-write lanes (19 sessions) are a `Group`+Translations+membership aggregate the seam does not own |
+| `AttachmentController` | Posts + Media 2-module | no-service: the attach/retrieve/delete lanes span the Posts `Post` read + the Media `MediaObject` quarantine write — a 2-module aggregate |
+| `ContentImageController` | Posts + Media 2-module | no-service: same shape as `AttachmentController` |
+| `AdminAnalyticsController` | no Usage write-service | edge-minting: the CSV export writes one `AccessAudit` (Authorization-module) row; routing it through `UsageAnalyticsService` (117 lines, headroom) would mint a new `Usage→Authorization:AccessAudit` edge (verified absent) |
+| `DocumentController` | `DocumentService` 193 | edge-minting (headroom is *not* the block): the `Query<Tag>` read + the `MediaObject.Quarantined` write would mint new `Documents→Tags:Tag` + `Documents→Media:MediaObject` edges (verified absent) |
+| `DirectoryController` | needs `HttpContext.Request` | request-context: the `ResolveTagDisplayNamesAsync` read needs the viewer's effective language from `HttpContext.Request` (a Web-layer request context) |
+| `BoardsController` | C08 frozen surface | C08 cluster: the board lanes read `Board` + `BoardItemPlacement` + membership; the builder extraction was deferred as C08's exit |
+| `TodosController` | C08 frozen surface | C08 cluster: the todo lanes read `Todo` + `BoardItemPlacement` + membership; the builder extraction was deferred as C08's exit |
+| `ProjectsController` | C08 frozen surface | C08 cluster: the `BoardDetail`/`TodoDetail` builders + the `ProjectsBase` reads; the builder extraction was deferred as C08's exit |
+| `ProjectsBaseController` | C08 frozen surface | C08 cluster: the shared base's tag-read + project-list reads; the builder extraction was deferred as C08's exit |
+| `HealthController` | pure diagnostics | diagnostics: the only op is the readiness probe (`Storage.Database.AssertConnectivityAsync`); no owning service (minting an `IHealthService` is the ceremony type the plan names as the anti-pattern) |
+
+### The baseline changes (text-only; the 36 `\u003C` escapes survived)
+
+| Entry | Change | Reason |
+|---|---|---|
+| `controllers_marten_allowlist` · `ReportTargetsController` | **removed** | the clean retirement (the stale no-headroom keep no longer stands — `ModerationService` is 398, not 1281) |
+| `controllers_marten_allowlist` · `AdminController` | reason **refreshed** | the prior "multi-document writes" text was false — the 2 ops are reads; the new reason names the reads + the no-service class |
+| `controllers_marten_allowlist` · `GroupsController` | reason **refreshed** | the prior "no IGroupService" text was false — `IGroupService` exists (C07, ADR 0286); the new reason names the write-lane aggregate the seam does not own |
+
+**Unchanged:** `files` 8 · `classes` 3 · `methods` 89 · `interfaces` 8 (no
+`IModerationService` entry — it is under the 20 ceiling) · `boundary_violations`
+465 (the seam-reshape mints no edge) · `views` 3. **No baseline line is raised.**
+
+### The ADR + index
+
+- **ADR 0296** (`0296-improve-code-3-c3-06-marten-allowlist-remainder-honest-finding.md`)
+  is the named record for the one clean retirement + the 17 honest keeps + the
+  **DoD #6 `≤ 5` not-met honest finding** (the floor is 17).
+- **`docs/adr/README.md`** — the `0296` index row added (gate (b): 296 files ==
+  296 rows).
+
+### Verification (all green, 2026-11-06)
+
+- [x] **`dotnet build Kumunita.slnx` — 0 errors.**
+- [x] **Affected tests pass** — the 9 `FileReportTargetAsync` Core tests
+  (filing + all-five-kinds + self-report + third-party + unknown-kind) + the 1
+  `ReportTargetsController` empty-id guard test.
+- [x] **`pwsh tools/code/code-check.ps1` — OK (0 violations)** (the
+  `ReportTargetsController` entry is gone; the 17 keeps are still there with a
+  reason; no entry is raised).
+- [x] **`pwsh tools/docs/improve-check.ps1` — ALL GATES PASS** (gate (b): the
+  `0296` index row present; files=296 == index rows=296).
+- [x] **The 36 `\u003C` escapes survived** (the baseline was edited textually).
+
+### Honest finding for C3-08 (the close)
+
+- **`allowlist` is now 17** (was 18). **DoD #6's `≤ 5` target is NOT met —
+  the honest floor is 17.** The remainder is precisely the no-service /
+  edge-minting / diagnostics / C08-frozen class the plan expected to be hard:
+  retiring any of the 17 would breach the `cs_file` 600 ceiling, mint a boundary
+  edge, mint a ceremony type, or fight a frozen seam. The plan's own words:
+  *"If the honest outcome is 8 or 9 (not 5) … that is a correct honest-finding,
+  not a failure."* C3-08 decides the six-member flip on the true number.
+- **The 5 no-headroom caller-owns-transaction keeps** (`Announcement`/`Posts`/
+  `Guardian`/`Tag`/`Page`) are the first 5 to resolve in any successor unit —
+  each needs the owning service to drop under 600 (a split) or the frozen seam
+  reshaped to open its own sessions (a larger seam change than this unit).
+- **The C08 cluster keeps** (`Boards`/`Todos`/`Projects`/`ProjectsBase`) resolve
+  with C08's deferred builder-extraction exit — a real part-vs-whole read seam
+  the C08 lane owns, not this lane's.
+- **The edge-minting keeps** (`AdminAnalytics`/`Document`) resolve by the edge
+  decision (ADR the minted edge + route the op through the owning service, or
+  extract the contract) — each is a deliberate cross-module decision, not a
+  forced service.
