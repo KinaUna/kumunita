@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.86.0", "2026-11-06", new List<string>
+        {
+            "A quiet pass over what we already ship (round 3) — no new feature, no resident-facing change. The platform's own code-quality reduction: the largest files split into named seams (23 → 8 over the ceiling), the clean Marten-allowlist entries retired (20 → 17; the 17 honest keeps are the no-service / edge-minting / diagnostics / C08-frozen class the plan expected to be hard), and the 3 flagged-accidental boundary edges retired (2 contract extractions + 1 name-collision rename). The codebase is measurably smaller, the module boundaries are cleaner, and nothing you already use has changed (the IMPROVE-CODE lane, round 3 — ADRs 0292–0297).",
+        }),
         new("0.85.0", "2026-11-01", new List<string>
         {
             "Home — the \"What's new around the street\" feed is no longer sign-in only (ADR 0284). Before, a visitor who was not signed in saw only the hero, the feature cards, and the roadmap; now the feed renders for everyone, showing the public surface of the platform: **public announcements** (the same read the /announcements list uses for a signed-out visitor) and **public pages** (the same read the /pages tree uses for a signed-out visitor). The **posts** column stays empty for a signed-out visitor — a post's audience is never \"everyone\" by design, so there is no public post to list there (that is the correct answer, not a fallback). A signed-in resident sees exactly the same feed as before. No layout or copy change for anyone who was already signed in.",

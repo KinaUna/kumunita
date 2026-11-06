@@ -158,6 +158,20 @@ Dependency rule: feature modules depend on the three identity/access modules (an
 never the reverse. AuthorizationModule may call UserInfoModule to resolve groups; it never
 calls feature modules.
 
+**Cross-module contracts (the settled boundary surface).** Where a feature module needs a
+single value or a narrow read from an identity/access module, the crossing is a *named
+contract in the source module* (an interface — the gate's allowed-target rule), not a
+concrete-type import: **`IInstanceBaseUrlReader`** (Identity) — the instance's public base
+URL the Notifications module composes into absolute email links (the accidental
+`VerificationOptions` crossing retired); **`IIdentityPrincipalStore`** (Identity) — the
+principal read + clean-slate wipe the Portability module needs over the EF Core identity
+tables (the accidental `AppDbContext` crossing retired; the EF Core context stays a private
+detail of the Identity module, ADR [0004](adr/0004-data-persistence-and-schema-evolution.md) §B). Both
+landed in the IMPROVE-CODE round-3 close (ADR [0297](adr/0297-improve-code-3-c3-07-flagged-accidental-boundary-edges.md)); the
+module-boundary edge count is the measured **459** (`tools/code/code-baseline.json`,
+the `boundary_violations` line — the ratchet-only-goes-down discipline, ADR
+[0290](adr/0290-improve-code-2-baseline-raises-and-seams.md)).
+
 The M1 design for these modules is in [`docs/design/m1-identity-access.md`](design/m1-identity-access.md);
 the interface set, the thin-principal shape, and change management are
 frozen by [ADR 0006](adr/0006-module-boundary-contracts.md) — the [Services draft](architecture/identity-access.md) is a

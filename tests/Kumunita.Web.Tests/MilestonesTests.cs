@@ -16,7 +16,7 @@ public class MilestonesTests
     public void Roadmap_Covers_M0_Through_M37_Plus_Named_Lanes_In_Order()
     {
         Assert.Equal(
-            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "SITE-2", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "ESC", "M33", "M34", "M35", "M36", "M37" },
+            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "SITE-2", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "ESC", "M33", "M34", "M35", "M36", "M37", "IMPROVE-3" },
             Ids.ToList());
     }
 
@@ -27,7 +27,7 @@ public class MilestonesTests
         // **done** (the M37 close, U06). The shipped set is **every** id
         // through M37 — the "last milestone, no successor" pin (the M36·10 /
         // M35·11 framing, re-applied).
-        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "SITE-2", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "ESC", "M33", "M34", "M35", "M36", "M37" })
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "SITE-2", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "ESC", "M33", "M34", "M35", "M36", "M37", "IMPROVE-3" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);
@@ -35,22 +35,23 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void M37_Is_The_Last_Milestone_With_No_Successor()
+    public void Roadmap_Has_No_InProgress_Entry_And_The_Last_Entry_Is_Shipped()
     {
-        // M37 (personal notes) is the **last** milestone on the roadmap —
-        // there is no <c>M38</c> to promote (the M36·10 / M35·11 "last
-        // milestone, no successor" framing, re-applied). The M37 close
-        // (U06) flipped M37 → done and replaced the prior
-        // "M37_Is_The_Single_InProgress_Milestone_And_The_Last" pin with
-        // this "no in-progress milestone" assertion: the roadmap is fully
-        // shipped (every entry is <c>StatusDone</c>) and the last entry is
-        // <c>M37</c> (no successor).
+        // The roadmap is **fully shipped** (no entry is <c>StatusNext</c>) —
+        // the "no in-progress milestone" invariant the M37 close (U06)
+        // established. The last entry is the most-recently-shipped named
+        // lane: <c>IMPROVE-3</c> (the IMPROVE-CODE round-3 code-quality
+        // reduction, ADRs 0292–0297) — the C3-08 close flip (the D6
+        // six-member pin). The prior last entry was <c>M37</c> (personal
+        // notes); the IMPROVE-3 entry is a code-quality lane (a shipped
+        // platform change, not a resident feature), consistent with the
+        // <c>IMPROVE</c> (round 1) and <c>ESC</c> named-lane precedent.
         var inProgress = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
         Assert.Empty(inProgress);
-        // M37 is the **last** entry in the roadmap (the M37 close pin — no
-        // <c>M38</c>).
-        Assert.Equal("M37", Milestones.All.Last().Id);
-        // And it is <c>done</c> (the close flip — the D9 six-member pin).
+        // The **last** entry in the roadmap is IMPROVE-3 (the most recent
+        // shipped named lane — no M38, no successor milestone).
+        Assert.Equal("IMPROVE-3", Milestones.All.Last().Id);
+        // And it is <c>done</c> (the close flip — the D6 six-member pin).
         Assert.Equal(Milestones.StatusDone, Milestones.All.Last().Status);
     }
 
