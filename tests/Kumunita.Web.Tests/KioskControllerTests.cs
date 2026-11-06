@@ -358,9 +358,10 @@ public class KioskControllerTests
     {
         var surfaces = new[]
         {
-            (Folder: "Projects", View: "BoardDetail.cshtml", Model: "BoardDetailViewModel"),
-            (Folder: "Projects", View: "TodosIndex.cshtml",  Model: "TodoIndexViewModel"),
-            (Folder: "Event",    View: "Calendar.cshtml",    Model: "EventCalendarViewModel"),
+            // BoardDetail was moved from Projects/ → Boards/ (view-path reorg).
+            (Folder: "Boards", View: "BoardDetail.cshtml", Model: "BoardDetailViewModel"),
+            (Folder: "Todos",  View: "TodosIndex.cshtml",  Model: "TodoIndexViewModel"),
+            (Folder: "Event",  View: "Calendar.cshtml",    Model: "EventCalendarViewModel"),
         };
         foreach (var (folder, view, model) in surfaces)
         {
@@ -446,11 +447,15 @@ public class KioskControllerTests
         Assert.Contains("body.kmb-kiosk .d-flex.mb-3", css);
         Assert.Contains("body.kmb-kiosk .kmb-tab-under-navbar", css);
 
-        // … and every detail page with a discussion marks it.
+        // … and the discussion partials that detail pages render mark it.
+        // The kmb-discussion markup was extracted from the detail views into
+        // the shared partials (the served markup is unchanged) — pin those.
         foreach (var (folder, view) in new[]
         {
-            ("Posts", "Detail.cshtml"), ("Groups", "PostDetail.cshtml"), ("Announcement", "Detail.cshtml"),
-            ("Projects", "TodoDetail.cshtml"), ("Event", "Detail.cshtml"), ("Groups", "EventDetail.cshtml"),
+            ("Posts", "Detail.cshtml"), ("Announcement", "Detail.cshtml"),
+            ("Event", "Detail.cshtml"), ("Groups", "EventDetail.cshtml"),
+            // The discussion sections that formerly lived inline in TodoDetail / PostDetail:
+            ("Todos", "_TodoComments.cshtml"), ("Groups", "_GroupPostReplies.cshtml"),
         })
         {
             Assert.Contains("kmb-discussion", ViewSource(folder, view));

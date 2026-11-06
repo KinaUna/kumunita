@@ -64,7 +64,8 @@ public class ProjectsRouteTableTests
         "POST /projects/boards/{id}/report",
         "POST /projects/boards/{id}/set-event",
         "POST /projects/boards/{id}/set-project",
-        "POST /projects/boards/{id}/translations",
+        // C2-02 collapsed the board translation route onto the same
+        // /translations/update + /translations/remove pair as Projects/Todos.
         "POST /projects/boards/{id}/translations/remove",
         "POST /projects/boards/{id}/translations/update",
         "POST /projects/goals",
@@ -115,12 +116,13 @@ public class ProjectsRouteTableTests
 
     /// <summary>
     /// The snapshot is not silently empty (a mis-filter would pass trivially):
-    /// it pins the 66-route family.
+    /// it pins the 65-route family (C2-02 collapsed the bare board translation
+    /// route onto the /translations/update + /translations/remove pair).
     /// </summary>
     [Fact]
     public void Snapshot_Has_The_Full_Family()
     {
-        Assert.Equal(66, Expected.Length);
+        Assert.Equal(65, Expected.Length);
     }
 
     /// <summary>

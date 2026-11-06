@@ -207,11 +207,14 @@ public class RichEditorTests
         foreach (var name in new[]
             {
                 "renderPreview", "applyToggle", "applyBlock",
-                "applyLink", "imageLink", "isSafeImageSrc", "bindRichEditor",
+                "applyLink", "imageLink", "bindRichEditor",
             })
         {
             Assert.Contains($"export function {name}", content, StringComparison.Ordinal);
         }
+        // C11 split moved `isSafeImageSrc` to `rich-editor-shared.ts`; `rich-editor.ts` now re-exports it —
+        // the public API is unchanged, but the surface shape is `export { isSafeImageSrc }` (not `export function`).
+        Assert.Contains("export { isSafeImageSrc }", content, StringComparison.Ordinal);
     }
 
     // ── Test helpers ───────────────────────────────────────────────────────

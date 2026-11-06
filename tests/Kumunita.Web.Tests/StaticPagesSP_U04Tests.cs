@@ -344,8 +344,8 @@ public class StaticPagesSP_U04Tests
             rows.Select(r => r.Route).ToArray());
 
         // The layout footer hard-codes exactly these five hrefs — assert the
-        // _Layout.cshtml footer block references all five (the unconditional
-        // render, the floor-honesty invariant).
+        // footer partial (_LayoutFooter.cshtml, the C11 split of _Layout.cshtml)
+        // references all five (the unconditional render, the floor-honesty invariant).
         var layout = ResolveLayout();
         foreach (var route in rows.Select(r => r.Route))
             Assert.True(layout.Contains($"href=\"{route}\""),
@@ -360,15 +360,19 @@ public class StaticPagesSP_U04Tests
             Assert.False(string.IsNullOrWhiteSpace(bySlug[s]), $"{s} did not resolve to a page id");
     }
 
-    /// <summary>Locates <c>Views/Shared/_Layout.cshtml</c> at the repo root.</summary>
+    /// <summary>
+    /// Locates <c>Views/Shared/_LayoutFooter.cshtml</c> at the repo root (C11
+    /// split: the footer block — the five hrefs this test pins — was extracted
+    /// from <c>_Layout.cshtml</c> into the footer partial).
+    /// </summary>
     private static string ResolveLayout()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Kumunita.slnx")))
             dir = dir.Parent;
         Assert.True(dir is not null, "Could not locate the repo root (Kumunita.slnx).");
-        var layout = Path.Combine(dir!.FullName, "src", "Kumunita.Web", "Views", "Shared", "_Layout.cshtml");
-        Assert.True(File.Exists(layout), $"_Layout.cshtml not found at {layout}.");
+        var layout = Path.Combine(dir!.FullName, "src", "Kumunita.Web", "Views", "Shared", "_LayoutFooter.cshtml");
+        Assert.True(File.Exists(layout), $"_LayoutFooter.cshtml not found at {layout}.");
         return File.ReadAllText(layout);
     }
 

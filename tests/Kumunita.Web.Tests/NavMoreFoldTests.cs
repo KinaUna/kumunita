@@ -62,15 +62,22 @@ public class NavMoreFoldTests
     /// <summary>
     /// <c>_Layout.cshtml</c> marks the two fold items (<c>data-nav-fold</c>,
     /// exactly two — Community and Groups) and the More menu
-    /// (<c>data-nav-more</c>, exactly one), and loads the compiled module as a
+    /// (<c>data-nav-more</c>, exactly one), and the C11 scripts partial
+    /// (<c>_LayoutScripts.cshtml</c>) loads the compiled module as a
     /// type=module script (SECURITY.md §6: no inline scripts in Razor views).
     /// </summary>
-    [Fact(DisplayName = "ADR 0113: _Layout.cshtml carries the fold hooks and loads the module")]
+    [Fact(DisplayName = "ADR 0113: _Layout.cshtml carries the fold hooks; _LayoutScripts.cshtml loads the module")]
     public void Layout_Carries_Fold_Hooks_And_Loads_Module()
     {
         var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "Shared", "_Layout.cshtml");
         Assert.True(File.Exists(path), $"_Layout.cshtml not found at {path}.");
         var html = File.ReadAllText(path);
+        // C11 split moved the <script> block into _LayoutScripts.cshtml —
+        // the fold hooks + nav links above stay in _Layout.cshtml, only the
+        // module-script tag lives in the partial.
+        var scriptsPath = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "Shared", "_LayoutScripts.cshtml");
+        Assert.True(File.Exists(scriptsPath), $"_LayoutScripts.cshtml not found at {scriptsPath}.");
+        var scripts = File.ReadAllText(scriptsPath);
 
         // Exactly two fold items (Community + Groups). Count only real
         // attribute usages (the attribute immediately followed by '>', as in
@@ -85,10 +92,11 @@ public class NavMoreFoldTests
         Assert.True(moreHooks.Count == 1,
             $"Expected exactly 1 'data-nav-more' hook (the More menu); found {moreHooks.Count}.");
 
-        // The module is loaded as a module script — not inline.
+        // The module is loaded as a module script — not inline (C11 split:
+        // the tag lives in _LayoutScripts.cshtml, the scripts partial of the layout).
         Assert.Contains(
             "<script type=\"module\" src=\"~/js/lib/nav-more-fold.js\"></script>",
-            html);
+            scripts);
 
         // The two folded links are re-homed, not re-labelled (M29·9 a11y
         // floor — the label is rendered where the kw-l key was today). M29

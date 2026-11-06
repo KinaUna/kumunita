@@ -74,7 +74,8 @@ public class IconSpriteTests
     public void Tabs_And_Switches_Carry_Icons()
     {
         // The tuple-driven strips render the icon from the tuple's Icon field.
-        foreach (var partial in new[] { "Projects/_ProjectsTabs.cshtml", "Event/_EventsTabs.cshtml",
+        // _ProjectsTabs was moved from Projects/ → Shared/ (view-path reorg).
+        foreach (var partial in new[] { "Shared/_ProjectsTabs.cshtml", "Event/_EventsTabs.cshtml",
                                         "Locale/_SettingsTabs.cshtml", "Admin/_AdminNav.cshtml" })
         {
             var src = ReadViewAt(partial);

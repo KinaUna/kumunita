@@ -924,11 +924,13 @@ public class IDocumentServiceSeamTest
     public void IDocumentFolderService_Expose_The_Six_Crossing_Methods()
     {
         var t = typeof(Kumunita.Core.Documents.IDocumentFolderService);
-        Assert.NotNull(t.GetMethod("CreateAsync"));
-        Assert.NotNull(t.GetMethod("ListByParentAsync"));
-        Assert.NotNull(t.GetMethod("MoveDocumentAsync"));
-        Assert.NotNull(t.GetMethod("RenameAsync"));
-        Assert.NotNull(t.GetMethod("MoveAsync"));
-        Assert.NotNull(t.GetMethod("DeleteAsync"));
+        // C2-04 added session-owning overloads, so GetMethod(name) throws AmbiguousMatchException —
+        // assert by name ("the interface exposes a method with this name", not exactly one overload).
+        Assert.True(t.GetMethods().Any(m => m.Name == "CreateAsync"));
+        Assert.True(t.GetMethods().Any(m => m.Name == "ListByParentAsync"));
+        Assert.True(t.GetMethods().Any(m => m.Name == "MoveDocumentAsync"));
+        Assert.True(t.GetMethods().Any(m => m.Name == "RenameAsync"));
+        Assert.True(t.GetMethods().Any(m => m.Name == "MoveAsync"));
+        Assert.True(t.GetMethods().Any(m => m.Name == "DeleteAsync"));
     }
 }
