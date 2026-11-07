@@ -27,9 +27,26 @@ and the 6 IS14 in-method decisions must all pass it. **If the gate finds a
 genuine leak, it goes red and you stop** — IS15 does not fix leaks (a new
 `IS10x` does).
 
-**Deliverables (1 new file + the handoff-notes append):**
+**A scaffold already exists and is your starting point.**
+`tests/Kumunita.Web.Tests/SecGate/DecisionFreeReadGateTests.cs` was
+pre-written and **compiles** (0 errors). Its current state, measured
+2026-11-07 on this branch:
 
-1. `tests/Kumunita.Web.Tests/SecGate/DecisionFreeReadGateTests.cs` (new).
+- `SecReadMarker_NamesAReason` → **GREEN** (all 64 markers valid).
+- `EveryAudienceBearingRead_IsDecidedOrMarked` → **RED**, reporting **151
+  candidate** `file:line` rows. That is a *superset* of the plan's M7
+  baseline of 52 — the scaffold's read-detection is deliberately broad (any
+  `LoadAsync<T>`/`Query<T>` naming a class-(b) type), and it has not yet
+  absorbed (a) the in-method decisions the scaffold's idiom list misses,
+  (b) the path-excludes that apply, and (c) the triage markers the gate's
+  body-extraction missed. **Your job is to drive that list toward a true
+  52 → 0** — not to start the file from scratch.
+
+**Deliverables (1 test file — refine the scaffold — + the handoff-notes
+append):**
+
+1. `tests/Kumunita.Web.Tests/SecGate/DecisionFreeReadGateTests.cs` (already
+   present — refine, don't rewrite).
 2. `docs/plans-milestones/in-progress/improve-sec-handoff-notes.md` — the
    `## IS15` section.
 
@@ -66,24 +83,38 @@ outside the per-request contract.
 
 ## The work
 
-1. **Read the entry reads** (below) — especially the IS08 gate, which is the
-   working **C# port precedent**: how to walk `src/**/*.cs` via
-   `SecGateSource`, how to detect a defect pattern, how to fail with a
-   file:line list.
-2. **Write the gate** using `SecGateSource.AllSrcFiles` / `ReadSrc` (IS04
-   harness). The class (b) list is a `static` set built from §2.5; the
-   decision idioms and path-excludes are the lists above.
-3. **Build + run** (runner form below).
-   - **Green** → 52 → 0 retired; record the pass count.
-   - **Red** → each file:line is either a marker the triage missed (add the
-     `// SEC-READ:` line, re-run) or a **leak** (a read with no decision and no
-     marker). For a leak: **stop**, name the method + the disclosure, and say
-     it must become a new `IS10x`. Do **not** fix it in IS15.
-4. **Handoff.** Append `## IS15 — The decision-free-read gate` with the two
-   test names, the pass count, the unmarked count (should be 0), the
-   path-exclude list, and anything noticed.
+The scaffold is already a working detector — treat it as the starting point
+and **drive its 151-row candidate list toward a true 52 → 0**, one row at a
+time. IS15 is a **gate-only** unit: every fix is *in the gate* (test file),
+never in `src/`. For each candidate row, the correct move is one of:
 
-**You touch only the one new test file and the handoff notes.**
+1. **The gate missed an in-method decision** — the method runs a decision the
+   scaffold's idiom list does not yet name (add the idiom to
+   `DecisionIdioms`, re-run).
+   - **Known gap (confirmed):** the IS14 `PageController.Edit` actions
+     (`PageController.cs:641` / `:710`) gate on `HasEditStanding(…)`, which is
+     **not** in the scaffold's idiom list. Adding it clears those two rows.
+     Expect similar gaps (e.g. `HasCreateStanding`, the group-lane membership
+     check, `Members.Contains` / `Participants.Contains`).
+2. **The gate missed a marker** — the method already carries a `// SEC-READ:`
+   line that the scaffold's body-extraction did not capture (fix
+   `ExtractBodyEnd` / the marker check, re-run). Do **not** re-add the marker.
+3. **Path-exclude** — the file is a seeder / portability / eraser / purge /
+   migration (add it to `PathExcludes`, re-run).
+4. **The gate over-detects a "read"** — the method names a class-(b) type in
+   a non-read position (a write, a `new T(…)`, an argument, a comment). Tighten
+   `ReadIdiom` / `FirstReferencedType` so it stops flagging it, re-run.
+5. **A genuine leak** — a read with no decision and no marker, that IS11–IS14
+   genuinely missed. **Stop, name the method + the disclosure, and say it must
+   become a new `IS10x`.** Do **not** fix or hide it in IS15.
+
+Repeat until the list is empty (or a leak forces a pause). Then **build +
+run** (runner form below): green → 52 → 0 retired; record the pass count and
+the final idiom / path-exclude sets. The `// CALIBRATION` comments in the
+scaffold mark the weak spots (method-declaration regex, idiom list,
+body-extraction) to verify as you go.
+
+**You touch only the one test file and the handoff notes.**
 
 ## Reading order
 
