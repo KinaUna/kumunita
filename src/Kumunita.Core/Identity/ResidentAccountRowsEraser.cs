@@ -1,5 +1,8 @@
+using Kumunita.Core.ErrorReports;
+using Kumunita.Core.Events;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Sessions;
+using Kumunita.Core.Usage;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -7,17 +10,22 @@ using Microsoft.Extensions.Logging;
 namespace Kumunita.Core.Identity;
 
 /// <summary>
-/// S2/E2 (IMPROVE-SEC IS22) — the <b>delete</b> erasure of the resident's
+/// S2/E2 (IMPROVE-SEC IS22 + IS23) — the erasure of the resident's
 /// <b>identity-adjacent rows</b>, the per-resident state the F1 §2C "decision"
 /// rows left undecided and the [DataClass] rows (IS20b/IS20c) now settle to
-/// <see cref="Kumunita.Core.Privacy.Erasure.Delete"/>: <see cref="SessionDoc"/>
-/// (a session credential — IP + user agent, one per login), <see cref="IdentityToken"/>
-/// (verify/setup tokens), <see cref="GuestAccess"/> (a bounded guest standing),
-/// <see cref="DelegationGrant"/> (either side), the four <c>Notification*</c>
-/// types (per-recipient state), and <see cref="OutboxEmail"/> (matched on the
-/// recipient email). The [DataClass] rows are the spec; this class is the
-/// execution (one fact lives in one place — the same part-vs-whole contract as
-/// <see cref="ResidentContentEraser"/> and
+/// <see cref="Kumunita.Core.Privacy.Erasure.Delete"/> (IS22) or
+/// <see cref="Kumunita.Core.Privacy.Erasure.Pseudonymize"/> (IS23):
+/// <see cref="SessionDoc"/> (a session credential — IP + user agent, one per login),
+/// <see cref="IdentityToken"/> (verify/setup tokens), <see cref="GuestAccess"/>
+/// (a bounded guest standing), <see cref="DelegationGrant"/> (either side), the
+/// four <c>Notification*</c> types (per-recipient state), and <see cref="OutboxEmail"/>
+/// (matched on the recipient email). IS23 adds the three child-scoped deletes
+/// (<see cref="GuardianTimeLimitSchedule"/> / <see cref="GuardianEventRequest"/> /
+/// <see cref="CommunityMembershipRequest"/>) and the three pseudonymizations
+/// (<see cref="ErrorReport"/> + <see cref="EscalationToken"/> +
+/// <see cref="UsageEvent"/>). The [DataClass] rows are the spec; this class is
+/// the execution (one fact lives in one place — the same part-vs-whole
+/// contract as <see cref="ResidentContentEraser"/> and
 /// <see cref="ResidentThreadPseudonymizer"/>).
 /// <para>
 /// <b>Behaviour:</b> only the resident's own rows are deleted, each matched by
@@ -57,7 +65,8 @@ public static class ResidentAccountRowsEraser
     /// (<c>{Resident}</c>, an id, not PII, per the IS08 gate's rule).</param>
     /// <param name="ct">Cancellation.</param>
     /// <returns>The touched-row count (sessions + tokens + guest rows +
-    /// delegations + the 4 notification types + the matching outbox rows).</returns>
+    /// delegations + the 4 notification types + the matching outbox rows
+    /// + the 3 child-scoped deletes + the 3 pseudonymizations — IS22 + IS23).</returns>
     public static async Task<int> EraseAsync(
         IDocumentSession session, string residentSubjectId, string? residentEmail,
         ILogger? logger = null, CancellationToken ct = default)
@@ -66,6 +75,7 @@ public static class ResidentAccountRowsEraser
         ArgumentException.ThrowIfNullOrEmpty(residentSubjectId);
 
         int touched = 0;
+        var tombstone = $"deleted:{residentSubjectId}";
 
         // 1. SessionDoc — a session credential (IP + user agent, one per login).
         //    Owner field: UserId. [DataClass] Delete (IS20b).
@@ -158,6 +168,92 @@ public static class ResidentAccountRowsEraser
                 .ToListAsync(ct).ConfigureAwait(false);
             foreach (var row in rows)
                 session.Delete(row);
+            touched += rows.Count;
+        }
+
+        // 7. GuardianTimeLimitSchedule — the supervised child's time-limit
+        //    schedule (identity = ChildId, pinned by CoreDocTypes). [DataClass]
+        //    Delete (IS20c/IS23): the child's schedule is the child's data.
+        {
+            var rows = await session.Query<GuardianTimeLimitSchedule>()
+                .Where(s => s.ChildId == residentSubjectId)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var row in rows)
+                session.Delete(row);
+            touched += rows.Count;
+        }
+
+        // 8. GuardianEventRequest — the supervised child's event-approval
+        //    requests (ChildId = the child's SubjectId). [DataClass] Delete
+        //    (IS20c/IS23): the child's requests are the child's data.
+        {
+            var rows = await session.Query<GuardianEventRequest>()
+                .Where(r => r.ChildId == residentSubjectId)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var row in rows)
+                session.Delete(row);
+            touched += rows.Count;
+        }
+
+        // 9. CommunityMembershipRequest — the supervised child's community
+        //    membership requests (UserId = the supervised child's SubjectId).
+        //    [DataClass] Delete (IS20c/IS23): the resident's requests are the
+        //    resident's data.
+        {
+            var rows = await session.Query<CommunityMembershipRequest>()
+                .Where(r => r.UserId == residentSubjectId)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var row in rows)
+                session.Delete(row);
+            touched += rows.Count;
+        }
+
+        // 10. ErrorReport — pseudonymize (the row STAYS; the Pseudonymize
+        //     precedent from PseudonymizeAuditRowsAsync). SubjectId →
+        //     tombstone; ContactEmail → null (the PII being nulled; never
+        //     logged — IS08 gate). [DataClass] Pseudonymize (IS20c,
+        //     principalField: "SubjectId").
+        {
+            var rows = await session.Query<ErrorReport>()
+                .Where(r => r.SubjectId == residentSubjectId)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var row in rows)
+            {
+                row.SubjectId = tombstone;
+                row.ContactEmail = null;
+                session.Store(row);
+            }
+            touched += rows.Count;
+        }
+
+        // 11. EscalationToken — pseudonymize: CreatedBy → tombstone (the row
+        //     STAYS; the token is operator-scoped but the creator's identity
+        //     is erased). [DataClass] Pseudonymize (IS20c,
+        //     principalField: "CreatedBy").
+        {
+            var rows = await session.Query<EscalationToken>()
+                .Where(t => t.CreatedBy == residentSubjectId)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var row in rows)
+            {
+                row.CreatedBy = tombstone;
+                session.Store(row);
+            }
+            touched += rows.Count;
+        }
+
+        // 12. UsageEvent — pseudonymize: ActorId → tombstone (the row STAYS;
+        //     the usage metric is kept, the identity is erased).
+        //     [DataClass] Pseudonymize (IS20c, principalField: "ActorId").
+        {
+            var rows = await session.Query<UsageEvent>()
+                .Where(e => e.ActorId == residentSubjectId)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var row in rows)
+            {
+                row.ActorId = tombstone;
+                session.Store(row);
+            }
             touched += rows.Count;
         }
 

@@ -1,10 +1,13 @@
 using System.IO;
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.ErrorReports;
+using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Sessions;
+using Kumunita.Core.Usage;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Microsoft.AspNetCore.Identity;
@@ -248,6 +251,238 @@ public sealed class DeleteAccountRowsTests(PostgresFixture fixture) : IClassFixt
         Assert.NotNull(await LoadAsync<OutboxEmail>(boot.Store, otherBox));
     }
 
+    // ── IS23: 3 child-scoped deletes (guardian, community) ──────────────────
+
+    [Fact]
+    public async Task DeleteAccount_ChildGuardianRows_Removed()
+    {
+        var boot = await BootAsync();
+        var actor  = await SeedAccountAsync(boot, "ga-actor@examplium.com", globalAdmin: true);
+        var target = await SeedAccountAsync(boot, "rows-is23-child@examplium.com", globalAdmin: false);
+        var other  = await SeedAccountAsync(boot, "rows-is23-other@examplium.com", globalAdmin: false);
+
+        // The resident (target) is the child in all three rows; the other
+        // resident is the child in the "survives" rows.
+        var targetEventId = Guid.NewGuid().ToString("N");
+        var otherEventId  = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        await using (var session = boot.Store.LightweightSession())
+        {
+            // GuardianTimeLimitSchedule: identity = ChildId (pinned).
+            session.Store(new GuardianTimeLimitSchedule
+            {
+                ChildId = target,
+                Enabled = true,
+                Mode = TimeLimitMode.Blocked,
+                Hours = [8, 9],
+                DaysOfWeek = [1, 2],
+                Updated = now
+            });
+            session.Store(new GuardianTimeLimitSchedule
+            {
+                ChildId = other,
+                Enabled = false,
+                Mode = TimeLimitMode.Blocked,
+                Hours = [],
+                DaysOfWeek = [],
+                Updated = now
+            });
+            // GuardianEventRequest: ChildId = the supervised child.
+            session.Store(new GuardianEventRequest
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                EventId = targetEventId,
+                ChildId = target,
+                DesiredStatus = RsvpStatus.Going,
+                Status = GuardianEventRequestStatus.Pending,
+                RequestedAt = now
+            });
+            session.Store(new GuardianEventRequest
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                EventId = otherEventId,
+                ChildId = other,
+                DesiredStatus = RsvpStatus.Going,
+                Status = GuardianEventRequestStatus.Pending,
+                RequestedAt = now
+            });
+            // CommunityMembershipRequest: UserId = the supervised child.
+            session.Store(new CommunityMembershipRequest
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ComponentId = "community-1",
+                UserId = target,
+                RequestedBy = actor,
+                Status = CommunityMembershipRequestStatus.Pending,
+                RequestedAt = now
+            });
+            session.Store(new CommunityMembershipRequest
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ComponentId = "community-1",
+                UserId = other,
+                RequestedBy = actor,
+                Status = CommunityMembershipRequestStatus.Pending,
+                RequestedAt = now
+            });
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await boot.Identity.DeleteAccountAsync(target, adminSubjectId: actor);
+
+        // All three child-scoped rows for the resident are gone (fresh
+        // LoadAsync → null)…
+        Assert.Null(await LoadAsync<GuardianTimeLimitSchedule>(boot.Store, target));
+        // GuardianEventRequest: query by ChildId (no surrogate id handy —
+        // load via a query session).
+        await using (var qs = boot.Store.QuerySession())
+        {
+            var targetEventReq = await Marten.QueryableExtensions.ToListAsync(
+                qs.Query<GuardianEventRequest>().Where(r => r.ChildId == target),
+                TestContext.Current.CancellationToken);
+            Assert.Empty(targetEventReq);
+            var targetCommReq = await Marten.QueryableExtensions.ToListAsync(
+                qs.Query<CommunityMembershipRequest>().Where(r => r.UserId == target),
+                TestContext.Current.CancellationToken);
+            Assert.Empty(targetCommReq);
+
+            // …while the OTHER resident's rows survive (the deletes are
+            // child-scoped, not a blanket wipe).
+            var otherEventReq = await Marten.QueryableExtensions.ToListAsync(
+                qs.Query<GuardianEventRequest>().Where(r => r.ChildId == other),
+                TestContext.Current.CancellationToken);
+            Assert.Single(otherEventReq);
+            var otherCommReq = await Marten.QueryableExtensions.ToListAsync(
+                qs.Query<CommunityMembershipRequest>().Where(r => r.UserId == other),
+                TestContext.Current.CancellationToken);
+            Assert.Single(otherCommReq);
+        }
+        Assert.NotNull(await LoadAsync<GuardianTimeLimitSchedule>(boot.Store, other));
+    }
+
+    // ── IS23: 3 pseudonymizations (error, escalation, usage) ────────────────
+
+    [Fact]
+    public async Task DeleteAccount_ErrorReport_Pseudonymized_ContactEmailCleared()
+    {
+        var boot = await BootAsync();
+        var actor  = await SeedAccountAsync(boot, "ga-actor@examplium.com", globalAdmin: true);
+        var target = await SeedAccountAsync(boot, "rows-is23-err@examplium.com", globalAdmin: false);
+        var other  = await SeedAccountAsync(boot, "rows-is23-err-other@examplium.com", globalAdmin: false);
+
+        var targetReportId = Guid.NewGuid().ToString("N");
+        var otherReportId  = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        await using (var session = boot.Store.LightweightSession())
+        {
+            // PII gotcha (IS08): ContactEmail is stored fixture data, not a
+            // log template. Kept synthetic; never logged by the eraser.
+            session.Store(new ErrorReport
+            {
+                Id = targetReportId,
+                SubjectId = target,
+                Description = "Something went wrong (synthetic fixture)",
+                ContactEmail = "a@example.test",
+                RequestId = "req-001",
+                Created = now,
+                TriageStatus = "new"
+            });
+            session.Store(new ErrorReport
+            {
+                Id = otherReportId,
+                SubjectId = other,
+                Description = "Something else (synthetic fixture)",
+                ContactEmail = "b@example.test",
+                RequestId = "req-002",
+                Created = now,
+                TriageStatus = "new"
+            });
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await boot.Identity.DeleteAccountAsync(target, adminSubjectId: actor);
+
+        // The resident's ErrorReport row STAYS (the pseudonymize contract),
+        // with the principal → tombstone and the PII (ContactEmail) → null.
+        var targetReport = await LoadAsync<ErrorReport>(boot.Store, targetReportId);
+        Assert.NotNull(targetReport);
+        Assert.Equal($"deleted:{target}", targetReport.SubjectId);
+        Assert.Null(targetReport.ContactEmail);
+
+        // An ErrorReport for a different SubjectId is untouched.
+        var otherReport = await LoadAsync<ErrorReport>(boot.Store, otherReportId);
+        Assert.NotNull(otherReport);
+        Assert.Equal(other, otherReport.SubjectId);
+        Assert.Equal("b@example.test", otherReport.ContactEmail);
+    }
+
+    [Fact]
+    public async Task DeleteAccount_UsageEvents_Pseudonymized()
+    {
+        var boot = await BootAsync();
+        var actor  = await SeedAccountAsync(boot, "ga-actor@examplium.com", globalAdmin: true);
+        var target = await SeedAccountAsync(boot, "rows-is23-usage@examplium.com", globalAdmin: false);
+        var other  = await SeedAccountAsync(boot, "rows-is23-usage-other@examplium.com", globalAdmin: false);
+
+        var targetUsageId = Guid.NewGuid().ToString("N");
+        var otherUsageId  = Guid.NewGuid().ToString("N");
+        var targetTokenId = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        await using (var session = boot.Store.LightweightSession())
+        {
+            session.Store(new UsageEvent
+            {
+                Id = targetUsageId,
+                At = now,
+                ActorId = target,
+                RouteTemplate = "GET /posts/{id}"
+            });
+            session.Store(new UsageEvent
+            {
+                Id = otherUsageId,
+                At = now,
+                ActorId = other,
+                RouteTemplate = "GET /posts/{id}"
+            });
+            // EscalationToken: CreatedBy = the admin's subject. The token is
+            // operator-scoped (an operator credential) but the creator's
+            // identity is the resident's — pseudonymize the principal field,
+            // the token hash itself is untouched (still verifiable by the
+            // origin platform, the row STAYS).
+            session.Store(new EscalationToken
+            {
+                Id = targetTokenId,
+                Label = "origin-platform-x",
+                TokenHash = "0000000000000000000000000000000000000000000000000000000000000000",
+                TokenPrefix = "kesc_synthetic",
+                Created = now,
+                CreatedBy = target
+            });
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await boot.Identity.DeleteAccountAsync(target, adminSubjectId: actor);
+
+        // Both principal-tombstone rows STAY (the pseudonymize contract) with
+        // the principal field → tombstone.
+        var targetUsage = await LoadAsync<UsageEvent>(boot.Store, targetUsageId);
+        Assert.NotNull(targetUsage);
+        Assert.Equal($"deleted:{target}", targetUsage.ActorId);
+        Assert.Equal("GET /posts/{id}", targetUsage.RouteTemplate);
+
+        var targetToken = await LoadAsync<EscalationToken>(boot.Store, targetTokenId);
+        Assert.NotNull(targetToken);
+        Assert.Equal($"deleted:{target}", targetToken.CreatedBy);
+        // The token hash (the operator credential) is untouched.
+        Assert.Equal("0000000000000000000000000000000000000000000000000000000000000000",
+                     targetToken.TokenHash);
+
+        // A UsageEvent for a different ActorId is untouched.
+        var otherUsage = await LoadAsync<UsageEvent>(boot.Store, otherUsageId);
+        Assert.NotNull(otherUsage);
+        Assert.Equal(other, otherUsage.ActorId);
+    }
+
     // ── Harness (mirrors DeleteAccountThreadTests / IdentityServiceDeleteLaneGdprTests) ──
 
     private sealed record Boot
@@ -265,10 +500,16 @@ public sealed class DeleteAccountRowsTests(PostgresFixture fixture) : IClassFixt
         var conn = await fixture.NewDatabaseAsync(ct);
 
         // CoreDocTypes covers the identity-adjacent set (IdentityToken,
-        // GuestAccess, DelegationGrant, OutboxEmail); the IS22 additions are
-        // SessionDocTypes (SessionDoc) + NotificationDocTypes (the 4
-        // Notification* types). The Messaging/GroupMessaging/Media surfaces are
-        // the IS21 base (DeleteCoreAsync runs ResidentContentEraser →
+        // GuestAccess, DelegationGrant, OutboxEmail) AND the IS23
+        // child-scoped deletes (GuardianTimeLimitSchedule +
+        // CommunityMembershipRequest — both in CoreDocTypes). The IS22
+        // additions are SessionDocTypes (SessionDoc) +
+        // NotificationDocTypes (the 4 Notification* types). The IS23
+        // additions are EventDocTypes (GuardianEventRequest),
+        // ErrorReportDocTypes (ErrorReport), EscalationDocTypes
+        // (EscalationToken), and UsageDocTypes (UsageEvent). The
+        // Messaging/GroupMessaging/Media surfaces are the IS21 base
+        // (DeleteCoreAsync runs ResidentContentEraser →
         // ResidentThreadPseudonymizer + the media byte-delete).
         var store = DocumentStore.For(opts =>
         {
@@ -280,6 +521,10 @@ public sealed class DeleteAccountRowsTests(PostgresFixture fixture) : IClassFixt
             MediaDocTypes.Configure(opts);
             SessionDocTypes.Configure(opts);
             NotificationDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ErrorReportDocTypes.Configure(opts);
+            EscalationDocTypes.Configure(opts);
+            UsageDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
