@@ -168,3 +168,22 @@ updated: 2026-11-07
   per-char `('0'-'9' | 'a'-'f')` guard before it could mis-pin.
 - Next: **IS07** — the consumer side, redacting the 4 `IdentityService` /
   `SmtpSender` templates to `{UserId}` + `{EmailDomain}` / `{RecipientHash}`.
+
+## IS07 — Redact the identity + SMTP log templates
+
+- **Files touched:** `src/Kumunita.Core/Identity/IdentityService.cs` (3 sites)
+  and `src/Kumunita.Core/Identity/SmtpSender.cs` (1 site), template + argument
+  only, zero behaviour change. `using Kumunita.Core.Logging;` added to both
+  (missing before). No test added — §2.3 records IS07 as "no new test"
+  (P-3 pinned by IS05 sink floor + IS08 gate).
+- **The 4 sites:** `IdentityService.cs:161` (disposable-email rejection —
+  `{EmailDomain}`, `LogRedact.EmailDomain(email)`; `{Domain}` already carried
+  the domain), `:219` (registered unverified resident), `:273` (re-issued
+  verification) — all `LogRedact.EmailDomain(email)`. `SmtpSender.cs:296`
+  (delivered email — `{RecipientHash}`, `LogRedact.Hash8(email.Recipient)`).
+- **Verification:** `dotnet build` 0 errors. `grep -rn "{Email}"
+  src/Kumunita.Core/Identity/` → **0 hits**; raw `{Recipient}` → **0 hits**;
+  `LogRedact.*` present at all 4 sites (§2.4 anchor). **3/3
+  `IdentityServiceSignupPolicyTests` pass** (in-process runner, ~8 s).
+- Next: **IS08** — the seeder redaction (`FirstBootSeeder`,
+  `SampleDataSeeder`) + the log-PII gate over `src/**/*.cs`.
