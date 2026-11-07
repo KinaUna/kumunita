@@ -78,3 +78,32 @@ updated: 2026-11-07
   agreement gate check against).
 - `improve-check.ps1` ALL GATES PASS. No code touched, no build run
   (design-only unit).
+
+## IS04 — Gate harness + deny-matrix gate
+
+- Files created: `tests/Kumunita.Web.Tests/SecGate/SecGateSource.cs` (repo-root
+  walk-up, `ReadSrc`, `AllSrcFiles`, `TestMethodExists`),
+  `tests/Kumunita.Web.Tests/SecGate/AccessViaDenyMatrixTests.cs`,
+  `tools/sec/sec-report.ps1`, this handoff append.
+- The deny matrix maps all **13** `AccessVia` members (the U08 table's 11 plus
+  `Anonymous` (ADR 0154) and `Escalation` (M31·9/ESC) — the enum has grown
+  past U08's "all 11" line; the gate is written against the live enum, so the
+  next append without a pin fails `EveryAccessVia_HasANamedDenyTest`). Each maps to a deny-side pin
+  that exists in `tests/**` (e.g.
+  `Escalation → ESC_5_AcceptInbound_InvalidToken_Returns_Error_NoRow`).
+  The two E13 invariant tests (`EvaluateAudience_EmptyAudience_AllMode_Denies`,
+  `C2_Delegate_OutOfScope_Denies_WithDelegationViaRecorded`) are pinned by
+  `EmptyAudienceDenies_AndDelegationScope_ArePinned`.
+- `dotnet build` 0 errors; the 3 `SecGate` tests pass, and the full
+  `Kumunita.Web.Tests` suite (1296) is green (runner form: `dotnet exec
+  tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll`, the
+  `docs/dev/testing-and-ci.md` in-process path — `dotnet test -- -class`
+  reports "Zero tests ran / exit 5" on this machine).
+- `pwsh tools/sec/sec-report.ps1` prints the six baselines (9/24 · 25/65 · 7 ·
+  52 · 8 · 3).
+- Noticed: `Directory.EnumerateFiles` does not take `**` glob patterns (it
+  takes a filename pattern + `EnumerationOptions.RecurseSubdirectories`) —
+  `SecGateSource.AllSrcFiles` is documented to that effect for IS15/IS24/IS38b/
+  IS40.
+- Next: **IS05** (Sentry breadcrumb floor) is the first Phase A fix;
+  IS15/IS24/IS38b/IS40 reuse `SecGateSource`.
