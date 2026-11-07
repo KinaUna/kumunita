@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Posts;
 
 /// <summary>
@@ -34,6 +36,8 @@ namespace Kumunita.Core.Posts;
 /// is "add a translation of a language the post does not yet have."
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A; ADR 0022 user-added translations")]
 public sealed class PostTranslation
 {
     public string Id { get; set; } = string.Empty;

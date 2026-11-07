@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Posts;
 
 /// <summary>
@@ -11,6 +13,8 @@ namespace Kumunita.Core.Posts;
 /// <see cref="PostService.UpdateReplyAsync"/>, mirroring <c>Post.Modified</c>.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A")]
 public sealed class PostReply
 {
     public string Id { get; set; } = string.Empty;
