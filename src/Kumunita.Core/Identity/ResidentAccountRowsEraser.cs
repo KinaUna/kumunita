@@ -49,6 +49,34 @@ namespace Kumunita.Core.Identity;
 public static class ResidentAccountRowsEraser
 {
     /// <summary>
+    /// IS24 (S2/E2 gate) — the closed set of doc types <see cref="EraseAsync"/>
+    /// touches, one <c>typeof(T)</c> per query block in the same order (IS22's
+    /// 6 blocks 1–6, then IS23's 6 blocks 7–12), so the set and the queries sit
+    /// side by side (the part-vs-whole "one fact in one place" contract). The
+    /// <c>[DataClass]</c> rows (IS20b/IS20c) are the spec; this set is the
+    /// execution; <c>SecGate.DataClassCoverageTests</c> (the IS24 gate) asserts
+    /// the agreement.
+    /// </summary>
+    public static IReadOnlySet<Type> HandledTypes { get; } = new HashSet<Type>
+    {
+        typeof(SessionDoc),                   // IS22 — block 1: a session credential (IP + user agent)
+        typeof(IdentityToken),                // IS22 — block 2: verify/setup tokens
+        typeof(GuestAccess),                  // IS22 — block 3: a bounded guest standing
+        typeof(DelegationGrant),              // IS22 — block 4: either side (owner or delegate)
+        typeof(Notification),                 // IS22 — block 5: per-recipient read state
+        typeof(NotificationPreference),       // IS22 — block 5
+        typeof(NotificationSubscription),     // IS22 — block 5
+        typeof(NotificationQuietSchedule),    // IS22 — block 5
+        typeof(OutboxEmail),                  // IS22 — block 6: matched on Recipient == the resident's email
+        typeof(GuardianTimeLimitSchedule),    // IS23 — block 7: the child's time-limit schedule
+        typeof(GuardianEventRequest),         // IS23 — block 8: the child's event-approval requests
+        typeof(CommunityMembershipRequest),   // IS23 — block 9: the child's membership requests
+        typeof(ErrorReport),                  // IS23 — block 10: pseudonymized (SubjectId → tombstone, ContactEmail → null)
+        typeof(EscalationToken),              // IS23 — block 11: pseudonymized (CreatedBy → tombstone)
+        typeof(UsageEvent),                   // IS23 — block 12: pseudonymized (ActorId → tombstone)
+    };
+
+    /// <summary>
     /// Deletes the resident's identity-adjacent rows (see the class doc) in the
     /// caller's <paramref name="session"/> (C3 — no commit here). See the class
     /// doc for the owner-field matching, the <see cref="DelegationGrant"/>

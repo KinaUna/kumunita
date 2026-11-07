@@ -44,6 +44,50 @@ namespace Kumunita.Core.Identity;
 public static class ResidentContentEraser
 {
     /// <summary>
+    /// IS24 (S2/E2 gate) — the closed set of doc types <see cref="EraseAsync"/>
+    /// touches, one <c>typeof(T)</c> per query block in the same order, so the
+    /// set and the queries sit side by side (the part-vs-whole "one fact in one
+    /// place" contract). The <c>[DataClass]</c> rows (IS17–IS20, 81/81) are the
+    /// spec; this set is the execution; <c>SecGate.DataClassCoverageTests</c>
+    /// (the IS24 gate) asserts the agreement, so the next doc type that is
+    /// annotated <c>Delete</c>/<c>Pseudonymize</c> but not listed here — or
+    /// listed here but annotated <c>Keep</c> — fails the build.
+    /// </summary>
+    public static IReadOnlySet<Type> HandledTypes { get; } = new HashSet<Type>
+    {
+        typeof(Kumunita.Core.Posts.Post),                // IS21 — §2A primary set
+        typeof(Kumunita.Core.Posts.PostReply),           // IS21
+        typeof(Kumunita.Core.Posts.PostTranslation),     // IS21
+        typeof(Kumunita.Core.Posts.ReplyTranslation),    // IS21
+        typeof(Kumunita.Core.Announcements.Announcement),          // IS21
+        typeof(Kumunita.Core.Announcements.AnnouncementTranslation), // IS21
+        typeof(Kumunita.Core.Announcements.AnnouncementComment),    // IS21
+        typeof(Kumunita.Core.Events.Event),              // IS21
+        typeof(Kumunita.Core.Events.EventTranslation),   // IS21
+        typeof(Kumunita.Core.Events.EventRsvp),          // IS21
+        typeof(Kumunita.Core.Projects.Project),          // IS21
+        typeof(Kumunita.Core.Projects.ProjectGoal),      // IS21
+        typeof(Kumunita.Core.Projects.TodoItem),         // IS21
+        typeof(Kumunita.Core.Projects.TodoComment),      // IS21
+        typeof(Kumunita.Core.Projects.TodoTranslation),  // IS21
+        typeof(Kumunita.Core.Projects.BoardTranslation), // IS21
+        typeof(Kumunita.Core.Projects.ProjectTranslation), // IS21
+        typeof(Kumunita.Core.Projects.KanbanBoard),      // IS21 — cascade set (placements + lanes travel with it)
+        typeof(Kumunita.Core.Pages.Page),                // IS21
+        typeof(Kumunita.Core.Pages.PageTranslation),     // IS21
+        typeof(Kumunita.Core.Inventory.InventoryItem),   // IS21
+        typeof(Kumunita.Core.Documents.Document),        // IS21
+        typeof(Kumunita.Core.Documents.DocumentFolder),  // IS21
+        typeof(Kumunita.Core.Bookmarks.Bookmark),        // IS21
+        typeof(Kumunita.Core.Bookmarks.BookmarkFolder),  // IS21
+        typeof(Kumunita.Core.Tags.Tag),                  // IS21
+        typeof(Kumunita.Core.Tags.TagTranslation),       // IS21
+        typeof(Kumunita.Core.Media.MediaObject),         // IS21 — F1.U4 catalog rows (bytes are the composer's, §5)
+        typeof(Kumunita.Core.PersonalNotes.PersonalNote),    // IS21
+        typeof(Kumunita.Core.PersonalNotes.NoteFolder),      // IS21
+    };
+
+    /// <summary>
     /// Deletes the resident's §2A residential content docs (and the
     /// <c>MediaObject</c> catalog rows) in the caller's <paramref
     /// name="session"/> (C3 — no commit here). See the class doc for the

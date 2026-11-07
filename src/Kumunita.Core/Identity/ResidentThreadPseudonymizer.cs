@@ -52,6 +52,34 @@ namespace Kumunita.Core.Identity;
 public static class ResidentThreadPseudonymizer
 {
     /// <summary>
+    /// IS24 (S2/E2 gate) — the closed set of doc types <see cref="PseudonymizeAsync"/>
+    /// <b>erases</b> (its <c>Delete</c>/<c>Pseudonymize</c>-annotated rows), one
+    /// <c>typeof(T)</c> per such query block in the same order, so the set and the
+    /// queries sit side by side (the part-vs-whole "one fact in one place"
+    /// contract). The <c>[DataClass]</c> rows (IS20a) are the spec; this set is the
+    /// execution; <c>SecGate.DataClassCoverageTests</c> (the IS24 gate) asserts the
+    /// agreement.
+    /// <para>
+    /// <c>Conversation</c> and <c>GroupConversation</c> are deliberately
+    /// <b>absent</b>: they are <c>Erasure.Keep</c> rows (D3 — the other
+    /// participant's thread must stay). <see cref="PseudonymizeAsync"/> only
+    /// tombstones the resident's <i>seat</i> on them (the row itself survives),
+    /// which is <b>not an erasure of the row</b>; the gate's
+    /// <c>NoHandledType_IsMarkedKeep</c> test asserts the union of the three
+    /// <c>HandledTypes</c> sets is disjoint from the <c>Keep</c> rows ("a
+    /// <c>Keep</c> type is never eraser-handled"), so listing the two Keep rows
+    /// here would flag a false positive. This set is "the types this seam
+    /// erases", by the gate's own definition of "handled".
+    /// </para>
+    /// </summary>
+    public static IReadOnlySet<Type> HandledTypes { get; } = new HashSet<Type>
+    {
+        typeof(Message),                 // IS21 — 1:1 sent rows: body erased, sender tombstoned
+        typeof(GroupMessage),            // IS21 — group sent rows: body erased, sender tombstoned
+        typeof(GroupMessagingInvitation), // IS21 — pending invite to the resident deleted
+    };
+
+    /// <summary>
     /// The D3 rule (see the class doc) for one resident's threads, in the
     /// caller's <paramref name="session"/> (C3 — no commit here).
     /// </summary>
