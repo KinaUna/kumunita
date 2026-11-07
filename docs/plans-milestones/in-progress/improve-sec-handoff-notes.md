@@ -187,3 +187,41 @@ updated: 2026-11-07
   `IdentityServiceSignupPolicyTests` pass** (in-process runner, ~8 s).
 - Next: **IS08** — the seeder redaction (`FirstBootSeeder`,
   `SampleDataSeeder`) + the log-PII gate over `src/**/*.cs`.
+
+## IS08 — Redact the seeders + the log-PII gate (M4: 7 → 0)
+
+- **Files touched:** `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs`
+  (2 sites) and `SampleDataSeeder.cs` (1 site) — template label + address
+  argument only, zero behaviour change; `using Kumunita.Core.Logging;` added to
+  both (missing before). Plus `tests/Kumunita.Web.Tests/SecGate/
+  LogTemplatePiiGateTests.cs` (new, the gate) and this append.
+- **The 3 sites:** `FirstBootSeeder.cs:231` + `:297` (`{Email}` →
+  `{EmailDomain}`, arg → `LogRedact.EmailDomain(email)`; the `:297` site's
+  `{UserId}` is an id — left), `SampleDataSeeder.cs:2580` (`{Email}` →
+  `{EmailDomain}`; `{Name}` left). All carry the domain, never the address.
+- **The gate:** `NoLogTemplate_CarriesAPiiPlaceholder` walks `src/**/*.cs`
+  only (per the spec — `tests/` legitimately carries the sink probes, e.g.
+  `SentryBreadcrumbPiiTests`, and is out of scope). For each structured-log
+  call it walks to the matching close paren **respecting string literals and
+  line comments** (the line-wrap immunity: a template split across 2–3 lines
+  stays one span), then flags any placeholder that is **exactly a PII word**
+  (`Email`/`Ip`/`Phone`/`Address`/`Recipient`/`Body`, case-insensitive).
+  Id-shaped placeholders are excluded by construction — `{EmailDomain}`,
+  `{RecipientId}`, `{Idp}`, `{IdempotencyKey}`, `{UserId}`, `{MaxBodyChars}`
+  never equal a bare word. Allowlist is **empty** (a site that can't be
+  redacted is a recorded pause, not a silent exception).
+- **Verification:** `dotnet build` 0 errors. `grep "{Email}" Bootstrap/` →
+  **0**; `LogRedact.EmailDomain` in `Bootstrap/` → **3** (§2.4 anchor). Gate
+  **1/1 pass**; `AccessViaDenyMatrixTests` still **3/3** (harness intact).
+  **Bite-checked:** reverting `FirstBootSeeder.cs:231` to `'{Email}', email`
+  made the gate FAIL naming exactly `FirstBootSeeder.cs:231  {Email}` with a
+  redact-at-the-source message, then restored → green.
+- **One fix during the unit:** the call-span scanner first pre-seeded its paren
+  depth *and* counted the opening paren, so it swept to the next unrelated
+  string and swept up `{email}` from email-body *content* strings (not log
+  templates) — re-armed at the real `(` (depth 1 from `openParen+1`) and scoped
+  the scan to `src/`. The gate is now red exactly when a log template carries a
+  bare PII word.
+- Next: **IS09** — the trust-boundary + log-hygiene docs (B7 Sentry row, the B4
+  snippet note, and closing the PII half of the log-hygiene open item as
+  "decided and closed by IS08"; log-forging L8c stays open).

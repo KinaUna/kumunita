@@ -5,6 +5,7 @@ using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Inventory;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Logging;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -2576,7 +2577,7 @@ public static class SampleDataSeeder
         await session.SaveChangesAsync();
 
         if (logger is not null)
-            logger.LogDebug("Sample data: ensured account {Email} ({Name}).", email, displayName);
+            logger.LogDebug("Sample data: ensured account {EmailDomain} ({Name}).", LogRedact.EmailDomain(email), displayName);
         return existing;
     }
 
