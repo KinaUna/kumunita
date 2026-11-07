@@ -141,6 +141,7 @@ public sealed class ContentTargetResolver : IContentTargetResolver
     public async Task<(string? Title, string? Link)> ResolveForListAsync(
         string targetKind, string targetId, string actorId, string surface)
     {
+        // SEC-READ: caller-gated by BookmarkService / PersonalNoteService (owner-scoped bookmark/note lanes; the list lane is a title+link projection, ADR 0118 D5)
         if (!ContentTargetKinds.IsValid(targetKind, surface))
             return (null, null);
 
