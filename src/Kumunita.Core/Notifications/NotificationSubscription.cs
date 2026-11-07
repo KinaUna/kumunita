@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Notifications;
 
 /// <summary>
@@ -47,6 +49,8 @@ namespace Kumunita.Core.Notifications;
 /// <see cref="NotificationPreference"/>.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): the resident's own subscription (IS22)")]
 public sealed class NotificationSubscription
 {
     /// <summary>Surrogate PK; (RecipientId, Kind, TargetId) is the business key.</summary>
