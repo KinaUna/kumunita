@@ -107,3 +107,40 @@ updated: 2026-11-07
   IS40.
 - Next: **IS05** (Sentry breadcrumb floor) is the first Phase A fix;
   IS15/IS24/IS38b/IS40 reuse `SecGateSource`.
+
+
+## IS05 — Sentry breadcrumb floor (prove, then fix)
+
+- **First verification (the "drift pause" I almost filed) was wrong** — I
+  recorded it and corrected it. The members the plan names **do exist on the
+  6.12.1 `o =>` receiver**: `SentryAspNetCoreOptions` inherits
+  `MinimumBreadcrumbLevel` / `MinimumEventLevel` (`LogLevel`) from
+  `SentryLoggingOptions` in `Sentry.Extensions.Logging.dll` — a *different
+  assembly* than the `Sentry.dll` I initially reflected, so the whole-assembly
+  search missed them. The `Sentry.AspNetCore.xml` docs list only *declared*
+  members, not inherited ones. **Lesson:** check the base type of the receiver,
+  not just the assembly the receiver is declared in.
+- **The E3 premise is reachable at 6.12.1** — `UseSentry` registers the Sentry
+  logging integration (`SentryAspNetCoreLoggerProvider`,
+  `SentryAspNetCoreStructuredLoggerProvider`) in the runtime DI (verified by
+  enumeration of `app.Services`), so Information-level log lines **do** become
+  breadcrumbs on captured events when `SENTRY_DSN` is set. The two floor lines
+  are the right fix, not a no-op.
+- **Files touched:** `Program.cs` (the `UseSentry` block: added
+  `o.MinimumBreadcrumbLevel = LogLevel.Warning;` +
+  `o.MinimumEventLevel = LogLevel.Error;`, plus the three "vacuous" comment
+  corrections at `:443`, `:1372`, `:1449`); `SentryBreadcrumbPiiTests.cs` (new,
+  3 tests); this handoff append. `src/**` behavior unchanged beyond the floor.
+- **Verified:** the seam compiles against 6.12.1 (the `o =>` receiver
+  accepts both floor lines); the harness mirrors `Program.cs` (F10.U3 app-host
+  idiom) and observes the captured event through `SetBeforeSend` (the event's
+  `Breadcrumbs` is the public surface) + an in-memory `ITransport` (swallows,
+  nothing leaves the process).
+- **3/3 `SentryBreadcrumbPiiTests` pass** (the Information line with
+  `a@example.test` produces **no** breadcrumb and its value is not observable
+  on the captured event; the Warning line **does** become a breadcrumb with no
+  PII; `SentryPiiScrubber.Scrub` still redacts the header/cookie/query PII).
+  **F10.U3** still green (1/1). `dotnet build` 0 errors. `grep -n vacuous
+  src/Kumunita.Web/Program.cs` → **0 hits**.
+- Next: **IS06** (`LogRedact` helper) — the source-side fix for P-3, the
+  durable complement to this sink-side floor.
