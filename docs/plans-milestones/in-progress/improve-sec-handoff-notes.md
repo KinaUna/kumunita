@@ -535,3 +535,39 @@ updated: 2026-11-07
 - **Two pauses / corrections (not annotated):** `Profile` (Pseudonymize row names no principal field — the prompt's explicit "pause, not a guess" case) and `AdminOverride` (not a registered doc type — hand-rolled, no §2.5 row). Both are recorded above for the successor and the IS21/IS24 consumers.
 - **retentionKey convention:** the bare `RetentionOptions` field name (`OutboxBodyDays`, `DeadLetterDays`, `TokenDays`) — matching IS16's `DataClassAttribute` doc examples (`SessionDays`, `TokenDays`) — not the full `Retention__*` config key.
 - **Next unit:** IS18 (Posts / Announcements / Events / Pages / Tags / Moderation batch, copied verbatim from §2.5).
+
+## IS18a — Posts batch (4 types: `Post`, `PostReply`, `PostTranslation`, `ReplyTranslation`)
+
+- **Files (4):** `Posts/Post.cs`, `Posts/PostReply.cs`, `Posts/PostTranslation.cs`, `Posts/ReplyTranslation.cs`. Each gains one `[DataClass]` + `using Kumunita.Core.Privacy;`; no new method, no DI, no behaviour.
+- **Values (verbatim §2.5):** all four `PrivateContent/Delete/Resident`, no `retentionKey` (every §2.5 Retention-key cell is `—`), no `principalField`. Reasons: `Post` "F1 §2A: resident-authored content"; `PostReply` "F1 §2A"; `PostTranslation` "F1 §2A; ADR 0022 user-added translations"; `ReplyTranslation` "F1 §2A; ADR 0022".
+- **Tests:** none (IS17–IS19 are "no test" per design §2.3). `grep -c "\[DataClass("` over the 4 files → **4**. `dotnet build` (solution) → **0 errors**.
+
+## IS18b — Announcements batch (3 types: `Announcement`, `AnnouncementTranslation`, `AnnouncementComment`)
+
+- **Files (3):** `Announcements/Announcement.cs`, `Announcements/AnnouncementTranslation.cs`, `Announcements/AnnouncementComment.cs`.
+- **Values (verbatim §2.5):** all three `PrivateContent/Delete/Resident`. Reasons: `Announcement` "F1 §2A" with the §2.5 condition carried in the reason text ("condition: `AuthorId == resident`; platform `AuthorId == ""` are kept"); `AnnouncementTranslation` "F1 §2A"; `AnnouncementComment` "F1 §2A: the resident's comments".
+- **Tests:** none. `grep -c` over the 3 files → **3**. `dotnet build` → **0 errors**.
+
+## IS18c — Events batch (4 types: `Event`, `EventTranslation`, `EventRsvp`, `GuardianEventRequest`)
+
+- **Files (4):** `Events/Event.cs`, `Events/EventTranslation.cs`, `Events/EventRsvp.cs`, `Events/GuardianEventRequest.cs`.
+- **Values (verbatim §2.5):** `Event`/`EventTranslation`/`EventRsvp` `PrivateContent/Delete/Resident` — reasons "F1 §2A", "F1 §2A; ADR 0059", "F1 §2A: the resident's own RSVPs (not the event's authorship)"; `GuardianEventRequest` `AuditModeration/Delete/Never` reason "IS23: a child's event request is the child's data".
+- **Tests:** none. `grep -c` over the 4 files → **4**. `dotnet build` → **0 errors**.
+
+## IS18d — Pages + Tags batch (4 types: `Page`, `PageTranslation`, `Tag`, `TagTranslation`)
+
+- **Files (4):** `Pages/Page.cs`, `Pages/PageTranslation.cs`, `Tags/Tag.cs`, `Tags/TagTranslation.cs`.
+- **Values (verbatim §2.5):** all four `PrivateContent/Delete/Resident`. Reasons: `Page` "F1 §2A: the resident's blog pages"; `PageTranslation` "F1 §2A; the E6 gap this lane closes (IS31)"; `Tag` "F1 §2A: the tags the resident created"; `TagTranslation` "F1 §2A: user-added tag translations".
+- **Tests:** none. `grep -c` over the 4 files → **4**. `dotnet build` → **0 errors**.
+
+## IS18e — Moderation (1 type: `Report`)
+
+- **Files (1):** `Posts/Report.cs` (a Moderation-type row that lives under `Posts/`, per the plan's file map). No hand-rolled data-class comment in the file was found (superseded-comment check: none).
+- **Values (verbatim §2.5):** `AuditModeration/Pseudonymize/Never`, `principalField: "ReporterId"` (the field exists on the class, verified). Reason: "F1 §2C decision (now decided): moderation state, not authored content (IS23); M27 C-M27·3 excludes it from the delete set". Satisfies IS16's `Pseudonymize_RequiresPrincipalField` invariant.
+- **Tests:** none. `grep -c` over `Report.cs` → **1**. `dotnet build` → **0 errors**.
+
+## IS18 — batch summary (16 of the 16 listed types annotated)
+
+- **Total:** `grep -rc "\[DataClass(" src --include="*.cs"` → **34** (18 after IS17 + 16 here). Every annotated file has exactly one `using Kumunita.Core.Privacy;`. 15 `Delete` rows + 1 `Pseudonymize` row (`Report`); no `Keep` rows, no `retentionKey` in the batch (every §2.5 cell `—`), `principalField` only on `Report`.
+- **No pauses, no corrections:** every §2.5 row was present and unambiguous; no hand-rolled data-class comment superseded. No test added, no eraser/export touched, no type outside the batch annotated. `dotnet build` (solution) → **0 errors** (160 warnings, all pre-existing route/nullable warnings in `Kumunita.Web` — unchanged by this lane).
+- **Next unit:** IS19 (Projects / Documents / Bookmarks / Inventory / PersonalNotes / Media / Kiosk batch, copied verbatim from §2.5).
