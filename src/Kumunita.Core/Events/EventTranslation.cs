@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Events;
 
 /// <summary>
@@ -35,6 +37,8 @@ namespace Kumunita.Core.Events;
 /// <c>Add</c> lane again).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A; ADR 0059")]
 public sealed class EventTranslation
 {
     public string Id { get; set; } = string.Empty;

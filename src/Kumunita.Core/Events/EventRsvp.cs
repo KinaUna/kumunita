@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Events;
 
 /// <summary>
@@ -35,6 +37,8 @@ public enum RsvpStatus
 /// <c>GetMyRsvpAsync</c> split, U03).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A: the resident's own RSVPs (not the event's authorship)")]
 public sealed class EventRsvp
 {
     public string Id { get; set; } = string.Empty;
