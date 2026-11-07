@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Projects;
 
 /// <summary>
@@ -15,6 +17,8 @@ namespace Kumunita.Core.Projects;
 /// BoardId)</c> — a to-do appears on a board at most once.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "F1 §2A sub-entities: under `KanbanBoard`")]
 public sealed class BoardItemPlacement
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)
