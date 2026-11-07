@@ -616,3 +616,65 @@ updated: 2026-11-07
 - **Pause:** `InventoryCheckout` left unannotated (no principal field named in §2.5 — IS17 `Profile` precedent; `BorrowerId` is the candidate for the owner / IS21). No hand-rolled data-class comment was superseded in any file (none carried one, verified per the plan).
 - **No test added, no eraser/export touched, no type outside the batch annotated.** `dotnet build` (solution) → **0 errors** (160 warnings, all pre-existing — unchanged by this lane).
 - **Next unit:** IS20 (Messaging / GroupMessaging / Notifications / Sessions / Usage / ErrorReports / SiteContent / SurfaceLabels / Escalation / Onboarding / Community* batch — **plus** the `EveryRegisteredDocType_HasADataClass` 81/81 coverage gate; note `InventoryCheckout` and IS17's `Profile` will both need resolution before that gate can go green).
+
+## IS20a — Messaging + GroupMessaging threads (4 types: `Conversation`, `Message`, `GroupConversation`, `GroupMessage`)
+
+- **Files (4):** `Messaging/Conversation.cs`, `Messaging/Message.cs`, `GroupMessaging/GroupConversation.cs`, `GroupMessaging/GroupMessage.cs`.
+- **Values (verbatim §2.5):** `Conversation` `PrivateContent/Keep/Resident` reason "D3: the other participant's thread must stay coherent; IS21's `ResidentThreadPseudonymizer` does the tombstone"; `Message` `PrivateContent/Pseudonymize/Resident` reason "D3: 1:1 direct messages survive under the tombstone, not deleted (IS21)" `principalField: "SenderId"`; `GroupConversation` `PrivateContent/Keep/Resident` reason "D3: group threads stay for the other participants (IS21)"; `GroupMessage` `PrivateContent/Pseudonymize/Resident` reason "D3 (IS21); shipped after F1 — the E2 gap this lane closes" `principalField: "SenderId"`.
+- **Tests:** none (pure annotation). `grep -c "[DataClass("` over the 4 files → **4**. `dotnet build` → **0 errors**.
+
+## IS20b — Invitation + 3 Notifications (4 types: `GroupMessagingInvitation`, `Notification`, `NotificationPreference`, `NotificationSubscription`)
+
+- **Files (4):** `GroupMessaging/GroupMessagingInvitation.cs`, `Notifications/Notification.cs`, `Notifications/NotificationPreference.cs`, `Notifications/NotificationSubscription.cs`.
+- **Values (verbatim §2.5):** `GroupMessagingInvitation` `PrivateContent/Delete/Never` reason "an invitation to a thread; deleting the account drops the pending invite (IS21)"; `Notification` `Operational/Delete/Never` reason "F1 §2C decision (now decided): received per-resident state, not authored (IS22); D6: read 90 days, unread 365 days" `retentionKey: "NotificationUnreadDays"` (the **unread** key — the longer-living, per the prompt's convention: the attribute takes a single key, so the read key 90 stays in the reason text verbatim); `NotificationPreference` `Operational/Delete/Never` reason "F1 §2C decision (now decided): the resident's own preference (IS22)"; `NotificationSubscription` `Operational/Delete/Never` reason "F1 §2C decision (now decided): the resident's own subscription (IS22)".
+- **Tests:** none. `grep -c` over the 4 files → **4**. `dotnet build` → **0 errors**.
+
+## IS20c — QuietSchedule + SessionDoc + Usage (4 types: `NotificationQuietSchedule`, `SessionDoc`, `UsageEvent`, `CommunityStorageSettings`)
+
+- **Files (4):** `Notifications/NotificationQuietSchedule.cs`, `Sessions/SessionDoc.cs`, `Usage/UsageEvent.cs`, `Usage/CommunityStorageSettings.cs`.
+- **Values (verbatim §2.5):** `NotificationQuietSchedule` `Operational/Delete/Never` reason "F1 §2C decision (now decided): the resident's own schedule (IS22)"; `SessionDoc` `Pii/Delete/Never` reason "F1 §2C decision (now decided): a session credential, not content; D6: 30 days after revoke or expiry" `retentionKey: "SessionDays"`; `UsageEvent` `Operational/Pseudonymize/Never` reason "F1 §2C excluded (per-user storage row / usage history): derived metrics, not content; the resident's identity is erased, the metric stays (IS23)" `principalField: "ActorId"`; `CommunityStorageSettings` `Operational/Keep/Never` reason "the community's storage cap; no resident principal" (per §2.5, not the prompt-table's "a sample of platform storage" — §2.5 is the source of truth).
+- **Tests:** none. `grep -c` over the 4 files → **4**. `dotnet build` → **0 errors**.
+- **Note:** the `CommunityStorageSettings` reason fix was landed and committed inside IS20f's commit (the `git commit --amend --no-edit` amended HEAD, which at that point was IS20f — the file content is correct either way; this is a commit-attribution detail, not a code defect).
+
+## IS20d — StorageSample + ErrorReports (4 types: `StorageMetricsSample`, `ErrorReport`, `EscalationToken`, `EscalationOutboundConfig`)
+
+- **Files (4):** `Usage/StorageMetricsSample.cs`, `ErrorReports/ErrorReport.cs`, `ErrorReports/EscalationToken.cs`, `ErrorReports/EscalationOutboundConfig.cs`.
+- **Values (verbatim §2.5):** `StorageMetricsSample` `Operational/Keep/Never` reason "a sample of platform storage; no resident principal"; `ErrorReport` `AuditModeration/Pseudonymize/Never` reason "F1 §2C decision (now decided): an operator-facing report the resident filed (IS23); D6: 180 days after resolution" `retentionKey: "ErrorReportDays"` `principalField: "SubjectId"`; `EscalationToken` `Secret/Pseudonymize/Never` reason "F1 §2C decision (now decided): an operator credential, but the `CreatedBy` is the resident's (IS23); D6: 7 days after revocation or expiry" `retentionKey: "TokenDays"` `principalField: "CreatedBy"`; `EscalationOutboundConfig` `Secret/Keep/Never` reason "the outbound webhook config; the `Token` is an operator secret, not a resident PII field".
+- **Tests:** none. `grep -c` over the 4 files → **4**. `dotnet build` → **0 errors**.
+
+## IS20e — SiteContent + SurfaceLabels (4 types: `SiteContent`, `SiteContentTranslation`, `SurfaceLabels`, `SurfaceLabelTranslation`)
+
+- **Files (4):** `SiteContent/SiteContent.cs`, `SiteContent/SiteContentTranslation.cs`, `SurfaceLabels/SurfaceLabels.cs`, `SurfaceLabels/SurfaceLabelTranslation.cs`.
+- **Values (verbatim §2.5):** all four `Platform/Keep/InstanceOnly`. Reasons: `SiteContent` "F1 §2C excluded: platform singletons, not resident content"; `SiteContentTranslation` "F1 §2C excluded: the site's hero text per language"; `SurfaceLabels` "F1 §2C excluded: the admin's surface labels"; `SurfaceLabelTranslation` "F1 §2C excluded: the labels per language".
+- **Tests:** none. `grep -c` over the 4 files → **4**. `dotnet build` → **0 errors**.
+
+## IS20f — Community / UserInfo edges (4 types: `CommunityMembershipRequest`, `GroupInvitation`, `GroupJoinRequest`, `GroupTranslation` + `CommunityTranslation`)
+
+- **Files (4, the last holds 2 types):** `UserInfo/CommunityMembershipRequest.cs`, `UserInfo/GroupInvitation.cs`, `UserInfo/GroupJoinRequest.cs`, `UserInfo/Translations.cs`.
+- **Values (verbatim §2.5):** `CommunityMembershipRequest` `AuditModeration/Delete/Never` reason "IS23: the request is the resident's; deleting the account drops it"; `GroupInvitation` `AuditModeration/Delete/Never` reason "F1 §2C decision (now decided): an identity-graph edge received; the row is stale once the account is gone"; `GroupJoinRequest` `AuditModeration/Delete/Never` reason "F1 §2C decision (now decided): an identity-graph edge submitted; the row is stale once the account is gone"; `GroupTranslation` `PrivateContent/Keep/InstanceOnly` reason "F1 §2A sub-entities: under `Group`; carries only `GroupId` + `LanguageCode`, no principal field (the `Group` row's `Keep(reason)` is what governs it)"; `CommunityTranslation` `PrivateContent/Keep/InstanceOnly` reason "F1 §2A sub-entities: under `Group`/`Component`; carries only `GroupId`/`ComponentId` + `LanguageCode`, no principal field".
+- **Tests:** none. `grep -c` over the 4 files → **5** (Translations.cs counts 2). `dotnet build` → **0 errors**.
+
+## IS20g — the platform onboarding singleton (1 type: `AdminOnboarding`)
+
+- **Files (1):** `AdminOnboarding/AdminOnboarding.cs`.
+- **Values (verbatim §2.5):** `AdminOnboarding` `Platform/Keep/Never` reason "the platform's onboarding state; the `CompletedAt` is an operator timestamp".
+- **Tests:** none. `grep -c` over the file → **1**. `dotnet build` → **0 errors**.
+
+## IS20h — the P-1 coverage gate (`EveryRegisteredDocType_HasADataClass`)
+
+- **File (1 new):** `tests/Kumunita.Core.Tests/DataClassCoverageTests.cs`.
+- **Location decision:** the plan's §2.3 names the gate in `tests/Kumunita.Web.Tests/SecGate/DataClassCoverageTests.cs`, but IS16 landed its sibling catalog tests in `tests/Kumunita.Core.Tests/DataClassCatalogTests.cs`. **Chose the Core.Tests location for consistency** (the gate exercises `DataClassCatalog.For`/`All`, which live in Core; both test projects reference `Kumunita.Core`, so either compiles). D7's "gates live in SecGate" refers to the *other* gates (M1/M4/M7/inline-handler); this is the one P-1 coverage gate that belongs with the catalog tests it exercises. Recorded here per the plan.
+- **Form (a) — red gate, chosen.** The assertion is strict (all 81 covered) and the test currently **fails**, naming the two unresolved pauses. It does **not** hard-code 79. D7: "start from the measured baseline and retire it to zero; never freeze it."
+- **How it enumerates the 81:** builds one `StoreOptions`, calls the `Configure(StoreOptions)` method on each of the 24 `*DocTypes` classes via reflection, then reads `IReadOnlyStoreOptions.AllKnownDocumentTypes().Select(dt => dt.DocumentType)` (Marten 9.50.2; `PortabilityDocTypes` is excluded — it has no `Configure`, its rows are an inventory map, not Marten registrations). **Registered set = exactly 81** (verified: `grep -rhoE 'Schema.For<[^>]+>' src/Kumunita.Core --include=*.cs | sort -u` = 82, minus 1 false positive `Schema.For</c>` from a doc comment = 81).
+- **Result: RED, 79/81, naming exactly the two pauses.** Failure message: `Uncovered: Kumunita.Core.Inventory.InventoryCheckout, Kumunita.Core.UserInfo.Profile`. This is the *correct, expected* state — IS17 paused `Profile` and IS19 paused `InventoryCheckout`, both `Pseudonymize` rows naming no principal field, so annotating them would throw on IS16's `Pseudonymize_RequiresPrincipalField`. **IS21 must resolve both** (name the principal field: `BorrowerId` for `InventoryCheckout` is the candidate; `Profile` candidates per IS17 — §2.6 Rule 3 blanked PII `Email`/`Phone`/`Address`), at which point the gate moves 79 → 81.
+- **Tests:** `DataClassCatalogTests` (IS16, 3 tests) → **green**. `DataClassCoverageTests.EveryRegisteredDocType_HasADataClass` → **red** (by design). `dotnet build` (solution) → **0 errors**.
+
+## IS20 — batch summary (26 of the 26 listed types annotated, gate landed red at 79/81)
+
+- **Total:** `grep -rc "\[DataClass(" src --include="*.cs"` → **79** (53 after IS19 + 26 here). Every annotated file has exactly one `using Kumunita.Core.Privacy;` (verified: none of the 25 files imported it before). `Translations.cs` carries **2** attributes + 1 `using`.
+- **Batch shape (26 rows):** 9 `Delete` + 12 `Keep` (all with non-empty `reason`) + 5 `Pseudonymize`. **Exactly 5 `principalField`** rows in the batch: `Message`→`SenderId`, `GroupMessage`→`SenderId`, `UsageEvent`→`ActorId`, `ErrorReport`→`SubjectId`, `EscalationToken`→`CreatedBy` — **each verified to name a field that exists on its POCO** (checked against the class body before writing). **Exactly 4 `retentionKey`** rows in the batch: `Notification`→`NotificationUnreadDays` (the unread key; read key 90 kept in the reason), `SessionDoc`→`SessionDays`, `ErrorReport`→`ErrorReportDays`, `EscalationToken`→`TokenDays` — all bare `RetentionOptions` field names (design §2.2), not `Retention__*` config keys. No `Delete`/`Keep` row carries a `principalField`.
+- **Conventions held (per `/memories/repo/dataclass-annotation-convention.md`):** `reason:` verbatim from §2.5; `retentionKey` = bare `RetentionOptions` field name; `principalField` Pseudonymize-only and field-verified. One §2.5-vs-prompt-table drift found and resolved in favor of §2.5: `CommunityStorageSettings` reason is "the community's storage cap; no resident principal" (not the prompt's "a sample of platform storage").
+- **Paused (not annotated, per the plan — do not resolve here):** `Profile` (IS17) and `InventoryCheckout` (IS19) both stay unannotated; the gate names them. No hand-rolled data-class comment was superseded in any of the 25 files (verified: none carried one before).
+- **No eraser/export touched, no paused type annotated, no type outside the 26 annotated, no new behaviour.** `dotnet build` (solution) → **0 errors** (160 warnings, all pre-existing — unchanged by this lane).
+- **Splits landed as one commit each:** IS20a (4 files) → IS20b (4) → IS20c (4) → IS20d (4) → IS20e (4) → IS20f (4) → IS20g (1) → IS20h (1 gate file). All within D8's ≤ 4 files.
+- **Next unit:** IS21 (Erasure: pseudonymize 1:1 and group threads, D3) — the unit that must also **resolve the two pauses** (`Profile`, `InventoryCheckout`) by naming their principal fields, so IS20h's gate can move 79 → 81.
