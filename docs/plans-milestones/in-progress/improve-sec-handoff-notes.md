@@ -144,3 +144,27 @@ updated: 2026-11-07
   src/Kumunita.Web/Program.cs` → **0 hits**.
 - Next: **IS06** (`LogRedact` helper) — the source-side fix for P-3, the
   durable complement to this sink-side floor.
+
+
+## IS06 — LogRedact helper
+
+- **Files touched:** `src/Kumunita.Core/Logging/LogRedact.cs` (new, pure
+  BCL-only static class next to `LogLine`) and
+  `tests/Kumunita.Core.Tests/LogRedactTests.cs` (new, 3 tests). This handoff
+  append. The Web project is **untouched** (IS06 is pure Core) — no Web test
+  run required.
+- **Two members (design §2.2):** `EmailDomain(string?)` → lower-cased domain
+  after the `@`, `"(none)"` for null/empty/no-`@`/empty-local/empty-domain,
+  local part never returned. `Hash8(string?)` → first 8 lowercase-hex chars of
+  SHA-256 (UTF-8 bytes), `"(none)"` for null/empty (the pinned sentinel, made
+  total). Nothing retained; both return a total `string`.
+- **3/3 `LogRedactTests` pass** (`EmailDomain_ReturnsDomainOnly`,
+  `EmailDomain_NullOrMalformed_IsNone`, `Hash8_IsStableAndShort`). `dotnet
+  build` 0 errors. §2.4 anchors present; helper carries no PII literal and no
+  `System.Text.Json` (the doctest examples were reworded so the DoD grep is
+  clean).
+- **One correction during the unit:** the `Hash8` hex-check assertion was
+  first written with a malformed boolean expression — replaced with a clean
+  per-char `('0'-'9' | 'a'-'f')` guard before it could mis-pin.
+- Next: **IS07** — the consumer side, redacting the 4 `IdentityService` /
+  `SmtpSender` templates to `{UserId}` + `{EmailDomain}` / `{RecipientHash}`.
