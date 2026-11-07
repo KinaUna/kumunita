@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Announcements;
 
 /// <summary>
@@ -46,6 +48,8 @@ namespace Kumunita.Core.Announcements;
 /// carries (C-M5·7) is deliberately absent here.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A: the resident's comments")]
 public sealed class AnnouncementComment
 {
     public string Id { get; set; } = string.Empty;

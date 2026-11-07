@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Announcements;
 
 /// <summary>
@@ -47,6 +49,8 @@ namespace Kumunita.Core.Announcements;
 /// have."
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A")]
 public sealed class AnnouncementTranslation
 {
     public string Id { get; set; } = string.Empty;
