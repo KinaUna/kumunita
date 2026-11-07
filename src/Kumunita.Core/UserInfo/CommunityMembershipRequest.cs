@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.UserInfo;
 
 /// <summary>
@@ -60,6 +62,8 @@ public enum CommunityMembershipRequestStatus
 /// <c>RequestedBy</c>.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Delete, ExportScope.Never,
+    reason: "IS23: the request is the resident's; deleting the account drops it")]
 public sealed class CommunityMembershipRequest
 {
     /// <summary>Surrogate PK; (ComponentId, UserId) is the business key

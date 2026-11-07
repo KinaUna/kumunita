@@ -10,7 +10,7 @@ namespace Kumunita.Core.Usage;
 /// cref="PerUserQuotaBytes"/> <c>0</c> ⇒ unlimited.
 /// </summary>
 [DataClass(DataClassKind.Operational, Erasure.Keep, ExportScope.Never,
-    reason: "a sample of platform storage; no resident principal")]
+    reason: "the community's storage cap; no resident principal")]
 public sealed class CommunityStorageSettings
 {
     public string Id { get; set; } = "community";

@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.UserInfo;
 
 /// <summary>
@@ -38,6 +40,8 @@ public enum InvitationStatus
 /// add/remove (invariant C3, same transaction as the state write).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): an identity-graph edge received; the row is stale once the account is gone")]
 public sealed class GroupInvitation
 {
     /// <summary>Surrogate PK; (GroupId, UserId) remains the business key (unique index).</summary>
