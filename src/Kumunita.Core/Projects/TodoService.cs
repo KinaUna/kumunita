@@ -459,6 +459,7 @@ public partial class TodoService : ProjectsStore, ITodoService
 
     public async Task<TodoItem> CreateTodoAsync(string actorId, IReadOnlySet<string> actorRoles, CreateTodoRequest request, CancellationToken ct = default)
     {
+        // SEC-READ: no disclosure — a write lane whose only audience-type read is the blocker's presence check (existence / not-soft-deleted, no field is read or exposed); standing is in-method (the create lane's CheckTodoStanding shape).
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrEmpty(actorId))
             throw new UnauthorizedAccessException("An acting actor is required to create a to-do.");
@@ -543,6 +544,7 @@ public partial class TodoService : ProjectsStore, ITodoService
 
     public async Task<TodoItem> UpdateTodoAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, UpdateTodoRequest request, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the load is followed by the in-method standing gate CheckTodoStanding (creator ∪ assignee ∪ GlobalAdmin, C-M5·6, TodoService.cs:566), then the write.
         if (string.IsNullOrEmpty(todoItemId)) throw new KeyNotFoundException("A to-do id is required.");
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to edit a to-do.");
@@ -811,6 +813,7 @@ public partial class TodoService : ProjectsStore, ITodoService
 
     public async Task<IReadOnlyList<TodoTranslation>> GetTodoTranslationsAsync(string todoItemId)
     {
+        // SEC-READ: caller-gated by TodosController.Detail / the feed reads — the parent to-do's single Read decision (GetTodoAsync's CanAsync(Read) / the feed's CanSeeAsync) already ran before the caller reads this seam (C-M3·1: a translation carries no own audience, it inherits the parent's decision).
         if (string.IsNullOrEmpty(todoItemId))
             throw new ArgumentException("A to-do id is required.", nameof(todoItemId));
 

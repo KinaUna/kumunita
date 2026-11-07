@@ -255,6 +255,7 @@ public partial class EventService
     /// author.</exception>
     public async Task<Event> UpdateGroupEventAsync(string eventId, string actorId, GroupEventUpdate update, IDocumentSession session, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the load is followed by the in-method author gate (GE·4: author-only, GlobalAdmin explicitly denied; EventService.Group.cs:275-276).
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
         ArgumentNullException.ThrowIfNull(update);
         if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to edit a group event.");

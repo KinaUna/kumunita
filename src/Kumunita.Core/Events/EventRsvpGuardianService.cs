@@ -88,6 +88,7 @@ public sealed class EventRsvpGuardianService : IEventRsvpGuardian
     /// stored, the guardians are notified).</exception>
     public async Task<EventRsvp> RsvpAsync(string eventId, string actorId, RsvpStatus status, CancellationToken ct = default)
     {
+        // SEC-READ: no disclosure — a write lane with no audience-bearing read: standing is in-method (any signed-in resident, the M4_RsvpWritesNoAccessAuditRow pin — the lane deliberately does not route standing through IAuthorizationService), and the only store reads are the event's presence + the actor's own GuardianLink/Profile rows.
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
         if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to RSVP.");
 
@@ -327,6 +328,7 @@ public sealed class EventRsvpGuardianService : IEventRsvpGuardian
     public async Task<GuardianEventRequest> ApproveEventRsvpAsync(
         string eventId, string childId, string guardianId, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the standing gate is in-method (GuardianEventLinkAsync's active-link check, EventRsvpGuardianService.cs:340) before the event/request reads; the lane is the guardian's own scope (a write, not a content read — ADR 0028 G·1).
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
         if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
         if (string.IsNullOrEmpty(guardianId)) throw new UnauthorizedAccessException("A guardian id is required.");
@@ -417,6 +419,7 @@ public sealed class EventRsvpGuardianService : IEventRsvpGuardian
     public async Task<GuardianEventRequest> DenyEventRsvpAsync(
         string eventId, string childId, string guardianId, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the standing gate is in-method (GuardianEventLinkAsync's active-link check, EventRsvpGuardianService.cs:431) before the event/request reads; the lane is the guardian's own scope (a write, not a content read — ADR 0028 G·1).
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
         if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
         if (string.IsNullOrEmpty(guardianId)) throw new UnauthorizedAccessException("A guardian id is required.");
@@ -482,6 +485,7 @@ public sealed class EventRsvpGuardianService : IEventRsvpGuardian
     public async Task VetoEventRsvpAsync(
         string eventId, string childId, string guardianId, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the standing gate is in-method (GuardianEventLinkAsync's active-link check, EventRsvpGuardianService.cs:497) before the event/RSVP reads; the lane is the guardian's own scope (a write, not a content read — ADR 0028 G·1).
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
         if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
         if (string.IsNullOrEmpty(guardianId)) throw new UnauthorizedAccessException("A guardian id is required.");
@@ -534,6 +538,7 @@ public sealed class EventRsvpGuardianService : IEventRsvpGuardian
     public async Task<IReadOnlyList<GuardianEventRequest>> GetPendingEventRsvpRequestsAsync(
         string childId, CancellationToken ct = default)
     {
+        // SEC-READ: caller-gated by GuardianController.Detail — that action runs ActiveLinkAsync(subject, childId) (the guardian's active-link standing, GuardianController.cs:129) before this seam; a non-guardian learns nothing.
         if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
 
         await using var session = _store.QuerySession();
@@ -557,6 +562,7 @@ public sealed class EventRsvpGuardianService : IEventRsvpGuardian
     public async Task<IReadOnlyList<EventRsvp>> GetChildRsvpsAsync(
         string childId, CancellationToken ct = default)
     {
+        // SEC-READ: caller-gated by GuardianController.Detail — that action runs ActiveLinkAsync(subject, childId) (the guardian's active-link standing, GuardianController.cs:129) before this seam; a non-guardian learns nothing.
         if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
 
         await using var session = _store.QuerySession();
