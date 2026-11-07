@@ -49,3 +49,32 @@ updated: 2026-11-07
 - IS03 builds the §2.5 table on top of §2.2's `[DataClass]`/retention keys
   and §2.3's test-name contract; the signature text in §2.2 is the
   implementing contract for IS05–IS42.
+
+## IS03 — Design doc Part 2b
+
+- Appended to `docs/design/improve-sec-design.md`: `## Part 2b` with
+  §2.5 (**81 rows**, one per `Schema.For<T>` registration across the 27
+  `*DocTypes.cs` files — the plan's `81` is confirmed by count) and
+  §2.6 (the `ContentFree` strip table over the 44 M11 types).
+- Per-class breakdown of the 81: a **3** · b **41** · c **14** · d **3**
+  · e **1** · operational **10** · platform **9**. Every principal-bearing
+  type has a non-empty erasure value; 20 `Keep(reason)` rows are platform
+  singletons / cascade sub-entities / `Group` (ADR 0142) / D3 thread
+  coherence (`Conversation`, `GroupConversation`).
+- F1 §2C "decision" rows all decided per D2/D3/D6: Notifications ×4,
+  `DelegationGrant`, `GuestAccess`, `IdentityToken`, `SessionDoc` →
+  `Delete`; `Report`, `ErrorReport`, `EscalationToken`, `UsageEvent` →
+  `Pseudonymize`; resident-owned `Group` → `Keep` (ADR 0142).
+- §2.6 leaves **8 `// TODO ❓` rows** (owner decision, IS27 defaults to
+  skip): `DelegationGrant`, `GroupInvitation`, `GroupJoinRequest`,
+  `GuardianLink`, `Report` (class c); `Notification`, `NotificationPreference`,
+  `NotificationSubscription` (recipient inbox). 27 `PrivateContent` types
+  omitted, 7 of those audience-bearing (public rows stay), `Profile` PII
+  fields (`Email`/`Phone`/`Address`) blanked, 8 always-present
+  (structural/public).
+- Next: **IS04** builds the deny-matrix gate harness; **IS16–IS20**
+  annotate the 81 types with `[DataClass]` **verbatim from §2.5** (the
+  table is the single fact IS16's `DataClassAttribute` and IS24's
+  agreement gate check against).
+- `improve-check.ps1` ALL GATES PASS. No code touched, no build run
+  (design-only unit).

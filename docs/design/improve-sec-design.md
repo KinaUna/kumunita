@@ -408,3 +408,189 @@ name is the anchor) or one of these greps — either way the drift is caught.
 | IS40 | `EveryRow_HasASeamLink_ThatResolves` + `EveryCodeRow_NamesAPinningTestThatExists` + `EveryOpsRow_LinksARunbookThatExists` |
 | IS41 | the four-rule sentence in `AGENTS.md` (or `docs/start/agent.md`); `data-classes.md` pointer to `[DataClass]` + §2.5; the U23 "credential = token row id" correction in `decisions-open-items.md` |
 | IS42 | `docs/ops/owner-ops-ledger.md` — the `last verified` table column; linked from `docs/ops/hardening-checklist.md` + `docs/SECURITY.md` |
+
+## Part 2b — the data-class policy table (IS03)
+
+One policy row per **registered** doc type (81) plus the `ContentFree`
+export-strip table. This is the table IS16–IS20 annotate **verbatim** onto
+each type via `[DataClass]` (IS16), and IS24's agreement gate checks against.
+The class labels follow
+[`docs/security/data-classes.md`](../security/data-classes.md)
+(a–e + operational/platform); the erasure and export values use the enum
+members §2.2 names (`DataClassKind` / `Erasure` / `ExportScope`); the
+retention-key names use §2.2's `RetentionOptions` record.
+
+**Defaults applied (per the plan's decisions):**
+
+- **D2** — erasure and export are declared on the type itself; a row here
+  is the single fact IS16–IS20 copy verbatim.
+- **D3** — resident-sent `Message` / `GroupMessage` are **pseudonymized**
+  (body erased, sender → `deleted:{id}`), not deleted; the `Conversation`
+  / `GroupConversation` rows are **kept** so the other participants' threads
+  stay coherent.
+- **D6** — retention keys are the §2.2 `RetentionOptions` fields; `0` means
+  keep indefinitely; a type that is `Delete`-erased or a platform singleton
+  needs no key.
+- **Every F1 §2C "decision" row is decided here** (the rows named in
+  F1 §2C — [`prod-hardening-f1-gdpr-deletion.md` §2C](prod-hardening-f1-gdpr-deletion.md))
+  carry an explicit `Delete` / `Pseudonymize` / `Keep(reason)` value in the
+  erasure column below; none is left as "excluded (default)".
+
+### §2.5 — One row per registered doc type (81)
+
+The 81 types are the deduplicated set of `Schema.For<T>` registrations
+across every `*DocTypes.cs` under `src/Kumunita.Core` (27 files, IS20's
+coverage gate reflects over these — the plan's `81` is confirmed by count).
+
+| Type | Class | Erasure | Export | Retention key | Reason |
+|---|---|---|---|---|---|
+| `Profile` | a | Pseudonymize | Resident | — | F1 §2B: already handled by `DeleteCoreAsync` (step 8); the IS24 gate checks the agreement, not a second eraser |
+| `SessionDoc` | a | Delete | Never | `Retention__SessionDays` | F1 §2C decision (now decided): a session credential, not content; D6: 30 days after revoke or expiry |
+| `OutboxEmail` | a | Delete (where `Recipient` is the resident) | Never | `Retention__OutboxBodyDays` (body) + `Retention__OutboxRowDays` (row) | F1 §2C decision (now decided); D6: body nulled 7 days after delivery, row deleted 90 days |
+| `SuppressedAddress` | operational | Delete (where the address is the resident's) | Never | — | the resident opted out of notifications; the row is theirs; D2: declared on the type |
+| `Conversation` | b | **Keep** (D3 — the resident's seat is tombstoned, the row stays) | Resident | — | D3: the other participant's thread must stay coherent; IS21's `ResidentThreadPseudonymizer` does the tombstone |
+| `Message` | b | Pseudonymize (body erased, `SenderId` → `deleted:{id}` when the resident sent) | Resident | — | D3: 1:1 direct messages survive under the tombstone, not deleted (IS21) |
+| `GroupConversation` | b | **Keep** (the resident is removed from `Participants`) | Resident | — | D3: group threads stay for the other participants (IS21) |
+| `GroupMessage` | b | Pseudonymize (as `Message`, when the resident sent) | Resident | — | D3 (IS21); shipped after F1 — the E2 gap this lane closes |
+| `GroupMessagingInvitation` | b | Delete (where the resident is the invitee) | Never | — | an invitation to a thread; deleting the account drops the pending invite (IS21) |
+| `Post` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A: resident-authored content |
+| `PostReply` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A |
+| `PostTranslation` | b | Delete (where `AuthorId == resident`, nullable) | Resident | — | F1 §2A; ADR 0022 user-added translations |
+| `ReplyTranslation` | b | Delete (where `AuthorId == resident`, nullable) | Resident | — | F1 §2A; ADR 0022 |
+| `Announcement` | b | Delete (where `AuthorId == resident`; platform announcements `AuthorId == ""` are kept) | Resident | — | F1 §2A |
+| `AnnouncementTranslation` | b | Delete (where `AuthorId == resident`, nullable) | Resident | — | F1 §2A |
+| `AnnouncementComment` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A: the resident's comments |
+| `Event` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A |
+| `EventTranslation` | b | Delete (where `AuthorId == resident`, nullable) | Resident | — | F1 §2A; ADR 0059 |
+| `EventRsvp` | b | Delete (where `UserId == resident`) | Resident | — | F1 §2A: the resident's **own** RSVPs (not the event's authorship) |
+| `GuardianEventRequest` | c | Delete (where the resident is the child) | Never | — | IS23: a child's event request is the child's data |
+| `Page` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A: the resident's blog pages |
+| `PageTranslation` | b | Delete (where `AuthorId == resident`, nullable) | Resident | — | F1 §2A; the E6 gap this lane closes (IS31) |
+| `Project` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A |
+| `ProjectGoal` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A |
+| `ProjectTranslation` | b | Delete (where `AuthorId == resident`, nullable) | Resident | — | F1 §2A; ADR 0088 |
+| `TodoItem` | b | Delete (where `AuthorId == resident`; **not** `AssigneeId`) | Resident | — | F1 §2A |
+| `TodoComment` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A |
+| `TodoTranslation` | b | Delete (where `AuthorId == resident`, nullable) | Resident | — | F1 §2A; ADR 0088 |
+| `KanbanBoard` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A: the board the resident owns |
+| `KanbanLane` | b | **Keep** (cascade — no principal field) | InstanceOnly | — | F1 §2A sub-entities: travels with `KanbanBoard`; the board row's Delete is what removes it, not a principal query |
+| `BoardItemPlacement` | b | **Keep** (cascade — no principal field) | InstanceOnly | — | F1 §2A sub-entities: under `KanbanBoard` |
+| `BoardTranslation` | b | Delete (where `AuthorId == resident`, nullable) | Resident | — | F1 §2A; ADR 0088 |
+| `InventoryItem` | b | Delete (where `AuthorId == resident`) | Resident | — | F1 §2A |
+| `InventoryCheckout` | b | Pseudonymize (the resident's identity is erased, the checkout state is kept for stock accuracy) | Never | — | a stock record; the checkout state (who/when) is PII, the item count is operational |
+| `Document` | b | Delete (where `OwnerId == resident`) | Resident | — | F1 §2A: the resident's uploads |
+| `DocumentFolder` | b | Delete (where `OwnerId == resident`) | Resident | — | F1 §2A |
+| `Bookmark` | b | Delete (where `OwnerId == resident`) | Resident | — | F1 §2A |
+| `BookmarkFolder` | b | Delete (where `OwnerId == resident`) | Resident | — | F1 §2A; the E6 gap this lane closes (IS31) |
+| `PersonalNote` | b | Delete (where `OwnerId == resident`) | Resident | — | F1 §2A; M37 / ADR 0167; the E6 gap this lane closes (IS31) |
+| `NoteFolder` | b | Delete (where `OwnerId == resident`) | Resident | — | F1 §2A; the E6 gap this lane closes (IS31) |
+| `MediaObject` | e | Delete (where `CreatedById == resident`) | Never | — | F1 §2A: the catalog rows + their bytes (U4's set); the bytes live on a dedicated volume, not in the export |
+| `Tag` | b | Delete (where `CreatedBy == resident`) | Resident | — | F1 §2A: the tags the resident created |
+| `TagTranslation` | b | Delete (where `AuthorId == resident`, nullable) | Resident | — | F1 §2A: user-added tag translations |
+| `Group` | b | **Keep** (ownership transfers per ADR 0142) | InstanceOnly | — | IS03 §2C decision (now decided): the resident is the **owner**; the group outlives the account (the E2 gap this lane closes) |
+| `GroupMembership` | b | Delete (where `UserId == resident`) | InstanceOnly | — | F1 §2B: already handled by `DeleteCoreAsync` (step 6) |
+| `GroupInvitation` | c | Delete (where `UserId == resident`) | Never | — | F1 §2C decision (now decided): an identity-graph edge received; the row is stale once the account is gone |
+| `GroupJoinRequest` | c | Delete (where `UserId == resident`) | Never | — | F1 §2C decision (now decided): an identity-graph edge submitted; the row is stale once the account is gone |
+| `DelegationGrant` | c | Delete (where the resident is `OwnerId` or `DelegateId`) | Never | — | F1 §2C decision (now decided): the delegation is meaningless once either side's account is gone (IS22) |
+| `GuardianLink` | c | Delete (where the resident is `GuardianId` or `ChildId`) | Never | — | F1 §2B: already handled by `DeleteCoreAsync` (step 8b, dissolved) |
+| `GuardianTimeLimitSchedule` | c | Delete (where the resident is the child) | Never | — | IS23: the child's schedule is the child's data |
+| `GuestAccess` | c | Delete (where `SubjectId == resident`) | Never | — | F1 §2C decision (now decided): a credential; arguably should go on delete (IS22) |
+| `Component` | platform | **Keep** (platform singleton) | InstanceOnly | — | a community component, not resident content; F1 §2C excluded |
+| `ComponentMembership` | c | Delete (where `UserId == resident`) | InstanceOnly | — | F1 §2B: already handled by `DeleteCoreAsync` (step 7) |
+| `ModeratorAssignment` | c | Delete (where `UserId == resident`) | InstanceOnly | — | F1 §2B: already handled by `DeleteCoreAsync` (step 7) |
+| `CommunityMembershipRequest` | c | Delete (where the resident is the requester) | Never | — | IS23: the request is the resident's; deleting the account drops it |
+| `CommunityTranslation` | b | **Keep** (cascade — no principal field) | InstanceOnly | — | F1 §2A sub-entities: under `Group`/`Component`; carries only `GroupId`/`ComponentId` + `LanguageCode`, no principal field |
+| `GroupTranslation` | b | **Keep** (cascade — no principal field) | InstanceOnly | — | F1 §2A sub-entities: under `Group`; carries only `GroupId` + `LanguageCode`, no principal field (the `Group` row's `Keep(reason)` is what governs it) |
+| `KioskPlaylist` | operational | Delete (where `Id == resident`) | Never | — | a per-resident display preference (Id = the resident's subject id, ADR 0164/0285); the resident's own playlist config; IS22's `ResidentAccountRowsEraser` adds the delete |
+| `AccessAudit` | c | Pseudonymize (`ActorId` / `EffectivePrincipalId` → tombstone) | Never | — | F1 §2B: already pseudonymized by `DeleteCoreAsync` (step 5); data-classes.md §3.1: the audit log is a disclosure surface, retained per the tiered policy |
+| `AuditPurgeSummary` | c | **Keep** (a summary of a past purge, not a resident row) | Never | — | an operational record of the purge itself; no resident principal |
+| `Report` | c | Pseudonymize (`ReporterId` → tombstone) | Never | — | F1 §2C decision (now decided): moderation state, not authored content (IS23); M27 C-M27·3 excludes it from the delete set |
+| `IdentityToken` | d | Delete (where `SubjectId == resident`) | Never | `Retention__TokenDays` | F1 §2C decision (now decided): a credential (verify/setup tokens) (IS22); D6: 7 days after consumption or expiry |
+| `EscalationToken` | d | Pseudonymize (`CreatedBy` → tombstone) | Never | `Retention__TokenDays` | F1 §2C decision (now decided): an operator credential, but the `CreatedBy` is the resident's (IS23); D6: 7 days after revocation or expiry |
+| `EscalationOutboundConfig` | d | **Keep** (a platform singleton, not a resident row) | Never | — | the outbound webhook config; the `Token` is an operator secret, not a resident PII field |
+| `Notification` | operational | Delete (where `RecipientId == resident`) | Never | `Retention__NotificationUnreadDays` (unread) / `Retention__NotificationReadDays` (read) | F1 §2C decision (now decided): received per-resident state, not authored (IS22); D6: read 90 days, unread 365 days |
+| `NotificationPreference` | operational | Delete (where `RecipientId == resident`) | Never | — | F1 §2C decision (now decided): the resident's own preference (IS22) |
+| `NotificationSubscription` | operational | Delete (where `RecipientId == resident`) | Never | — | F1 §2C decision (now decided): the resident's own subscription (IS22) |
+| `NotificationQuietSchedule` | operational | Delete (where `RecipientId == resident`) | Never | — | F1 §2C decision (now decided): the resident's own schedule (IS22) |
+| `ErrorReport` | c | Pseudonymize (`SubjectId` → tombstone; `ContactEmail` → null) | Never | `Retention__ErrorReportDays` | F1 §2C decision (now decided): an operator-facing report the resident filed (IS23); D6: 180 days after resolution |
+| `EmailDeadLetter` | operational | Delete (where the recipient is the resident) | Never | `Retention__DeadLetterDays` | D6: 30 days; the recipient is the resident's address (IS34a) |
+| `UsageEvent` | operational | Pseudonymize (`ActorId` → tombstone) | Never | — | F1 §2C excluded (per-user storage row / usage history): derived metrics, not content; the resident's identity is erased, the metric stays (IS23) |
+| `StorageMetricsSample` | operational | **Keep** (a platform aggregate, not a resident row) | Never | — | a sample of platform storage; no resident principal |
+| `CommunityStorageSettings` | operational | **Keep** (a platform setting, not a resident row) | Never | — | the community's storage cap; no resident principal |
+| `AdminOnboarding` | platform | **Keep** (a platform singleton, not a resident row) | Never | — | the platform's onboarding state; the `CompletedAt` is an operator timestamp |
+| `SiteContent` | platform | **Keep** (a platform singleton, not a resident row) | InstanceOnly | — | F1 §2C excluded: platform singletons, not resident content |
+| `SiteContentTranslation` | platform | **Keep** (a platform singleton, not a resident row) | InstanceOnly | — | F1 §2C excluded: the site's hero text per language |
+| `SurfaceLabels` | platform | **Keep** (a platform singleton, not a resident row) | InstanceOnly | — | F1 §2C excluded: the admin's surface labels |
+| `SurfaceLabelTranslation` | platform | **Keep** (a platform singleton, not a resident row) | InstanceOnly | — | F1 §2C excluded: the labels per language |
+| `LanguageCatalog` | platform | **Keep** (a platform catalog, not a resident row) | InstanceOnly | — | the language list; no resident principal |
+| `LocaleSettings` | platform | **Keep** (a platform singleton, not a resident row) | InstanceOnly | — | the community's locale defaults; no resident principal |
+| `TranslationResource` | platform | **Keep** (a platform resource, not a resident row) | InstanceOnly | — | the UI translation strings; no resident principal |
+
+**Per-class breakdown (81 rows):** a (PII) **3** · b (private content)
+**41** · c (audit & moderation) **14** · d (secrets) **3** · e (media) **1** ·
+operational **10** · platform **9**.
+
+**Every principal-bearing type has a non-empty erasure value.** The 20
+`Keep(reason)` rows fall into four shapes: **13 platform/operational
+singletons or aggregates with no resident principal** (`Component`,
+`AdminOnboarding`, `SiteContent`, `SiteContentTranslation`, `SurfaceLabels`,
+`SurfaceLabelTranslation`, `LanguageCatalog`, `LocaleSettings`,
+`TranslationResource`, `EscalationOutboundConfig`, `AuditPurgeSummary`,
+`StorageMetricsSample`, `CommunityStorageSettings`), **4 cascade
+sub-entities with no principal field** (`KanbanLane`, `BoardItemPlacement`,
+`CommunityTranslation`, `GroupTranslation` — they travel with their parent's
+row and are governed by the parent's erasure), **1 ownership-transfer
+case** (`Group` — the group outlives the account, ADR 0142), and **2 D3
+thread-coherence rows** (`Conversation`, `GroupConversation` — the rows
+stay so the other participants' threads remain coherent; the resident's
+seat is tombstoned, not deleted). The 9 `Pseudonymize` rows
+(`Profile`, `Message`, `GroupMessage`, `InventoryCheckout`, `AccessAudit`,
+`Report`, `ErrorReport`, `EscalationToken`, `UsageEvent`) name the
+principal field erased and the field kept — the IS24 gate checks that the
+eraser's `HandledTypes` set agrees.
+
+### §2.6 — The `ContentFree` export-scope table
+
+IS27's filter is driven by `DataClassCatalog`. The 44 M11 types are the
+closed `PortabilityDocTypes.Entries` list (`PortabilityDocTypes.cs:91–158`;
+`grep -c 'PortabilityDocEntry("'` confirms **44**). Three strip rules apply:
+
+1. **`PrivateContent` → the type is omitted** from the archive entirely.
+2. **Restrictive `Audience` → the row is omitted** (the type is present in
+   the archive, the restricted rows are absent; rows with a null/empty
+   `Audience` are public and stay).
+3. **`Profile` PII fields → blanked** (`Email`, `Phone`, `Address` set to
+   `null`; the `Profile` row itself stays — it is the resident's own data).
+
+**The 44 M11 types, classified by strip rule:**
+
+| Strip rule | M11 types | Count |
+|---|---|---|
+| Rule 1 — `PrivateContent`, omitted entirely | `Announcement`, `AnnouncementComment`, `AnnouncementTranslation`, `BoardItemPlacement`, `BoardTranslation`, `Conversation`, `Event`, `EventRsvp`, `EventTranslation`, `Group`, `KanbanBoard`, `KanbanLane`, `Message`, `Page`, `PageTranslation`, `Post`, `PostReply`, `PostTranslation`, `Project`, `ProjectGoal`, `ProjectTranslation`, `ReplyTranslation`, `Tag`, `TagTranslation`, `TodoComment`, `TodoItem`, `TodoTranslation` | **27** |
+| Rule 2 — audience-bearing (public rows stay, restricted rows omitted) | a subset of Rule 1's 27: `Post`, `Event`, `Page`, `Project`, `ProjectGoal`, `TodoItem`, `KanbanBoard` (the 7 of the 27 with a non-null `Audience` field; IS27 checks `Audience.Mode != Any` per row) | **(7 of the 27)** |
+| Rule 3 — `Profile` PII fields blanked | `Profile` | **1** |
+| Always present (structural / public, no strip) | `Component`, `CommunityTranslation`, `GroupTranslation`, `TranslationResource` (platform singletons); `ComponentMembership`, `GroupMembership`, `ModeratorAssignment` (governance); `MediaObject` (catalog row; bytes are on the dedicated volume, out of the JSON archive by construction) | **8** |
+| **`// TODO ❓`** (owner decision, not decided here) | `DelegationGrant`, `GroupInvitation`, `GroupJoinRequest`, `GuardianLink`, `Report` (class (c) — accountability records); `Notification`, `NotificationPreference`, `NotificationSubscription` (the recipient's inbox state) | **8** |
+| | **Total** | **44** ✓ |
+
+**`// TODO ❓` rows (owner decision; IS27 defaults to **skipped** if the
+owner has not decided by the unit):**
+
+| Type | Class | Question | IS27 default |
+|---|---|---|---|
+| `DelegationGrant` | c | the delegation graph (who delegated to whom, what scope) is an accountability record — is it structure or private? | **Skipped** |
+| `GroupInvitation` | c | an identity-graph edge received; stale once the account is gone | **Skipped** |
+| `GroupJoinRequest` | c | an identity-graph edge submitted; stale once the account is gone | **Skipped** |
+| `GuardianLink` | c | the guardian/child relationship; both sides' privacy is implicated | **Skipped** |
+| `Report` | c | a moderation record; "the resident was reported" is an accountability fact | **Skipped** |
+| `Notification` | operational | the recipient's inbox; received per-resident state | **Skipped** |
+| `NotificationPreference` | operational | the resident's own setting; not operator-facing | **Skipped** |
+| `NotificationSubscription` | operational | the resident's own setting; not operator-facing | **Skipped** |
+
+**What `Full` restores over `ContentFree`:** all 27 `PrivateContent` types
+(including the 7 audience-bearing rows), the `Profile` PII fields
+(`Email`/`Phone`/`Address` restored), and the 8 `// TODO ❓` rows (unless
+the owner has promoted them to `ContentFree` before IS27 ships). `Full` is
+the M11 round-trip set (all 44 types, no fields blanked). The `Full` scope
+requires an active `AdminOverride` (IS28's gate, ADR 0299) and is audited
+`Via: BreakGlass` (IS28).
