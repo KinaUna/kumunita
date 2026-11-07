@@ -257,3 +257,46 @@ updated: 2026-11-07
   **and** keeps the class (a) link; abstract reads **seven (B1–B7)**; both
   `updated:` = 2026-11-07; the open-items table reads as PII-closed /
   log-forging-open. `git status` → only the 2 docs + this append.
+
+## IS10 — Fix the `TodoDetail` board-title leak (E4, the one confirmed S leak)
+- **Files (3, the 3rd authorized by the owner mid-unit):**
+  `src/Kumunita.Web/Controllers/TodosController.cs` (the `TodoDetail` F2
+  block **only** — no constructor change, no `IAuthorizationService` added, no
+  other action); `tests/Kumunita.Web.Tests/TodoDetailBoardVisibilityTests.cs`
+  (new, 3 tests); `tests/Kumunita.Web.Tests/ProjectsControllerTests.cs` (one
+  harness stub, see "noticed").
+- **The F2-block change:** the raw `session.Query<KanbanBoard>()` title lookup
+  is gone — it is now `boards.ListBoardsForTodoAsync(id, actorId,
+  HttpContext.RequestAborted)` (the `CanSeeAsync`-filtered seam, IS10 E4),
+  with `placements` and `lanes` kept only for boards in the visible set
+  (`visibleBoardIds`); `boardTitle` is rebuilt from the visible boards. The
+  old local `IReadOnlyList<KanbanBoard> boards` was dropped, so `boards`
+  resolves to the injected `IBoardService` (no shadowing).
+- **Tests (3/3 green):** `TodoDetail_RestrictedBoardTitle_NotShown`,
+  `TodoDetail_VisibleBoardTitle_Shown`,
+  `TodoDetail_RestrictedBoardPlacement_NoLaneChip`. Real scratch-Postgres
+  store for the placements/lanes reads (Marten 9 `ToListAsync()` is not
+  NSubstitutable — the `ProjectsControllerTests` precedent); the seam is
+  NSubstituted to drive the two visibility outcomes.
+- **Notice (rule 9 — the pre-existing test):** `ProjectsControllerTests.Todo_Detail_SubtasksRendered`
+  regressed (empty `vm.Placements`) because its `IBoardService` substitute
+  never stubbed `ListBoardsForTodoAsync`, so the new visible-set filter dropped
+  the placement. That board is **public** (no `Audience`), so this is a
+  harness-stub gap, **not** the leak the test pinned. Added one stub
+  (`projects_B.ListBoardsForTodoAsync(…) → [board-detail]`); the test's own
+  assertions are unchanged. All 55 (3 new + 52 regression across
+  `ProjectsControllerTests` + `M14InterlockTests`) green; `dotnet build` 0
+  errors.
+- **Verification anchors:** `grep "session.Query<KanbanBoard>()"
+  TodosController.cs` → **0**; `grep "ListBoardsForTodoAsync"
+  TodosController.cs` → the single call in `TodoDetail` (plus its doc-comment
+  ref); `git status` → controller + new test + the `ProjectsControllerTests`
+  stub + this append (the two pre-existing untracked `*-prompt.md` files are
+  not part of this unit).
+- **Next unit (IS11):** triage batch 1 (Posts / Documents / Moderation, 13
+  methods) — `// SEC-READ:` markers or a pause on a leak; the 52 → 0 gate is
+  IS15's.
+- **Noticed:** the `Audience` type uses `Mode` + `List<AudienceGrant>`
+  (not a `Kind`/`Value` pair) — relevant for any test that seeds an
+  audience-restricted board (the IS10 fixture uses
+  `Grants = [new AudienceGrant(GrantKind.Group, "grp-…")]`).

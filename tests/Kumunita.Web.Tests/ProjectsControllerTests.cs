@@ -218,6 +218,22 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects_T.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
             .Returns(new TodoDetailResult { Todo = parent, Subtasks = [sub] });
 
+        // IS10 (E4) — the detail's F2 block now routes the board-title lookup
+        // through the <c>CanSeeAsync</c>-filtered
+        // <see cref="IBoardService.ListBoardsForTodoAsync"/> seam and keeps
+        // placements only for boards in the visible set. This board is public
+        // (no <c>Audience</c>), so the production seam returns it — the harness
+        // stubs that outcome (the test otherwise predates the new seam call).
+        projects_B.ListBoardsForTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new List<KanbanBoard>
+            {
+                new()
+                {
+                    Id = "board-detail", Title = "Board", AuthorId = actor,
+                    Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+                },
+            });
+
         var controller = BuildTodos(projects, store: store, subjectId: actor);
         var result = await controller.TodoDetail(todoId);
 
