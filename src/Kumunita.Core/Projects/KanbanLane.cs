@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Projects;
 
 /// <summary>
@@ -14,6 +16,8 @@ namespace Kumunita.Core.Projects;
 /// unique-index shape — the last-write-wins concurrency exception).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "F1 §2A sub-entities: travels with `KanbanBoard`; the board row's Delete is what removes it, not a principal query")]
 public sealed class KanbanLane
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)
