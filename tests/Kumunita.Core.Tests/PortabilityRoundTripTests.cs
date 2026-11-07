@@ -605,7 +605,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         // Export — one *.kumunita archive (the U02/U03 export seam: the docs
         // + the no-secret principals + the config + the media bytes + the
         // manifest).
-        var exportStream = await serviceA.ExportAsync("pt-admin-001", ct);
+        var exportStream = await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct);
         var exportBytes = await ReadAllBytesAsync(exportStream, ct);
         Assert.NotEmpty(exportBytes);
 
@@ -776,7 +776,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
             await BootFullInstanceAsync(ct);
         await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
-        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
         Assert.NotEmpty(exportBytes);
 
         // Instance B — the collision: it already holds the SAME principals +
@@ -884,7 +884,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
             await BootFullInstanceAsync(ct);
         await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
-        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
         Assert.NotEmpty(exportBytes);
 
         // Instance B — a fresh instance (raw store) that has ALREADY booted,
@@ -965,7 +965,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             });
             await sa.SaveChangesAsync(ct);
         }
-        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
         Assert.NotEmpty(exportBytes);
 
         // Instance B — a fresh instance (no escalation config row yet).
@@ -1025,7 +1025,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             });
             await sa.SaveChangesAsync(ct);
         }
-        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
         Assert.NotEmpty(exportBytes);
 
         // Instance B — the representative instance + its OWN escalation config
@@ -1104,7 +1104,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
             await BootFullInstanceAsync(ct);
         var planted = await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
-        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
         Assert.NotEmpty(exportBytes);
 
         // Instance B — the same principals (the keep-existing targets) + its
@@ -1213,7 +1213,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             });
             await sa.SaveChangesAsync(ct);
         }
-        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
         Assert.NotEmpty(exportBytes);
 
         // Instance B — a DIFFERENT instance that already holds the SAME
@@ -1416,7 +1416,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         // Export (the C-M11·2 boundary at the wire: the archive bytes are
         // the witness — the PrincipalsExport's "the extractor never
         // touches the credential columns" pin, observed at the wire).
-        var exportStream = await serviceA.ExportAsync(knownPrincipalId, ct);
+        var exportStream = await serviceA.ExportAsync(knownPrincipalId, PortabilityExportScope.Full, ct);
         var exportBytes = await ReadAllBytesAsync(exportStream, ct);
         Assert.NotEmpty(exportBytes);
 
@@ -1447,7 +1447,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
             await BootFullInstanceAsync(ct);
         await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
-        var cleanExportStream = await serviceA.ExportAsync("pt-admin-001", ct);
+        var cleanExportStream = await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct);
         await using var cleanBuffer = new MemoryStream();
         await cleanExportStream.CopyToAsync(cleanBuffer, ct);
         var cleanExportBytes = cleanBuffer.ToArray();
@@ -1697,7 +1697,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             sa.Store(new Post { Id = "a-post-tagged", ComponentId = "pt-component-001", AuthorId = "pt-resident-001", TagIds = [aTagId], Created = DateTimeOffset.UtcNow });
             await sa.SaveChangesAsync(ct);
         }
-        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
         Assert.NotEmpty(exportBytes);
 
         // Instance B — a MINIMAL target (the principals + the config + the SAME
@@ -1784,7 +1784,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             sa.Store(new Tag { Id = "a-tag-recycling-x", Slug = "recycling", Name = "Recycling — A", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
             await sa.SaveChangesAsync(ct);
         }
-        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
         Assert.NotEmpty(exportBytes);
 
         // Instance B — the same slug but a DIFFERENT default-language name
@@ -1873,7 +1873,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             });
             await sa.SaveChangesAsync(ct);
         }
-        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", ct), ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
         Assert.NotEmpty(exportBytes);
 
         // Instance B — the representative instance (so B already holds
