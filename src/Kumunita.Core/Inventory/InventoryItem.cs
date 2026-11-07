@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Inventory;
 
 /// <summary>
@@ -36,6 +38,8 @@ namespace Kumunita.Core.Inventory;
 /// per item at a time.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A")]
 public sealed class InventoryItem
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)
