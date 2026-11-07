@@ -225,3 +225,35 @@ updated: 2026-11-07
 - Next: **IS09** — the trust-boundary + log-hygiene docs (B7 Sentry row, the B4
   snippet note, and closing the PII half of the log-hygiene open item as
   "decided and closed by IS08"; log-forging L8c stays open).
+
+## IS09 — Trust-boundary + log-hygiene docs (B7, the B4 class-(b) note, the L8c split)
+
+- **Docs only — no code, no build, no test** (§2.3 records IS09 as "no test —
+  docs only; the B7/B4 rows are doc-truth pinned by IS41").
+- **Files touched:** `docs/security/trust-boundaries.md` (abstract 6→7, the B4
+  class-(b) snippet note, the new B7 Sentry row, `updated:` → 2026-11-07) and
+  `docs/security/decisions-open-items.md` (the log-hygiene row split into its
+  closed PII half and its open log-forging half, `updated:` → 2026-11-07). This
+  append. **No `src/**` change.**
+- **B7 row (Sentry):** DSN-gated (`SENTRY_DSN` unset → the `UseSentry` seam is
+  not executed, byte-identical to before), `MinimumBreadcrumbLevel = Warning`
+  (the IS05 floor), `SendDefaultPii = false`, the request scrubber
+  redacts headers/cookies/query, and log templates carry no PII (the IS08
+  gate). All facts copied from `Program.cs` ≈ :449–:481 + `:1383`; third-party
+  cell bolded like B5.
+- **B4 note:** kept the `[class (a)](data-classes.md)` link; added that
+  notification/DM/mention emails also carry a ≤ 200-char UGC/DM snippet
+  (`UgcSnippets.Truncate`, `src/Kumunita.Core/Notifications/UgcSnippets.cs:23`),
+  so **class (b)** crosses B4 too.
+- **L8c split:** one ambiguous "still open" row → two. PII half **closed** by
+  IS08 (links `LogTemplatePiiGateTests` + the IS05 floor); log-forging half
+  (SEC L8c) **still open**, no owner decision. L8c was **not** closed.
+- **Not this unit (IS39's / IS41's / IS42's):** the B7 **control-map row** lands
+  in **IS39** (the traceability rewrite), the `data-classes.md` / token-at-rest
+  / AGENTS.md-rules doc-truth is **IS41**, and the owner-ops ledger (e.g. the
+  `SENTRY_DSN` "now safe" note, D6 retention) is **IS42**.
+- **Verification:** `grep -n "^| B7" docs/security/trust-boundaries.md` → 1
+  hit (DSN-gated + Warning floor + no-PII-templates); B4 row carries class (b)
+  **and** keeps the class (a) link; abstract reads **seven (B1–B7)**; both
+  `updated:` = 2026-11-07; the open-items table reads as PII-closed /
+  log-forging-open. `git status` → only the 2 docs + this append.
