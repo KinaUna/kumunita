@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Messaging;
 
 /// <summary>
@@ -6,6 +8,8 @@ namespace Kumunita.Core.Messaging;
 /// canonical form — the (ParticipantA, ParticipantB) unique index in
 /// <see cref="MessagingDocTypes"/> is the idempotency witness for F1.
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Keep, ExportScope.Resident,
+    reason: "D3: the other participant's thread must stay coherent; IS21's `ResidentThreadPseudonymizer` does the tombstone")]
 public sealed class Conversation
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)
