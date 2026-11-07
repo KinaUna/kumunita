@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Documents;
 
 /// <summary>
@@ -27,6 +29,8 @@ namespace Kumunita.Core.Documents;
 /// GlobalAdmin).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A")]
 public sealed class DocumentFolder
 {
     /// <summary>Surrogate document identity (Marten's default <c>string</c> Id,
