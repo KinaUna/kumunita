@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Pages;
 
 /// <summary>
@@ -68,6 +70,8 @@ namespace Kumunita.Core.Pages;
 /// <see cref="Audience"/> + <c>CanAsync(Read)</c>.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A: the resident's blog pages")]
 public sealed class Page
 {
     public string Id { get; set; } = string.Empty;

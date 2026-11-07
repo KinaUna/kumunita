@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Tags;
 
 /// <summary>
@@ -21,6 +23,8 @@ namespace Kumunita.Core.Tags;
 /// visibility inherits the content the tag is attached to.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A: user-added tag translations")]
 public sealed class TagTranslation
 {
     /// <summary>Surrogate document identity (Marten's default <c>string</c>

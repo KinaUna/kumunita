@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Tags;
 
 /// <summary>
@@ -22,6 +24,8 @@ namespace Kumunita.Core.Tags;
 /// a mere attacher.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A: the tags the resident created")]
 public sealed class Tag
 {
     /// <summary>Surrogate document identity (Marten's default <c>string</c>
