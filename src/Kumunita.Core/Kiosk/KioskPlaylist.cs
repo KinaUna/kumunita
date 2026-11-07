@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Kiosk;
 
 /// <summary>
@@ -29,6 +31,8 @@ namespace Kumunita.Core.Kiosk;
 /// write commits exactly **one** <c>kiosk.save</c> row (<c>Via = Owner</c>).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Delete, ExportScope.Never,
+    reason: "a per-resident display preference (Id = the resident's subject id, ADR 0164/0285); the resident's own playlist config; IS22's `ResidentAccountRowsEraser` adds the delete")]
 public sealed class KioskPlaylist
 {
     /// <summary>The per-resident identity key (the subject id of the user who
