@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.SiteContent;
 
 /// <summary>
@@ -40,6 +42,8 @@ namespace Kumunita.Core.SiteContent;
 /// renders (a resident browsing in that language).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.Platform, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "F1 §2C excluded: the site's hero text per language")]
 public sealed class SiteContentTranslation
 {
     /// <summary>The surrogate document identity (the conventional <c>string Id</c>

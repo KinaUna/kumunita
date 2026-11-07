@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.SurfaceLabels;
 
 /// <summary>
@@ -49,6 +51,8 @@ namespace Kumunita.Core.SurfaceLabels;
 /// path (a resident browsing the nav / a surface header in that language).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.Platform, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "F1 §2C excluded: the labels per language")]
 public sealed class SurfaceLabelTranslation
 {
     /// <summary>The surrogate document identity (the conventional <c>string Id</c>
