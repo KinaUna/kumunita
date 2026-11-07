@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.UserInfo;
 
 /// <summary>
@@ -12,6 +14,8 @@ namespace Kumunita.Core.UserInfo;
 /// arrives in M3.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.Platform, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "a community component, not resident content; F1 §2C excluded")]
 public sealed class Component
 {
     public string Id { get; set; } = string.Empty;
@@ -69,6 +73,8 @@ public sealed class Component
 /// <see cref="Posts.PostService"/> for the gate itself).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Delete, ExportScope.InstanceOnly,
+    reason: "F1 §2B: already handled by `DeleteCoreAsync` (step 7)")]
 public sealed class ModeratorAssignment
 {
     public string Id { get; set; } = string.Empty;
@@ -110,6 +116,8 @@ public sealed class ModeratorAssignment
 /// admin actions.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Delete, ExportScope.InstanceOnly,
+    reason: "F1 §2B: already handled by `DeleteCoreAsync` (step 7)")]
 public sealed class ComponentMembership
 {
     /// <summary>Surrogate PK; (ComponentId, UserId) is the business key.</summary>
