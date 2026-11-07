@@ -42,35 +42,20 @@ public sealed record PortabilityImportResult(bool Ok, IReadOnlyList<string> Fail
 public interface IPortabilityService
 {
     /// <summary>
-    /// U02–U03 (export) — one complete, valid <c>*.kumunita</c> archive
-    /// (the §layout: the docs + the no-secret principals + the config,
-    /// then the media bytes + the finalized manifest). Emits exactly one
-    /// <c>portability.export</c> <c>AccessAudit</c> row (<c>Via = Admin</c>).
+    /// U02–U03 (export) — one valid <c>*.kumunita</c> archive (the §layout: the
+    /// docs + the no-secret principals + the config, then the media bytes +
+    /// the finalized manifest). Emits exactly one <c>portability.export.*</c>
+    /// <c>AccessAudit</c> row (the controller adds none — C-M11·6).
     /// </summary>
     /// <remarks>
-    /// **IS27 (ADR 0299):** the <see cref="PortabilityExportScope"/> is
-    /// <see cref="PortabilityExportScope.ContentFree"/> — the content-free
-    /// export is the default. A full export (the complete M11 archive, the
-    /// pre-IS27 behaviour) requires the
-    /// <see cref="ExportAsync(string, PortabilityExportScope, CancellationToken)"/>
-    /// overload with <see cref="PortabilityExportScope.Full"/> (which is
-    /// IS28's gate: an active <c>AdminOverride</c> is required).
+    /// **IS28 (ADR 0299):** the audit row is **scope-aware** —
+    /// <c>Action = "portability.export.content-free"</c> / <c>Via: Admin</c> for
+    /// <see cref="PortabilityExportScope.ContentFree"/>, and
+    /// <c>Action = "portability.export.full"</c> / <c>Via: BreakGlass</c> for
+    /// <see cref="PortabilityExportScope.Full"/> (the full scope is the
+    /// operator-gated path: an active <c>AdminOverride</c> is required by the
+    /// controller's gate before this is called, ADR 0299).
     /// </remarks>
-    /// <param name="actorId">The GlobalAdmin actor's <c>subjectId</c> (the audit row's actor).</param>
-    Task<Stream> ExportAsync(string actorId, CancellationToken ct = default);
-
-    /// <summary>
-    /// **IS27 (ADR 0299)** — the export with an explicit
-    /// <see cref="PortabilityExportScope"/>. <see cref="PortabilityExportScope.Full"/>
-    /// is the pre-IS27 behaviour (all 44 types, no fields blanked, no rows
-    /// filtered); <see cref="PortabilityExportScope.ContentFree"/> applies the
-    /// design §2.6 strip rules (driven by <see cref="Privacy.DataClassCatalog"/>).
-    /// The audit row is emitted identically for both scopes in IS27
-    /// (<c>Action = "portability.export"</c>, <c>Via = Admin</c>); IS28 extends
-    /// the <c>Action</c> to record the scope
-    /// (<c>portability.export.{content-free|full}</c>) + <c>Via: BreakGlass</c>
-    /// for the full-scope path (ADR 0299).
-    /// </summary>
     /// <param name="actorId">The GlobalAdmin actor's <c>subjectId</c> (the audit row's actor).</param>
     /// <param name="scope">The export scope (ADR 0299).</param>
     /// <param name="ct">Cancellation.</param>
@@ -143,17 +128,6 @@ public sealed class PortabilityService(
     IMediaFileStore mediaFileStore) : IPortabilityService
 {
     /// <inheritdoc />
-    public Task<Stream> ExportAsync(string actorId, CancellationToken ct = default)
-    {
-        // IS27 (ADR 0299): the two-arg form delegates to the scope overload
-        // with the <see cref="PortabilityExportScope.ContentFree"/> default —
-        // the content-free export is now the default for the legacy seam.
-        // The existing round-trip tests (IS27b) call the scope overload with
-        // <see cref="PortabilityExportScope.Full"/> for the full archive.
-        return ExportAsync(actorId, PortabilityExportScope.ContentFree, ct);
-    }
-
-    /// <inheritdoc />
     public async Task<Stream> ExportAsync(string actorId, PortabilityExportScope scope, CancellationToken ct = default)
     {
         // U02 — the docs + the no-secret principals + the config.
@@ -183,14 +157,14 @@ public sealed class PortabilityService(
             mediaManifest,
             DateTimeOffset.UtcNow);
 
-        // U04 — the one `portability.export` AccessAudit row (C-M11·6, the
+        // U04 — the one `portability.export.*` AccessAudit row (C-M11·6, the
         // ADR 0105 `messaging.toggle` one-audit-row shape — the controller adds
-        // none; `Action` is the verb, `TargetKind`/`TargetId` are
-        // "portability"). Emitted after the archive is built (a failed build
-        // throws before this point, so no audit row for a refused export).
-        // IS28 will extend the `Action` to record the scope
-        // (`portability.export.{content-free|full}`) + `Via: BreakGlass`
-        // for the full-scope path (ADR 0299).
+        // none; `TargetKind`/`TargetId` are "portability"). Emitted after the
+        // archive is built (a failed build throws before this point, so no
+        // audit row for a refused export).
+        // IS28 (ADR 0299) — the `Action` + `Via` are scope-aware: the
+        // content-free default is `portability.export.content-free` / `Via: Admin`;
+        // the full (operator-gated) path is `portability.export.full` / `Via: BreakGlass`.
         await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
         session.Store(new Authorization.AccessAudit
         {
@@ -198,10 +172,14 @@ public sealed class PortabilityService(
             At = DateTimeOffset.UtcNow,
             ActorId = actorId,
             EffectivePrincipalId = actorId,
-            Action = "portability.export",
+            Action = scope == PortabilityExportScope.Full
+                ? "portability.export.full"
+                : "portability.export.content-free",
             TargetKind = "portability",
             TargetId = "portability",
-            Via = Authorization.AccessVia.Admin,
+            Via = scope == PortabilityExportScope.Full
+                ? Authorization.AccessVia.BreakGlass
+                : Authorization.AccessVia.Admin,
             Outcome = Authorization.AccessOutcome.Allow
         });
         await session.SaveChangesAsync(ct).ConfigureAwait(false);

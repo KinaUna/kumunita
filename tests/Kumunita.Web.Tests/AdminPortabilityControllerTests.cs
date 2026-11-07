@@ -163,7 +163,11 @@ public class AdminPortabilityControllerTests
         var (controller, portability) = Build();
         var payload = new byte[] { 0x50, 0x4B, 0x03, 0x04, 0x00, 0x00 };
 
-        portability.ExportAsync(Admin, Arg.Any<CancellationToken>())
+        // IS28 (ADR 0299) — the default (absent scope) is now the explicit
+        // ContentFree scope (the vestigial two-arg overload was removed; the
+        // content-free default is the same archive).
+        portability.ExportAsync(Admin, PortabilityExportScope.ContentFree,
+                Arg.Any<CancellationToken>())
             .Returns(new MemoryStream(payload));
 
         var action = await controller.Export();
@@ -173,7 +177,8 @@ public class AdminPortabilityControllerTests
         file.FileStream?.CopyTo(ms);
         Assert.Equal(payload, ms.ToArray());
 
-        await portability.Received(1).ExportAsync(Admin, Arg.Any<CancellationToken>());
+        await portability.Received(1).ExportAsync(
+            Admin, PortabilityExportScope.ContentFree, Arg.Any<CancellationToken>());
     }
 
     // ── Import (ok) ───────────────────────────────────────────────────────
