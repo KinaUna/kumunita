@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.UserInfo;
 
 /// <summary>
@@ -27,6 +29,8 @@ namespace Kumunita.Core.UserInfo;
 /// <c>Via: Admin</c>.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2B: already handled by `DeleteCoreAsync` (step 8b, dissolved)")]
 public sealed class GuardianLink
 {
     /// <summary>Surrogate PK; (GuardianId, ChildId) remains the business key.</summary>
