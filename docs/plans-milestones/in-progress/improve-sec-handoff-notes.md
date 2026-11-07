@@ -29,3 +29,23 @@ updated: 2026-11-07
   corrects or marks n/a**.
 - Nothing ambiguous in the plan rows; no code touched, no build run
   (IS01 is design-only).
+
+## IS02 — Design doc Part 2a
+
+- Appended to `docs/design/improve-sec-design.md`: `## Part 2a` with
+  §2.1 (re-verified register), §2.2 (the seven fix-shape signatures), §2.3
+  (test names for IS05–IS42), §2.4 (drift-guard anchors per unit).
+- **13/13 register rows re-verified** against `development` @ `0936c327`:
+  12 confirmed as written, **1 corrected** — E3's `IdentityService.cs:270`
+  is `:271` (the plan's `:270` is the argument line; the `{Email}` template
+  is `:271`). No row is "n/a (fixed)" — nothing in the tree pre-fixes any
+  unit.
+- Noticed: E11's "hashed at rest" claim actually lives in `WhatsNew.cs:94–120`
+  (0.68.0) + `STATUS.md:62`, not `decisions-open-items.md` as the plan's
+  *Where* pin says; recorded in §2.1 so IS09/IS41 land the correction in the
+  right file (history stays untouched).
+- `improve-check.ps1` ALL GATES PASS. No code touched, no build run
+  (design-only unit).
+- IS03 builds the §2.5 table on top of §2.2's `[DataClass]`/retention keys
+  and §2.3's test-name contract; the signature text in §2.2 is the
+  implementing contract for IS05–IS42.
