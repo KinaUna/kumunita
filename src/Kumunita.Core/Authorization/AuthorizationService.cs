@@ -585,39 +585,13 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
         return new ActorContext(actorId, groupIds, communityIdsSet, IsDelegated: true);
     }
 
-    private async Task<bool> HasBreakGlassAsync(IDocumentSession session, string userId)
+    private Task<bool> HasBreakGlassAsync(IDocumentSession session, string userId)
     {
-        // AdminOverride is hand-rolled (AuthorizationFeature / ADR 0004 §B.1)
-        // — operator-written via psql; the app only reads it. It is NOT a
-        // Marten document, so the read is a parameterised SQL query on the
-        // <em>same document session</em> — this keeps the read inside the
-        // caller's transaction when one is in flight, and the ADO.NET
-        // command executes against the same physical connection the session
-        // holds (Marten 9 IQuerySession surfaces a Connection property for
-        // exactly this raw-SQL seam — see M1Feature's raw-SQL reads in DDL
-        // tests for the same pattern).
-        var conn = ((Npgsql.NpgsqlConnection)session.Connection!);
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText =
-            "SELECT EXISTS (" +
-            "  SELECT 1 FROM \"mt\".\"AdminOverride\" " +
-            "  WHERE \"userId\" = @userId " +
-            "    AND \"consumedAt\" IS NOT NULL " +
-            "    AND \"expiresAt\" > @now" +
-            ")";
-
-        var pUser = cmd.CreateParameter();
-        pUser.ParameterName = "@userId";
-        pUser.Value = userId;
-        cmd.Parameters.Add(pUser);
-
-        var pNow = cmd.CreateParameter();
-        pNow.ParameterName = "@now";
-        pNow.Value = DateTimeOffset.UtcNow;
-        cmd.Parameters.Add(pNow);
-
-        var result = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
-        return result is bool b && b;
+        // Delegated to the standalone probe (ADR 0299, IS26) — the exact SQL
+        // and semantics now live in BreakGlassProbe so callers that already
+        // own a query session (the full instance export, IS28) gate on the
+        // same seam without widening IAuthorizationService (ADR 0006).
+        return BreakGlassProbe.HasActiveAsync(session, userId);
     }
 
     // ── Actor context (the shared state the decision consumes) ─────────────
