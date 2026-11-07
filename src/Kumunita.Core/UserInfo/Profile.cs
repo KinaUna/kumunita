@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Privacy;
 
 namespace Kumunita.Core.UserInfo;
 
@@ -25,6 +26,19 @@ namespace Kumunita.Core.UserInfo;
 /// (ADR 0001-B).
 /// </para>
 /// </summary>
+// D3-style row (IS21 resolves the IS17 pause): the §2.5 row says
+// `Pseudonymize`, so the ADR 0298 invariant requires a principal field.
+// The field this row's policy erases is `Email` — the PII anchor §2.6 Rule 3
+// blanks — and the field the [DataClass]-driven IS24 agreement gate keys on.
+// NOTE for IS24: F1 step 8 (IdentityService.AccountOps.cs) today DELETES the
+// whole row (`Assert.Null(ProfileAsync(...))` is pinned by
+// IdentityServiceDeleteAccountTests), so the gate should treat a
+// Pseudonymize row whose eraser deletes the row as "handled" (a stronger
+// erasure than the tombstone the row names) — the row's *policy* (class a,
+// Resident export) is what this attribute records.
+[DataClass(DataClassKind.Pii, Erasure.Pseudonymize, ExportScope.Resident,
+    reason: "F1 §2B: already handled by DeleteCoreAsync (step 8); the IS24 gate checks the agreement, not a second eraser",
+    principalField: "Email")]
 public sealed class Profile
 {
     /// <summary>Document identity — one profile per account. Mapped in
