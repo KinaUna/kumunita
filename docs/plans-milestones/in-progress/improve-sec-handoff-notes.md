@@ -571,3 +571,48 @@ updated: 2026-11-07
 - **Total:** `grep -rc "\[DataClass(" src --include="*.cs"` → **34** (18 after IS17 + 16 here). Every annotated file has exactly one `using Kumunita.Core.Privacy;`. 15 `Delete` rows + 1 `Pseudonymize` row (`Report`); no `Keep` rows, no `retentionKey` in the batch (every §2.5 cell `—`), `principalField` only on `Report`.
 - **No pauses, no corrections:** every §2.5 row was present and unambiguous; no hand-rolled data-class comment superseded. No test added, no eraser/export touched, no type outside the batch annotated. `dotnet build` (solution) → **0 errors** (160 warnings, all pre-existing route/nullable warnings in `Kumunita.Web` — unchanged by this lane).
 - **Next unit:** IS19 (Projects / Documents / Bookmarks / Inventory / PersonalNotes / Media / Kiosk batch, copied verbatim from §2.5).
+
+## IS19a — Projects 1 batch (4 types: `Project`, `ProjectGoal`, `ProjectTranslation`, `TodoItem`)
+
+- **Files (4):** `Projects/Project.cs`, `Projects/ProjectGoal.cs`, `Projects/ProjectTranslation.cs`, `Projects/TodoItem.cs`.
+- **Values (verbatim §2.5):** all four `PrivateContent/Delete/Resident`. Reasons: `Project` "F1 §2A"; `ProjectGoal` "F1 §2A"; `ProjectTranslation` "F1 §2A; ADR 0088"; `TodoItem` "F1 §2A" (the §2.5 condition "where `AuthorId == resident`; **not** `AssigneeId`" is the eraser's query, not part of the attribute — `principalField` is Pseudonymize-only, so it is not carried).
+- **Tests:** none. `grep -c` over the 4 files → **4**. `dotnet build` → **0 errors**.
+
+## IS19b — Projects 2 batch (4 types: `TodoComment`, `TodoTranslation`, `KanbanBoard`, `KanbanLane`)
+
+- **Files (4):** `Projects/TodoComment.cs`, `Projects/TodoTranslation.cs`, `Projects/KanbanBoard.cs`, `Projects/KanbanLane.cs`.
+- **Values (verbatim §2.5):** `TodoComment` `PrivateContent/Delete/Resident` "F1 §2A"; `TodoTranslation` `PrivateContent/Delete/Resident` "F1 §2A; ADR 0088"; `KanbanBoard` `PrivateContent/Delete/Resident` "F1 §2A: the board the resident owns"; `KanbanLane` `PrivateContent/Keep/InstanceOnly` reason "F1 §2A sub-entities: travels with `KanbanBoard`; the board row's Delete is what removes it, not a principal query" (a cascade row — `Keep_RequiresReason` satisfied, no `principalField`).
+- **Tests:** none. `grep -c` over the 4 files → **4**. `dotnet build` → **0 errors**.
+
+## IS19c — Projects 3 batch (2 types: `BoardItemPlacement`, `BoardTranslation`)
+
+- **Files (2):** `Projects/BoardItemPlacement.cs`, `Projects/BoardTranslation.cs`.
+- **Values (verbatim §2.5):** `BoardItemPlacement` `PrivateContent/Keep/InstanceOnly` reason "F1 §2A sub-entities: under `KanbanBoard`" (cascade row, as `KanbanLane`); `BoardTranslation` `PrivateContent/Delete/Resident` "F1 §2A; ADR 0088".
+- **Tests:** none. `grep -c` over the 2 files → **2**. `dotnet build` → **0 errors**.
+
+## IS19d — Documents + Bookmarks batch (4 types: `Document`, `DocumentFolder`, `Bookmark`, `BookmarkFolder`)
+
+- **Files (4):** `Documents/Document.cs`, `Documents/DocumentFolder.cs`, `Bookmarks/Bookmark.cs`, `Bookmarks/BookmarkFolder.cs`.
+- **Values (verbatim §2.5):** all four `PrivateContent/Delete/Resident`. Reasons: `Document` "F1 §2A: the resident's uploads"; `DocumentFolder` "F1 §2A"; `Bookmark` "F1 §2A"; `BookmarkFolder` "F1 §2A; the E6 gap this lane closes (IS31)".
+- **Tests:** none. `grep -c` over the 4 files → **4**. `dotnet build` → **0 errors**.
+
+## IS19e — Inventory + PersonalNotes batch (3 types annotated: `InventoryItem`, `PersonalNote`, `NoteFolder`; 1 paused: `InventoryCheckout`)
+
+- **Files (3):** `Inventory/InventoryItem.cs`, `PersonalNotes/PersonalNote.cs`, `PersonalNotes/NoteFolder.cs`.
+- **Values (verbatim §2.5):** all three `PrivateContent/Delete/Resident`. Reasons: `InventoryItem` "F1 §2A"; `PersonalNote` "F1 §2A; M37 / ADR 0167; the E6 gap this lane closes (IS31)"; `NoteFolder` "F1 §2A; the E6 gap this lane closes (IS31)".
+- **⛔ PAUSE — `Inventory/InventoryCheckout.cs` NOT annotated.** The §2.5 row is `b | Pseudonymize (the resident's identity is erased, the checkout state is kept for stock accuracy) | Never` but **names no principal field** — the exact IS17 `Profile` pause (`/memories/repo/dataclass-annotation-convention.md`). IS16's `Pseudonymize_RequiresPrincipalField` invariant would throw if annotated without one, and guessing is not allowed (rules 1–9). `BorrowerId` (`InventoryCheckout.cs:30`) is the candidate principal field for the owner / IS21 to confirm. Recorded here per the plan; the type stays unannotated, so IS20's 81/81 coverage gate will surface it until it is resolved.
+- **Tests:** none. `grep -c` over the 3 annotated files → **3**. `dotnet build` → **0 errors**.
+
+## IS19f — Media + Kiosk batch (2 types: `MediaObject`, `KioskPlaylist`)
+
+- **Files (2):** `Media/MediaObject.cs`, `Kiosk/KioskPlaylist.cs`.
+- **Values (verbatim §2.5):** `MediaObject` `Media/Delete/Never` reason "F1 §2A: the catalog rows + their bytes (U4's set); the bytes live on a dedicated volume, not in the export"; `KioskPlaylist` `Operational/Delete/Never` reason "a per-resident display preference (Id = the resident's subject id, ADR 0164/0285); the resident's own playlist config; IS22's `ResidentAccountRowsEraser` adds the delete".
+- **Tests:** none. `grep -c` over the 2 files → **2**. `dotnet build` → **0 errors**.
+
+## IS19 — batch summary (19 of the 20 listed types annotated, 1 paused)
+
+- **Total:** `grep -rc "\[DataClass(" src --include="*.cs"` → **53** (34 after IS18 + 19 here). Every annotated file has exactly one `using Kumunita.Core.Privacy;` (verified: none of the 19 files imported it before). 17 `Delete` rows + 2 `Keep` cascade rows (`KanbanLane`, `BoardItemPlacement`, both with non-empty `reason`); no `Pseudonymize` annotated (the one such row is the paused `InventoryCheckout`).
+- **Conventions held (per `/memories/repo/dataclass-annotation-convention.md`):** no `principalField` anywhere in the batch (Pseudonymize-only), no `retentionKey` anywhere (every §2.5 "Retention key" cell in the batch is `—`), `reason:` verbatim from §2.5.
+- **Pause:** `InventoryCheckout` left unannotated (no principal field named in §2.5 — IS17 `Profile` precedent; `BorrowerId` is the candidate for the owner / IS21). No hand-rolled data-class comment was superseded in any file (none carried one, verified per the plan).
+- **No test added, no eraser/export touched, no type outside the batch annotated.** `dotnet build` (solution) → **0 errors** (160 warnings, all pre-existing — unchanged by this lane).
+- **Next unit:** IS20 (Messaging / GroupMessaging / Notifications / Sessions / Usage / ErrorReports / SiteContent / SurfaceLabels / Escalation / Onboarding / Community* batch — **plus** the `EveryRegisteredDocType_HasADataClass` 81/81 coverage gate; note `InventoryCheckout` and IS17's `Profile` will both need resolution before that gate can go green).
