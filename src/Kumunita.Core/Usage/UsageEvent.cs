@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Usage;
 
 /// <summary>
@@ -13,6 +15,9 @@ namespace Kumunita.Core.Usage;
 /// Purged only by the <see cref="UsagePurgeService"/> writer (D5,
 /// the 365-day platform constant).
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Pseudonymize, ExportScope.Never,
+    reason: "F1 §2C excluded (per-user storage row / usage history): derived metrics, not content; the resident's identity is erased, the metric stays (IS23)",
+    principalField: "ActorId")]
 public sealed class UsageEvent
 {
     public string Id { get; set; } = string.Empty;

@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Sessions;
 
 /// <summary>
@@ -21,6 +23,9 @@ namespace Kumunita.Core.Sessions;
 /// (ADR 0004 §B.1, the M3/Media/Page precedent).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.Pii, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): a session credential, not content; D6: 30 days after revoke or expiry",
+    retentionKey: "SessionDays")]
 public sealed class SessionDoc
 {
     /// <summary>The session id — a GUID string, the Marten document identity (conventional,

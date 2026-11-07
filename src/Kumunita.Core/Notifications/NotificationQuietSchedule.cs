@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Notifications;
 
 /// <summary>
@@ -33,6 +35,8 @@ public enum QuietScheduleMode
 /// empty array means "all" (a schedule with only hours set is quiet on every
 /// day during those hours).
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): the resident's own schedule (IS22)")]
 public sealed class NotificationQuietSchedule
 {
     /// <summary>Document identity — the recipient's subject id (one schedule
