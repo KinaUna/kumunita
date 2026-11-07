@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Localization;
 
 /// <summary>
@@ -5,6 +7,8 @@ namespace Kumunita.Core.Localization;
 /// instance supports. Admins edit it in-app (/admin/languages, M6's surface) —
 /// the first-boot seeder materializes the source-language (<c>en</c>) row.
 /// </summary>
+[DataClass(DataClassKind.Platform, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "the language list; no resident principal")]
 public sealed class LanguageCatalog
 {
     /// <summary>BCP-47 code — the row's identity (ADR 0005 B: <c>{ code }</c>).</summary>
@@ -25,6 +29,8 @@ public sealed class LanguageCatalog
 /// language. One row per instance; <see cref="Id"/> fixed to the sentinel
 /// <c>singleton</c> so re-resolving it is a plain identity-keyed load.
 /// </summary>
+[DataClass(DataClassKind.Platform, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "the community's locale defaults; no resident principal")]
 public sealed class LocaleSettings
 {
     public const string SingletonId = "singleton";

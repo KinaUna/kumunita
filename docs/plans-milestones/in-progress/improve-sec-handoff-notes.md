@@ -498,3 +498,40 @@ updated: 2026-11-07
 - **Scope held:** no existing doc type is annotated (that is IS17–IS20); no eraser / export reads the attribute yet (IS21–IS24). The attribute is **inert** — no Marten, no DI, no behaviour. `grep -rn "\[DataClass(" src --include="*.cs"` → **only** the new `Privacy` file (the two fixture usages are in the test assembly, not `src/`).
 - **Noticed (for IS17–IS20):** the §2.5 "Reason" column values are the exact `reason:` strings to copy per type; the §2.5 "Class" column's letters a–e / operational / platform map to the `DataClassKind` members as `a→Pii, b→PrivateContent, c→AuditModeration, d→Secret, e→Media, operational→Operational, platform→Platform`. The 9 `Pseudonymize` rows in §2.5 already name their principal field (the `Pseudonymize_RequiresPrincipalField` rule is satisfied by the table); IS17–IS20 must carry that field into `principalField:`.
 - **Next unit:** IS17 (annotate the Identity/UserInfo/Authorization/Localization batch, ~20 types, one line each, copied verbatim from §2.5).
+
+## IS17a — Identity batch (4 types: `OutboxEmail`, `EmailDeadLetter`, `IdentityToken`, `GuestAccess`)
+
+- **Files (3):** `Identity/EmailMessages.cs` (both), `Identity/IdentityToken.cs`, `Identity/GuestAccess.cs`. Each gains one `[DataClass]` + `using Kumunita.Core.Privacy;`; no new method, no DI, no behaviour.
+- **Values (verbatim §2.5):** `OutboxEmail` `Pii/Delete/Never` reason "F1 §2C … D6: body nulled 7 days … row deleted 90 days" `retentionKey: OutboxBodyDays` (the §2.5 two-key row; `OutboxRowDays` is the row-delete key, an IS34a concern); `EmailDeadLetter` `Operational/Delete/Never` reason "D6: 30 days … (IS34a)" `retentionKey: DeadLetterDays`; `IdentityToken` `Secret/Delete/Never` reason "F1 §2C … (IS22); D6: 7 days …" `retentionKey: TokenDays`; `GuestAccess` `AuditModeration/Delete/Never` reason "F1 §2C … (IS22)".
+- **Tests:** none (IS17–IS19 are "no test" per design §2.3; the 81/81 gate is IS20's). `grep -c "\[DataClass("` over the 3 files → **4**. `dotnet build` (solution) → **0 errors**.
+
+## IS17b — UserInfo batch 1 (5 types: `Group`, `GroupMembership`, `DelegationGrant`, `GuardianLink`, `GuardianTimeLimitSchedule`)
+
+- **Files (3):** `UserInfo/Group.cs` (first three), `UserInfo/GuardianLink.cs`, `UserInfo/GuardianTimeLimitSchedule.cs`.
+- **Values (verbatim §2.5):** `Group` `PrivateContent/Keep/InstanceOnly` reason "IS03 §2C decision … ADR 0142" (a `Keep` row — reason present, satisfies IS16's `Keep_RequiresReason`); `GroupMembership` `PrivateContent/Delete/InstanceOnly` reason "F1 §2B … (step 6)"; `DelegationGrant` `AuditModeration/Delete/Never` reason "F1 §2C … (IS22)"; `GuardianLink` `AuditModeration/Delete/Never` reason "F1 §2B … (step 8b, dissolved)"; `GuardianTimeLimitSchedule` `AuditModeration/Delete/Never` reason "IS23: the child's schedule is the child's data".
+- **Tests:** none. `grep -c` over the 3 files → **5**. `dotnet build` → **0 errors**.
+
+## IS17c — UserInfo batch 2 (3 types annotated; `Profile` **PAUSED**)
+
+- **Files (1):** `UserInfo/Component.cs` — `Component` `Platform/Keep/InstanceOnly` reason "a community component … F1 §2C excluded"; `ModeratorAssignment` + `ComponentMembership` both `AuditModeration/Delete/InstanceOnly` reason "F1 §2B … (step 7)".
+- **PAUSE — `Profile` (not annotated, recorded per rule 1–9):** the §2.5 row is `a | Pseudonymize | Resident | — | F1 §2B: already handled by DeleteCoreAsync (step 8)…` — a **Pseudonymize** row that names **no principal field** (unlike `AccessAudit`, whose §2.5 names `ActorId`). IS16's `Pseudonymize_RequiresPrincipalField` invariant would throw at read time, and the IS17 prompt states this case explicitly: *"a Pseudonymize type with no field named in §2.5 is a pause, not a guess."* Left unannotated; needs an owner/IS21 decision on which field is pseudonymized (the §2.6 Rule 3 blanked PII fields `Email`/`Phone`/`Address` are candidates, but §2.5 does not name one).
+- **Tests:** none. `grep -c` over `Component.cs` → **3**. `dotnet build` → **0 errors**.
+
+## IS17d — Authorization batch (2 types annotated; `AdminOverride` **out of scope**)
+
+- **Files (1):** `Authorization/AccessAudit.cs` — `AccessAudit` `AuditModeration/Pseudonymize/Never` reason "F1 §2B … data-classes.md §3.1 …" `principalField: ActorId` (the §2.5 row names `ActorId` / `EffectivePrincipalId`; `ActorId` is the acting account, the primary principal — matches the prompt's `AccessAudit → ActorId` example); `AuditPurgeSummary` `AuditModeration/Keep/Never` reason "an operational record of the purge itself; no resident principal".
+- **Out of scope — `AdminOverride` (not annotated):** listed in the IS17 file map but **not a registered `Schema.For<T>` doc type** — `CoreDocTypes.cs:138`: *"AdminOverride is hand-rolled, see AuthorizationFeature"*; there is no `Schema.For<AdminOverride>` anywhere in `src/`. It has **no row in the 81-row §2.5 table** (grep confirms it appears only at the BreakGlassProbe SQL note and the IS28 gate note, never as a `| \`AdminOverride\` |` row). Annotating it would add a non-registered type to `DataClassCatalog.All` and break IS20's 81/81 coverage gate. File-map correction recorded; the successor may fold it into a "registered vs. hand-rolled" note in IS41.
+- **Tests:** none. `grep -c` over `AccessAudit.cs` → **2**. `dotnet build` → **0 errors**.
+
+## IS17e — Localization + Notifications batch (4 types: `LanguageCatalog`, `LocaleSettings`, `TranslationResource`, `SuppressedAddress`)
+
+- **Files (3):** `Localization/LanguageCatalog.cs` (both), `Localization/TranslationResource.cs`, `Notifications/SuppressedAddress.cs`.
+- **Values (verbatim §2.5):** `LanguageCatalog` `Platform/Keep/InstanceOnly` reason "the language list; no resident principal"; `LocaleSettings` `Platform/Keep/InstanceOnly` reason "the community's locale defaults; no resident principal"; `TranslationResource` `Platform/Keep/InstanceOnly` reason "the UI translation strings; no resident principal"; `SuppressedAddress` `Operational/Delete/Never` reason "the resident opted out of notifications; the row is theirs; D2: declared on the type".
+- **Tests:** none. `grep -c` over the 3 files → **4**. `dotnet build` → **0 errors**.
+
+## IS17 — batch summary (18 of the 20 listed types annotated)
+
+- **Total:** `grep -rc "\[DataClass(" src --include="*.cs"` → **18** (the 11 files above; `Profile.cs` and `AdminOverride.cs` correctly at **0**). Every annotated file has exactly one `using Kumunita.Core.Privacy;`. No test added, no eraser/export touched, no IS18–IS20 type annotated. `dotnet build` (solution) → **0 errors**.
+- **Two pauses / corrections (not annotated):** `Profile` (Pseudonymize row names no principal field — the prompt's explicit "pause, not a guess" case) and `AdminOverride` (not a registered doc type — hand-rolled, no §2.5 row). Both are recorded above for the successor and the IS21/IS24 consumers.
+- **retentionKey convention:** the bare `RetentionOptions` field name (`OutboxBodyDays`, `DeadLetterDays`, `TokenDays`) — matching IS16's `DataClassAttribute` doc examples (`SessionDays`, `TokenDays`) — not the full `Retention__*` config key.
+- **Next unit:** IS18 (Posts / Announcements / Events / Pages / Tags / Moderation batch, copied verbatim from §2.5).
