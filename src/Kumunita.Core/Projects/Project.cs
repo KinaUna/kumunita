@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Projects;
 
 /// <summary>
@@ -33,6 +35,8 @@ namespace Kumunita.Core.Projects;
 /// D3).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A")]
 public sealed class Project
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)

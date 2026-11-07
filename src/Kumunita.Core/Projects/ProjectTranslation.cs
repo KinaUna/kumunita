@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Projects;
 
 /// <summary>
@@ -38,6 +40,8 @@ namespace Kumunita.Core.Projects;
 /// <c>Add</c> lane again).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A; ADR 0088")]
 public sealed class ProjectTranslation
 {
     public string Id { get; set; } = string.Empty;
