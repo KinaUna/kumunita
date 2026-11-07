@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.AdminOnboarding;
 
 /// <summary>
@@ -13,6 +15,8 @@ namespace Kumunita.Core.AdminOnboarding;
 /// **untouched** — this is a new doc in a new context, not a new field on an
 /// existing one (the ADR 0150 D6 / ADR 0006 module-boundary pin).
 /// </summary>
+[DataClass(DataClassKind.Platform, Erasure.Keep, ExportScope.Never,
+    reason: "the platform's onboarding state; the `CompletedAt` is an operator timestamp")]
 public sealed class AdminOnboarding
 {
     public const string SingletonId = "singleton";
