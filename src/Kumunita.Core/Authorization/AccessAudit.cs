@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Authorization;
 
 /// <summary>
@@ -15,6 +17,9 @@ namespace Kumunita.Core.Authorization;
 /// <see cref="AuditPurgeSummary"/> row (the only writer that deletes; §5).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Pseudonymize, ExportScope.Never,
+    reason: "F1 §2B: already pseudonymized by `DeleteCoreAsync` (step 5); data-classes.md §3.1: the audit log is a disclosure surface, retained per the tiered policy",
+    principalField: "ActorId")]
 public sealed class AccessAudit
 {
     public string Id { get; set; } = string.Empty;
@@ -54,6 +59,8 @@ public sealed class AccessAudit
 /// A summary row written only by the scheduled purge job: count, cutoff, at. It is the
 /// audit-of-audit for the deletion — the only deletion writer is the purge job (§5).
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Keep, ExportScope.Never,
+    reason: "an operational record of the purge itself; no resident principal")]
 public sealed class AuditPurgeSummary
 {
     public string Id { get; set; } = string.Empty;
