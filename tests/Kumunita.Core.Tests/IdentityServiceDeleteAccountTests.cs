@@ -264,6 +264,13 @@ public sealed class IdentityServiceDeleteAccountTests(PostgresFixture fixture) :
             opts.DatabaseSchemaName = "mt";
             CoreDocTypes.Configure(opts);
             PostDocTypes.Configure(opts);
+            // IS22 gotcha (same category as the MediaDocTypes GOTCHA above in
+            // the reference harness): DeleteCoreAsync now runs
+            // ResidentAccountRowsEraser, which queries the pinned-identity
+            // NotificationPreference / NotificationQuietSchedule — the
+            // NotificationDocTypes surface must be registered or the query
+            // throws InvalidDocumentException (no closed-shape id strategy).
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
