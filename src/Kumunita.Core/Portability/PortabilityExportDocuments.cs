@@ -125,19 +125,38 @@ public static class PortabilityExportDocuments
     /// carries. The loop is uniform (the <see cref="NameToType"/> table
     /// lookup + reflection-dispatched <c>Query&lt;T&gt;()</c> /
     /// <c>ToListAsync()</c> / <c>JsonSerializer</c> — not per-type code).
+    /// <para>
+    /// <b>IS27 (ADR 0299, design §2.6):</b> <see cref="PortabilityExportScope.Full"/>
+    /// (the default — the pre-IS27 behaviour, unchanged) exports all 44 types
+    /// with every row and every field. <see cref="PortabilityExportScope.ContentFree"/>
+    /// applies the §2.6 strip rules (driven by
+    /// <see cref="Privacy.DataClassCatalog"/>, not per-type code): the
+    /// <see cref="ContentFreeFilter.ShouldSkipType"/> types are omitted,
+    /// the <see cref="ContentFreeFilter.ShouldFilterRows"/> types keep
+    /// public rows (<c>Audience = null</c>) and drop restricted ones, and
+    /// the <see cref="ContentFreeFilter.ShouldBlankPii"/> type's PII fields
+    /// are blanked.
+    /// </para>
     /// </summary>
     /// <param name="documentStore">The frozen Marten seam.</param>
+    /// <param name="scope">The export scope (ADR 0299; the default is
+    /// <see cref="PortabilityExportScope.Full"/> — the pre-IS27 behaviour).</param>
     /// <param name="ct">Cancellation.</param>
     /// <returns>
     /// <c>Docs</c> — the type name → <c>docs/{Type}.json</c> payload bytes
-    /// (one entry per registry entry); <c>DocCounts</c> — the type name →
-    /// row count (the manifest's <c>doc_counts</c>).
+    /// (one entry per registry entry; for <see cref="PortabilityExportScope.ContentFree"/>
+    /// the skipped types are still present with an empty array so the
+    /// manifest's <c>doc_counts</c> stays a closed 44-entry map); <c>DocCounts</c> —
+    /// the type name → row count (the manifest's <c>doc_counts</c>).
     /// </returns>
     public static async Task<(Dictionary<string, byte[]> Docs, Dictionary<string, int> DocCounts)> ExportAsync(
-        IDocumentStore documentStore, CancellationToken ct = default)
+        IDocumentStore documentStore,
+        PortabilityExportScope scope = PortabilityExportScope.Full,
+        CancellationToken ct = default)
     {
         var docs = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         var docCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var contentFree = scope == PortabilityExportScope.ContentFree;
 
         await using var session = documentStore.QuerySession();
 
@@ -146,6 +165,18 @@ public static class PortabilityExportDocuments
             ct.ThrowIfCancellationRequested();
 
             var docType = NameToType[entry.Type];
+
+            // IS27 (ADR 0299 §2.6) — the content-free strip rules, driven by
+            // DataClassCatalog (not per-type code). Full scope: no strip at all.
+            if (contentFree && ContentFreeFilter.ShouldSkipType(docType))
+            {
+                // The type stays in the closed 44-entry map (the manifest's
+                // doc_counts is a closed inventory) but the array is empty.
+                docs[entry.Type] = JsonSerializer.SerializeToUtf8Bytes(
+                    new List<object>(), typeof(List<object>), JsonOpts);
+                docCounts[entry.Type] = 0;
+                continue;
+            }
 
             // Uniform query + terminal (reflection-dispatched on the
             // resolved Type — the "not per-type code" pin):
@@ -166,6 +197,21 @@ public static class PortabilityExportDocuments
 
             // Generic JSON round-trip: one Serialize over the List<T> (the
             // same options as KumunitaArchive.ToJson<T>).
+            // IS27 (ADR 0299 §2.6) — the row-level strip rules (content-free only).
+            // Rule 2: the audience-bearing PrivateContent types keep only the
+            // public rows (Audience = null — the frozen Decide() branch 5).
+            // Rule 3: Profile PII fields (Email/Phone/Address) blanked.
+            if (contentFree)
+            {
+                if (ContentFreeFilter.ShouldFilterRows(docType))
+                    list = ContentFreeFilter.KeepOnlyPublicRows(list, docType);
+                if (ContentFreeFilter.ShouldBlankPii(docType))
+                {
+                    foreach (var row in (System.Collections.IEnumerable)list)
+                        ContentFreeFilter.BlankProfilePii(row!);
+                }
+            }
+
             var listType = typeof(List<>).MakeGenericType(docType);
             docs[entry.Type] = JsonSerializer.SerializeToUtf8Bytes(list, listType, JsonOpts);
 
