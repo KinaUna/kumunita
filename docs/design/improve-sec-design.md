@@ -566,10 +566,10 @@ closed `PortabilityDocTypes.Entries` list (`PortabilityDocTypes.cs:91–158`;
 
 | Strip rule | M11 types | Count |
 |---|---|---|
-| Rule 1 — `PrivateContent`, omitted entirely | `Announcement`, `AnnouncementComment`, `AnnouncementTranslation`, `BoardItemPlacement`, `BoardTranslation`, `Conversation`, `Event`, `EventRsvp`, `EventTranslation`, `Group`, `KanbanBoard`, `KanbanLane`, `Message`, `Page`, `PageTranslation`, `Post`, `PostReply`, `PostTranslation`, `Project`, `ProjectGoal`, `ProjectTranslation`, `ReplyTranslation`, `Tag`, `TagTranslation`, `TodoComment`, `TodoItem`, `TodoTranslation` | **27** |
-| Rule 2 — audience-bearing (public rows stay, restricted rows omitted) | a subset of Rule 1's 27: `Post`, `Event`, `Page`, `Project`, `ProjectGoal`, `TodoItem`, `KanbanBoard` (the 7 of the 27 with a non-null `Audience` field; IS27 checks `Audience.Mode != Any` per row) | **(7 of the 27)** |
+| Rule 1 — `PrivateContent` (class b), omitted entirely | `Announcement`, `AnnouncementComment`, `AnnouncementTranslation`, `BoardItemPlacement`, `BoardTranslation`, `CommunityTranslation`, `Conversation`, `Event`, `EventRsvp`, `EventTranslation`, `Group`, `GroupMembership`, `GroupTranslation`, `KanbanBoard`, `KanbanLane`, `Message`, `Page`, `PageTranslation`, `Post`, `PostReply`, `PostTranslation`, `Project`, `ProjectGoal`, `ProjectTranslation`, `ReplyTranslation`, `Tag`, `TagTranslation`, `TodoComment`, `TodoItem`, `TodoTranslation` | **30** |
+| Rule 2 — audience-bearing (public rows stay, restricted rows omitted) | a subset of Rule 1's 30: `Post`, `Event`, `Page`, `Project`, `ProjectGoal`, `TodoItem`, `KanbanBoard` (the 7 of the 30 with a non-null `Audience` field; IS27 checks `Audience.Mode != Any` per row) | **(7 of the 30)** |
 | Rule 3 — `Profile` PII fields blanked | `Profile` | **1** |
-| Always present (structural / public, no strip) | `Component`, `CommunityTranslation`, `GroupTranslation`, `TranslationResource` (platform singletons); `ComponentMembership`, `GroupMembership`, `ModeratorAssignment` (governance); `MediaObject` (catalog row; bytes are on the dedicated volume, out of the JSON archive by construction) | **8** |
+| Always present (structural / public, no strip) | `Component`, `TranslationResource` (platform singletons); `ComponentMembership`, `ModeratorAssignment` (governance); `MediaObject` (class (e) catalog row — the bytes are on the dedicated volume, out of the JSON archive by construction) | **5** |
 | **`// TODO ❓`** (owner decision, not decided here) | `DelegationGrant`, `GroupInvitation`, `GroupJoinRequest`, `GuardianLink`, `Report` (class (c) — accountability records); `Notification`, `NotificationPreference`, `NotificationSubscription` (the recipient's inbox state) | **8** |
 | | **Total** | **44** ✓ |
 
@@ -587,7 +587,7 @@ owner has not decided by the unit):**
 | `NotificationPreference` | operational | the resident's own setting; not operator-facing | **Skipped** |
 | `NotificationSubscription` | operational | the resident's own setting; not operator-facing | **Skipped** |
 
-**What `Full` restores over `ContentFree`:** all 27 `PrivateContent` types
+**What `Full` restores over `ContentFree`:** all 30 `PrivateContent` types
 (including the 7 audience-bearing rows), the `Profile` PII fields
 (`Email`/`Phone`/`Address` restored), and the 8 `// TODO ❓` rows (unless
 the owner has promoted them to `ContentFree` before IS27 ships). `Full` is
