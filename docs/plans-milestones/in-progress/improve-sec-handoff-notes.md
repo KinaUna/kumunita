@@ -300,3 +300,51 @@ updated: 2026-11-07
   (not a `Kind`/`Value` pair) — relevant for any test that seeds an
   audience-restricted board (the IS10 fixture uses
   `Grants = [new AudienceGrant(GrantKind.Group, "grp-…")]`).
+
+## IS11 — Triage batch 1 (Posts / Documents / Moderation, SEC-READ markers)
+
+- **Deliverables (4 marker files + this append):** `src/Kumunita.Core/Posts/PostService.cs`, `src/Kumunita.Core/Posts/PostService.Media.cs`, `src/Kumunita.Core/Documents/DocumentService.cs`, `src/Kumunita.Core/Moderation/ModerationService.cs`. Comment-only edits (no method body, signature, `using`, or test changed). `dotnet build` 0 errors; the affected Core (`PostServiceTests`, `ModerationServiceTests`, `PostReplyCountTests`) and Web (`DocumentControllerTests`, `ModerationControllerTests`, `PostReadDecisionTests`) classes are all green (76 + 44, no failures).
+- **Count of markers added: 22** (11 PostService, 4 PostService.Media, 4 DocumentService, 3 ModerationService). Every marker line ends in a reason (IS15's `SecReadMarker_NamesAReason` enforces).
+- **`method → verdict → evidence line` table** (one row per marked method):
+
+  | Method (file) | Taxonomy line used | Evidence (file:line, makes it safe) |
+  |---|---|---|
+  | `PostService.CreatePostAsync` (PostService.cs:446) | `owner-only` — the read is the actor's own effective community set | PostService.cs:481–497: `GetEffectiveCommunityIdsAsync(actorId)` scopes to the actor's own memberships; the write is the actor's own post |
+  | `PostService.UpdatePostAsync` (PostService.cs:673) | `owner-only` — author-only edit lane (ADR 0014) | PostService.cs:711–713: `post.AuthorId == actorId` else `UnauthorizedAccessException` |
+  | `PostService.CreateReplyAsync` (PostService.cs:808) | `no disclosure` — the parent-post load is to route the reply-mention notification to the parent author | PostService.cs:839–852: `parentPost.AuthorId` is used only to choose the notification recipient, not a read surface |
+  | `PostService.UpdateReplyAsync` (PostService.cs:976) | `owner-only` — author-only reply-edit lane (ADR 0016) | PostService.cs:990–992: `reply.AuthorId == actorId` else `UnauthorizedAccessException` |
+  | `PostService.DeletePostAsync` (PostService.cs:1043) | `owner-only` — author-only soft-delete lane (ADR 0024) | PostService.cs:1055–1057: `post.AuthorId == actorId` else `UnauthorizedAccessException` |
+  | `PostService.DeleteReplyAsync` (PostService.cs:1085) | `owner-only` — author-only reply-soft-delete lane (ADR 0024) | PostService.cs:1096–1097: `reply.AuthorId == actorId` else `UnauthorizedAccessException` |
+  | `PostService.PublishPostAsync` (PostService.cs:1140) | `owner-only` — author-only draft publish lane (ADR 0037) | PostService.cs:1152–1154: `post.AuthorId == actorId` else `UnauthorizedAccessException` |
+  | `PostService.ListMyDraftsAsync` (PostService.cs:1193) | `owner-only` — the read is scoped to the actor's own drafts | PostService.cs:1204: `p.IsDraft && p.AuthorId == actorId && p.DeletedAt == null` |
+  | `PostService.GetPostTranslationsAsync` (PostService.cs:1352) | `caller-gated by PostsController.Detail / GroupsController.GroupPostDetail / HomeController.Index` (C-M3·1) | PostService.cs:1345–1351: "the caller has already made the Read decision (the Web reads this only after `GetPostAsync` returned the post)" |
+  | `PostService.CountRepliesAsync` (PostService.cs:1378) | `no disclosure` — returns only post-id → reply-count | PostService.cs:1397–1405: the projection is `Select(r => r.PostId)` + a count dictionary; no audience-bearing field is exposed |
+  | `PostService.GetReplyTranslationsAsync` (PostService.cs:1409) | `caller-gated by PostsController.Detail / GroupsController.GroupPostDetail` (C-M3·1) | PostService.cs:1401–1407: "the reply read inherits the parent post's single Read decision, already made by the caller" |
+  | `PostService.FindPostByImageIdAsync` (PostService.Media.cs:32) | `caller-gated by ContentImageController.Image` (`PostReadDecision.ResolveAsync`) | ContentImageController.cs:80–93: the finder result is fed into `PostReadDecision.ResolveAsync(post, actorId, authz)` and Deny → 404 |
+  | `PostService.FindReplyByImageIdAsync` (PostService.Media.cs:53) | `caller-gated by ContentImageController.Image` (against the parent post, C-M3·1) | ContentImageController.cs:99–118: the reply's parent is loaded and `PostReadDecision.ResolveAsync(parent, …)` decides |
+  | `PostService.FindPostByAttachmentIdAsync` (PostService.Media.cs:77) | `caller-gated by AttachmentController.Download` (`PostReadDecision.ResolveAsync`) | AttachmentController.cs:180 (same seam as the image route, the C-ATT·7 pin) |
+  | `PostService.FindReplyByAttachmentIdAsync` (PostService.Media.cs:98) | `caller-gated by AttachmentController.Download` (against the parent post, C-M3·1) | AttachmentController.cs:197 (the reply → parent → decision shape, the C-ATT·7 pin) |
+  | `DocumentService.UpdateAsync` (DocumentService.cs:257) | `owner-only` — the load is followed by the owner-only gate (ADR 0125 D1) | DocumentService.cs:265–267: `doc.OwnerId == actorId` else the lane's 403/404 shape |
+  | `DocumentService.DeleteAsync` (DocumentService.cs:350) | `owner-only` — the load is followed by the owner-only gate (ADR 0122/0125) | DocumentService.cs:356 (the load) + the ADR 0122 D7 posture (missing + denied + deleted all collapse to 404) |
+  | `DocumentService.ListDeletedAsync` (DocumentService.cs:392) | `owner-only` — non-admin callers are scoped to their own rows; GlobalAdmin sees the restore-surface list of titles | DocumentService.cs:399–401: `d.DeletedAt != null` + `d.OwnerId == actorId` for non-admins |
+  | `DocumentService.RestoreAsync` (DocumentService.cs:418) | `owner-only` — the load is followed by the owner/global-admin restore gate (ADR 0241) | DocumentService.cs:428–430: `!actorIsGlobalAdmin && doc.OwnerId != actorId` → `UnauthorizedAccessException` |
+  | `ModerationService.GetQueueAsync` (ModerationService.cs:281) | `report-gated (ADR 0003)` — the queue self-filters | ModerationService.cs:305–335: the standing-moderator branch requires `ModeratorAssignment` row + `Component.ModeratorAccess == true`; a plain resident sees none |
+  | `ModerationService.GetDetailAsync` (ModerationService.cs:427) | `report-gated (ADR 0003)` — ModerationController.Resolve scopes the read | ModerationController.cs:266–268: `!isGlobalAdmin && !(isStanding && IsInActorScopeAsync(…))` → `NotFound()` |
+  | `ModerationService.GetStandingModeratorsAsync` (ModerationService.cs:555) | `report-gated (ADR 0003)` — surfaced only from GetDetailAsync (report-gated) | ModerationService.cs:525: the single non-test caller is GetDetailAsync (the report-gated seam) |
+
+- **Methods left as *already decided* (no marker):**
+  - `PostService.ListFeedAsync` (PostService.cs:217) — `CanSeeAsync` in-method over the feed rows (PostService.cs:260).
+  - `PostService.ListAllFeedAsync` (PostService.cs:297) — `CanSeeAsync` in-method (PostService.cs:339).
+  - `PostService.GetPostAsync` (PostService.cs:362) — `CanAsync` in-method (PostService.cs:395).
+  - `PostService.HidePostAsync` (PostService.cs:1221) — `CanAsync(Moderate)` in-method (PostService.cs:1233).
+  - `PostService.RemovePostAsync` (PostService.cs:1258) — `CanAsync(Moderate)` in-method (PostService.cs:1268).
+  - `DocumentService.ListAsync` (DocumentService.cs:74) — `CanSeeAsync` in-method (DocumentService.cs:128).
+  - `DocumentService.GetAsync` (DocumentService.cs:150) — `CanAsync(Read)` in-method (DocumentService.cs:165).
+  - `ModerationService.IsStandingModeratorOnComponentAsync` (ModerationService.cs:263) — a pure probe, returns `bool`; no audience-bearing field is exposed.
+  - `ModerationService.IsInActorScopeAsync` (ModerationService.cs:580) — a pure probe, returns `bool`; the `Component.ModeratorAccess` bool is a flag, not a content field.
+  - `DocumentService.UploadAsync` (DocumentService.cs:186) — a write lane (no audience-bearing read; the caller's standing is decided at the Web boundary, D5).
+- **No leaks found; no pause.** Every method either self-decides in-method (`CanAsync`/`CanSeeAsync`/`CanAsync(Moderate)`), is owner-scoped (`AuthorId == actorId` / `OwnerId == actorId` / `AuthorId` on the drafts filter), returns no audience-bearing field (counts, ids, shapes with the content stripped), or is a read seam whose caller already ran the decision (the Web controllers' `PostReadDecision.ResolveAsync` / `ModerationController.Resolve` / `PostsController.Detail`).
+- **Noticed:** `ModerationService.GetStandingModeratorsAsync` has only one non-test caller (`ModerationService.GetDetailAsync` itself, ModerationService.cs:525). The taxonomy line records that the seam is only surfaced from the report-gated seam, so the report-gate applies.
+- **Noticed:** `DocumentService.ListDeletedAsync`'s GlobalAdmin branch lists every soft-deleted document's title. The doc-comment (DocumentService.cs:387–391) already pins this as "a list of titles and names for restoring, not a read of the content: no download, no audience decision". The marker records the same posture.
+- **Noticed:** `PostService.CreatePostAsync` reads the actor's own effective community set via `GetEffectiveCommunityIdsAsync`. That is a UserInfo read, not an audience-bearing read (the actor's own rows). The posting-right gate is in-method (the ADR 0003 posting-right rule). The marker records the owner-only posture.
+- **Next unit (IS12):** triage batch 2 (Events / Projects, 12 methods) — the same `// SEC-READ:` marker or a pause-on-leak; the 52 → 0 gate is still IS15's.

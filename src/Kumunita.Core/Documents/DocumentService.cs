@@ -256,6 +256,7 @@ public sealed class DocumentService : IDocumentService
     /// <exception cref="UnauthorizedAccessException">The actor is not the document's owner.</exception>
     public async Task<Document> UpdateAsync(string documentId, DocumentEdit edit, string actorId, IDocumentSession session)
     {
+        // SEC-READ: owner-only — the load is followed by the owner-only gate (doc.OwnerId == actorId, ADR 0125 D1)
         if (string.IsNullOrEmpty(documentId)) throw new ArgumentException("A document id is required.", nameof(documentId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting owner is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(edit);
@@ -349,6 +350,7 @@ public sealed class DocumentService : IDocumentService
     /// document's owner.</exception>
     public async Task DeleteAsync(string documentId, string actorId, IDocumentSession session)
     {
+        // SEC-READ: owner-only — the load is followed by the owner-only gate (doc.OwnerId == actorId, ADR 0122/0125)
         if (string.IsNullOrEmpty(documentId)) throw new ArgumentException("A document id is required.", nameof(documentId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting owner is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(session);
@@ -391,6 +393,7 @@ public sealed class DocumentService : IDocumentService
     /// </summary>
     public async Task<IReadOnlyList<Document>> ListDeletedAsync(string actorId, bool actorIsGlobalAdmin, int max = 200)
     {
+        // SEC-READ: owner-only — non-admin callers are scoped to their own rows (d.OwnerId == actorId); GlobalAdmin sees the restore-surface list of titles, not content (ADR 0241)
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("An actor is required.", nameof(actorId));
         if (max < 1) max = 1;
@@ -417,6 +420,7 @@ public sealed class DocumentService : IDocumentService
     /// <exception cref="UnauthorizedAccessException">The actor is neither the owner nor a GlobalAdmin.</exception>
     public async Task RestoreAsync(string documentId, string actorId, bool actorIsGlobalAdmin, IDocumentSession session)
     {
+        // SEC-READ: owner-only — the load is followed by the owner/global-admin restore gate (ADR 0241; non-owner non-admin throws)
         if (string.IsNullOrEmpty(documentId)) throw new ArgumentException("A document id is required.", nameof(documentId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting subject is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(session);
