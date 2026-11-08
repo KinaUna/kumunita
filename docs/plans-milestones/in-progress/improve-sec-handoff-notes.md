@@ -1391,3 +1391,39 @@ ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
 - **Next unit: IS39** (control-map rewrite — traceability; the CSP-discipline
   row can now name `NoView_HasAnInlineScriptBlock` as its pin, and IS40 gates
   the traceability).
+
+## IS39 — Control-map rewrite (traceability) (E8, M1: 9/24 → all rows traced)
+
+Docs-only: the control map is now 5 columns, every row has a resolving seam,
+and every *code* row names an existing pinning test. The 8 lane controls
+(IS20/IS21–IS23/IS24/IS33–IS35/IS27–IS29/IS15/IS05–IS08/IS37–IS38c/IS36) each
+get a row, and the stamp row is fixed to the two real seams.
+
+- **Files (1):** `docs/security/control-map.md` (front-matter `updated` →
+  2026-11-08, ADR `0298`/`0299` added to `related:`; intro rewritten for the
+  `Seam` / `Pinned by` / `ADR` columns; table 3→5 columns; stamp row seam
+  corrected + 14-day inert note; 8 new rows; every code row now names a test).
+- **Public names:** none (no code). New ADR refs: `0298` (data classes /
+  erasure / retention / markers / log redaction / CSP / admin-read), `0299`
+  (operator-gated export). New test refs: `DataClassCoverageTests`,
+  `DeleteAccountThreadTests`, `DeleteAccountRowsTests`, `RetentionServiceTests`,
+  `AdminPortabilityScopeTests`, `BreakGlassProbeTests`,
+  `DecisionFreeReadGateTests`, `LogTemplatePiiGateTests`,
+  `SentryBreadcrumbPiiTests`, `CspInlineDisciplineGateTests`,
+  `AdminReadAuditTests`.
+- **Stamp row:** seam now `RevocationStampMiddleware` +
+  `PrivilegedStampMiddleware` (ADR 0281); `SecurityStampValidatorOptions`
+  recorded as *deliberately inert at 14 days*. Pinned by
+  `RevocationStampFailClosedTests` + `PrivilegedStampMiddlewareTests`.
+- **Verified (all resolve):** 25 `src/` seam links, 18 doc/ADR/ops links, and
+  every cited test class+method (`grep -rn "public.*<Method>" tests/`) — none
+  miss. `ContentImageServingTests` is a deliberately paused doc-class (zero
+  `[Fact]`), so the media/attachment serve seam is pinned by the real
+  `PostReadDecisionTests` instead.
+- **Tests:** n/a (docs-only; no build). Owner-ops rows = 8 (lockout, PBKDF2,
+  CAPTCHA, seed-token, DB-role, backups, pinned-image, SMTP) — each marked
+  `— (owner-ops, no code seam)`.
+- **Next unit: IS40** — the traceability gate
+  (`ControlMapTraceabilityTests`): red build if any row's seam is a dead link or
+  any code row names a test that does not exist. The names IS39 put in the
+  table are exactly what that gate checks.
