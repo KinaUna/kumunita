@@ -1,6 +1,8 @@
+using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
+using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,7 +33,20 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Route("admin/guests")]
 [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
-public sealed class AdminGuestsController(IIdentityService identity) : Controller
+public sealed class AdminGuestsController(
+    IIdentityService identity,
+    // IS36 (D9) — the ADR 0015 D1 "kw-l floor" optional-ctor-param idiom:
+    // optional (default null) so the existing test-construction site
+    // (AdminGuestsControllerTests, `new AdminGuestsController(identity)`)
+    // keeps compiling without a store; DI always supplies the live
+    // IDocumentStore in the app. When null (a test harness that does not
+    // supply it), the audit write in Index is skipped (a read is a no-op
+    // without a store — the "no disclosure" shape); when supplied (the app,
+    // and the new IS36 tests), exactly one aggregate AccessAudit row is
+    // written (TargetKind "guests", Action "guests.view"). No new AccessVia,
+    // no new IAuthorizationService method (the AccessAuditFactory "no new
+    // seam" shape).
+    IDocumentStore? store = null) : Controller
 {
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -49,6 +64,35 @@ public sealed class AdminGuestsController(IIdentityService identity) : Controlle
         var model = new GuestAdminViewModel { SubjectId = subjectId ?? string.Empty };
         if (subjectId is not null)
             model.Seed(await identity.GetGuestAccessAsync(subjectId));
+
+        // IS36 (D9) — the guest standing list is a disclosure surface (class
+        // (c) — the PII-bearing GuestAccess rows). A GlobalAdmin reading it
+        // leaves exactly one aggregate AccessAudit row (the ADR 0108
+        // "portability.export" precedent, adapted to a read view): TargetKind
+        // "guests", Action "guests.view", VisibleCount = 1 when a subject was
+        // supplied (one standing rendered), 0 for the create shape (no
+        // subject), TargetId null, Via Admin, Outcome Allow. Guarded: when the
+        // optional store is null the write is skipped (the "no disclosure"
+        // shape). Counts only — no PII (the IS08 gate).
+        if (store is not null)
+        {
+            await using (var auditSession = store.LightweightSession())
+            {
+                auditSession.Store(new AccessAudit
+                {
+                    Id           = Guid.NewGuid().ToString("N"),
+                    At           = DateTimeOffset.UtcNow,
+                    ActorId      = ActorId(User) ?? string.Empty,
+                    Action       = "guests.view",
+                    TargetKind   = "guests",
+                    VisibleCount = subjectId is not null ? 1 : 0,
+                    Via          = AccessVia.Admin,
+                    Outcome      = AccessOutcome.Allow
+                });
+                await auditSession.SaveChangesAsync();
+            }
+        }
+
         return View(model);
     }
 

@@ -1168,3 +1168,67 @@ ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
 - **Next unit: IS36** (audit the unaudited admin reads — `AdminController.Audit`,
   `ErrorReportAdminController`, `AdminGuestsController` — one aggregate
   `AccessAudit` row per view, `Via: Admin`, D9).
+
+## IS36 — Audit the unaudited admin reads (audit log, error reports, guests — E7, D9)
+
+- **Files (3 controllers + 1 new test file):**
+  - `src/Kumunita.Web/Controllers/AdminController.cs` — the `Audit` action
+    writes one `AccessAudit` row before `return View(...)`. The store +
+    `AdminSubjectId(User)` helper were already on the class; no constructor
+    change. `Action "audit-log.view"`, `TargetKind "audit-log"`,
+    `VisibleCount = rows.Count` (the `page = 50` the action rendered),
+    `TargetId = null`, `HiddenCount = null`, `Via Admin`, `Outcome Allow`.
+  - `src/Kumunita.Web/Controllers/ErrorReportAdminController.cs` — the
+    constructor gains an **optional** `IDocumentStore? store = null` param
+    (the ADR 0015 D1 "kw-l floor" idiom the localisation / forwarder seams
+    already use); the `Index` action writes one `AccessAudit` row when
+    `store is not null` (a test harness that did not supply it skips the
+    write — the "no disclosure" shape). `Action "error-reports.view"`,
+    `TargetKind "error-reports"`, `VisibleCount = reports.Count`, `Via
+    Admin`, `Outcome Allow`.
+  - `src/Kumunita.Web/Controllers/AdminGuestsController.cs` — the same
+    optional-store idiom; the `Index` action writes one `AccessAudit` row
+    when `store is not null`. `Action "guests.view"`, `TargetKind "guests"`,
+    `VisibleCount = subjectId is not null ? 1 : 0` (one standing rendered
+    for a supplied subject, 0 for the create shape), `Via Admin`,
+    `Outcome Allow`.
+  - `tests/Kumunita.Web.Tests/AdminReadAuditTests.cs` (new) — the 3 IS36
+    tests, mirroring the `AdminAnalyticsControllerTests` harness idiom.
+    Test 1 (audit log) uses a real Postgres-backed store (the
+    `MartenLinqQueryable` cast in `Marten.QueryableExtensions.ToListAsync`
+    cannot be NSubstituted — the `AdminPortabilityScopeTests` /
+    `F11U3_DeadLetterAlertTests` pattern); tests 2–3 (error reports, guests)
+    use NSubstitute stores + NSubstituted Core services.
+- **Public names:** `AdminReadAuditTests` / `AuditLogView_IsItselfAudited` /
+  `ErrorReportView_IsAudited` / `GuestListView_IsAudited`. Each test asserts
+  the exact row shape (the `TargetKind` + `Action` strings, `ActorId ==
+  Admin`, `Via Admin`, `Outcome Allow`, the `VisibleCount`, `TargetId null`,
+  `HiddenCount null`) + a `DidNotReceive` negative pin (no stray second row
+  or wrong `TargetKind`).
+- **Tests:** `dotnet exec tests/Kumunita.Web.Tests/bin/Debug/net10.0/
+  Kumunita.Web.Tests.dll -class "Kumunita.Web.Tests.AdminReadAuditTests"` →
+  **Total: 3, Failed: 0, Errors: 0**. Regression (the optional-store param
+  keeps the existing test sites compiling):
+  `-class AdminGuestsControllerTests -class AdminErrorReportTests -class
+  AdminErrorReportDetailTests -class AdminAnalyticsControllerTests` →
+  **Total: 23, Failed: 0**.
+  `-class "AdminController*"` → **Total: 30, Failed: 0**.
+  `-class EscalationInboundEndpointTests` → **Total: 7, Failed: 0**.
+- **Drift / noticed:**
+  - The `AdminAnalyticsController.Export` precedent omits `Id` on the
+    `AccessAudit` row — its tests NSubstitute the store (which never
+    validates) so the bug is latent. A real Marten store rejects an empty
+    externally-assigned string key (`Weasel.Core.StringIdentification
+    .AssignIfMissing` throws `InvalidOperationException`). All three IS36
+    rows set `Id = Guid.NewGuid().ToString("N")` (the codebase pattern, e.g.
+    `ErrorReportService.CreateAsync` / `SessionService.RevokeAsync`), so
+    they are correct against a real store. The precedent is unchanged (it
+    is not in this unit's scope).
+  - The optional-store guard (`store is not null`) means a test harness that
+    does not supply a store gets **no** audit write — the "no disclosure"
+    shape. DI always supplies the live store in the app, so production is
+    never skipped.
+- **Next unit: IS37** (the destructive-confirm views move to the existing
+  `form[data-confirm]` module — `Notes/Index` (2), `Bookmarks/Index` (1),
+  `AdminSurfaceLabels/Index` (1), `AdminHelp/Index` (2) — the 8 inline
+  `on*` handlers E9 found that `script-src 'self'` silently blocks).
