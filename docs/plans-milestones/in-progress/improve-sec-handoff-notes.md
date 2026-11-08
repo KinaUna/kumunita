@@ -1078,3 +1078,93 @@ ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
   `RollingFileSink.Retain` — extending the same handler/service this unit
   wired; the handler itself needs no change for part 2 since it calls the
   frozen `RunAsync` seam).
+
+## IS35 — `RetentionService` part 2: notifications, resolved error reports, log files (E5, D6)
+
+- **Files (2 source + 2 test + 1 doc):** `src/Kumunita.Core/Privacy/RetentionService.cs`
+  (extended `RunAsync` + the `RetentionSweepResult` record + the class summary),
+  `src/Kumunita.Web/SideEffects/RetentionTickHandler.cs` (the log-config seam —
+  **a justified touch to IS34b's handler**, recorded below),
+  `tests/Kumunita.Core.Tests/RetentionServiceTests.cs` (the 3 new tests + the
+  two new `*DocTypes` registrations in `BootAsync`),
+  `tests/Kumunita.Web.Tests/RetentionTickHandlerTests.cs` (the empty-config arg
+  to `Handle` + the two new `*DocTypes` registrations in its `BootAsync`),
+  `docs/ops/configuration-reference.md` (the D6 `Retention__*` block + the
+  daily `Retain` note). **No** new tick, handler, seed, or `Program.cs` touch.
+  `PortabilityDocTypes` (M11) untouched. `RetentionOptions` / `RetentionTick`
+  untouched (frozen).
+- **`RetentionService.RunAsync(IDocumentStore, RetentionOptions, DateTimeOffset,
+ ct, string? logDir = null, int logRetentionDays = 0) → Task<RetentionSweepResult>`**
+  (the same `static` seam, widened — the two optional log params default to
+  "skip the log leg", so an unconfigured caller runs no file retention this
+  pass). Part-2 additions, mirroring the part-1 house idiom (batched id-
+  collection + `Delete<T>(id)` + one `SaveChangesAsync`; every cutoff is
+  `RetentionPolicy.CutoffFor`, no re-derived `AddDays`):
+  - `Notification` — one WHERE clause, two mutually-exclusive cohorts: a
+    **read** row (non-null `ReadAt`) past the `NotificationsRead` cutoff (90 d),
+    or an **unread** row (null `ReadAt`) past the `NotificationsUnread` cutoff
+    (365 d) by its `Created` age. The unread cutoff is pre-computed to a
+    nullable constant so the lambda is a clean two-term null-safe comparison
+    (no ternary / no case-split — Linq2DB translates a null-safe comparison
+    over a constant, not a conditional).
+  - `ErrorReport` — a **resolved** report (non-null `ResolvedAt`) past the
+    `ErrorReports` cutoff (180 d); an **unresolved** report (null
+    `ResolvedAt`) is always kept (the part-1 "active SessionDoc always kept"
+    shape on the resolved cohort).
+  - **Log-file leg** — one `RollingFileSink.Retain(dir, retentionDays, now)`
+    call (pure, BCL-only), only when `logDir is not null && logRetentionDays
+    > 0` (the fail-safe). Returns a `LogFilesDeleted` count.
+- **`RetentionSweepResult`** (the `public sealed record`, now **9 `int`s**):
+  `SessionsDeleted, IdentityTokensDeleted, EscalationTokensDeleted,
+  DeadLettersDeleted, OutboxBodyNulled, OutboxDeleted, NotificationsDeleted,
+  ErrorReportsDeleted, LogFilesDeleted`. No PII — counts only (the IS08 gate).
+- **The log-config seam (the one real design call):** the file-sink directory +
+  retention days live in `FileSinkOptions` (the `Logging__File` section, read
+  in `Program.cs`, **not** DI-registered) — separate from `RetentionOptions`.
+  Chose the **prompt's "option 1"** with the minimal `Program.cs` surface: the
+  IS34b handler reads `FileSinkOptions` from the `IConfiguration` Wolverine
+  injects (the same `Logging__File` section `Program.cs` binds at boot; a
+  missing/unset section falls back to the POCO defaults via the
+  `?? new FileSinkOptions()` shape) and passes `Directory` + `RetentionDays`
+  to the service's two new optional log params. This is the **single justified
+  touch to IS34b's handler** (the prompt anticipated "a justified touch to the
+  IS34b handler"); no DI registration, no second `Program.cs` line. `Program.cs`
+  is otherwise untouched (still only IS05 + IS34b in this lane).
+- **Doc-type registration (the one consequence the prompt flagged):**
+  `Notification` and `ErrorReport` are registered by their own `*DocTypes`
+  surfaces (NOT `CoreDocTypes`). Since the part-2 queries run on **every**
+  sweep (their D6 keys are non-zero by default), **both** scratch stores
+  (Core.Tests `BootAsync` + the Web handler test `BootAsync`) now register
+  `NotificationDocTypes` + `ErrorReportDocTypes` — otherwise the part-2 queries
+  throw "table does not exist" on the part-1 tests too (the prompt's
+  "register if not already present").
+- **Tests (3 new, green; no regression):** `Retention_DeletesOldReadNotifications`
+  (read row 100 d > 90 d read cutoff → deleted; unread row 100 d < 365 d
+  unread cutoff → kept), `Retention_DeletesResolvedErrorReportsAfter180d`
+  (resolved 200 d > 180 d → deleted; unresolved → always kept),
+  `Retention_RetainsLogFilesDaily` (temp dir; one `app-old.log` mtime-forced
+  10 d old > 5 d retention → deleted; one recent kept; `LogFilesDeleted == 1`;
+  cleanup in `finally`). **Core runner (U3):** `dotnet exec
+  tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll -class
+  "Kumunita.Core.Tests.RetentionServiceTests" -class
+  "Kumunita.Core.Tests.RetentionPolicyTests"` → **Total: 10, Failed: 0, Errors: 0**
+  (7 `RetentionServiceTests` — 4 IS34a + 3 new — + 3 IS33, no regression).
+  **Web handler test (touched handler):** `dotnet exec
+  tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll -class
+  "Kumunita.Web.Tests.RetentionTickHandlerTests"` → **Total: 1, Failed: 0,
+  Errors: 0** (`Handler_CallsService_AndReschedules` still green). Build:
+  `dotnet build` → **0 errors**.
+- **PII:** none — tests use `user-a` / `user-b`, `a@example.test`,
+  `SECRET-BODY-*`, synthetic `app-*.log` names; `ErrorReport.ContactEmail`
+  never logged or asserted on value (counts only).
+- **Key-name drift noticed (NOT fixed here — IS41's seam):** the
+  `[DataClass(retentionKey: "...")]` strings on the POCOs do not match the
+  `RetentionOptions.DaysFor` key strings this service keys off (`Notification`
+  `retentionKey:"NotificationUnreadDays"` vs the machine keys
+  `NotificationsRead`/`NotificationsUnread`; `SessionDoc` `"SessionDays"` vs
+  `"Sessions"`; `ErrorReport` `"ErrorReportDays"` vs `"ErrorReports"`;
+  `IdentityToken`/`EscalationToken` `"TokenDays"` vs `"Tokens"`). IS34a
+  correctly uses the `DaysFor` key strings; this unit does too.
+- **Next unit: IS36** (audit the unaudited admin reads — `AdminController.Audit`,
+  `ErrorReportAdminController`, `AdminGuestsController` — one aggregate
+  `AccessAudit` row per view, `Via: Admin`, D9).

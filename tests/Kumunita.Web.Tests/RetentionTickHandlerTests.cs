@@ -52,7 +52,8 @@ public sealed class RetentionTickHandlerTests(PostgresFixture fixture) : IClassF
         // delivers: the handler injects a live store + options into the
         // IS34a-frozen RetentionService and re-yields a fresh RetentionTick.
         var results = await RetentionTickHandler.Handle(
-            new RetentionTick(), store, Options.Create(new RetentionOptions()));
+            new RetentionTick(), store, Options.Create(new RetentionOptions()),
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
 
         // (1) The handler returned a fresh RetentionTick (the re-schedule).
         Assert.IsType<RetentionTick>(Assert.Single(results));
@@ -64,7 +65,8 @@ public sealed class RetentionTickHandlerTests(PostgresFixture fixture) : IClassF
         // A second drive is a no-op (no row to delete) but still re-yields —
         // the schedule self-perpetuates.
         var results2 = await RetentionTickHandler.Handle(
-            new RetentionTick(), store, Options.Create(new RetentionOptions()));
+            new RetentionTick(), store, Options.Create(new RetentionOptions()),
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
         Assert.IsType<RetentionTick>(Assert.Single(results2));
     }
 
@@ -79,6 +81,12 @@ public sealed class RetentionTickHandlerTests(PostgresFixture fixture) : IClassF
             CoreDocTypes.Configure(opts);          // IdentityToken, OutboxEmail, EmailDeadLetter
             SessionDocTypes.Configure(opts);       // SessionDoc
             EscalationDocTypes.Configure(opts);    // EscalationToken
+            // IS35 (part 2): the part-2 Notification / resolved-ErrorReport
+            // queries run on every sweep (their D6 keys are non-zero by default),
+            // so the scratch store must register them (the prompt's "register
+            // if not already present").
+            NotificationDocTypes.Configure(opts);  // Notification
+            ErrorReportDocTypes.Configure(opts);   // ErrorReport
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;

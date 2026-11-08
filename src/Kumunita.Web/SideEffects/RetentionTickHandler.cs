@@ -1,5 +1,7 @@
+using Kumunita.Core.Logging;
 using Kumunita.Core.Privacy;
 using Marten;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Kumunita.Web.SideEffects;
@@ -28,6 +30,19 @@ namespace Kumunita.Web.SideEffects;
 /// is bound in <c>Program.cs</c> (IS34b) the way
 /// <c>AuditPurgeOptions</c> / <c>MediaOptions</c> are.
 /// </para>
+/// <para>
+/// IS35 (D6, the log-file leg): the handler also passes the file-sink
+/// directory + retention days to <see cref="RetentionService.RunAsync"/>'s two
+/// optional log parameters, so the daily <see cref="RollingFileSink.Retain"/>
+/// pass runs every tick (D6: the file-log <c>Retain</c> runs daily, not only
+/// at boot). It reads <see cref="FileSinkOptions"/> (the <c>Logging__File</c>
+/// section — the same source <c>Program.cs</c> binds at boot) via the
+/// <c>IConfiguration</c> Wolverine injects; a missing/unset section falls back
+/// to the POCO defaults (the <c>Program.cs</c> <c>?? new FileSinkOptions()</c>
+/// shape), so a log-less test harness still resolves. The log leg is the one
+/// D6 piece with no <see cref="RetentionOptions"/> key — it is driven by
+/// <see cref="FileSinkOptions"/>, not the retention key surface.
+/// </para>
 /// </summary>
 public static class RetentionTickHandler
 {
@@ -47,14 +62,26 @@ public static class RetentionTickHandler
     public static async Task<IEnumerable<object>> Handle(
         RetentionTick tick,
         IDocumentStore store,
-        IOptions<RetentionOptions> options)
+        IOptions<RetentionOptions> options,
+        IConfiguration configuration)
     {
         // `now` is passed explicitly to the service (UtcNow here keeps
         // production correct; the harness pins its own — the
         // AuditPurgeHandler precedent). RetentionService logs counts (no PII);
         // nothing logged here.
+        //
+        // IS35 (D6): pass the file-sink directory + retention days to the log
+        // leg so RollingFileSink.Retain runs daily (not only at boot). The
+        // FileSinkOptions read mirrors Program.cs's boot read (the same
+        // Logging__File section); a missing/unset section falls back to the
+        // POCO defaults (the `?? new FileSinkOptions()` shape).
+        var fileSinkOptions =
+            configuration?.GetSection(FileSinkOptions.SectionName).Get<FileSinkOptions>()
+            ?? new FileSinkOptions();
         await RetentionService.RunAsync(
-            store, options.Value, DateTimeOffset.UtcNow);
+            store, options.Value, DateTimeOffset.UtcNow,
+            logDir: fileSinkOptions.Directory,
+            logRetentionDays: fileSinkOptions.RetentionDays);
 
         // Self-reschedule: return a fresh RetentionTick so the recurring
         // schedule carries forward (the TimeoutMessage's 1-day delay is baked

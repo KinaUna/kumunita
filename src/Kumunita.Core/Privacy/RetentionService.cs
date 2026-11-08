@@ -1,14 +1,18 @@
 using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Logging;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.Sessions;
 using Marten;
 
 namespace Kumunita.Core.Privacy;
 
 /// <summary>
-/// The IMPROVE-SEC D6 / E5 retention sweep, **part 1** (the I/O leg): deletes or
-/// nulls the part-1 document types once they cross their retention cutoff. The
-/// **decision** of *when* a row crosses a cutoff is the pure
+/// The IMPROVE-SEC D6 / E5 retention sweep, **parts 1+2** (the I/O leg): deletes
+/// or nulls the D6 document types once they cross their retention cutoff, and
+/// runs the daily file-log <see cref="RollingFileSink.Retain"/> leg (D6: the
+/// file-log <c>Retain</c> runs daily, not only at boot). The **decision** of
+/// *when* a row crosses a cutoff is the pure
 /// <see cref="RetentionPolicy"/> (IS33) — this class only supplies the I/O and
 /// must call <see cref="RetentionPolicy.CutoffFor"/> for every cutoff and never
 /// re-derive it (the
@@ -34,6 +38,31 @@ namespace Kumunita.Core.Privacy;
 /// <c>OutboxDays</c> cutoff.</item>
 /// </list>
 /// </para>
+/// <para>
+/// Part-2 types (E5 / D6):
+/// <list type="bullet">
+/// <item><see cref="Kumunita.Core.Notifications.Notification"/> — a **read**
+/// row (non-null <c>ReadAt</c>) is purged past the <c>NotificationsRead</c>
+/// cutoff (90 d); an **unread** row (null <c>ReadAt</c>) is purged past the
+/// <c>NotificationsUnread</c> cutoff (365 d) by its <c>Created</c> age. Both
+/// cohorts are deleted in one pass (a read row is past the read cutoff only;
+/// an unread row is past the unread cutoff only).</item>
+/// <item><see cref="Kumunita.Core.ErrorReports.ErrorReport"/> — a **resolved**
+/// report (non-null <c>ResolvedAt</c>) is purged past the <c>ErrorReports</c>
+/// cutoff (180 d). **Unresolved** reports (null <c>ResolvedAt</c>) are always
+/// kept — never delete an unresolved report.</item>
+/// </list>
+/// </para>
+/// <para>
+/// The log-file leg: <see cref="RollingFileSink.Retain"/> deletes the
+/// <c>app-*.log</c> files under the configured directory whose mtime is older
+/// than <c>now − RetentionDays</c> (the D6 daily-rotation pass, re-used here
+/// so it runs every tick, not only at boot). It is the one leg with no
+/// D6 <see cref="RetentionOptions"/> key — it is driven by the two optional
+/// <c>logDir</c> / <c>logRetentionDays</c> parameters (<c>null</c> / <c>0</c>
+/// skips the leg, the same fail-safe), and <see cref="RollingFileSink.Retain"/>
+/// stays pure (BCL-only, no store).
+/// </para>
 /// A key set to <c>0</c> (or absent) makes <see cref="RetentionPolicy.CutoffFor"/>
 /// return <c>null</c> — that type is **skipped** (kept), the fail-safe.
 /// <para>
@@ -42,10 +71,10 @@ namespace Kumunita.Core.Privacy;
 /// to anything logged here — log counts, never rows).
 /// </para>
 /// <para>
-/// The Wolverine handler and the <c>Program.cs</c> seed are IS34b; part 2
-/// (notifications, error reports, log files) is IS35. This class is
-/// Wolverine-free and HTTP-free (the <see cref="Kumunita.Core.Usage.UsagePurgeService"/>
-/// "Core does the work, Web hosts the handler" split).
+/// The Wolverine handler and the <c>Program.cs</c> seed are IS34b (frozen).
+/// This class is Wolverine-free and HTTP-free (the
+/// <see cref="Kumunita.Core.Usage.UsagePurgeService"/> "Core does the work,
+/// Web hosts the handler" split).
 /// </para>
 /// </summary>
 public static class RetentionService
@@ -64,18 +93,23 @@ public static class RetentionService
     /// <param name="options">The config-bound day-counts (the <c>Retention__*</c> surface, IS33).</param>
     /// <param name="now">Injection point for tests (pin "now" so each boundary is deterministic).</param>
     /// <param name="ct">Cancellation.</param>
-    /// <returns>The affected counts per type (no PII). A type skipped by a <c>null</c> cutoff reports <c>0</c>.</returns>
+    /// <param name="logDir">The directory the dated <c>app-*.log</c> files land in (the <see cref="Kumunita.Core.Logging.FileSinkOptions"/> <c>Directory</c>). <c>null</c> skips the log-file leg (the fail-safe; the caller then runs no file retention this pass).</param>
+    /// <param name="logRetentionDays">The file-log retention day-count (the <see cref="Kumunita.Core.Logging.FileSinkOptions"/> <c>RetentionDays</c>). A non-positive value skips the log-file leg (the fail-safe, matching <see cref="RollingFileSink.Retain"/>'s "no files older than <c>now − 0</c>" degenerate).</param>
+    /// <returns>The affected counts per type (no PII). A type skipped by a <c>null</c> cutoff reports <c>0</c>; a leg skipped by a <c>null</c>/<c>0</c> log parameter reports <c>0</c> for <see cref="RetentionSweepResult.LogFilesDeleted"/>.</returns>
     public static async Task<RetentionSweepResult> RunAsync(
         IDocumentStore store,
         RetentionOptions options,
         DateTimeOffset now,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? logDir = null,
+        int logRetentionDays = 0)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(options);
 
         int sessions = 0, identityTokens = 0, escalationTokens = 0,
-            deadLetters = 0, outboxBodyNulled = 0, outboxDeleted = 0;
+            deadLetters = 0, outboxBodyNulled = 0, outboxDeleted = 0,
+            notifications = 0, errorReports = 0, logFilesDeleted = 0;
 
         // --- SessionDoc: revoked beyond the Sessions cutoff (active kept). ---
         DateTimeOffset? sessionsCutoff = RetentionPolicy.CutoffFor(options, "Sessions", now);
@@ -164,17 +198,78 @@ public static class RetentionService
             outboxDeleted = outboxIds.Count;
         }
 
+        // --- Notification: part 2 (D6). Two cohorts, one pass. A READ row
+        //     (ReadAt != null) is past the NotificationsRead cutoff (90 d);
+        //     an UNREAD row (ReadAt null) is past the NotificationsUnread
+        //     cutoff (365 d) by its Created age. The two predicates are
+        //     mutually exclusive (a row is read or unread, never both), so the
+        //     single WHERE clause is the clean two-cohort disjunction —
+        //     each cutoff is its own CutoffFor, and a 0-valued/absent key
+        //     nulls that term out (the fail-safe).
+        //     The unread cutoff is pre-computed to a nullable constant so the
+        //     lambda is a clean two-term null-safe comparison (the part-1
+        //     single-cutoff shape, no ternary / no case-split — Linq2DB
+        //     translates a null-safe comparison over a constant, not a
+        //     conditional expression).
+        DateTimeOffset? notifReadCutoff = RetentionPolicy.CutoffFor(options, "NotificationsRead", now);
+        DateTimeOffset? notifUnreadCutoff = RetentionPolicy.CutoffFor(options, "NotificationsUnread", now);
+        if (notifReadCutoff is not null || notifUnreadCutoff is not null)
+        {
+            await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+            var notifIds = (await s.Query<Notification>()
+                    .Where(x =>
+                        (x.ReadAt != null && x.ReadAt < notifReadCutoff) ||
+                        (x.ReadAt == null && x.Created < notifUnreadCutoff))
+                    .Select(x => x.Id)
+                    .ToListAsync(ct)).Distinct().ToList();
+            foreach (var id in notifIds) s.Delete<Notification>(id);
+            await s.SaveChangesAsync(ct);
+            notifications = notifIds.Count;
+        }
+
+        // --- ErrorReport: part 2 (D6). A RESOLVED report (ResolvedAt != null)
+        //     is purged past the ErrorReports cutoff (180 d). An UNRESOLVED
+        //     report (ResolvedAt null) is always kept — never delete an
+        //     unresolved report (the part-1 "active SessionDoc always kept"
+        //     shape, on the resolved cohort).
+        DateTimeOffset? errorCutoff = RetentionPolicy.CutoffFor(options, "ErrorReports", now);
+        if (errorCutoff is { } ec)
+        {
+            await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+            var errorIds = (await s.Query<ErrorReport>()
+                    .Where(x => x.ResolvedAt != null && x.ResolvedAt < ec)
+                    .Select(x => x.Id)
+                    .ToListAsync(ct)).Distinct().ToList();
+            foreach (var id in errorIds) s.Delete<ErrorReport>(id);
+            await s.SaveChangesAsync(ct);
+            errorReports = errorIds.Count;
+        }
+
+        // --- Log files: part 2 (D6 — "the file-log Retain runs daily, not
+        //     only at boot"). The one leg with no D6 RetentionOptions key:
+        //     driven by the two optional log parameters (null/0 skips it, the
+        //     fail-safe). RollingFileSink.Retain stays pure (BCL-only); this
+        //     sweep just calls it — deletes the app-*.log files under
+        //     logDir whose mtime is older than now − logRetentionDays, per-file
+        //     try/catch (a file being written degrades to a skipped file).
+        if (logDir is not null && logRetentionDays > 0)
+        {
+            logFilesDeleted = RollingFileSink.Retain(logDir, logRetentionDays, now);
+        }
+
         return new RetentionSweepResult(
             sessions, identityTokens, escalationTokens, deadLetters,
-            outboxBodyNulled, outboxDeleted);
+            outboxBodyNulled, outboxDeleted,
+            notifications, errorReports, logFilesDeleted);
     }
 
 }
 
 /// <summary>
-/// The affected counts from a <see cref="RetentionService.RunAsync"/> part-1
-/// sweep (no PII — counts only). A type skipped by a <c>null</c> cutoff
-/// (key <c>0</c> / absent) reports <c>0</c>.
+/// The affected counts from a <see cref="RetentionService.RunAsync"/> sweep
+/// (no PII — counts only). A type skipped by a <c>null</c> cutoff (key <c>0</c>
+/// / absent) reports <c>0</c>; the log-file leg skipped by a <c>null</c>/<c>0</c>
+/// log parameter reports <c>0</c> for <see cref="LogFilesDeleted"/>.
 /// </summary>
 public sealed record RetentionSweepResult(
     int SessionsDeleted,
@@ -182,4 +277,7 @@ public sealed record RetentionSweepResult(
     int EscalationTokensDeleted,
     int DeadLettersDeleted,
     int OutboxBodyNulled,
-    int OutboxDeleted);
+    int OutboxDeleted,
+    int NotificationsDeleted,
+    int ErrorReportsDeleted,
+    int LogFilesDeleted);

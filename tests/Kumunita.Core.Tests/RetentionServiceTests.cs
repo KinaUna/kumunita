@@ -1,6 +1,7 @@
 using Kumunita.Core;
 using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.Privacy;
 using Kumunita.Core.Sessions;
 using Marten;
@@ -249,6 +250,137 @@ public sealed class RetentionServiceTests(PostgresFixture fixture) : IClassFixtu
         Assert.Equal(0, kept.SessionsDeleted); // Sessions=0 → null cutoff → skipped
     }
 
+    // ── IS35 (part 2): notifications, resolved error reports, log files ──
+
+    [Fact]
+    public async Task Retention_DeletesOldReadNotifications()
+    {
+        var store = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var now = DateTimeOffset.UtcNow;
+        // Read cutoff = now − 90 d (default NotificationsRead); unread cutoff =
+        // now − 365 d (default NotificationsUnread). A READ row read 100 d ago
+        // is past the read cutoff (deleted); an UNREAD row created 100 d ago is
+        // NOT past the unread cutoff (365 d) → kept.
+        var readId = Guid.NewGuid().ToString("n");
+        var unreadId = Guid.NewGuid().ToString("n");
+
+        await using (var session = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            session.Store(new Notification
+            {
+                Id = readId, RecipientId = "user-a", Kind = "mention",
+                IdempotencyKey = "notification:mention:1",
+                Created = now.AddDays(-200), ReadAt = now.AddDays(-100)
+            });
+            session.Store(new Notification
+            {
+                Id = unreadId, RecipientId = "user-a", Kind = "mention",
+                IdempotencyKey = "notification:mention:2",
+                Created = now.AddDays(-100), ReadAt = null
+            });
+            await session.SaveChangesAsync(ct);
+        }
+
+        var result = await RetentionService.RunAsync(store, new RetentionOptions(), now, ct);
+
+        // Only the read row is deleted (past the 90 d read cutoff); the unread
+        // row is kept (100 d < the 365 d unread cutoff).
+        Assert.Equal(1, result.NotificationsDeleted);
+        await using (var q = store.QuerySession())
+        {
+            Assert.Null(await q.LoadAsync<Notification>(readId, ct));
+            Assert.NotNull(await q.LoadAsync<Notification>(unreadId, ct));
+        }
+    }
+
+    [Fact]
+    public async Task Retention_DeletesResolvedErrorReportsAfter180d()
+    {
+        var store = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var now = DateTimeOffset.UtcNow;
+        // ErrorReports cutoff = now − 180 d (default). A RESOLVED report
+        // resolved 200 d ago is past it (deleted); an UNRESOLVED report
+        // (ResolvedAt null) is always kept.
+        var resolvedId = Guid.NewGuid().ToString("n");
+        var unresolvedId = Guid.NewGuid().ToString("n");
+
+        await using (var session = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            session.Store(new ErrorReport
+            {
+                Id = resolvedId, SubjectId = "user-a", Description = "it broke",
+                RequestId = "req-1", Created = now.AddDays(-300),
+                ResolvedAt = now.AddDays(-200), ResolvedBy = "user-b",
+                ResolutionNote = "fixed"
+            });
+            session.Store(new ErrorReport
+            {
+                Id = unresolvedId, SubjectId = "user-a", Description = "still broken",
+                RequestId = "req-2", Created = now.AddDays(-300),
+                ResolvedAt = null, ResolvedBy = null, ResolutionNote = null
+            });
+            await session.SaveChangesAsync(ct);
+        }
+
+        var result = await RetentionService.RunAsync(store, new RetentionOptions(), now, ct);
+
+        // Only the resolved report is deleted (past the 180 d cutoff); the
+        // unresolved report is always kept.
+        Assert.Equal(1, result.ErrorReportsDeleted);
+        await using (var q = store.QuerySession())
+        {
+            Assert.Null(await q.LoadAsync<ErrorReport>(resolvedId, ct));
+            Assert.NotNull(await q.LoadAsync<ErrorReport>(unresolvedId, ct));
+        }
+    }
+
+    [Fact]
+    public async Task Retention_RetainsLogFilesDaily()
+    {
+        var store = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var now = DateTimeOffset.UtcNow;
+
+        // A temp log dir with one OLD app-*.log (mtime forced past the cutoff)
+        // and one RECENT app-*.log (kept). Synthetic file names only — no PII
+        // (the RollingFileSink test precedent: BCL-only, temp dir, cleanup in
+        // a finally).
+        var dir = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            "kumunita-retention-" + System.IO.Path.GetRandomFileName());
+        System.IO.Directory.CreateDirectory(dir);
+        try
+        {
+            var oldName = System.IO.Path.Combine(dir, "app-old.log");
+            var recentName = System.IO.Path.Combine(dir, "app-recent.log");
+            await System.IO.File.WriteAllTextAsync(oldName, "old", ct);
+            await System.IO.File.WriteAllTextAsync(recentName, "recent", ct);
+            // Force the old file's mtime past the cutoff (now − 5 d): 10 days old.
+            System.IO.File.SetLastWriteTimeUtc(oldName, now.UtcDateTime.AddDays(-10));
+
+            var result = await RetentionService.RunAsync(
+                store, new RetentionOptions(), now, ct,
+                logDir: dir, logRetentionDays: 5);
+
+            // The old file is deleted (mtime 10 d old > 5 d retention); the
+            // recent file is kept. No sweep rows to delete, so the Marten
+            // counts are 0 — the log-file leg is the only non-zero count.
+            Assert.Equal(1, result.LogFilesDeleted);
+            Assert.False(System.IO.File.Exists(oldName));
+            Assert.True(System.IO.File.Exists(recentName));
+        }
+        finally
+        {
+            if (System.IO.Directory.Exists(dir))
+            {
+                try { System.IO.Directory.Delete(dir, recursive: true); }
+                catch (System.IO.IOException) { /* a file in flight: skip (the D6 no-per-row-crash shape) */ }
+            }
+        }
+    }
+
     private async Task<IDocumentStore> BootAsync()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -260,6 +392,12 @@ public sealed class RetentionServiceTests(PostgresFixture fixture) : IClassFixtu
             CoreDocTypes.Configure(opts);          // IdentityToken, OutboxEmail, EmailDeadLetter
             SessionDocTypes.Configure(opts);       // SessionDoc
             EscalationDocTypes.Configure(opts);    // EscalationToken
+            // IS35 (part 2): the two new sweep types. The part-2 Notification
+            // / resolved-ErrorReport queries run on EVERY sweep (their D6 keys
+            // are non-zero by default), so the scratch store must register them
+            // (the prompt's "register if not already present").
+            NotificationDocTypes.Configure(opts);  // Notification
+            ErrorReportDocTypes.Configure(opts);   // ErrorReport
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;
