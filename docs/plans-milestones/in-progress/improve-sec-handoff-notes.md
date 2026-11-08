@@ -785,3 +785,39 @@ updated: 2026-11-07
 - **Deviations from the prompt (recorded, not pauses):** (1) the prompt's sample idempotency key `instance.full-export-{stamp}` is **identical for every recipient**, but `NotificationService.EmitAsync`'s dedup predicate is on `IdempotencyKey` alone (no recipient in the `Where`) — a shared key would deliver to the **first** resident only and dedup the rest. The key is therefore **per recipient**: `instance.full-export:{stamp}:{user.Id}`. The prompt explicitly allows this ("the code sample is a starting shape, not a pinned contract … (a) the notification is emitted for exactly the non-guest residents"). (2) The prompt's sample loop used `documentStore.QuerySession()`; the C03 `EmitAsync` seam takes an `IDocumentSession` and the caller commits (D5), so it is an `OpenSession` (a write session) + one `SaveChangesAsync` — the `AnnouncementService` multi-recipient emission shape. (3) The prompt named only the `notifications.kind.instance.full-export` label key, but `ComposeContentAsync` also resolves `notification.{kind}.subject` / `.body`; to avoid the resident's inbox rendering the raw key as the subject, the subject + body template keys were added alongside the label in all four languages (the `notification.{kind}.{subject,body}` family every other kind already has).
 - **PII:** none — fixture ids are `is29-res-a` / `is29-res-b` / `is29-guest`, emails are the repo standard `a@example.test` / `b@example.test` / `g@example.test`; the body is `null` (no actor name / id, D10).
 - **Next unit: IS30** (Export docs) — an OPS break-glass runbook section ("full instance export"); a note in the M11 design doc linking ADR 0299. The control-map row is **IS39's** (it lands in the new format there).
+
+## IS30 — Export docs (the OPS runbook + the M11 note, ADR 0299)
+
+- **Files (2, docs-only):** `docs/ops/privacy-operations.md` (a new
+  **"Full instance export"** bullet, a sibling to "Break-glass elevation" in
+  the same operator-at-the-DB group — states *when* the full scope is the right
+  tool vs the content-free default, the three ordered steps **grant + consume
+  override → run the full scope → confirm the D10 transparency entry + the
+  `portability.export.full`/`Via: BreakGlass` audit row**, each with its
+  in-app surface, links ADR 0299 + ADR 0003, and a "do not conflate with the
+  resident's own export" note; the existing resident-export bullet is
+  **untouched**; `related:` gains ADR 0298 + 0299, `updated:` bumped);
+  `docs/design/m11-portability-design.md` (a `> Supersession (IS30, ADR 0299)`
+  blockquote directly after the "quiet surface" line in `## Human cost` —
+  the full scope's C-M11·6 claim is superseded (a) override required,
+  (b) `Via: BreakGlass`, (c) D10 transparency entry; the content-free default
+  stays quiet; `related:` gains ADR 0299, `updated:` bumped).
+- **Public names:** none — docs only. The runbook names the code seams the
+  operator verifies against: `BreakGlassProbe.HasActiveAsync` (the gate),
+  `Action = portability.export.full`, `Via: BreakGlass`, `kind:
+  instance.full-export`.
+- **Tests:** no test, because docs-only.
+- **Fidelity note (verified against code, not prose):** step 1 is
+  "grant **+ consume**" — the gate is `consumedAt IS NOT NULL AND
+  expiresAt > now` on the *exporting GlobalAdmin's* `AdminOverride` row
+  (`BreakGlassProbe.HasActiveAsync`, checked against `ActorId(User)` in
+  `AdminPortabilityController.Export`), so the token must be consumed at
+  `/admin/break-glass` before the full export will not 403.
+- **`docs/security/control-map.md` is NOT touched** (IS39's, per plan).
+- **PII:** none in the new text.
+- **Next unit: IS31** (Resident export: notes, folders, page translations —
+  E6) — `UserScopeInventory` rows for `PersonalNote`/`NoteFolder`/
+  `BookmarkFolder` (by `OwnerId`) and `PageTranslation` (by `AuthorId`), the
+  export type map, the `ImportOwnershipGuard` owner rule (verify the generic
+  rule covers these or add it), and the tests `Export_IncludesOwnNotesAndFolders`,
+  `Export_ExcludesOthersNotes`, `Import_ForeignNote_Rejected`.

@@ -8,7 +8,8 @@ audiences: [developer, agent]
 related:
   - docs/adr/0108-portability-import-export.md
   - docs/adr/0004-data-persistence-and-schema-evolution.md
-updated: 2026-11-02
+  - docs/adr/0299-instance-export-operator-gated.md
+updated: 2026-11-08
 ---
 
 # M11 — Portability (import/export) — design
@@ -163,6 +164,13 @@ privacy posture the platform already holds for its other world-seams
 lane). The cost is the operator's — the surface is quiet (one audit row
 per action) and the only thing it asks of the operator is a deliberate
 click.
+
+> **Supersession (IS30, ADR [0299](../adr/0299-instance-export-operator-gated.md)).** For the **full**
+> scope only, C-M11·6's "quiet surface" claim is superseded: a full export now
+> (a) requires an active `AdminOverride`, (b) is audited `Via: BreakGlass`
+> (`Action = portability.export.full`), and (c) emits the D10 resident
+> transparency entry (`kind: instance.full-export`). The **content-free default
+> is unchanged** — it remains a quiet surface.
 
 ## Parts affected
 
