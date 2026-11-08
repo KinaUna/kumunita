@@ -972,3 +972,57 @@ ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
  part 1: sessions, tokens, outbox, dead letters — the I/O leg that consumes
  this unit's `RetentionOptions` + `RetentionPolicy`; it must call
  `RetentionPolicy.CutoffFor`, never re-derive the cutoff).
+
+## IS34a — `RetentionTick` record + `RetentionService`, part 1 (sessions, tokens, outbox, dead letters — E5, D6)
+
+- **Files (3 new: 2 `Kumunita.Core.Privacy` + the Core test project):**
+ `src/Kumunita.Core/Privacy/RetentionTick.cs` (the `sealed record :
+ Wolverine.TimeoutMessage(TimeSpan.FromDays(1))` — the `MediaLifecycleTick`/
+ `UsagePurgeTick` shape verbatim), `src/Kumunita.Core/Privacy/RetentionService.cs`
+ (the part-1 I/O + the `RetentionSweepResult` count record),
+ `tests/Kumunita.Core.Tests/RetentionServiceTests.cs`. **No** handler, **no**
+ `Program.cs`, **no** notifications/error-report/log-file logic (IS34b / IS35).
+ `PortabilityDocTypes` untouched (C-M11·5).
+- **`RetentionService.RunAsync(IDocumentStore, RetentionOptions, DateTimeOffset,
+ ct) → Task<RetentionSweepResult>`** (public surface, `static`). Every cutoff is
+ `RetentionPolicy.CutoffFor(options, key, now)` (the IS33 seam) — a `null`
+ cutoff (key `0`/absent) **skips** that type. `grep AddDays` in the service →
+ none; no direct `options.<Key>` read for the cutoff math. House idiom
+ (`UsagePurgeService` / `AuditPurgeService`): batched id-collection +
+ `Delete<T>(id)` + one `SaveChangesAsync` per type. Part-1 types: `SessionDoc`
+ (revoked: `RevokedAt != null && RevokedAt < cutoff`; active kept — `SessionDoc`
+'s terminal field is `RevokedAt`, there is no separate expiry), `IdentityToken`
+ (`(ConsumedAt != null && ConsumedAt < cutoff) || ExpiresAt < cutoff`),
+ `EscalationToken` (`RevokedAt != null && RevokedAt < cutoff`), `EmailDeadLetter`
+ (`DeadAt < cutoff`), `OutboxEmail` (body nulled past `OutboxBodyNullDays`, row
+ deleted past `OutboxDays`). Returns counts only — no PII.
+- **`RetentionSweepResult`** (`public sealed record`, 6 `int`s):
+ `SessionsDeleted, IdentityTokensDeleted, EscalationTokensDeleted,
+ DeadLettersDeleted, OutboxBodyNulled, OutboxDeleted`.
+- **Tests (4/4, green — store harness, the `UsagePurgeServiceTests`/
+ `PostgresFixture` idiom; `CoreDocTypes` + `SessionDocTypes` +
+ `EscalationDocTypes` registered):** `Retention_DeletesOldRevokedSessions_KeepsLive`,
+ `Retention_NullsOutboxBodyAfter7d_DeletesAfter90d`,
+ `Retention_DeletesConsumedTokens` (covers the two token types + `EmailDeadLetter`),
+ `Retention_IsIdempotent` (2nd run = 0; a `Sessions=0` key skips its type).
+ Runner form (U3): `dotnet exec
+ tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll -class
+ "Kumunita.Core.Tests.RetentionServiceTests" -class
+ "Kumunita.Core.Tests.RetentionPolicyTests"` → **Total: 7, Failed: 0, Errors: 0**
+ (4 new + 3 IS33 `RetentionPolicyTests` still green — no regression).
+- **Marten 9.50.2 drift (noticed):** a query-loaded entity's field assignment is
+ not dirty-tracked for a plain `SaveChangesAsync` — the body-null step must
+ `session.Store(row)` after mutating (the `TranslationLane` `mutate → Store →
+ SaveChangesAsync` house idiom, made explicit). A generic
+ `DeleteWhereAsync<T>` helper does **not** compile (`T` has no known `Id`) —
+ the repo idiom is a concrete type per call site (`AuditPurgeService`/
+ `UsagePurgeService`).
+- **DI registration state:** there is **no** `src/Kumunita.Core/Privacy/
+ DependencyInjection.cs` (the module has none), so the `RetentionService` DI
+ registration is **deferred to IS34b** (recorded here per the prompt). No module
+ file was created.
+- **PII:** none — tests use `user-a`/`user-b`, `a@example.test`, `SECRET-BODY-*`.
+- **Next unit: IS34b** (`RetentionTickHandler` + the one `Program.cs` seed line —
+ the Web-side Wolverine handler that injects the store + options into this unit's
+ `RetentionService` and re-yields `RetentionTick`; also where the deferred DI
+ registration lands).
