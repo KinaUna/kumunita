@@ -1427,3 +1427,58 @@ get a row, and the stamp row is fixed to the two real seams.
   (`ControlMapTraceabilityTests`): red build if any row's seam is a dead link or
   any code row names a test that does not exist. The names IS39 put in the
   table are exactly what that gate checks.
+
+## IS40 — The control-map traceability gate (E8, M1: 9/24 → all rows traced)
+
+The gate half of the IS39 pair. IS39 made the table traceable by hand; this
+turns it into a build pin so the next added row, dead seam, or mis-named test
+fails the build instead of surfacing at audit time. One new test file, no
+product code, no change to `control-map.md`.
+
+- **Files (1 new):**
+  `tests/Kumunita.Web.Tests/SecGate/ControlMapTraceabilityTests.cs`
+  (namespace `Kumunita.Web.Tests.SecGate`; 3 `[Fact]`s). Reuses
+  `SecGateSource` (`ReadSrc`, `RepoRoot`, `TestMethodExists`) — the repo-root
+  walk-up is not re-implemented.
+- **Public names:** `ControlMapTraceabilityTests` with
+  `EveryRow_HasASeamLink_ThatResolves`,
+  `EveryCodeRow_NamesAPinningTestThatExists`,
+  `EveryOpsRow_LinksARunbookThatExists`. Private helpers: `ParseControlMapRows`,
+  `SplitRowCells`, `ExtractLinks`, `ExtractBacktickedTests`,
+  `ResolvesRepoFile`, `AssertNone`.
+- **Link-resolution base:** the control map lives in `docs/security/`, so its
+  `Seam`/`ADR` links are written relative to *that* directory
+  (`../../src/…`, `../ops/…`, `../adr/…`, `../../Dockerfile`,
+  `decisions-open-items.md#decisions`). The gate resolves each target against
+  the file's own directory (the markdown contract), strips `#fragment`, and
+  requires `File.Exists`. Resolving against the repo root (as a literal read of
+  the plan) would 404 every link.
+- **Owner-ops discriminator:** a `Pinned by (test)` cell containing
+  `owner-ops, no code seam` is an owner-ops row (8 rows); every other cell is a
+  code row whose backtick-quoted identifiers must each exist in `tests/**`.
+- **One named refinement (not a weakening):** the plan's test-1 text says every
+  `Seam` cell carries "≥ 1 markdown link", but the "Decision-free-read markers"
+  row names its seam in prose (the `// SEC-READ:` markers across `Kumunita.Core`)
+  with no link. Per the prompt's own test-3 note ("implement the honest
+  invariant, not the literal one"), the gate asserts the honest form: **every
+  row's seam is named (non-empty) and every seam link present resolves**. This
+  is at least as strong on resolution (all links in all 32 rows must resolve)
+  and adds the structural non-empty pin the literal "≥ 1 link" check would have
+  missed on prose-named rows. DoD ("no dead link", "no missing test") is met.
+- **Verified (bit, then reverted):** broke the "Data classes in code" row two
+  ways — dead seam link (`…/XXX_DOESNOTEXIST.cs`) → test 1 FAIL names the row +
+  the dead link; mis-named pinned test (`…_NO_SUCH_TEST`) → test 2 FAIL names the
+  row + the missing test. `git checkout` the table → all 3 green again; table ends
+  unmodified.
+- **Tests:** `dotnet exec Kumunita.Web.Tests.dll -class
+  Kumunita.Web.Tests.SecGate.ControlMapTraceabilityTests` → **Total: 3, Failed:
+  0, Skipped: 0**. Full suite (1322 total) shows **no new failure**: the only 3
+  reds are the recorded baseline — `DataClassCoverageTests`
+  `EveryResidentExportType_IsInUserScopeInventory` /
+  `EveryDeleteOrPseudonymizeType_IsHandledByAnEraser` and
+  `ImproveHarnessTests.CodeCheck_Gate_Passes` — recorded for their owner units,
+  not IS40's.
+- **Next unit: IS41** — Doc-truth pass + the lessons as rules
+  (`decisions-open-items.md` token-at-rest + the stale "named invariant tests"
+  item; `data-classes.md` → pointer to `[DataClass]` + design §2.5; the four
+  lane lessons as rules in `AGENTS.md`).
