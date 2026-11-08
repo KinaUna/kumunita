@@ -92,6 +92,15 @@ builder.Services.Configure<HealthOptions>(
 builder.Services.Configure<MediaOptions>(
     builder.Configuration.GetSection(MediaOptions.SectionName));
 
+// Retention (IMPROVE-SEC D6 / E5): per-instance retention config (the
+// `Retention__*` keys, bound in RetentionOptions — IS33). Same bind shape as
+// CommunityOptions / MediaOptions. Without this binding IOptions<RetentionOptions>
+// resolves a bare RetentionOptions and the RetentionTickHandler (IS34b) reads
+// the D6 defaults — which is correct, but an operator's `Retention__*` env
+// overrides would never reach it (the AuditPurgeOptions binding precedent).
+builder.Services.Configure<Kumunita.Core.Privacy.RetentionOptions>(
+    builder.Configuration.GetSection(Kumunita.Core.Privacy.RetentionOptions.SectionName));
+
 // Marten: the domain document store (ADR 0001/0004). All domain documents live in the `mt`
 // schema; the custom KumunitaFeature contributes the first versioned schema change.
 var kumunitaConnection = builder.Configuration.GetConnectionString("Kumunita")
@@ -1340,6 +1349,13 @@ await bus.PublishAsync(new StorageMetricsCaptureTick());
 // LocalVolumeFileStore bytes accumulate forever — the M13 UsagePurgeTick seed
 // precedent, re-using F1's idempotent DeleteIfExistsAsync byte-delete seam).
 await bus.PublishAsync(new MediaLifecycleTick());
+// IS34b (IMPROVE-SEC D6 / E5) — the D6 retention sweep tick (the
+// RetentionTickHandler self-schedules 1 day ahead after each run; this seed is
+// the first-boot scheduling. Without this line the handler never fires and the
+// D6 types — SessionDoc, IdentityToken, EscalationToken, EmailDeadLetter,
+// OutboxEmail — accumulate forever, the M13 UsagePurgeTick / F15
+// MediaLifecycleTick seed precedent).
+await bus.PublishAsync(new Kumunita.Core.Privacy.RetentionTick());
 // F18 (MAIL-06, T4 code leg) — the in-repo bounce/complaint ingest-rate alarm
 // (the MailAlarmsHandler self-reschedules hourly after each run; this seed is
 // the first-boot scheduling. Without this line the handler never fires and the

@@ -1026,3 +1026,55 @@ ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
  the Web-side Wolverine handler that injects the store + options into this unit's
  `RetentionService` and re-yields `RetentionTick`; also where the deferred DI
  registration lands).
+
+## IS34b — `RetentionTickHandler` + the `Program.cs` seed (E5, D6)
+
+- **Files:** `src/Kumunita.Web/SideEffects/RetentionTickHandler.cs` (new),
+  `src/Kumunita.Web/Program.cs` (the options-binding line + the one seed line,
+  the lane's last `Program.cs` touch after IS05's Sentry block),
+  `tests/Kumunita.Web.Tests/RetentionTickHandlerTests.cs` (new). **No**
+  `DependencyInjection.cs` created — `RetentionService` is `static` (the
+  IS34a note's "deferred DI" is really just the options binding in
+  `Program.cs`). `RetentionService.cs` / `RetentionTick.cs` /
+  `RetentionPolicyTests` / `RetentionServiceTests` **unchanged**;
+  `PortabilityDocTypes` (M11) untouched (C-M11·5).
+- **Handler public surface:** `public static async Task<IEnumerable<object>>
+  Handle(RetentionTick tick, IDocumentStore store,
+  IOptions<RetentionOptions> options)` — the `MediaLifecycleHandler` /
+  `AuditPurgeHandler` shape verbatim (thin adapter, no logger; `RetentionService`
+  does the I/O and returns counts; nothing logged here — the IS08
+  `LogTemplatePiiGateTests` apply to anything logged). Calls
+  `RetentionService.RunAsync(store, options.Value, DateTimeOffset.UtcNow)`
+  (IS34a's frozen seam; no re-derived cutoff, no inline delete SQL here) and
+  re-yields `new[] { new RetentionTick() }` (the 1-day delay is baked into the
+  `Wolverine.TimeoutMessage` base type — no per-callsite `DelayedFor`).
+- **`Program.cs` touches (2 lines, nothing else):**
+  1. Options binding next to `Configure<MediaOptions>`:
+     `builder.Services.Configure<Kumunita.Core.Privacy.RetentionOptions>(
+     builder.Configuration.GetSection(Kumunita.Core.Privacy.RetentionOptions.
+     SectionName));` — keys bind as `Retention__*` (IS33).
+  2. Seed next to the `MediaLifecycleTick` seed:
+     `await bus.PublishAsync(new Kumunita.Core.Privacy.RetentionTick());` —
+     same "without this line the schedule never fires" comment shape as the
+     neighbours (F15 / M33 / M13 precedent).
+- **Tests (1/1, green — the `PostgresFixture` scratch-DB idiom, IS34a's boot
+  shape):** `Handler_CallsService_AndReschedules` — seeds one revoked
+  `SessionDoc` (`user-a`, synthetic), drives `RetentionTickHandler.Handle`
+  directly, asserts the row was deleted (the IS34a service ran) and the handler
+  returned a fresh `RetentionTick` (the re-schedule); a second drive is a
+  no-op and re-yields again. Runner form (U3): `dotnet exec
+  tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll -class
+  "Kumunita.Web.Tests.RetentionTickHandlerTests"` → **Total: 1, Failed: 0,
+  Errors: 0**.
+- **Regression check (same command, IS34a + IS33 still green):** `dotnet exec
+  tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll -class
+  "Kumunita.Core.Tests.RetentionServiceTests" -class
+  "Kumunita.Core.Tests.RetentionPolicyTests"` → **Total: 7, Failed: 0,
+  Errors: 0** (4 IS34a + 3 IS33 — no regression). Build: `dotnet build
+  Kumunita.slnx -c Debug` → **0 errors**.
+- **PII:** none — the test uses `user-a` / `test-agent` / `10.0.0.1` (synthetic).
+- **Next unit: IS35** (`RetentionService` part 2: notifications
+  read-90d/unread-365d, resolved `ErrorReport` 180d, and the daily
+  `RollingFileSink.Retain` — extending the same handler/service this unit
+  wired; the handler itself needs no change for part 2 since it calls the
+  frozen `RunAsync` seam).
