@@ -4,7 +4,9 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Media;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.Portability;
+using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Marten;
 using Microsoft.AspNetCore.Http;
@@ -99,7 +101,7 @@ public sealed class AdminPortabilityScopeTests(PostgresFixture fixture) : IClass
     [Fact(DisplayName = "FullExport_WithOverride_AuditedBreakGlass")]
     public async Task FullExport_WithOverride_AuditedBreakGlass()
     {
-        var (store, connString, service) =
+        var (store, connString, service, _) =
             await BootRealServiceAsync(TestContext.Current.CancellationToken);
 
         // An active operator-granted AdminOverride for the test actor — the
@@ -133,6 +135,81 @@ public sealed class AdminPortabilityScopeTests(PostgresFixture fixture) : IClass
         Assert.Equal(AccessVia.BreakGlass, full.Via);
         Assert.Equal(Admin, full.ActorId);
         Assert.Equal("portability", full.TargetKind);
+    }
+
+    // ── 4 — IS29 (D10): Full export notifies every non-guest resident ──────
+
+    [Fact(DisplayName = "FullExport_NotifiesEveryResident")]
+    public async Task FullExport_NotifiesEveryResident()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var emitter = Substitute.For<INotificationEmitter>();
+
+        var (store, _, service, userManager) =
+            await BootRealServiceAsync(ct, emitter: emitter);
+
+        // Seed 2 non-guest residents + 1 guest (the D10 "non-guest" filter).
+        // The 2 non-guest users have no Profile row (missing → defaults to non-guest).
+        await SeedResidentAsync(userManager, "is29-res-a", "a@example.test", ct);
+        await SeedResidentAsync(userManager, "is29-res-b", "b@example.test", ct);
+        await SeedResidentAsync(userManager, "is29-guest", "g@example.test", ct);
+
+        // The guest's Profile (IsGuest = true) — the service reads this to exclude guests.
+        await using (var s = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            s.Store(new Profile
+            {
+                SubjectId = "is29-guest",
+                DisplayName = "Guest",
+                Verified = true,
+                IsGuest = true,
+            });
+            await s.SaveChangesAsync(ct);
+        }
+
+        await service.ExportAsync(Admin, PortabilityExportScope.Full, ct);
+
+        // Exactly 2 emission calls (the 2 non-guests), both with kind instance.full-export.
+        await emitter.Received(2).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            Arg.Any<string>(),
+            NotificationKinds.InstanceFullExport,
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+        // The guest is NOT in the call set.
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            "is29-guest",
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    // ── 5 — IS29 (D10): ContentFree export notifies no one ─────────────────
+
+    [Fact(DisplayName = "ContentFreeExport_NotifiesNoOne")]
+    public async Task ContentFreeExport_NotifiesNoOne()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var emitter = Substitute.For<INotificationEmitter>();
+
+        var (_, _, service, userManager) =
+            await BootRealServiceAsync(ct, emitter: emitter);
+
+        await SeedResidentAsync(userManager, "is29-res-a", "a@example.test", ct);
+        await SeedResidentAsync(userManager, "is29-res-b", "b@example.test", ct);
+
+        await service.ExportAsync(Admin, PortabilityExportScope.ContentFree, ct);
+
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
     }
 
     // ── Harnesses ──────────────────────────────────────────────────────────
@@ -177,8 +254,8 @@ public sealed class AdminPortabilityScopeTests(PostgresFixture fixture) : IClass
     /// <c>BreakGlassProbeTests</c> pattern), and the service (for the controller
     /// to call).
     /// </summary>
-    private async Task<(IDocumentStore store, string connString, PortabilityService service)>
-        BootRealServiceAsync(CancellationToken ct)
+    private async Task<(IDocumentStore store, string connString, PortabilityService service, UserManager<User> userManager)>
+        BootRealServiceAsync(CancellationToken ct, INotificationEmitter? emitter = null)
     {
         var conn = await fixture.NewDatabaseAsync(ct);
 
@@ -241,9 +318,9 @@ public sealed class AdminPortabilityScopeTests(PostgresFixture fixture) : IClass
 
         var service = new PortabilityService(
             store, new IdentityPrincipalStore(db), userManager, roleManager,
-            options, mediaStore, fileStore);
+            options, mediaStore, fileStore, emitter);
 
-        return (store, conn, service);
+        return (store, conn, service, userManager);
     }
 
     /// <summary>
@@ -281,6 +358,29 @@ public sealed class AdminPortabilityScopeTests(PostgresFixture fixture) : IClass
         Add(cmd, "@consumedAt", now.AddHours(-1));
 
         await cmd.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// Seeds a single test resident (the repo fixture style — no PII,
+    /// the standard test domain). The <c>User</c> row is the identity anchor;
+    /// a <c>Profile</c> row (when present) carries the <c>IsGuest</c> flag.
+    /// </summary>
+    private static async Task SeedResidentAsync(
+        UserManager<User> userManager, string id, string email, CancellationToken ct)
+    {
+        var result = await userManager.CreateAsync(
+            new User
+            {
+                Id = id,
+                UserName = id.Replace("-", ""),
+                Email = email,
+                NormalizedEmail = email.ToUpperInvariant(),
+            },
+            "Passw0rd!is29-test");
+        if (!result.Succeeded)
+            throw new InvalidOperationException(
+                "seed resident " + id + " failed: " +
+                string.Join(", ", result.Errors.Select(e => e.Description)));
     }
 
     /// <summary>An empty <see cref="IServiceProvider"/> for the Identity managers (the <c>PortabilityRoundTripTests</c> helper).</summary>

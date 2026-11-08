@@ -80,5 +80,8 @@
   "notifications.kind.guardian.group_invite": "Invitation \u00E0 un groupe pour ton enfant",
   "notifications.preference.guardian.group_invite.label": "Quand un groupe invite ton enfant",
   "notifications.kind.guardian.community_invite": "Membre d\u0027une communaut\u00E9 pour ton enfant",
-  "notifications.preference.guardian.community_invite.label": "Quand une communaut\u00E9 ajoute ton enfant"
+  "notifications.preference.guardian.community_invite.label": "Quand une communaut\u00E9 ajoute ton enfant",
+  "notifications.kind.instance.full-export": "Export complet de l'instance autoris\u00e9",
+  "notification.instance.full-export.subject": "Export complet de l'instance autoris\u00e9",
+  "notification.instance.full-export.body": "Un op\u00e9rateur a autoris\u00e9 un export complet de cette instance. L'export a \u00e9t\u00e9 effectu\u00e9 et consign\u00e9 dans le journal d'audit."
 }

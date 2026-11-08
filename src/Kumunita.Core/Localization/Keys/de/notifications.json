@@ -80,5 +80,8 @@
   "notifications.kind.group.message.mention": "Erw\u00E4hnung in Gruppennachricht",
   "notifications.preference.group.message.mention.label": "Erw\u00E4hnungen in Gruppennachrichten",
   "notifications.kind.group.message.invite": "Gruppennachrichten-Einladung",
-  "notifications.preference.group.message.invite.label": "Einladungen zu Gruppennachrichten"
+  "notifications.preference.group.message.invite.label": "Einladungen zu Gruppennachrichten",
+  "notifications.kind.instance.full-export": "Vollst\u00e4ndiger Instanz-Export freigegeben",
+  "notification.instance.full-export.subject": "Vollst\u00e4ndiger Instanz-Export freigegeben",
+  "notification.instance.full-export.body": "Ein Operator hat einen vollst\u00e4ndigen Export dieser Instanz freigegeben. Der Export wurde durchgef\u00fchrt und im Pr\u00fcfprotokoll erfasst."
 }

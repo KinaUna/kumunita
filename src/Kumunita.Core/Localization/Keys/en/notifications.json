@@ -80,5 +80,8 @@
   "notifications.kind.group.message.mention": "Group message mention",
   "notifications.preference.group.message.mention.label": "Mentions in group messages",
   "notifications.kind.group.message.invite": "Group message invitation",
-  "notifications.preference.group.message.invite.label": "Group message invitations"
+  "notifications.preference.group.message.invite.label": "Group message invitations",
+  "notifications.kind.instance.full-export": "Full instance export authorised",
+  "notification.instance.full-export.subject": "Full instance export authorised",
+  "notification.instance.full-export.body": "An operator authorised a full export of this instance. The export was performed and recorded in the audit log."
 }

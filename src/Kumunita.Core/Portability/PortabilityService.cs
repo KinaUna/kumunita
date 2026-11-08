@@ -1,5 +1,7 @@
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
+using Kumunita.Core.Notifications;
+using Kumunita.Core.UserInfo;
 using Marten;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
@@ -125,7 +127,13 @@ public sealed class PortabilityService(
     RoleManager<IdentityRole> roleManager,
     IOptions<CommunityOptions> communityOptions,
     IMediaStore mediaStore,
-    IMediaFileStore mediaFileStore) : IPortabilityService
+    IMediaFileStore mediaFileStore,
+    // IS29 (ADR 0299 §4, D10) — the transparency-emission seam (the C03
+    // INotificationEmitter contract). Resolved by DI in production; `null`
+    // in the existing test floor (the IS27/IS28 7-arg constructions keep
+    // compiling) — a `null` emitter simply skips the D10 loop below, so the
+    // round-trip / scope tests are unaffected.
+    INotificationEmitter? notificationEmitter = null) : IPortabilityService
 {
     /// <inheritdoc />
     public async Task<Stream> ExportAsync(string actorId, PortabilityExportScope scope, CancellationToken ct = default)
@@ -183,6 +191,46 @@ public sealed class PortabilityService(
             Outcome = Authorization.AccessOutcome.Allow
         });
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // IS29 (ADR 0299 §4, D10) — the transparency entry: a `Full` export
+        // (the operator-gated path) notifies **every non-guest resident** with
+        // kind `instance.full-export`, stating the date + the operator
+        // authorisation and carrying **no actor name / id** (the kind label —
+        // `notifications.kind.instance.full-export`, the IS29b key — is the
+        // resident-facing text; `body: null` keeps the body actor-free).
+        // A `ContentFree` export emits **zero** notifications (D10). The
+        // `notificationEmitter` guard keeps the existing test floor
+        // (`null`) green — the loop is simply skipped there. The idempotency
+        // key is **per recipient** (`:recipientId`) — the emitter's dedup is
+        // keyed on `IdempotencyKey` alone (no recipient in the predicate),
+        // so a single shared key would deliver to the first resident only.
+        if (scope == PortabilityExportScope.Full && notificationEmitter is not null)
+        {
+            // OpenSession (a write session) — the C03 EmitAsync seam takes an
+            // IDocumentSession and the caller commits (D5), the
+            // AnnouncementService publish-lane shape (the multi-recipient
+            // emission + one SaveChangesAsync).
+            await using var notifySession = documentStore.OpenSession(new Marten.Services.SessionOptions());
+            var profiles = (await notifySession.Query<Profile>()
+                .ToListAsync(ct).ConfigureAwait(false))
+                .ToDictionary(p => p.SubjectId, StringComparer.Ordinal);
+            var allUsers = await identityPrincipals.GetUsersAsync(ct).ConfigureAwait(false);
+            var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
+            foreach (var user in allUsers)
+            {
+                profiles.TryGetValue(user.Id, out var profile);
+                if (profile?.IsGuest == true)
+                    continue;   // D10 — non-guest residents only (a missing Profile defaults to non-guest)
+                await notificationEmitter.EmitAsync(
+                    notifySession,
+                    user.Id,
+                    NotificationKinds.InstanceFullExport,
+                    $"instance.full-export:{stamp}:{user.Id}",   // per-recipient key (one export, one stamp)
+                    body: null,
+                    ct: ct).ConfigureAwait(false);
+            }
+            await notifySession.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
 
         var stream = new MemoryStream();
         await KumunitaArchive.WriteAsync(stream, manifest, docs, media, principals, config, ct);
