@@ -1353,3 +1353,41 @@ ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
   test). **IS38c** (the E14 Document-folder-picker extraction) lands the
   `NoView_HasAnInlineScriptBlock` gate green before IS40's control-map
   traceability gate.
+
+## IS38c — Document folder-picker to a tsc module + the inline-script-block gate (E14)
+
+- **Files (5 = IS38c 4 + IS38c-b 1):** `client/lib/document-folder-picker.ts`
+  (new — the one IIFE: find `select[data-document-folder-picker]`, fetch
+  `GET /documents/folders`, append options with 2-space child indent, restore
+  the pre-populated value); `Views/Document/New.cshtml` + `Views/Document/Edit.cshtml`
+  (each `<select>` gains `data-document-folder-picker`; the 2 inline
+  `<script type="module">` blocks deleted, a Razor comment records the move);
+  `Views/Shared/_LayoutScripts.cshtml` (+1 global include after :27);
+  `SecGate/CspInlineDisciplineGateTests.cs` (IS38c-b — removed the
+  `Skip = "…E14…"` from `NoView_HasAnInlineScriptBlock` so it runs; trimmed the
+  now-stale "skipped in IS38" wording in the method body + class doc).
+- **Public names:** `document-folder-picker.ts` (no exported symbols — one IIFE);
+  `CspInlineDisciplineGateTests.NoView_HasAnInlineScriptBlock` (un-skipped).
+- **Untouched (verified, `git status`):** `confirm.ts`, `reset-form.ts`,
+  `inline-free.ts`, `_Layout.cshtml`, `DocumentFolderController.cs`, the 2
+  `application/json` data blocks, the `tag-suggest.js` include, the
+  `E14DocumentBlocks` pin, the handler test, and the (empty) allowlist.
+- **Tests (gate class, U3 runner form):** `dotnet exec
+  Kumunita.Web.Tests.dll -class "Kumunita.Web.Tests.SecGate.CspInlineDisciplineGateTests"`
+  → **Total: 2, Failed: 0, Skipped: 0** (the `NoView_HasAnInlineScriptBlock`
+  gate now runs green: 2 → 0 inline blocks).
+- **Full suite:** `dotnet exec Kumunita.Web.Tests.dll` → **Total: 1319,
+  Failed: 3, Skipped: 0**. The 3 failures are the **pre-existing baseline**
+  (IS24/IS31/IS32 drift, recorded red for their owner units), none touch an
+  IS38c file: `DataClassCoverageTests.EveryResidentExportType_IsInUserScopeInventory`,
+  `DataClassCoverageTests.EveryDeleteOrPseudonymizeType_IsHandledByAnEraser`,
+  `ImproveHarnessTests.CodeCheck_Gate_Passes`. **IS38c introduces no new
+  failure** (DoD-13 holds).
+- **Drift / noticed:** `tsc` emits `wwwroot/js/lib/document-folder-picker.js`
+  (gitignored build output — only the `.ts` is committed; `npm run build`
+  regenerates it). No CSP change; `script-src 'self'` still governs — the
+  include is an external module, which is exactly why the 2 inline blocks were
+  silently blocked (the folder `<select>` never populated; now fixed).
+- **Next unit: IS39** (control-map rewrite — traceability; the CSP-discipline
+  row can now name `NoView_HasAnInlineScriptBlock` as its pin, and IS40 gates
+  the traceability).

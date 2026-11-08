@@ -28,10 +28,10 @@ namespace Kumunita.Web.Tests.SecGate;
 ///   body** and no <c>src</c>). <c>&lt;script type="application/json"&gt;</c>
 ///   data islands are excluded (they are not executable; the two in this
 ///   repo are legitimate). Baseline **2** (the Document/New + Document/Edit
-///   folder-picker blocks, finding **E14**) — **skipped in IS38** so the
-///   committed suite stays green (DoD-13: no failure outside the IS04
-///   baseline, and a brand-new red test is not in that baseline). It lands
-///   green in **IS38c** after the 2 blocks are extracted to a tsc module.
+///   folder-picker blocks, finding **E14**) — **skipped in IS38** (so the
+///   committed suite stayed green) and **landed green in IS38c** (2 -> 0) once
+///   the 2 blocks are extracted to the tsc-built document-folder-picker.ts
+///   module.
 ///
 /// Both scans run on **comment-stripped** source: the 2
 /// <c>_LayoutScripts.cshtml</c> hits are in HTML comments, and several views
@@ -127,8 +127,7 @@ public class CspInlineDisciplineGateTests
             + "script-src 'self'.\n  " + string.Join("\n  ", flagged));
     }
 
-    [Fact(DisplayName = "No view carries an inline executable script block (E14: 2 -> 0, IS38c)",
-        Skip = "IS38c: lands green after the 2 Document folder-picker blocks (Document/New + Document/Edit) are extracted to a tsc module — see E14 in the handoff")]
+    [Fact(DisplayName = "No view carries an inline executable script block (E14: 2 -> 0, IS38c)")]
     public void NoView_HasAnInlineScriptBlock()
     {
         var violations = new List<string>();
@@ -161,11 +160,10 @@ public class CspInlineDisciplineGateTests
 
         var flagged = violations.Where(v => !Allowlist.Contains(v)).Distinct().ToList();
 
-        // In IS38 the committed state carries exactly the 2 E14 Document
-        // blocks (recorded, not fixed, not allowlisted). The test is [Skipped]
-        // in IS38 — but if it ever runs un-skipped before IS38c, the failure
-        // message must name those 2 blocks so the reader knows this is the
-        // expected E14 drift, not a new regression.
+        // IS38c landed: the 2 E14 Document folder-picker blocks are extracted
+        // to the tsc-built document-folder-picker.ts module, so the gate sees
+        // 0 inline blocks and returns here. (The E14DocumentBlocks pin below
+        // stays as the drift detector if a block reappears.)
         if (flagged.Count == 0)
             return;
 

@@ -187,7 +187,7 @@
                         <label class="form-label" for="folder" style="font-weight:600;">
                             <kw-l key="documents.folder">Folder</kw-l>
                         </label>
-                        <select class="form-control" id="folder" name="FolderId">
+                        <select class="form-control" id="folder" name="FolderId" data-document-folder-picker>
                             <option value=""><kw-l key="documents.folder_unfiled">Unfiled</kw-l></option>
                         </select>
                         <div class="text-muted small mt-1">
@@ -239,26 +239,9 @@
     <script type="module" src="~/js/lib/tag-suggest.js"></script>
 
     @* The folder picker — a small client-side script that fetches the
-       folder tree from /documents/folders and populates the <select>
-       (the PostController / PageController "seed the picker" idiom — the
-       folder tree is dynamic, so a server-rendered <select> would be
-       stale). *@
-    <script type="module">
-        (async () => {
-            const select = document.getElementById('folder');
-            if (!select) return;
-            try {
-                const res = await fetch('/documents/folders', { credentials: 'same-origin' });
-                if (!res.ok) return;
-                const { folders } = await res.json();
-                for (const f of folders) {
-                    const opt = document.createElement('option');
-                    opt.value = f.Id;
-                    const depth = f.ParentId ? '  ' : '';
-                    opt.textContent = depth + f.Name;
-                    select.appendChild(opt);
-                }
-            } catch { /* leave the "Unfiled" option only */ }
-        })();
-    </script>
+       folder tree (the PostController / PageController "seed the picker"
+       idiom — the tree is dynamic). IS38c / E14: the picker now lives in the
+       tsc-built document-folder-picker.ts module (data-document-folder-picker
+       on the <select> above); the inline <script> it replaced was silently
+       blocked by script-src 'self'. *@
 }

@@ -25,6 +25,9 @@
      remaining inline handlers: the AdminAnalytics window select and the
      Escalation/Tokens copy button) -->
 <script type="module" src="~/js/lib/inline-free.js"></script>
+<!-- Document folder picker (SECURITY.md §6; IS38c / E14 — the 2 inline
+     <script> blocks in Document/New + Document/Edit, which CSP was blocking) -->
+<script type="module" src="~/js/lib/document-folder-picker.js"></script>
 <!-- Detach menu (SECURITY.md §6 no-inline-script): while an opted-in
      dropdown (data-detach) is open, re-home its .dropdown-menu onto <body>
      so it escapes overflow-clipping ancestors (Kanban board / to-do feed)
