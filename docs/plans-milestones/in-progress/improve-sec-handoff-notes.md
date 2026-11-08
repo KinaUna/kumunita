@@ -1482,3 +1482,60 @@ product code, no change to `control-map.md`.
   (`decisions-open-items.md` token-at-rest + the stale "named invariant tests"
   item; `data-classes.md` → pointer to `[DataClass]` + design §2.5; the four
   lane lessons as rules in `AGENTS.md`).
+
+## IS41 — Doc-truth pass + the four rules (E10, E11, E13 + DoD-12)
+
+Docs-only pass, no code, no build, no new ADR, `WhatsNew.cs` untouched. Closes
+the three doc/code divergences and lands the lane's four lessons as rules.
+
+- **Files (4 docs modified, ≤ 4):**
+  - `docs/security/data-classes.md` (E10): kept the five-class prose intact;
+    added a pointer paragraph after the table — the per-type policy (class,
+    erasure, export, retention key) lives in `[DataClass]` (ADR 0298) + the
+    81-row table at design §2.5; named the types added after the prose was
+    first written (sessions `SessionDoc`, outbox `OutboxEmail`, group messaging
+    `GroupConversation`/`GroupMessage`).
+  - `docs/security/decisions-open-items.md` (E11 + E13): in the **Decisions**
+    section, added two notes — (1) the verify-lane link credential is the
+    `IdentityToken` **row id** (owner U23, 2026-10-31; no separate at-rest
+    hash; the historical F2 phrasing in `WhatsNew.cs` 0.68 / `STATUS.md` is
+    superseded, not rewritten), (2) the D6 retention decision pointing at
+    `RetentionOptions` (`Retention__*` keys, the D6 day-counts). In the open
+    items table, closed the stale "named invariant tests" row → **Closed** with
+    links to both named tests + `AccessViaDenyMatrixTests.EmptyAudienceDenies_
+    AndDelegationScope_ArePinned` (IS04).
+  - `AGENTS.md` (DoD-12): one bullet appended to "Conventions to preserve" —
+    the four lane rules (`[DataClass]` per new doc type, `// SEC-READ:` or
+    in-method decision for new audience-bearing reads, no PII in log templates,
+    no inline `on*`/`<script>` in views) + "each is enforced by a `SecGate`
+    test."
+  - `docs/security/trust-boundaries.md` (optional 4th, E11 B4): the B4 row
+    already said class (b) crosses B4 (IS09); added the one missing cross-ref —
+    the stored outbox copy each snippet was sent from is retained per D6 (body
+    nulled 7 d, `RetentionOptions`).
+
+- **Where-ref drift honored:** the plan's E11 pinned `decisions-open-items.md`
+  for a "tokens hashed at rest" sentence, but the design doc's re-verified
+  register (design §2.1, IS02) and the IS03 handoff both found the claim
+  actually lives in the **historical** `WhatsNew.cs` 0.68.0 / `STATUS.md` (out
+  of scope — history is not rewritten). Per the design doc's own directive
+  ("the IS41 correction must land against the open items, not rewrite the
+  history"), the fix records the **current-state** verify-lane credential model
+  as a Decisions note rather than correcting a sentence that isn't there. The
+  B4 half of E11 (class b crossing B4) was already closed by IS09; this unit
+  only added the D6 retention cross-ref.
+
+- **Public names:** none (docs only; no new test, no new type).
+- **Verified anchors:** both named tests exist
+  (`AuthorizationServiceTests.cs:52` / `:156`); the IS04 pinning test is at
+  `AccessViaDenyMatrixTests.cs:80`; `RetentionOptions.cs` and ADR 0298 exist;
+  B4 row confirmed to already say class (b) crosses B4.
+- **No build / tests run:** docs-only unit (D8 per-unit contract permits
+  "no test, because docs-only"); the four rules are already pinned by the
+  existing `SecGate` tests (`DataClassCoverageTests`,
+  `LogTemplatePiiGateTests`, `DecisionFreeReadGateTests`,
+  `CspInlineDisciplineGateTests`), which this unit does not touch.
+- **Next unit: IS42** — Owner-ops ledger
+  (`docs/ops/owner-ops-ledger.md`, the "last verified" ledger merging the
+  prod-hardening + SEC open items + the new `Retention__*` / `SENTRY_DSN` /
+  full-export rows).
