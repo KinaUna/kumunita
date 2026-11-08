@@ -9,7 +9,7 @@ lane: improve-sec
 related:
   - docs/plans-milestones/plan-improve-sec.md
   - docs/design/improve-sec-design.md
-updated: 2026-11-07
+updated: 2026-11-08
 ---
 
 > **Abstract:** the running handoff log for the IMPROVE-SEC lane — each unit
@@ -933,3 +933,42 @@ ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
  `Configure` blocks share anchors), they cannot be split into two clean commits
  from the final state. They are therefore committed **together** in one commit
  covering both E6 half-units, rather than as two separate per-unit commits.
+
+## IS33 — `RetentionOptions` + `RetentionPolicy` (pure — D6 retention defaults, E5)
+
+- **Files (3 new, all `Kumunita.Core.Privacy` + the Core test project):**
+ `src/Kumunita.Core/Privacy/RetentionOptions.cs` (config-bound POCO),
+ `src/Kumunita.Core/Privacy/RetentionPolicy.cs` (pure `static`),
+ `tests/Kumunita.Core.Tests/RetentionPolicyTests.cs`. No product I/O: **no**
+ `RetentionTick`, **no** `RetentionService`, **no** handler, **no** DI, **no**
+ `Program.cs` (those are IS34a / IS34b). `UsagePurgePolicy` and
+ `MediaOptions` were read for shape only, **not** changed; `PortabilityDocTypes`
+ untouched (C-M11·5).
+- **`RetentionOptions`:** `SectionName = "Retention"` (keys bind `Retention__*`),
+ one `int` (days) per D6 key with the D6 default — `Sessions` 30,
+ `OutboxBodyNullDays` 7, `OutboxDays` 90, `DeadLetters` 30,
+ `NotificationsRead` 90, `NotificationsUnread` 365, `ErrorReports` 180,
+ `Tokens` 7. `DaysFor(string key)` resolves a key name to its configured value;
+ **unknown keys return `0`** (keep — a typo never purges).
+- **`RetentionPolicy` (the pure decision seam — the chosen signature):**
+ `CutoffFor(RetentionOptions options, string key, DateTimeOffset now) →
+ DateTimeOffset?` and `Keep(RetentionOptions options, string key) → bool`.
+ Key-driven (not type-driven): the caller supplies the `RetentionOptions` that
+ holds the days (the prompt's "caller-supplied-constant" shape, mirroring
+ `UsagePurgePolicy.ComputeCutoff`). A positive key → `now − days`; a `0`/absent
+ key → **`null` cutoff** (keep, the fail-safe side). No store, no I/O, no
+ Marten, no Wolverine.
+- **Tests (3/3, green — plain xunit, no `PostgresFixture`/`DocumentStore`/
+ `*DocTypes`):** `Defaults_MatchD6` (pins the 8 D6 numbers), `ZeroMeansKeep`
+ (a `0` key and an unknown key both yield `null` cutoff / `Keep == true`),
+ `Cutoff_IsNowMinusDays` (`CutoffFor(opts, "Tokens", Now) == Now.AddDays(-7)`,
+ injected `now`). Runner form (U3): `dotnet exec
+ tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll -class
+ "Kumunita.Core.Tests.RetentionPolicyTests" -class
+ "Kumunita.Core.Tests.UsagePurgePolicyTests"` → **Total: 9, Failed: 0** (3 new +
+ 6 existing `UsagePurgePolicyTests` still green — no regression).
+- **PII:** none — the tests use a synthetic `now` and the key name `"NotAKey"`.
+- **Next unit: IS34a** (`RetentionTick` record + the Core `RetentionService`,
+ part 1: sessions, tokens, outbox, dead letters — the I/O leg that consumes
+ this unit's `RetentionOptions` + `RetentionPolicy`; it must call
+ `RetentionPolicy.CutoffFor`, never re-derive the cutoff).
