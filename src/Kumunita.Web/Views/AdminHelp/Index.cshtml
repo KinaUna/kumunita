@@ -60,7 +60,7 @@
                     <td class="text-end">
                         <form method="post" action="/admin/help/reset"
                               class="d-inline"
-                              onsubmit="return confirm('Reset &quot;@p.Title&quot; to its seeded text? This overwrites any hand-edited copy.');">
+                              data-confirm="Reset &quot;@p.Title&quot; to its seeded text? This overwrites any hand-edited copy.">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="pageId" value="@p.PageId" />
                             <button class="btn btn-outline-secondary btn-sm" type="submit"><kw-l key="admin.help.reset">Reset</kw-l></button>
@@ -85,7 +85,7 @@
             </div>
         </div>
         <form method="post" action="/admin/help/reset-all"
-              onsubmit="return confirm('Reset ALL @Model.Pages.Count seeded help pages to their seeded text? This overwrites every hand-edited copy.');">
+              data-confirm="Reset ALL @Model.Pages.Count seeded help pages to their seeded text? This overwrites every hand-edited copy.">
             @Html.AntiForgeryToken()
             <button class="btn btn-danger" type="submit"><kw-l key="admin.help.reset_all_button">Reset all</kw-l></button>
         </form>

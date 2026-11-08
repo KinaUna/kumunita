@@ -1232,3 +1232,52 @@ ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
   `form[data-confirm]` module — `Notes/Index` (2), `Bookmarks/Index` (1),
   `AdminSurfaceLabels/Index` (1), `AdminHelp/Index` (2) — the 8 inline
   `on*` handlers E9 found that `script-src 'self'` silently blocks).
+
+## IS37 — The confirm views move to the existing `data-confirm` module (E9)
+
+- **Files (exactly 4 views, 6 handler swaps):**
+  - `src/Kumunita.Web/Views/Notes/Index.cshtml` — 2 (folder delete :157, note delete :253).
+  - `src/Kumunita.Web/Views/Bookmarks/Index.cshtml` — 1 (folder delete :145).
+  - `src/Kumunita.Web/Views/AdminSurfaceLabels/Index.cshtml` — 1 (translation remove :168).
+  - `src/Kumunita.Web/Views/AdminHelp/Index.cshtml` — 2 (reset one page :63, reset all :88).
+- **The swap:** each `onsubmit="return confirm('MSG')"` becomes
+  `data-confirm="MSG"` — `MSG` byte-identical (Razor `@p.Title`,
+  `@Model.Pages.Count` and the `&quot;` entities in the AdminHelp :63 message
+  carried verbatim). The attribute is double-quoted, so no escaping needed.
+  `method`, `action`, `style`, `class` unchanged.
+- **No new TS, no new script, no `_LayoutScripts` change, no CSP change.**
+  `client/lib/confirm.ts` + its global include stay untouched; the message
+  stays server-rendered (the view↔JS seam).
+- **Verification:**
+  - `dotnet build src/Kumunita.Web` → **0 Error(s)** (69 warnings, all pre-existing).
+  - `grep -rnE "\son[a-z]+=\"" src/Kumunita.Web/Views` → **0 live
+    confirm-handler hits** in the 4 views. Remaining hits: 2 in
+    `_LayoutScripts.cshtml` (verified HTML *comments* — `<!-- … -->`, not
+    attributes) + 2 in `AdminAnalytics/Index` (`onchange`) and
+    `Admin/Escalation/Tokens` (`onclick`) — **IS38's** (autosubmit + copy,
+    different contract).
+  - `grep -c "data-confirm="` → Notes 2, Bookmarks 1, AdminSurfaceLabels 1,
+    AdminHelp 2 (total 6).
+  - `git diff --stat` → only the 4 views, 6 insertions / 6 deletions.
+  - `Bookmarks/Index` :198 verified as a *different* form (no `onsubmit`) —
+    not touched.
+- **Public names:** none new (pure Razor change).
+- **Tests:** none in IS37 (the `NoView_HasAnInlineEventHandler` "8 → 0" gate
+  is **IS38's**, landing in
+  `tests/Kumunita.Web.Tests/SecGate/CspInlineDisciplineGateTests.cs`).
+- **Drift / noticed:**
+  - The prompt + plan say "**8** inline handlers in 4 views" but the table and
+    grep both give **6** `onsubmit="return confirm('…')"` in those 4 views.
+    The other 2 inline handlers (`AdminAnalytics` `onchange`,
+    `Escalation/Tokens` `onclick`) are different patterns owned by **IS38**.
+    The "8 → 0" pin in the gate counts all 8 (6 confirm + 2 IS38), which is
+    IS38's deliverable. IS37 delivered its 6.
+  - The E9 finding in the plan says "8 inline `on*` handlers in **6** views"
+    but then lists the 6 in 4 views for IS37 and the other 2 (IS38) in 2
+    more views — consistent with the split.
+- **Next unit: IS38** (autosubmit + copy in `AdminAnalytics/Index` +
+  `Admin/Escalation/Tokens`, `client/lib/autosubmit.ts` +
+  `client/lib/copy-text.ts` or one `client/lib/inline-free.ts`, the
+  `_LayoutScripts.cshtml` include line, and the CSP-discipline gate test —
+  `NoView_HasAnInlineEventHandler` (8 → 0) + `NoView_HasAnInlineScriptBlock`,
+  ignoring Razor and HTML comments; build + `tsc` green).

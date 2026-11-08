@@ -165,7 +165,7 @@
                     </form>
                     <form method="post" action="/admin/labels/translations/remove"
                           class="mt-3 d-flex align-items-center gap-2"
-                          onsubmit="return confirm('Remove this translation?');">
+                          data-confirm="Remove this translation?">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="languageCode" value="@t.LanguageCode" />
                         <button type="submit" class="btn btn-outline-danger btn-sm"><kw-l key="common.remove">Remove</kw-l></button>
