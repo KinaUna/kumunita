@@ -50,7 +50,7 @@
 <form method="get" class="row g-2 mb-3">
     <div class="col-auto">
         <label class="visually-hidden" for="window"><kw-l key="admin.analytics_window">Window</kw-l></label>
-        <select id="window" name="window" class="form-select form-select-sm" onchange="this.form.submit()">
+        <select id="window" name="window" class="form-select form-select-sm" data-autosubmit>
             <option value="7"  selected="@(Model.WindowDays == 7  ? "selected" : null)">7</option>
             <option value="30" selected="@(Model.WindowDays == 30 ? "selected" : null)">30</option>
             <option value="90" selected="@(Model.WindowDays == 90 ? "selected" : null)">90</option>

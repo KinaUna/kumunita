@@ -1281,3 +1281,75 @@ ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
   `_LayoutScripts.cshtml` include line, and the CSP-discipline gate test —
   `NoView_HasAnInlineEventHandler` (8 → 0) + `NoView_HasAnInlineScriptBlock`,
   ignoring Razor and HTML comments; build + `tsc` green).
+
+## IS38 — Autosubmit + copy, and the CSP-discipline gate (E9)
+
+- **Files (5 = IS38 4 + IS38b 1):**
+  - `src/Kumunita.Web/client/lib/inline-free.ts` — **new**; two IIFEs
+    (autosubmit: `[data-autosubmit]` → `form.requestSubmit()` on change;
+    copy-text: `[data-copy-target]` → `navigator.clipboard.writeText`), the
+    `reset-form.ts` / `confirm.ts` precedent.
+  - `src/Kumunita.Web/Views/Shared/_LayoutScripts.cshtml` — +1
+    `<script type="module" src="~/js/lib/inline-free.js">` include (after
+    `reset-form.js`, ≈ :26).
+  - `src/Kumunita.Web/Views/AdminAnalytics/Index.cshtml` —
+    `onchange="this.form.submit()"` → `data-autosubmit` (1 handler).
+  - `src/Kumunita.Web/Views/Admin/Escalation/Tokens.cshtml` —
+    `onclick="navigator.clipboard.writeText(…)"` →
+    `data-copy-target="new-token"` (1 handler).
+  - `tests/Kumunita.Web.Tests/SecGate/CspInlineDisciplineGateTests.cs` —
+    **new** (IS38b); reuses `SecGateSource`, comment-stripping (Razor + HTML),
+    empty allowlist.
+- **The two gates:** `NoView_HasAnInlineEventHandler` → **green** (8 → 0;
+  the 2 `_LayoutScripts` hits are HTML comments, stripped).
+  `NoView_HasAnInlineScriptBlock` → **present but `[Skipped(…E14…)]`** so the
+  committed suite stays green (DoD-13); it lands green in **IS38c** after the
+  2 Document blocks are extracted. Verified the handler gate has teeth:
+  planting a throwaway `onclick` view made it **FAIL** and name the file,
+  then removed.
+- **E14 — NEW FINDING (not in the E9 baseline), recorded, NOT fixed, NOT
+  allowlisted:** `src/Kumunita.Web/Views/Document/New.cshtml:246` and
+  `Document/Edit.cshtml:245` each carry a live inline
+  `<script type="module">` block that `fetch('/documents/folders')` to populate
+  the folder `<select>`. Both are **silently blocked by `script-src 'self'`**
+  (CSP :1083) — the folder dropdown does not populate (a real latent bug).
+  Out of IS38's scope (a tsc module + 2 view edits = over the D8 ≤ 4 limit).
+  **IS38c** extracts the shared fetch-and-populate logic to a tsc module,
+  swaps each block for a `data-*` attribute, then un-skips
+  `NoView_HasAnInlineScriptBlock` (2 → 0). The 2
+  `application/json` data islands (`_LayoutScripts:143` `kumunita-strings`,
+  `Boards/BoardDetail:526` `card-edit-prefills`) are **excluded by the
+  `type="…json"` rule** — legitimate, never in scope.
+- **Skip-form adaptation:** the prompt's `[Skipped("…")]` shorthand is not a
+  xunit.v3 4.0.2 attribute — `FactAttribute` carries a `Skip` (string)
+  property (verified in the package XML docs), so the committed form is
+  `[Fact(DisplayName = "…", Skip = "…E14…")]` on the same method. Same intent,
+  the only xunit.v3-valid spelling.
+- **Verification:** `dotnet build` → **0 errors**; `tsc` green
+  (`wwwroot/js/lib/inline-free.js` emitted); `grep -rnE "\son[a-z]+=\""
+  src/Kumunita.Web/Views` → **0 live handler hits** (the 2 `_LayoutScripts`
+  comment hits remain — verified `<!-- … -->`). `dotnet exec
+  Kumunita.Web.Tests.dll -class "…CspInlineDisciplineGateTests"` →
+  **Total 2, Failed 0, Skipped 1**.
+- **Full suite — 3 failures, all PRE-EXISTING (verified by stashing all 5 IS38
+  files and re-running on clean HEAD `b64c2d73`: same 3 fail):**
+  `DataClassCoverageTests.EveryResidentExportType_IsInUserScopeInventory`,
+  `DataClassCoverageTests.EveryDeleteOrPseudonymizeType_IsHandledByAnEraser`
+  (IS24/IS31/IS32 drift, recorded red for their owner units), and
+  `ImproveHarnessTests.CodeCheck_Gate_Passes`. **None reference any IS38 file**;
+  IS38 introduces no new failure. (DoD-13 holds: no failure *outside* the
+  IS04 baseline that IS38 caused.)
+- **Drift / noticed:** building the `InlineHandler` regex `@"\son[a-z]+="""`
+  (verbatim, `\s` + one embedded `"` + close) is the correct C# form — a
+  non-verbatim `"\son[a-z]+=\""` is an *invalid escape* (`\s`). The string
+  also needs its trailing `,` before `RegexOptions.Compiled` (an early
+  rewrite dropped it → cascade of spurious line-74 errors).
+- **Next unit: IS39** (control-map rewrite — traceability;
+  `docs/security/control-map.md` gets **Control · Answers · Seam · Pinned by ·
+  ADR**; the stamp row moves to `RevocationStampMiddleware` +
+  `PrivilegedStampMiddleware`; new rows for data classes, erasure, retention,
+  operator-gated export, decision-free-read markers, log redaction + Sentry
+  floor, CSP discipline, admin-read audit; every code row names an existing
+  test). **IS38c** (the E14 Document-folder-picker extraction) lands the
+  `NoView_HasAnInlineScriptBlock` gate green before IS40's control-map
+  traceability gate.
