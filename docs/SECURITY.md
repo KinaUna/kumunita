@@ -64,3 +64,6 @@ The related surfaces:
   `GET /.well-known/security.txt`.
 - **The operational hardening checklist** — the operator's "what must be true"
   slice: [`ops/hardening-checklist.md`](ops/hardening-checklist.md).
+- **The owner-ops ledger** — the single record of the operator steps that must
+  run against a live instance, each with a "last verified" cell:
+  [`ops/owner-ops-ledger.md`](ops/owner-ops-ledger.md).

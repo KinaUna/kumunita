@@ -120,3 +120,4 @@ be true, that document says
 - [`SECURITY.md`](../SECURITY.md) — the threat model, data classes, and full control map this checklist operationalizes.
 - [`SECURITY-AUDIT.md`](../SECURITY-AUDIT.md) — the cadence and checklists (C/D/P/R) that verify this checklist.
 - [Configuration reference](configuration-reference.md) — the env fields the hardening rows depend on.
+- [Owner-ops ledger](owner-ops-ledger.md) — the single record of the operator steps behind these rows, each with its "last verified" cell.

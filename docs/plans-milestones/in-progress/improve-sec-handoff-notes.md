@@ -1539,3 +1539,54 @@ the three doc/code divergences and lands the lane's four lessons as rules.
   (`docs/ops/owner-ops-ledger.md`, the "last verified" ledger merging the
   prod-hardening + SEC open items + the new `Retention__*` / `SENTRY_DSN` /
   full-export rows).
+
+## IS42 — Owner-ops ledger (E12)
+
+- **Files (≤ 3 docs, one new + two link edits):**
+  - `docs/ops/owner-ops-ledger.md` (new) — front-matter
+    (`id: ops-owner-ops-ledger`, `tier: reference`, `kind: runbook`,
+    `audiences: [platform-maintainer]`) + the required abstract + the single
+    ledger table (item · source · what proves it · last verified), 19 rows.
+  - `docs/ops/hardening-checklist.md` — one `Related` bullet pointing at the
+    ledger (appended to the existing `Related` list).
+  - `docs/SECURITY.md` — one "related surfaces" bullet pointing at the ledger
+    (appended after the hardening-checklist bullet).
+- **Coverage:** all 15 non-"—" F-rows from the prod-hardening `## Summary`
+  (F4, F5, F9, F10, F11, F12, F13, F14, F16, F17, F18, F19, F20, F21, F22);
+  the three SEC parked / deferred items (L1/U28, L8c, "to pin" digests);
+  the three new IS-lane rows (`Retention__*` reviewed; the `SENTRY_DSN`
+  decision now safe after IS05/IS08; the full-export runbook rehearsed,
+  linking `docs/ops/privacy-operations.md` "Full instance export" + ADR 0299).
+- **De-dup verified:** F10's `SENTRY_DSN` and the lane's "now safe" row share
+  one row (source `F10 + IS05/IS08`); F12 + F13's `Community__SupportEmail`
+  share one row (source `F12/F13`). No other overlap.
+- **"Last verified" cells:** all 19 blank — the unit flips nothing, closes
+  nothing, and records no owner attestation (a blank cell is *open*, not a
+  failure; that is the whole point of the column, per the prompt).
+- **No build / tests run:** docs-only unit (D8 per-unit contract permits
+  "no test, because docs-only"). No `.cs`, no `.ts`, no config value
+  changed, no ADR added, no open item closed.
+- **Verified anchors (read only, not whole files):**
+  - `hardening-handoff-notes.md` `## Summary` (lines 1186–1230) — the 15
+    non-"—" F-rows.
+  - `sec-handoff-notes.md` `## Summary` + deferred list (lines 378–430) —
+    L1/U28, L8c, "to pin" digests (`node:22`, `postgres:18`,
+    `axllent/mailpit:latest`).
+  - `configuration-reference.md` lines 50–100 — the `SENTRY_DSN` key and the
+    eight `Retention__*` keys (≈ lines 92–99) for the exact names.
+  - `privacy-operations.md` "Full instance export" section (≈ lines 70–95)
+    — the IS30 break-glass runbook the last row links.
+  - `hardening-checklist.md` `Related` list (≈ lines 116–122) +
+    `SECURITY.md` related-surfaces list (≈ lines 58–66) — the two link sites.
+- **Git state at handoff:** the working tree is clean (the three docs are the
+  only changed files); the IS42 prompt file is **not** part of this unit
+  commit (lane convention — the prompt was committed separately as
+  `9fa81548`).
+- **Next unit: IS43** — Run and record. Full build, both full suites,
+  `tools/sec/sec-report.ps1`; record before → after for the six baselines
+  (control-map pinned 9/24 → 100%; undecided erasure 25 → 0; PII log
+  placeholders 7 → 0; unmarked decision-free reads 52 → 0; inline handlers
+  8 → 0; unaudited admin reads 3 → 0) against the IS04 baseline; delete
+  `tools/sec/sec-measure.py`; **if a gate is red, stop and list it.** Then
+  `IS44` (independent cold-read verification) and `IS45` (close flip +
+  archive).
