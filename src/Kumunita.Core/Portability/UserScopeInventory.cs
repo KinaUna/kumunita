@@ -60,7 +60,7 @@ public static class UserScopeInventory
 {
     /// <summary>
     /// The closed in-scope inventory (the design doc §2.2 table, verbatim
-    /// — 29 doc families; <see cref="Entries"/> is the closed lookup by
+    /// — 35 doc families; <see cref="Entries"/> is the closed lookup by
     /// type name, <see cref="IsInScope"/> the membership test).
     /// </summary>
     public static IReadOnlyDictionary<string, UserScopeEntry> Entries { get; } =
@@ -95,6 +95,12 @@ public static class UserScopeInventory
             ["GroupMembership"]      = new UserScopeEntry("GroupMembership", ["UserId"], "M11 ref map", "the resident's own membership rows"),
             ["GroupInvitation"]      = new UserScopeEntry("GroupInvitation", ["UserId"], "M11 ref map", "invitations the resident received"),
             ["GroupJoinRequest"]     = new UserScopeEntry("GroupJoinRequest", ["UserId"], "M11 ref map", "join-requests the resident submitted"),
+            ["PersonalNote"]         = new UserScopeEntry("PersonalNote", ["OwnerId"], "PersonalNote.cs (drift guard entry 1)", "the resident's personal notes (M37) — the E6 closure (IS31)"),
+            ["NoteFolder"]           = new UserScopeEntry("NoteFolder", ["OwnerId"], "NoteFolder.cs (drift guard entry 1)", "the resident's note folders (M37) — the E6 closure (IS31)"),
+            ["BookmarkFolder"]       = new UserScopeEntry("BookmarkFolder", ["OwnerId"], "BookmarkFolder.cs (drift guard entry 1)", "the resident's bookmark folders (M17 / ADR 0168) — the E6 closure (IS31)"),
+            ["PageTranslation"]      = new UserScopeEntry("PageTranslation", ["AuthorId"], "M11 ref map", "the resident's authored page translations — the ownership field is AuthorId"),
+            ["GroupConversation"]    = new UserScopeEntry("GroupConversation", ["Participants"], "GroupConversation.cs (via Participants)", "the group threads the resident participates in — union scope: the resident is in the Participants set"),
+            ["GroupMessage"]         = new UserScopeEntry("GroupMessage", [], "GroupMessage.cs (via GroupConversation)", "messages in the resident's group threads — indirect scope: ConversationId → GroupConversation, the resident is a participant"),
         };
 
     /// <summary>
@@ -148,7 +154,7 @@ public static class UserScopeInventory
 
     /// <summary>
     /// The closed-membership test (C-M27·3) — <c>true</c> only for the
-    /// 29 <see cref="Entries"/> in-scope doc types; <c>false</c> for
+    /// 35 <see cref="Entries"/> in-scope doc types; <c>false</c> for
     /// every <see cref="Excluded"/> row (including the five M11
     /// "Excluded" docs) and for any type name outside the closed set
     /// (an out-of-closed-set doc type is <em>never</em> in scope — the

@@ -297,6 +297,19 @@ public sealed partial class UserPortabilityService(
     ///     calling; <c>null</c> (or empty) means "no membership rows",
     ///     so a <c>Group</c> row's only in-scope path is its
     ///     <c>OwnerId</c> (the fail-closed default).</param>
+    /// <param name="inScopeGroupConversationIds">The
+    ///     <c>GroupConversation</c> id set the resident is a
+    ///     <c>Participants</c> member of (the
+    ///     <c>GroupConversation</c> rows where the resident is in the
+    ///     <c>Participants</c> set) — a <c>GroupMessage</c> row is in
+    ///     scope iff its <c>ConversationId</c> is in this set, and a
+    ///     <c>GroupConversation</c> row is in scope iff its
+    ///     <c>Id</c> is in this set. IS32 resolves this over the store's
+    ///     own <c>GroupConversation</c> rows before calling; <c>null</c>
+    ///     (or empty) means "no group threads in scope", so
+    ///     <c>GroupMessage</c> and <c>GroupConversation</c> rows
+    ///     contribute nothing (the fail-closed default, mirroring
+    ///     <paramref name="inScopeConversationIds"/>).</param>
     /// <returns>A new list (the input order preserved) of the input's
     ///     own instances that are in the resident's scope — empty for
     ///     an out-of-closed-set <paramref name="type"/>, an empty
@@ -306,7 +319,8 @@ public sealed partial class UserPortabilityService(
         IReadOnlyList<object> docs,
         string residentSubjectId,
         IReadOnlySet<string>? inScopeConversationIds = null,
-        IReadOnlySet<string>? residentGroupIds = null)
+        IReadOnlySet<string>? residentGroupIds = null,
+        IReadOnlySet<string>? inScopeGroupConversationIds = null)
     {
         if (!UserScopeInventory.IsInScope(type))
             return [];
@@ -320,7 +334,8 @@ public sealed partial class UserPortabilityService(
             if (doc is null)
                 continue;
             if (ScopeRowHoldsSeat(doc, entry, residentSubjectId,
-                    inScopeConversationIds, residentGroupIds))
+                    inScopeConversationIds, residentGroupIds,
+                    inScopeGroupConversationIds))
                 inScope.Add(doc);
         }
         return inScope;
@@ -341,7 +356,8 @@ public sealed partial class UserPortabilityService(
         UserScopeEntry entry,
         string residentSubjectId,
         IReadOnlySet<string>? inScopeConversationIds,
-        IReadOnlySet<string>? residentGroupIds)
+        IReadOnlySet<string>? residentGroupIds,
+        IReadOnlySet<string>? inScopeGroupConversationIds)
     {
         var type = doc.GetType();
 
@@ -376,6 +392,37 @@ public sealed partial class UserPortabilityService(
             return groupId is not null
                 && residentGroupIds is not null
                 && residentGroupIds.Contains(groupId);
+        }
+        if (entry.Type == "GroupMessage")
+        {
+            // IS32 (E6) — the indirect basis, mirroring the <c>Message</c>
+            // branch: the ConversationId → GroupConversation link (the
+            // resident is a participant), not a direct field on the
+            // GroupMessage. <c>inScopeGroupConversationIds</c> is null
+            // (or empty) → fail-closed (no group message is in scope).
+            var conversationId = (string?)type.GetProperty("ConversationId",
+                BindingFlags.Public | BindingFlags.Instance)?.GetValue(doc);
+            return conversationId is not null
+                && inScopeGroupConversationIds is not null
+                && inScopeGroupConversationIds.Contains(conversationId);
+        }
+        if (entry.Type == "GroupConversation")
+        {
+            // IS32 (E6) — the union seat, mirroring the <c>Conversation</c>
+            // two-seat union: in scope iff the resident's subject id is in
+            // the row's <c>Participants</c> set (a list field the generic
+            // owner rule cannot see — it is invisible to the
+            // <c>OwnershipFields</c> scan). <c>inScopeGroupConversationIds</c>
+            // is null (or empty) → fail-closed (no group thread is in scope).
+            var participants = (System.Collections.IEnumerable?)
+                type.GetProperty("Participants", BindingFlags.Public | BindingFlags.Instance)
+                    ?.GetValue(doc);
+            if (participants is null)
+                return false;
+            foreach (var p in participants)
+                if (p is string s && s == residentSubjectId)
+                    return true;
+            return false;
         }
 
         // Every other in-scope kind — a direct principal field
@@ -495,6 +542,19 @@ public sealed partial class UserPortabilityService(
         nameToType["Document"]         = typeof(Kumunita.Core.Documents.Document);
         nameToType["DocumentFolder"]   = typeof(Kumunita.Core.Documents.DocumentFolder);
         nameToType["Bookmark"]         = typeof(Kumunita.Core.Bookmarks.Bookmark);
+        // IS31 (E6) — the three local (non-M11) rows of the new closed-set
+        // family; <c>PageTranslation</c> is already in the M11 map (entry 44)
+        // and must NOT be re-added (the C-M11·5 closed-set pin).
+        nameToType["PersonalNote"]     = typeof(Kumunita.Core.PersonalNotes.PersonalNote);
+        nameToType["NoteFolder"]       = typeof(Kumunita.Core.PersonalNotes.NoteFolder);
+        nameToType["BookmarkFolder"]   = typeof(Kumunita.Core.Bookmarks.BookmarkFolder);
+        // IS32 (E6) — the two group-messaging rows of the closed-set family.
+        // Neither is in the frozen M11 <see cref="PortabilityDocTypes"/> map
+        // (verified — zero hits), so both are resolved locally, exactly like
+        // the four non-M11 drift-guard entry 1 types; they are NOT added to
+        // <c>PortabilityDocTypes</c> (the C-M11·5 closed-set pin).
+        nameToType["GroupConversation"] = typeof(Kumunita.Core.GroupMessaging.GroupConversation);
+        nameToType["GroupMessage"]      = typeof(Kumunita.Core.GroupMessaging.GroupMessage);
         return nameToType;
     }
 
@@ -524,10 +584,12 @@ public sealed partial class UserPortabilityService(
             string residentSubjectId,
             CancellationToken ct)
     {
-        // ── Pre-query Conversation + GroupMembership (the seat sets) ──────
+        // ── Pre-query Conversation + GroupMembership + GroupConversation (the seat sets) ──────
         // Message (indirect basis) needs inScopeConversationIds; Group
-        // (owner-or-member union) needs residentGroupIds. Both are derived
-        // from the resident's own rows before the main loop.
+        // (owner-or-member union) needs residentGroupIds; IS32 (E6) —
+        // GroupMessage (indirect basis) + GroupConversation (union) need
+        // inScopeGroupConversationIds. All are derived from the resident's
+        // own rows before the main loop.
         var allConversations = await QueryAllRowsAsync(session, typeof(Kumunita.Core.Messaging.Conversation), ct);
         var inScopeConversations = ScopeFilter("Conversation", allConversations, residentSubjectId);
         var inScopeConversationIds = inScopeConversations
@@ -544,6 +606,23 @@ public sealed partial class UserPortabilityService(
             .Select(id => id!)
             .ToHashSet(StringComparer.Ordinal);
 
+        // IS32 (E6) — the group-messaging seat set: the ids of the
+        // <c>GroupConversation</c> threads the resident is a
+        // <c>Participants</c> member of. The <c>GroupConversation</c>
+        // <see cref="ScopeFilter"/> union branch checks the resident is in the
+        // row's <c>Participants</c> set directly (the <c>inScopeGroupConversat
+        //ionIds</c> seat-set is only consumed by the <c>GroupMessage</c>
+        // indirect branch below), so only <c>residentSubjectId</c> is needed
+        // here.
+        var allGroupConversations = await QueryAllRowsAsync(session, typeof(Kumunita.Core.GroupMessaging.GroupConversation), ct);
+        var inScopeGroupConversations = ScopeFilter(
+            "GroupConversation", allGroupConversations, residentSubjectId);
+        var inScopeGroupConversationIds = inScopeGroupConversations
+            .Select(r => (string?)r.GetType().GetProperty("Id", BindingFlags.Public | BindingFlags.Instance)?.GetValue(r))
+            .Where(id => id is not null)
+            .Select(id => id!)
+            .ToHashSet(StringComparer.Ordinal);
+
         // ── Per-type doc export (the U02 scope filter over the M11 loop) ──
         var docs = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         var docCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -554,8 +633,9 @@ public sealed partial class UserPortabilityService(
             ct.ThrowIfCancellationRequested();
             var docType = nameToType[type];
 
-            // Conversation + GroupMembership were already queried above;
-            // reuse the filtered results to avoid a double query.
+            // Conversation + GroupMembership + GroupConversation (IS32) were
+            // already queried above; reuse the filtered results to avoid a
+            // double query.
             IReadOnlyList<object> inScopeRows;
             if (type == "Conversation")
             {
@@ -565,11 +645,16 @@ public sealed partial class UserPortabilityService(
             {
                 inScopeRows = inScopeMemberships;
             }
+            else if (type == "GroupConversation")
+            {
+                inScopeRows = inScopeGroupConversations;
+            }
             else
             {
                 var allRows = await QueryAllRowsAsync(session, docType, ct);
                 inScopeRows = ScopeFilter(type, allRows, residentSubjectId,
-                    inScopeConversationIds, residentGroupIds);
+                    inScopeConversationIds, residentGroupIds,
+                    inScopeGroupConversationIds);
             }
 
             // Serialize using the value's own runtime type — the ScopeFilter

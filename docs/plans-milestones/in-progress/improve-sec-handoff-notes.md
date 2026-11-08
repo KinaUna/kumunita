@@ -821,3 +821,115 @@ updated: 2026-11-07
   export type map, the `ImportOwnershipGuard` owner rule (verify the generic
   rule covers these or add it), and the tests `Export_IncludesOwnNotesAndFolders`,
   `Export_ExcludesOthersNotes`, `Import_ForeignNote_Rejected`.
+
+## IS31 — Resident export: notes, folders, page translations (E6)
+
+- **Files (4):** `src/Kumunita.Core/Portability/UserScopeInventory.cs` (four new `Entries` rows + the class-level and `IsInScope` doc comments bumped 29→33); `src/Kumunita.Core/Portability/UserPortabilityService.cs` (three `nameToType` rows in `BuildNameToTypeMap` — `PersonalNote` / `NoteFolder` / `BookmarkFolder`; `PageTranslation` was already in the M11 `NameToType` and is NOT re-added, C-M11·5 pin); `tests/Kumunita.Core.Tests/UserPortabilityExportTests.cs` + `tests/Kumunita.Core.Tests/UserPortabilityAcceptanceTests.cs` (both harnesses gain `PersonalNotesDocTypes.Configure(opts)` so the export loop's `QueryAllRowsAsync` can hit the new `PersonalNote` + `NoteFolder` tables); new `tests/Kumunita.Core.Tests/UserPortabilityNotesExportTests.cs` (the three tests).
+- **Public names:** none new. The four closed-set rows are: `PersonalNote` (by `OwnerId`), `NoteFolder` (by `OwnerId`), `BookmarkFolder` (by `OwnerId`), `PageTranslation` (by `AuthorId`). The three local rows are `Kumunita.Core.PersonalNotes.PersonalNote`, `Kumunita.Core.PersonalNotes.NoteFolder`, `Kumunita.Core.Bookmarks.BookmarkFolder` (verified by `grep -rn "class …"` before typing).
+- **ImportOwnershipGuard verdict (deliverable 3):** **no change — the generic owner rule covers it.** The `if (type is not (GroupType or ConversationType or MessageType))` branch of `ImportOwnershipGuard.Check` reads each `OwnershipFields` value by property name and compares to the actor's subject id; a `PersonalNote` row whose `OwnerId` is not the actor is rejected with `ReasonNotOwned` (the existing rule, exercised by `Import_ForeignNote_Rejected`). No new guard branch was added.
+- **Tests:** `UserPortabilityNotesExportTests` → **3/3 pass** (`Export_IncludesOwnNotesAndFolders`, `Export_ExcludesOthersNotes`, `Import_ForeignNote_Rejected`).
+- **Regression:** `UserPortabilityExportTests` → **4/4 pass** (the two harnesses that boot a `DocumentStore` and call `service.ExportAsync` now register `PersonalNotesDocTypes` — without it the export loop's `QueryAllRowsAsync(PersonalNote)` throws `Marten.InvalidOperationException` because the table isn't in the schema). `UserPortabilityClassifyTests` + `ImportOwnershipGuardTests` → **14/14 pass**. `UserPortabilityAcceptanceTests` → **3/3 pass**. `dotnet build` → **0 errors**.
+- **`PortabilityDocTypes` (M11) is untouched** (C-M11·5 closed-set pin — `git diff src/Kumunita.Core/Portability/PortabilityDocTypes.cs` → no output).
+- **IS24's `DataClassCoverageTests` (the `SecGate` agreement gate):** the gate's own doc-comment says "Expected state (a drift this lane surfaces, not a bug in the gate): …the `Resident`-export rows IS31/IS32 add (`Announcement` / `AnnouncementTranslation` / `AnnouncementComment` / `BookmarkFolder` / `PersonalNote` / `NoteFolder` / `PageTranslation` / `GroupConversation` / `GroupMessage`) fail gate 2. Per the SEC protocol (rules 1–9), a red gate here is a **drift found in a previous unit** — pause and record it in the handoff." — the IS31/IS32 rows the gate comment lists are exactly the E6 closure this lane is working through. **After IS31:** my four types (`PersonalNote`, `NoteFolder`, `BookmarkFolder`, `PageTranslation`) are **no longer in the missing list** (they are now keys in `UserScopeInventory.Entries`). The remaining 5 missing are `Announcement` / `AnnouncementTranslation` / `GroupConversation` / `GroupMessage` / `TagTranslation` — **IS32's** (`GroupConversation` / `GroupMessage`) **and other units'** scope. The `EveryDeleteOrPseudonymizeType_IsHandledByAnEraser` gate (a separate failure) lists 13 types unhandled — also pre-existing drift from the IS17–IS20 annotation phase, not introduced by IS31. Per SEC protocol rule 9, **I did not edit the gate to pass; I recorded the state and moved on.**
+- **PII:** none in code, tests or notes — fixture ids are `is31-res-a` / `is31-res-b`, emails are the repo standard `a@x.com` / `b@x.com`; the note bodies are the synthetic strings `note by is31-res-a` / `b-` / `t-` etc.
+- **Next unit: IS32** (Resident export: group messaging, indirect scope) — the `Entries` rows for `GroupConversation` (resident ∈ `Participants`) and `GroupMessage` (via `ConversationId`, the `Message` indirect rule); the guard gets a **`GroupMessage` rule** mirroring `Message` (the caller supplies the actor's group-conversation ids; an empty set means fail-closed); tests `Export_IncludesGroupThreadsActorIsIn`, `Import_GroupMessage_ForeignConversation_Rejected`, `Guard_GroupMessage_RequiresActorConversation`.
+
+## IS32 — Resident export: group messaging, indirect scope (E6)
+
+- **Files (6):** `src/Kumunita.Core/Portability/UserScopeInventory.cs` (two new
+ `Entries` rows — `GroupConversation` (by `Participants`, union) +
+ `GroupMessage` (empty `OwnershipFields`, indirect via `ConversationId`); the
+ class-level and `IsInScope` doc comments bumped 33→35);
+ `src/Kumunita.Core/Portability/UserPortabilityService.cs` (two `nameToType`
+ rows in `BuildNameToTypeMap` — `Kumunita.Core.GroupMessaging.GroupConversation`
+ + `GroupMessage`, resolved locally, NOT added to `PortabilityDocTypes`,
+ C-M11·5 pin; the `GroupConversation` seat-set pre-query in
+ `ExportDocsByTypeAsync` deriving `inScopeGroupConversationIds`; a new optional
+ `ScopeFilter`/`ScopeRowHoldsSeat` parameter `inScopeGroupConversationIds`
+ (default null = fail-closed, mirroring `inScopeConversationIds`) with a
+ `GroupMessage` branch (indirect, `ConversationId` ∈ the set) and a
+ `GroupConversation` branch (union, resident ∈ the `Participants` list));
+ `src/Kumunita.Core/Portability/ImportOwnershipGuard.cs` (two new
+ `Check` branches + the new `ParticipantsContains` helper + the optional
+ `actorGroupConversationIds` parameter appended to `Check`); the two export
+ harnesses `tests/Kumunita.Core.Tests/UserPortabilityExportTests.cs` +
+ `UserPortabilityAcceptanceTests.cs` (both gain `GroupMessagingDocTypes.Configure
+ (opts)`); new `tests/Kumunita.Core.Tests/UserPortabilityGroupMessagingExportTe
+sts.cs` (the three tests).
+- **Public names:** `ImportOwnershipGuard.Check` gains an optional
+ `IReadOnlySet<string>? actorGroupConversationIds = null` parameter (appended
+ after `actorConversationIds`, so existing call sites —
+ `UserPortabilityService.Strategies.cs:54` and `UserPortabilityService.cs:1168`
+ — compile unchanged and pass `null`, i.e. fail-closed for `GroupMessage`).
+ `UserPortabilityService.ScopeFilter` gains an optional
+ `inScopeGroupConversationIds` parameter. No new public types.
+- **ScopeFilter verdict (deliverable 2):** the `GroupConversation` union branch
+ checks the resident's subject id is in the row's `Participants` `List<string>`
+ (a list field the generic owner rule cannot see — IS31's single-owner types
+ never hit this); the `GroupMessage` indirect branch is the exact mirror of the
+ `Message` branch. The `GroupConversation` seat-set is pre-queried in
+ `ExportDocsByTypeAsync` and passed into the per-type `ScopeFilter` call; the
+ `GroupConversation` branch reads `Participants` directly (it does NOT consume
+ the seat-set — only `GroupMessage` does), so the pre-query needs only
+ `residentSubjectId`.
+- **ImportOwnershipGuard verdict (deliverable 3):** **both branches added,
+ required for correctness.** The `GroupMessage` rule mirrors `Message` exactly
+ (fail-closed on a null/empty `actorGroupConversationIds`). The
+ `GroupConversation` participant rule (actor ∈ `Participants`) is a **deviation
+ the plan did not name explicitly** — the plan names the `GroupMessage` rule
+ "explicitly" but the `GroupConversation` union seat is required: without it,
+ `GroupConversation` (whose `OwnershipFields` is `["Participants"]`) would fall
+ through the generic owner rule, and the rule compares `Str(row, "Participants")`
+ (the list's `ToString()`) to the actor's subject id — which never matches, so
+ *every* group thread would import (a foreign-thread leak, the opposite of
+ fail-closed). I recorded this per SEC rule 9; I did not ship a foreign-thread
+ import.
+- **Tests:** `UserPortabilityGroupMessagingExportTests` → **3/3 pass**
+ (`Export_IncludesGroupThreadsActorIsIn`, `Import_GroupMessage_ForeignConversat
+ion_Rejected`, `Guard_GroupMessage_RequiresActorConversation`).
+- **Regression (the xunit.v3 `-class` runner form, SEC U3):**
+ `UserPortabilityExportTests` **4/4**, `UserPortabilityAcceptanceTests` **3/3**,
+ `ImportOwnershipGuardTests` **9/9**, `UserPortabilityClassifyTests` **4/4**,
+ `UserPortabilityResolveTests` **5/5**, `UserPortabilityHostileClassifyTests`
+ **4/4**, `UserPortabilityHostileResolveTests` **4/4**,
+ `UserPortabilityNotesExportTests` **3/3**,
+ `ImportOwnershipGuardServiceSeamTests` **4/4** — **43/43 pass** in one run
+ (the two `ExportAsync` harnesses now register `GroupMessagingDocTypes`; the
+ classify/resolve harnesses do NOT need it — `QueryAllRowsAsync` tolerates
+ unregistered doc types here, as IS31's `PersonalNote`/`NoteFolder` proved by
+ the same harnesses passing at baseline without `PersonalNotesDocTypes`).
+ `dotnet build` → **0 errors**.
+- **`PortabilityDocTypes` (M11) is untouched** (C-M11·5 closed-set pin —
+ `git diff src/Kumunita.Core/Portability/PortabilityDocTypes.cs` → no output;
+ `grep GroupConversation|GroupMessage` over `PortabilityDocTypes.cs` +
+ `PortabilityExportDocuments.cs` → zero hits, as the prompt predicted).
+- **IS24's `DataClassCoverageTests` (the `SecGate` agreement gate):**
+ `EveryResidentExportType_IsInUserScopeInventory` → `GroupConversation` +
+ `GroupMessage` are **no longer in the missing list**; the remaining 3 are
+ `Announcement` / `AnnouncementTranslation` / `TagTranslation` (other units'
+ scope). The `EveryDeleteOrPseudonymizeType_IsHandledByAnEraser` gate lists 13
+ unhandled types (`AccessAudit`, `EmailDeadLetter`, `InventoryCheckout`,
+ `KioskPlaylist`, `SuppressedAddress`, `Report`, `ComponentMembership`,
+ `GroupInvitation`, `GroupJoinRequest`, `GroupMembership`, `GuardianLink`,
+ `ModeratorAssignment`, `Profile`) — **pre-existing drift from the IS17–IS20
+ annotation phase, not introduced by IS32** (IS31's handoff already records this
+ 13-type set). `GroupConversation` is `Erasure.Keep` (stays out of every
+ `HandledTypes` set) and `GroupMessage` is `Erasure.Pseudonymize` (already
+ handled by IS21's `ResidentThreadPseudonymizer`) — neither appears in the 13.
+ Per SEC protocol rule 9, **I did not edit the gate to pass; I recorded the
+ state and moved on.**
+- **PII:** none in code, tests or notes — fixture ids are `m32-resident-a` /
+ `m32-resident-b` (and `user-a` in the guard-level tests, the repo standard),
+ emails are `a@x.com` / `b@x.com`; the group-message bodies are the synthetic
+ strings `hi from A` / `hi from B`.
+- **Next unit: IS33** (`RetentionOptions` + `RetentionPolicy`, pure — D6
+ retention defaults).
+- **Commit note (deviation, recorded per rule 9):** the IS32 prompt states
+ "IS00–IS31 are committed", but on pickup IS31's changes were **uncommitted**
+ (working tree only — `git log` shows `IS30` as the last committed unit, and
+ IS31's `UserScopeInventory` / `UserPortabilityService` / two-harness edits were
+ unstaged). Because IS31 and IS32 interleave in the same files (the
+ 29→33→35 doc-comment bumps, the `BuildNameToTypeMap` block, and both harness
+ `Configure` blocks share anchors), they cannot be split into two clean commits
+ from the final state. They are therefore committed **together** in one commit
+ covering both E6 half-units, rather than as two separate per-unit commits.
