@@ -11,10 +11,10 @@
 
     <ItemGroup>
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
-      <PackageReference Include="Microsoft.Testing.Extensions.VSTestBridge" Version="2.5.1" />
+      <PackageReference Include="Microsoft.Testing.Extensions.VSTestBridge" Version="2.5.2" />
       <PackageReference Include="NSubstitute" Version="6.2.0" />
-      <PackageReference Include="xunit.v3" Version="4.0.2" />
-      <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />      <!-- GA U06 (ADR 0038): the 5 Assign Web tests are <b>integration</b> tests —
+      <PackageReference Include="xunit.v3" Version="4.0.3" />
+      <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14" />      <!-- GA U06 (ADR 0038): the 5 Assign Web tests are <b>integration</b> tests —
            the Assign action's standing gate (ActiveLinkAsync) + the happy-path
            CreateGuardianLinkAsync seam both run real Marten SQL (Marten 9's
            FirstOrDefaultAsync/ToListAsync cannot be NSubstituted — they cast to
