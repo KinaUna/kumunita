@@ -38,5 +38,12 @@
   "moderation.back_to_queue": "\u2190 Back to queue",
   "moderation.queue_reply_by": "reply by",
   "moderation.resolve_reply_label": "Reply (target of this report)",
-  "moderation.resolve_reply_by": "Reply by"
+  "moderation.resolve_reply_by": "Reply by",
+  "moderation.resolve_outcome_label": "Outcome",
+  "moderation.resolve_outcome_noaction": "No action",
+  "moderation.resolve_outcome_hidden": "Hide the post",
+  "moderation.resolve_outcome_removed": "Remove the post",
+  "moderation.resolve_outcome_other": "Other (see note)",
+  "moderation.resolve_note_label": "Note to the reporter (optional)",
+  "moderation.resolve_note_placeholder": "What happened, in one or two sentences"
 }

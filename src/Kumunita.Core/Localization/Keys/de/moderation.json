@@ -38,5 +38,12 @@
   "moderation.back_to_queue": "\u2190 Zur\u00FCck zur Warteschlange",
   "moderation.queue_reply_by": "Antwort von",
   "moderation.resolve_reply_label": "Antwort (Ziel dieser Meldung)",
-  "moderation.resolve_reply_by": "Antwort von"
+  "moderation.resolve_reply_by": "Antwort von",
+  "moderation.resolve_outcome_label": "Ergebnis",
+  "moderation.resolve_outcome_noaction": "Keine Maßnahme",
+  "moderation.resolve_outcome_hidden": "Beitrag ausblenden",
+  "moderation.resolve_outcome_removed": "Beitrag entfernen",
+  "moderation.resolve_outcome_other": "Sonstiges (siehe Hinweis)",
+  "moderation.resolve_note_label": "Hinweis an die Meldung (optional)",
+  "moderation.resolve_note_placeholder": "Was ist passiert, in einem oder zwei Sätzen"
 }

@@ -38,5 +38,12 @@
   "moderation.back_to_queue": "\u2190 Retour \u00E0 la file",
   "moderation.queue_reply_by": "r\u00E9ponse de",
   "moderation.resolve_reply_label": "R\u00E9ponse (cible de ce signalement)",
-  "moderation.resolve_reply_by": "R\u00E9ponse de"
+  "moderation.resolve_reply_by": "R\u00E9ponse de",
+  "moderation.resolve_outcome_label": "Issue",
+  "moderation.resolve_outcome_noaction": "Aucune action",
+  "moderation.resolve_outcome_hidden": "Masquer la publication",
+  "moderation.resolve_outcome_removed": "Supprimer la publication",
+  "moderation.resolve_outcome_other": "Autre (voir note)",
+  "moderation.resolve_note_label": "Note \u00E0 l\u2019attention du signaleur (facultative)",
+  "moderation.resolve_note_placeholder": "Ce qui s\u2019est pass\u00E9, en une ou deux phrases"
 }

@@ -38,5 +38,12 @@
   "moderation.back_to_queue": "\u2190 Tilbage til k\u00F8en",
   "moderation.queue_reply_by": "svar af",
   "moderation.resolve_reply_label": "Svar (m\u00E5l for denne rapport)",
-  "moderation.resolve_reply_by": "Svar af"
+  "moderation.resolve_reply_by": "Svar af",
+  "moderation.resolve_outcome_label": "Udfald",
+  "moderation.resolve_outcome_noaction": "Ingen handling",
+  "moderation.resolve_outcome_hidden": "Skjul indlægget",
+  "moderation.resolve_outcome_removed": "Fjern indlægget",
+  "moderation.resolve_outcome_other": "Andet (se note)",
+  "moderation.resolve_note_label": "Note til rapportøren (valgfri)",
+  "moderation.resolve_note_placeholder": "Hvad skete der, i et eller to sætninger"
 }

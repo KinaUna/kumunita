@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using Kumunita.Core.Moderation;
+using Kumunita.Core.Posts;
 using Kumunita.Web.Controllers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.Primitives;
 using NSubstitute;
 using Xunit;
 
@@ -49,6 +51,18 @@ namespace Kumunita.Web.Tests;
 /// components with <c>ModeratorAccess</c> ON; the actual write-lane gate
 /// is the action-level <c>[Authorize(Roles = GlobalAdmin)]</c> + the
 /// Core's <c>CanAsync(Moderate)</c> — the two independent gates).
+/// </item>
+/// <item><b>ModerationController_ResolvePost_OutcomeAndNote_PassThrough</b>
+/// — <c>POST /moderation/{id}/resolve</c> (IMPROVE-UX R04): the form
+/// carries <c>outcome=Hidden</c> + a <c>resolutionNote</c> and the
+/// controller passes the parsed <see cref="ReportOutcome.Hidden"/> +
+/// the note verbatim to the R03 seam (the pass-through, not the seam's
+/// behavior — the R03 Core tests pin the seam).
+/// </item>
+/// <item><b>ModerationController_ResolvePost_EmptyForm_PreR04Shape</b>
+/// — <c>POST /moderation/{id}/resolve</c> (IMPROVE-UX R04): an empty
+/// form (no outcome, no note) calls the seam with both
+/// <c>null</c> — the pre-R04 "no outcome recorded" shape.
 /// </item>
 /// </list>
 /// <para>
@@ -155,6 +169,101 @@ public sealed class ModerationControllerTests
         // reads — the controller does not re-derive access).
         await moderation.Received(1).IsInActorScopeAsync(
             actor, component, Arg.Any<CancellationToken>());
+    }
+
+    // ── 3 — ModerationController_ResolvePost_OutcomeAndNote_PassThrough ─
+
+    /// <summary>
+    /// <c>POST /moderation/{id}/resolve</c> (IMPROVE-UX R04 — the
+    /// resolve form's outcome + note pass-through): the form carries
+    /// <c>outcome=Hidden</c> + a non-empty <c>resolutionNote</c> and
+    /// the controller passes the parsed <see cref="ReportOutcome.Hidden"/>
+    /// + the note verbatim to the R03 seam's
+    /// <see cref="IModerationService.ResolveReportAsync"/>
+    /// (the pass-through, not the seam's behavior — the R03 Core
+    /// tests pin what the seam does with those values). A successful
+    /// resolve redirects to the queue (the write-lane
+    /// redirect-after-write shape).
+    /// </summary>
+    [Fact]
+    public async Task ModerationController_ResolvePost_OutcomeAndNote_PassThrough()
+    {
+        const string reportId      = "r-resolve-outcome";
+        const string admin         = "subj-admin";
+        const string note          = "The post was hidden at the author's request.";
+
+        var moderation = Substitute.For<IModerationService>();
+        var controller = Build(moderation, subjectId: admin, roles: ["GlobalAdmin"]);
+
+        // The form fields the resolve form posts (the R04 shape:
+        // outcome is the enum's string name, resolutionNote is the
+        // free-text note).
+        controller.HttpContext.Request.Form = new FormCollection(
+            new Dictionary<string, StringValues>
+            {
+                ["outcome"]        = new StringValues("Hidden"),
+                ["resolutionNote"] = new StringValues(note),
+            });
+
+        var result = await controller.ResolvePost(reportId);
+
+        // The successful resolve redirects to the queue (the write-lane
+        // redirect-after-write shape — the same Redirect("/moderation")
+        // the pre-R04 shape used).
+        Assert.IsType<RedirectResult>(result);
+
+        // The pass-through: the outcome is parsed to ReportOutcome.Hidden,
+        // the note is passed verbatim (the R03 lane's ≤500-cap helper is
+        // the second line of defense — this note is within the cap, so
+        // the controller's job is to forward it unchanged).
+        await moderation.Received(1).ResolveReportAsync(
+            reportId:       reportId,
+            globalAdminId:  admin,
+            outcome:        ReportOutcome.Hidden,
+            resolutionNote: note,
+            ct:             Arg.Any<CancellationToken>());
+    }
+
+    // ── 4 — ModerationController_ResolvePost_EmptyForm_PreR04Shape ────
+
+    /// <summary>
+    /// <c>POST /moderation/{id}/resolve</c> (IMPROVE-UX R04 — the
+    /// pre-R04 "no outcome recorded" shape): an empty form (no
+    /// <c>outcome</c>, no <c>resolutionNote</c> — the user left both
+    /// blank) calls the R03 seam with both optional parameters
+    /// <c>null</c> — the same call the seam received before R04
+    /// (the two-argument shape still compiles because the R03
+    /// parameters are optional; R04's controller change is what
+    /// populates them when the form supplies them).
+    /// </summary>
+    [Fact]
+    public async Task ModerationController_ResolvePost_EmptyForm_PreR04Shape()
+    {
+        const string reportId = "r-resolve-empty";
+        const string admin    = "subj-admin";
+
+        var moderation = Substitute.For<IModerationService>();
+        var controller = Build(moderation, subjectId: admin, roles: ["GlobalAdmin"]);
+
+        // An empty form — no outcome, no note (the user left both blank).
+        controller.HttpContext.Request.Form = new FormCollection(
+            new Dictionary<string, StringValues>());
+
+        var result = await controller.ResolvePost(reportId);
+
+        // The successful resolve redirects to the queue.
+        Assert.IsType<RedirectResult>(result);
+
+        // The pre-R04 shape: both optional parameters are null (the
+        // controller maps the blank form fields to null — the outcome's
+        // unrecognized/empty parse → null, the note's empty/whitespace →
+        // null — the R03 seam's "no outcome recorded" path).
+        await moderation.Received(1).ResolveReportAsync(
+            reportId:       reportId,
+            globalAdminId:  admin,
+            outcome:        null,
+            resolutionNote: null,
+            ct:             Arg.Any<CancellationToken>());
     }
 
     // ── Harness ────────────────────────────────────────────────────────

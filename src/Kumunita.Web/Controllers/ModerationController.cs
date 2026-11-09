@@ -461,7 +461,7 @@ public sealed class ModerationController(
     /// <summary>
     /// The "close the report" submit (F6 — the resolve
     /// counterpart to <see cref="Unlock"/>). Delegates to the
-    /// frozen <see cref="ModerationService.ResolveReportAsync"/>
+    /// frozen <see cref="IModerationService.ResolveReportAsync"/>
     /// (the same SoD / gate shape as <see cref="Unlock"/> —
     /// the Core's <c>CanAsync(Moderate)</c> inside U5's method
     /// + this action's <c>[Authorize(Roles = GlobalAdmin)]</c>;
@@ -482,14 +482,39 @@ public sealed class ModerationController(
         if (string.IsNullOrEmpty(id)) return NotFound();
         var admin = SubjectId(User) ?? string.Empty;
 
+        // IMPROVE-UX R04 — the optional resolve-form pair (the D1
+        // closed vocabulary + the ≤500 note, the R03 seam's optional
+        // parameters). Both are optional: an empty / absent form field
+        // means the user left it blank, and the pre-R04 "no outcome
+        // recorded" call shape (the two-argument call the seam still
+        // compiles against) is what the seam gets back. The outcome is
+        // parsed with the AdminController precedent (line 513,
+        // <c>Enum.TryParse</c> + <c>ignoreCase: true</c>) — an
+        // unrecognized value is treated as "left blank" (the
+        // pre-R04 shape), never an error. The note is passed through
+        // verbatim — the R03 lane's own <c>ResolveReportNote</c>
+        // helper is the ≤500-cap second line of defense (the form's
+        // <c>maxlength</c> is the first); the controller does not add
+        // its own validation (the prompt's explicit do-not).
+        var outcomeRaw = Request.Form["outcome"].ToString();
+        var outcome = Enum.TryParse<Kumunita.Core.Posts.ReportOutcome>(outcomeRaw, ignoreCase: true, out var parsed)
+            ? (Kumunita.Core.Posts.ReportOutcome?)parsed
+            : null;
+        var noteRaw = Request.Form["resolutionNote"].ToString();
+        var note = string.IsNullOrWhiteSpace(noteRaw) ? null : noteRaw;
+
         try
         {
             // IMPROVE-CODE C09 — the committed lane (the Core's own
             // session; the C5 flag-flip inside is unchanged, ADR
-            // 0006 §D).
+            // 0006 §D). IMPROVE-UX R04 — the optional outcome + note
+            // pair (the R03 seam's optional parameters; null / null
+            // is the pre-R04 "no outcome recorded" call shape).
             await moderation.ResolveReportAsync(
-                reportId:      id,
-                globalAdminId: admin)
+                reportId:       id,
+                globalAdminId:  admin,
+                outcome:        outcome,
+                resolutionNote: note)
                 .ConfigureAwait(false);
             TempData["info"] = await this.FlashAsync("moderation.flash_resolved", "Report resolved.");
         }
