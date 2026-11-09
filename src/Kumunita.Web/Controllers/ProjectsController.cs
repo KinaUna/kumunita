@@ -744,7 +744,7 @@ public sealed class ProjectsController : ProjectsBaseController
         {
             // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
             // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
-            await using var session = store.LightweightSession();
+            await using var session = store!.LightweightSession();
             await this.projects.ProjectTranslationLane.AddAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
@@ -812,7 +812,7 @@ public sealed class ProjectsController : ProjectsBaseController
         {
             // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
             // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
-            await using var session = store.LightweightSession();
+            await using var session = store!.LightweightSession();
             await this.projects.ProjectTranslationLane.UpdateAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)
@@ -873,7 +873,7 @@ public sealed class ProjectsController : ProjectsBaseController
         {
             // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
             // session, C3 one SaveChangesAsync).
-            await using var session = store.LightweightSession();
+            await using var session = store!.LightweightSession();
             await this.projects.ProjectTranslationLane.RemoveAsync(session, id, languageCode, actorId, RoleSet(User));
         }
         catch (UnauthorizedAccessException)

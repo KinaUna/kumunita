@@ -96,6 +96,13 @@ public static class RetentionService
     /// <param name="logDir">The directory the dated <c>app-*.log</c> files land in (the <see cref="Kumunita.Core.Logging.FileSinkOptions"/> <c>Directory</c>). <c>null</c> skips the log-file leg (the fail-safe; the caller then runs no file retention this pass).</param>
     /// <param name="logRetentionDays">The file-log retention day-count (the <see cref="Kumunita.Core.Logging.FileSinkOptions"/> <c>RetentionDays</c>). A non-positive value skips the log-file leg (the fail-safe, matching <see cref="RollingFileSink.Retain"/>'s "no files older than <c>now − 0</c>" degenerate).</param>
     /// <returns>The affected counts per type (no PII). A type skipped by a <c>null</c> cutoff reports <c>0</c>; a leg skipped by a <c>null</c>/<c>0</c> log parameter reports <c>0</c> for <see cref="RetentionSweepResult.LogFilesDeleted"/>.</returns>
+    /// <remarks>
+    /// One delegated private helper per document type (plus the log-file
+    /// leg). Each helper owns its own cutoff resolution and Marten session;
+    /// the sweep is a fixed-order list of calls with an unchanged signature
+    /// and unchanged per-type behavior (CH07 / CODE-HYGIENE, ADR 0298 D6 —
+    /// the split is pure refactoring: no new public seam, no behavior change).
+    /// </remarks>
     public static async Task<RetentionSweepResult> RunAsync(
         IDocumentStore store,
         RetentionOptions options,
@@ -107,161 +114,214 @@ public static class RetentionService
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(options);
 
-        int sessions = 0, identityTokens = 0, escalationTokens = 0,
-            deadLetters = 0, outboxBodyNulled = 0, outboxDeleted = 0,
-            notifications = 0, errorReports = 0, logFilesDeleted = 0;
+        // Fixed-order sweep, one helper per document type (the per-type block
+        // comments — type + cutoff key + fail-safe shape — live on the
+        // helpers themselves).
+        var sessions = await RunSessionsAsync(store, options, now, ct);
+        var (identityTokens, escalationTokens) = await RunTokensAsync(store, options, now, ct);
+        var deadLetters = await RunDeadLettersAsync(store, options, now, ct);
+        var outboxBodyNulled = await RunOutboxBodyNullAsync(store, options, now, ct);
+        var outboxDeleted = await RunOutboxDeleteAsync(store, options, now, ct);
+        var notifications = await RunNotificationsAsync(store, options, now, ct);
+        var errorReports = await RunErrorReportsAsync(store, options, now, ct);
 
-        // --- SessionDoc: revoked beyond the Sessions cutoff (active kept). ---
-        DateTimeOffset? sessionsCutoff = RetentionPolicy.CutoffFor(options, "Sessions", now);
-        if (sessionsCutoff is { } sc)
-        {
-            await using var s = store.OpenSession(new Marten.Services.SessionOptions());
-            var sessionIds = (await s.Query<SessionDoc>()
-                    .Where(x => x.RevokedAt != null && x.RevokedAt < sc)
-                    .Select(x => x.Id)
-                    .ToListAsync(ct)).Distinct().ToList();
-            foreach (var id in sessionIds) s.Delete<SessionDoc>(id);
-            await s.SaveChangesAsync(ct);
-            sessions = sessionIds.Count;
-        }
-
-        // --- IdentityToken: consumed or expired beyond the Tokens cutoff. ---
-        // --- EscalationToken: revoked beyond the Tokens cutoff. ---
-        DateTimeOffset? tokensCutoff = RetentionPolicy.CutoffFor(options, "Tokens", now);
-        if (tokensCutoff is { } tc)
-        {
-            await using var s = store.OpenSession(new Marten.Services.SessionOptions());
-            var identityIds = (await s.Query<IdentityToken>()
-                    .Where(x => (x.ConsumedAt != null && x.ConsumedAt < tc) || x.ExpiresAt < tc)
-                    .Select(x => x.Id)
-                    .ToListAsync(ct)).Distinct().ToList();
-            foreach (var id in identityIds) s.Delete<IdentityToken>(id);
-
-            var escalationIds = (await s.Query<EscalationToken>()
-                    .Where(x => x.RevokedAt != null && x.RevokedAt < tc)
-                    .Select(x => x.Id)
-                    .ToListAsync(ct)).Distinct().ToList();
-            foreach (var id in escalationIds) s.Delete<EscalationToken>(id);
-
-            await s.SaveChangesAsync(ct);
-            identityTokens = identityIds.Count;
-            escalationTokens = escalationIds.Count;
-        }
-
-        // --- EmailDeadLetter: dead beyond the DeadLetters cutoff. ---
-        DateTimeOffset? deadCutoff = RetentionPolicy.CutoffFor(options, "DeadLetters", now);
-        if (deadCutoff is { } dc)
-        {
-            await using var s = store.OpenSession(new Marten.Services.SessionOptions());
-            var deadIds = (await s.Query<EmailDeadLetter>()
-                    .Where(x => x.DeadAt < dc)
-                    .Select(x => x.Id)
-                    .ToListAsync(ct)).Distinct().ToList();
-            foreach (var id in deadIds) s.Delete<EmailDeadLetter>(id);
-            await s.SaveChangesAsync(ct);
-            deadLetters = deadIds.Count;
-        }
-
-        // --- OutboxEmail: null the Body past OutboxBodyNullDays (row kept),
-        //     delete the row past OutboxDays (the two cutoffs are independent
-        //     — a row is nulled first, kept, then deleted). ---
-        DateTimeOffset? bodyCutoff = RetentionPolicy.CutoffFor(options, "OutboxBodyNullDays", now);
-        if (bodyCutoff is { } bc)
-        {
-            await using var s = store.OpenSession(new Marten.Services.SessionOptions());
-            var toNull = await s.Query<OutboxEmail>()
-                .Where(x => x.Body != null && x.Body != "" && x.QueuedAt < bc)
-                .ToListAsync(ct);
-            // Explicitly re-Store each mutated row (the
-            // EventService.Group / Pages update idiom, made explicit): a query-
-            // loaded row is not guaranteed to be dirty-tracked for a field
-            // assignment, so persisting the mutated object is the safe commit.
-            foreach (var row in toNull)
-            {
-                row.Body = string.Empty;
-                s.Store(row);
-            }
-            await s.SaveChangesAsync(ct);
-            outboxBodyNulled = toNull.Count;
-        }
-
-        DateTimeOffset? outboxCutoff = RetentionPolicy.CutoffFor(options, "OutboxDays", now);
-        if (outboxCutoff is { } oc)
-        {
-            await using var s = store.OpenSession(new Marten.Services.SessionOptions());
-            var outboxIds = (await s.Query<OutboxEmail>()
-                    .Where(x => x.QueuedAt < oc)
-                    .Select(x => x.Id)
-                    .ToListAsync(ct)).Distinct().ToList();
-            foreach (var id in outboxIds) s.Delete<OutboxEmail>(id);
-            await s.SaveChangesAsync(ct);
-            outboxDeleted = outboxIds.Count;
-        }
-
-        // --- Notification: part 2 (D6). Two cohorts, one pass. A READ row
-        //     (ReadAt != null) is past the NotificationsRead cutoff (90 d);
-        //     an UNREAD row (ReadAt null) is past the NotificationsUnread
-        //     cutoff (365 d) by its Created age. The two predicates are
-        //     mutually exclusive (a row is read or unread, never both), so the
-        //     single WHERE clause is the clean two-cohort disjunction —
-        //     each cutoff is its own CutoffFor, and a 0-valued/absent key
-        //     nulls that term out (the fail-safe).
-        //     The unread cutoff is pre-computed to a nullable constant so the
-        //     lambda is a clean two-term null-safe comparison (the part-1
-        //     single-cutoff shape, no ternary / no case-split — Linq2DB
-        //     translates a null-safe comparison over a constant, not a
-        //     conditional expression).
-        DateTimeOffset? notifReadCutoff = RetentionPolicy.CutoffFor(options, "NotificationsRead", now);
-        DateTimeOffset? notifUnreadCutoff = RetentionPolicy.CutoffFor(options, "NotificationsUnread", now);
-        if (notifReadCutoff is not null || notifUnreadCutoff is not null)
-        {
-            await using var s = store.OpenSession(new Marten.Services.SessionOptions());
-            var notifIds = (await s.Query<Notification>()
-                    .Where(x =>
-                        (x.ReadAt != null && x.ReadAt < notifReadCutoff) ||
-                        (x.ReadAt == null && x.Created < notifUnreadCutoff))
-                    .Select(x => x.Id)
-                    .ToListAsync(ct)).Distinct().ToList();
-            foreach (var id in notifIds) s.Delete<Notification>(id);
-            await s.SaveChangesAsync(ct);
-            notifications = notifIds.Count;
-        }
-
-        // --- ErrorReport: part 2 (D6). A RESOLVED report (ResolvedAt != null)
-        //     is purged past the ErrorReports cutoff (180 d). An UNRESOLVED
-        //     report (ResolvedAt null) is always kept — never delete an
-        //     unresolved report (the part-1 "active SessionDoc always kept"
-        //     shape, on the resolved cohort).
-        DateTimeOffset? errorCutoff = RetentionPolicy.CutoffFor(options, "ErrorReports", now);
-        if (errorCutoff is { } ec)
-        {
-            await using var s = store.OpenSession(new Marten.Services.SessionOptions());
-            var errorIds = (await s.Query<ErrorReport>()
-                    .Where(x => x.ResolvedAt != null && x.ResolvedAt < ec)
-                    .Select(x => x.Id)
-                    .ToListAsync(ct)).Distinct().ToList();
-            foreach (var id in errorIds) s.Delete<ErrorReport>(id);
-            await s.SaveChangesAsync(ct);
-            errorReports = errorIds.Count;
-        }
-
-        // --- Log files: part 2 (D6 — "the file-log Retain runs daily, not
-        //     only at boot"). The one leg with no D6 RetentionOptions key:
-        //     driven by the two optional log parameters (null/0 skips it, the
-        //     fail-safe). RollingFileSink.Retain stays pure (BCL-only); this
-        //     sweep just calls it — deletes the app-*.log files under
-        //     logDir whose mtime is older than now − logRetentionDays, per-file
-        //     try/catch (a file being written degrades to a skipped file).
-        if (logDir is not null && logRetentionDays > 0)
-        {
-            logFilesDeleted = RollingFileSink.Retain(logDir, logRetentionDays, now);
-        }
+        // Log files: the one leg with no D6 <see cref="RetentionOptions"/> key —
+        // driven by the two optional log parameters (null/0 skips it, the
+        // fail-safe).
+        var logFilesDeleted = SweepLogFiles(logDir, logRetentionDays, now);
 
         return new RetentionSweepResult(
             sessions, identityTokens, escalationTokens, deadLetters,
             outboxBodyNulled, outboxDeleted,
             notifications, errorReports, logFilesDeleted);
     }
+
+    /// <summary>
+    /// <see cref="Kumunita.Core.Sessions.SessionDoc"/>: a revoked session's terminal field
+    /// is <c>RevokedAt</c> (the only nullable field on the doc), so a row is purged
+    /// iff <c>RevokedAt &lt; Sessions</c> cutoff. Active sessions (<c>RevokedAt</c>
+    /// null) are always kept. One id-collection + delete in a single session (the
+    /// <see cref="Kumunita.Core.Usage.UsagePurgeService.PurgeAsync"/> house shape);
+    /// a <c>null</c> cutoff skips the type (fail-safe).
+    /// </summary>
+    private static async Task<int> RunSessionsAsync(IDocumentStore store, RetentionOptions options, DateTimeOffset now, CancellationToken ct)
+    {
+        DateTimeOffset? cutoff = RetentionPolicy.CutoffFor(options, "Sessions", now);
+        if (cutoff is not { } sc) return 0;
+
+        await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+        var ids = (await s.Query<SessionDoc>()
+                .Where(x => x.RevokedAt != null && x.RevokedAt < sc)
+                .Select(x => x.Id)
+                .ToListAsync(ct)).Distinct().ToList();
+        foreach (var id in ids) s.Delete<SessionDoc>(id);
+        await s.SaveChangesAsync(ct);
+        return ids.Count;
+    }
+
+    /// <summary>
+    /// <see cref="Kumunita.Core.Identity.IdentityToken"/>: consumed or expired beyond the
+    /// <c>Tokens</c> cutoff; <see cref="Kumunita.Core.ErrorReports.EscalationToken"/>: revoked
+    /// beyond the same cutoff. Both in one session (they share the key); a <c>null</c>
+    /// cutoff skips both (fail-safe).
+    /// </summary>
+    private static async Task<(int IdentityTokens, int EscalationTokens)> RunTokensAsync(
+        IDocumentStore store, RetentionOptions options, DateTimeOffset now, CancellationToken ct)
+    {
+        DateTimeOffset? cutoff = RetentionPolicy.CutoffFor(options, "Tokens", now);
+        if (cutoff is not { } tc) return (0, 0);
+
+        await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+        var identityIds = (await s.Query<IdentityToken>()
+                .Where(x => (x.ConsumedAt != null && x.ConsumedAt < tc) || x.ExpiresAt < tc)
+                .Select(x => x.Id)
+                .ToListAsync(ct)).Distinct().ToList();
+        foreach (var id in identityIds) s.Delete<IdentityToken>(id);
+
+        var escalationIds = (await s.Query<EscalationToken>()
+                .Where(x => x.RevokedAt != null && x.RevokedAt < tc)
+                .Select(x => x.Id)
+                .ToListAsync(ct)).Distinct().ToList();
+        foreach (var id in escalationIds) s.Delete<EscalationToken>(id);
+
+        await s.SaveChangesAsync(ct);
+        return (identityIds.Count, escalationIds.Count);
+    }
+
+    /// <summary>
+    /// <see cref="Kumunita.Core.Identity.EmailDeadLetter"/>: dead beyond the <c>DeadLetters</c>
+    /// cutoff. A <c>null</c> cutoff skips the type (fail-safe).
+    /// </summary>
+    private static async Task<int> RunDeadLettersAsync(IDocumentStore store, RetentionOptions options, DateTimeOffset now, CancellationToken ct)
+    {
+        DateTimeOffset? cutoff = RetentionPolicy.CutoffFor(options, "DeadLetters", now);
+        if (cutoff is not { } dc) return 0;
+
+        await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+        var ids = (await s.Query<EmailDeadLetter>()
+                .Where(x => x.DeadAt < dc)
+                .Select(x => x.Id)
+                .ToListAsync(ct)).Distinct().ToList();
+        foreach (var id in ids) s.Delete<EmailDeadLetter>(id);
+        await s.SaveChangesAsync(ct);
+        return ids.Count;
+    }
+
+    /// <summary>
+    /// <see cref="Kumunita.Core.Identity.OutboxEmail"/>: null the <c>Body</c> past
+    /// <c>OutboxBodyNullDays</c> (the row is kept until the separate <c>OutboxDays</c>
+    /// cutoff — <see cref="RunOutboxDeleteAsync"/>). A row is nulled first, kept, then
+    /// deleted. Explicitly re-<c>Store</c> each mutated row (the
+    /// EventService.Group / Pages update idiom, made explicit): a query-loaded row is
+    /// not guaranteed to be dirty-tracked for a field assignment, so persisting the
+    /// mutated object is the safe commit. A <c>null</c> cutoff skips the type (fail-safe).
+    /// </summary>
+    private static async Task<int> RunOutboxBodyNullAsync(IDocumentStore store, RetentionOptions options, DateTimeOffset now, CancellationToken ct)
+    {
+        DateTimeOffset? cutoff = RetentionPolicy.CutoffFor(options, "OutboxBodyNullDays", now);
+        if (cutoff is not { } bc) return 0;
+
+        await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+        var toNull = await s.Query<OutboxEmail>()
+            .Where(x => x.Body != null && x.Body != "" && x.QueuedAt < bc)
+            .ToListAsync(ct);
+        foreach (var row in toNull)
+        {
+            row.Body = string.Empty;
+            s.Store(row);
+        }
+        await s.SaveChangesAsync(ct);
+        return toNull.Count;
+    }
+
+    /// <summary>
+    /// <see cref="Kumunita.Core.Identity.OutboxEmail"/>: delete the row past
+    /// <c>OutboxDays</c> (independent of the <c>OutboxBodyNullDays</c> nulling leg —
+    /// <see cref="RunOutboxBodyNullAsync"/> — a row is nulled first, kept, then
+    /// deleted). A <c>null</c> cutoff skips the type (fail-safe).
+    /// </summary>
+    private static async Task<int> RunOutboxDeleteAsync(IDocumentStore store, RetentionOptions options, DateTimeOffset now, CancellationToken ct)
+    {
+        DateTimeOffset? cutoff = RetentionPolicy.CutoffFor(options, "OutboxDays", now);
+        if (cutoff is not { } oc) return 0;
+
+        await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+        var ids = (await s.Query<OutboxEmail>()
+                .Where(x => x.QueuedAt < oc)
+                .Select(x => x.Id)
+                .ToListAsync(ct)).Distinct().ToList();
+        foreach (var id in ids) s.Delete<OutboxEmail>(id);
+        await s.SaveChangesAsync(ct);
+        return ids.Count;
+    }
+
+    /// <summary>
+    /// <see cref="Kumunita.Core.Notifications.Notification"/>: part 2 (D6). Two cohorts,
+    /// one pass. A READ row (<c>ReadAt != null</c>) is past the <c>NotificationsRead</c>
+    /// cutoff (90 d); an UNREAD row (<c>ReadAt null</c>) is past the
+    /// <c>NotificationsUnread</c> cutoff (365 d) by its <c>Created</c> age. The two
+    /// predicates are mutually exclusive (a row is read or unread, never both), so
+    /// the single WHERE clause is the clean two-cohort disjunction — each cutoff is
+    /// its own <see cref="RetentionPolicy.CutoffFor"/>, and a 0-valued/absent key
+    /// nulls that term out (the fail-safe).
+    /// The unread cutoff is pre-computed to a nullable constant so the lambda is a
+    /// clean two-term null-safe comparison (the part-1 single-cutoff shape, no
+    /// ternary / no case-split — Linq2DB translates a null-safe comparison over a
+    /// constant, not a conditional expression).
+    /// </summary>
+    private static async Task<int> RunNotificationsAsync(IDocumentStore store, RetentionOptions options, DateTimeOffset now, CancellationToken ct)
+    {
+        DateTimeOffset? notifReadCutoff = RetentionPolicy.CutoffFor(options, "NotificationsRead", now);
+        DateTimeOffset? notifUnreadCutoff = RetentionPolicy.CutoffFor(options, "NotificationsUnread", now);
+        if (notifReadCutoff is null && notifUnreadCutoff is null) return 0;
+
+        await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+        var ids = (await s.Query<Notification>()
+                .Where(x =>
+                    (x.ReadAt != null && x.ReadAt < notifReadCutoff) ||
+                    (x.ReadAt == null && x.Created < notifUnreadCutoff))
+                .Select(x => x.Id)
+                .ToListAsync(ct)).Distinct().ToList();
+        foreach (var id in ids) s.Delete<Notification>(id);
+        await s.SaveChangesAsync(ct);
+        return ids.Count;
+    }
+
+    /// <summary>
+    /// <see cref="Kumunita.Core.ErrorReports.ErrorReport"/>: part 2 (D6). A RESOLVED
+    /// report (<c>ResolvedAt != null</c>) is purged past the <c>ErrorReports</c> cutoff
+    /// (180 d). An UNRESOLVED report (<c>ResolvedAt null</c>) is always kept — never
+    /// delete an unresolved report (the part-1 "active SessionDoc always kept" shape,
+    /// on the resolved cohort). A <c>null</c> cutoff skips the type (fail-safe).
+    /// </summary>
+    private static async Task<int> RunErrorReportsAsync(IDocumentStore store, RetentionOptions options, DateTimeOffset now, CancellationToken ct)
+    {
+        DateTimeOffset? cutoff = RetentionPolicy.CutoffFor(options, "ErrorReports", now);
+        if (cutoff is not { } ec) return 0;
+
+        await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+        var ids = (await s.Query<ErrorReport>()
+                .Where(x => x.ResolvedAt != null && x.ResolvedAt < ec)
+                .Select(x => x.Id)
+                .ToListAsync(ct)).Distinct().ToList();
+        foreach (var id in ids) s.Delete<ErrorReport>(id);
+        await s.SaveChangesAsync(ct);
+        return ids.Count;
+    }
+
+    /// <summary>
+    /// Log files: part 2 (D6 — "the file-log Retain runs daily, not only at boot").
+    /// The one leg with no D6 <see cref="RetentionOptions"/> key: driven by the two
+    /// optional log parameters (<c>null</c>/<c>0</c> skips it, the fail-safe).
+    /// <see cref="RollingFileSink.Retain"/> stays pure (BCL-only, no store); this
+    /// sweep just calls it — deletes the <c>app-*.log</c> files under
+    /// <c>logDir</c> whose mtime is older than <c>now − logRetentionDays</c>,
+    /// per-file try/catch (a file being written degrades to a skipped file).
+    /// </summary>
+    private static int SweepLogFiles(string? logDir, int logRetentionDays, DateTimeOffset now)
+        => logDir is not null && logRetentionDays > 0
+            ? RollingFileSink.Retain(logDir, logRetentionDays, now)
+            : 0;
 
 }
 

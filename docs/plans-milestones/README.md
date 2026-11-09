@@ -39,16 +39,29 @@ to live here are in
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
 
-**Latest lane: `IMPROVE-SEC`** — the security & privacy integration lane
-(units `IS00`…`IS45`, proposed 2026-11-06) **shipped on 2026-11-09** — the
+**Latest lane: `CODE-HYGIENE`** — the code-hygiene lane (units `U00`–`U14`,
+proposed 2026-11-06) **shipped and closed on 2026-11-09** — the close unit
+`CH14` verified the six close criteria green and moved the register, the
+`u*-prompt.md` unit prompts, and the handoff notes to the archive at
+[`archive/lanes/code-hygiene/`](../archive/lanes/code-hygiene/) (register
+[plan-code-hygiene](../archive/lanes/code-hygiene/plan-code-hygiene.md), closing
+log
+[code-hygiene-handoff-notes.md](../archive/lanes/code-hygiene/code-hygiene-handoff-notes.md)).
+Its design doc stays a living
+[`docs/design/code-hygiene-design.md`](../design/code-hygiene-design.md)
+(per D10 — design docs stay living through lane close); the two M2 successor-scope
+reds remain carried by `improve-sec` (IS21–IS23 / IS31–IS32).
+When a new lane starts, its register + unit prompts land here first and move to
+that archive folder at its close.
+
+The lane before it, `IMPROVE-SEC` — the security & privacy integration lane
+(units `IS00`…`IS45`, proposed 2026-11-06) — **shipped on 2026-11-09**; the
 close unit `IS45` landed the six-member "shipped" flip and moved its register,
 the `is*-prompt.md` unit prompts, and the handoff notes to the archive at
 [`archive/lanes/improve-sec/`](../archive/lanes/improve-sec/) (register
 [plan-improve-sec](../archive/lanes/improve-sec/plan-improve-sec.md), closing
 log
 [improve-sec-handoff-notes.md](../archive/lanes/improve-sec/improve-sec-handoff-notes.md)).
-When a new lane starts, its register + unit prompts land here first and move to
-that archive folder at its close.
 
 The lane before it, `IMPROVE-CODE-3`
 (`C3-00`–`C3-08`), **shipped on 2026-11-06** — it finished the two lines its

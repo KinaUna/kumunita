@@ -107,7 +107,6 @@ public class CspInlineDisciplineGateTests
         {
             string rel = ToRel(file);
             string src = StripComments(SecGateSource.ReadSrc(rel));
-            int baseLine = 1;
             foreach (Match m in InlineHandler.Matches(src))
             {
                 int line = 1;
@@ -169,8 +168,7 @@ public class CspInlineDisciplineGateTests
 
         bool isOnlyE14 = flagged.Count == E14DocumentBlocks.Length
             && E14DocumentBlocks.All(rel => flagged.Any(f => f.StartsWith(rel + ':', StringComparison.Ordinal)));
-        Assert.True(
-            false,
+        Assert.Fail(
             isOnlyE14
                 ? "The 2 E14 Document folder-picker inline <script type=\"module\"> "
                 + "blocks are still present (Document/New, Document/Edit). Extract "

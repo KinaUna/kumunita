@@ -412,19 +412,26 @@ public partial class GuardianController(IUserInfoService userInfo, IGroupService
     }
 
     /// <summary>
-    /// <b>Approve</b> a child's event-attendance request (POST
-    /// <c>me/children/{childId}/eventrsvp/{eventId}/approve</c>) — the
-    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves"/>
-    /// posture's resolve lane (the <see cref="ApproveInvitation"/> /
-    /// <see cref="RejectInvitation"/> idiom verbatim, over events): writes the
-    /// child's <c>EventRsvp</c> with the request's desired status through the
-    /// frozen <see cref="Kumunita.Core.Events.IEventService
-    /// .ApproveEventRsvpAsync"/> seam. <c>UnauthorizedAccessException</c>
-    /// (no active link) → 404; <c>KeyNotFoundException</c> (no request) → 404;
-    /// <c>InvalidOperationException</c> (already resolved) → the page's error
-    /// surface.
+    /// <b>Dissolve</b> the guardian link over a child (POST
+    /// <c>me/children/{childId}/dissolve</c>) — the ADR 0028 lane: the
+    /// guardian's standing over the child ends. A <b>co-guardian</b> removes
+    /// themselves (the other guardian(s) continue; the child keeps their
+    /// account); a <b>sole guardian</b> hands the account over to the child
+    /// (the independence lane, ADR 0028 G·4/G·2). Writes through the frozen
+    /// <see cref="Kumunita.Core.UserInfo.IGuardianService
+    /// .DissolveGuardianLinkAsync"/> seam. <c>UnauthorizedAccessException</c>
+    /// (no active link) → 404; <c>InvalidOperationException</c> (an invariant
+    /// the dissolution cannot satisfy) → the page's error surface.
+    /// <para>
+    /// <b>Route note (CODE-HYGIENE CH02):</b> this action was previously pinned
+    /// to <c>{childId}/eventrsvp/{eventId}/approve</c> — the exact route of
+    /// <see cref="ApproveEventRsvp"/> — which made the two actions ambiguous
+    /// (ASP0023). The route is now <c>{childId}/dissolve</c>;
+    /// <see cref="ApproveEventRsvp"/> keeps
+    /// <c>{childId}/eventrsvp/{eventId}/approve</c>.
+    /// </para>
     /// </summary>
-    [HttpPost("{childId}/eventrsvp/{eventId}/approve")]
+    [HttpPost("{childId}/dissolve")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Dissolve(string childId)
     {

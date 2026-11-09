@@ -26,6 +26,7 @@ folder (no per-file rows are needed).
 | Old path (former `plans-milestones/done/`) | New path |
 |---|---|
 | docs/plans-milestones/improve-docs/… | [docs/archive/lanes/improve-docs/…](lanes/improve-docs/) |
+| docs/plans-milestones/plan-code-hygiene.md (+ the `u00`–`u14` unit prompts) · `in-progress/code-hygiene-handoff-notes.md` | [docs/archive/lanes/code-hygiene/…](lanes/code-hygiene/) (U14 close, shipped 2026-11-09: the plan register + the 16 `u*-prompt.md` briefs + the handoff notes; the design doc stays living in `docs/design/code-hygiene-design.md`) |
 | docs/plans-milestones/done/esc/… | [docs/archive/lanes/esc/…](lanes/esc/) |
 | docs/plans-milestones/done/ev-dwm/… | [docs/archive/lanes/ev-dwm/…](lanes/ev-dwm/) |
 | docs/plans-milestones/done/events-calendar/… | [docs/archive/lanes/events-calendar/…](lanes/events-calendar/) |

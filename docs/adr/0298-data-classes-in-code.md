@@ -75,3 +75,6 @@ gate, IS21–IS24 consume it.
 - Rejected: a central registry table (further from the type, a second
   inventory to drift); a docs table + script (a weaker gate than an
   attribute the build can read).
+- CODE-HYGIENE U13 (2026-11-09): boundary edges + method baselines
+  re-baselined to the current count (ratchet gate, `tools/code/code-baseline.json`);
+  the grown edges this lane re-baselines carry this ADR as their `adr:` reason.

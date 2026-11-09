@@ -37,7 +37,7 @@ public class BreakGlassProbeTests(PostgresFixture fixture) : IClassFixture<Postg
             consumedAt: now.AddHours(-1));
 
         await using var session = store.QuerySession();
-        var active = await BreakGlassProbe.HasActiveAsync(session, user);
+        var active = await BreakGlassProbe.HasActiveAsync(session, user, TestContext.Current.CancellationToken);
         Assert.True(active);
     }
 
@@ -54,7 +54,7 @@ public class BreakGlassProbeTests(PostgresFixture fixture) : IClassFixture<Postg
             consumedAt: now.AddDays(-29));
 
         await using var session = store.QuerySession();
-        var active = await BreakGlassProbe.HasActiveAsync(session, user);
+        var active = await BreakGlassProbe.HasActiveAsync(session, user, TestContext.Current.CancellationToken);
         Assert.False(active);
     }
 
@@ -72,7 +72,7 @@ public class BreakGlassProbeTests(PostgresFixture fixture) : IClassFixture<Postg
             consumedAt: null);
 
         await using var session = store.QuerySession();
-        var active = await BreakGlassProbe.HasActiveAsync(session, user);
+        var active = await BreakGlassProbe.HasActiveAsync(session, user, TestContext.Current.CancellationToken);
         Assert.False(active);
     }
 

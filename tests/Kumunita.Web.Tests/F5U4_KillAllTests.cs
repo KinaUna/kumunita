@@ -176,7 +176,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<P
                 LastActive = DateTime.UtcNow,
                 RevokedAt = null,
             });
-            await plant.SaveChangesAsync();
+            await plant.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         // Drive the real F5.U3 surface: SessionsKillAll → Core seam

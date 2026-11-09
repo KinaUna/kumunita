@@ -40,6 +40,12 @@ namespace Kumunita.Web.Controllers;
 /// authorization-escalation surface).
 /// </para>
 /// </summary>
+// CODE-HYGIENE CH04 (CS9113) — the `posts` (PostService) ctor param is
+// intentionally unread: the group-post report now reads via the `groupPosts`
+// seam (C3-03, ADR 0013). It is retained only so the pre-C08 test
+// construction site (ReportTargetsControllerTests.cs) still compiles — drop
+// the param + that test arg when that lane lands.
+#pragma warning disable CS9113
 [Authorize]
 public sealed class ReportTargetsController(
     IModerationService moderation,
@@ -58,6 +64,7 @@ public sealed class ReportTargetsController(
     // 404 — the posts-is-null idiom). DI always supplies the live
     // GroupPostService in the app.
     Kumunita.Core.Posts.IGroupPostService? groupPosts = null) : Controller
+#pragma warning restore CS9113
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);

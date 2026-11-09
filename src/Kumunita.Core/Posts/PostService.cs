@@ -107,12 +107,12 @@ public partial class PostService
             Create = (id, lang, title, body, actor, created) => new PostTranslation
             {
                 Id = Guid.NewGuid().ToString("N"), PostId = id, LanguageCode = lang,
-                Title = title, Body = body, AuthorId = actor, Created = created,
+                Title = title, Body = body!, AuthorId = actor, Created = created,
             },
             ApplyUpdate = (row, title, body, _, _) =>
             {
                 row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-                row.Body = body;
+                row.Body = body!;
             },
         });
 
@@ -140,9 +140,9 @@ public partial class PostService
             Find = (session, id, lang) => session.Query<ReplyTranslation>().Where(t => t.ReplyId == id && t.LanguageCode == lang).FirstOrDefaultAsync(),
             Create = (id, lang, _, body, actor, created) => new ReplyTranslation
             {
-                Id = Guid.NewGuid().ToString("N"), ReplyId = id, Body = body, AuthorId = actor, Created = created,
+                Id = Guid.NewGuid().ToString("N"), ReplyId = id, Body = body!, AuthorId = actor, Created = created,
             },
-            ApplyUpdate = (row, _, body, _, _) => { row.Body = body; },
+            ApplyUpdate = (row, _, body, _, _) => { row.Body = body!; },
         });
     }
 

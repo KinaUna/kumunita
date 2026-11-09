@@ -98,6 +98,7 @@ authoritative old→new path index.
 
 | Lane | Register | Handoff note | Design doc | ADR |
 |---|---|---|---|---|
+| `code-hygiene` | [plan-code-hygiene](lanes/code-hygiene/plan-code-hygiene.md) | [code-hygiene-handoff-notes](lanes/code-hygiene/code-hygiene-handoff-notes.md) (U14 close, **shipped 2026-11-09** — the six close criteria green; the two M2 successor-scope reds carried by improve-sec) | [code-hygiene-design.md](../design/code-hygiene-design.md) | [the ADR index](../adr/README.md) (the code conventions + the ratchet gate at `tools/code/` are the lane's output) |
 | `esc` | [plan-esc-escalation-authorization](lanes/esc/plan-esc-escalation-authorization.md) | [esc-handoff-notes](lanes/esc/esc-handoff-notes.md) | [esc-escalation-authorization-design.md](../design/esc-escalation-authorization-design.md) | [0159-escalation-authorization](../adr/0159-escalation-authorization.md) |
 | `ev-dwm` | [plan-ev-dwm](lanes/ev-dwm/plan-ev-dwm.md) | [handoff-notes](lanes/ev-dwm/handoff-notes.md) | [events-calendar-dwm-design.md](../design/events-calendar-dwm-design.md) | [0064-events-calendar-dwm-views](../adr/0064-events-calendar-dwm-views.md) |
 | `events-calendar` | [plan-events-calendar](lanes/events-calendar/plan-events-calendar.md) | [events-calendar-handoff-notes](lanes/events-calendar/events-calendar-handoff-notes.md) | [events-calendar-design.md](../design/events-calendar-design.md) | [0063-events-calendar-view](../adr/0063-events-calendar-view.md) |

@@ -36,7 +36,7 @@ public class KioskItemCatalogTests
         var items = await catalog.SearchAsync(type, "  ", Actor, Ct);
 
         Assert.Equal("a", Assert.Single(items).Id);
-        await search.DidNotReceiveWithAnyArgs().SearchSurfaceAsync(default!, default!, default, default!, default);
+        await search.DidNotReceiveWithAnyArgs().SearchSurfaceAsync(default!, default!, default, default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public class KioskItemCatalogTests
         var items = await catalog.SearchAsync(KioskItemType.Todo, " bins ", Actor, Ct);
 
         Assert.Equal("Put the bins out", Assert.Single(items).Title);
-        await search.DidNotReceiveWithAnyArgs().BrowseSurfaceAsync(default!, default, default!, default);
+        await search.DidNotReceiveWithAnyArgs().BrowseSurfaceAsync(default!, default, default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class KioskItemCatalogTests
 
         Assert.Equal(["c-1", "c-2"], all.Select(i => i.Id).ToArray());
         Assert.Equal("c-2", Assert.Single(filtered).Id);
-        await search.DidNotReceiveWithAnyArgs().BrowseSurfaceAsync(default!, default, default!, default);
+        await search.DidNotReceiveWithAnyArgs().BrowseSurfaceAsync(default!, default, default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public class KioskItemCatalogTests
         var items = await catalog.SearchAsync(KioskItemType.Board, "", "", Ct);
 
         Assert.Empty(items);
-        await search.DidNotReceiveWithAnyArgs().BrowseSurfaceAsync(default!, default, default!, default);
+        await search.DidNotReceiveWithAnyArgs().BrowseSurfaceAsync(default!, default, default!, default!, TestContext.Current.CancellationToken);
     }
 
     private static (KioskItemCatalog catalog, ISearchService search, IUserInfoService userInfo, IGroupService groupService, IProfileSettingsService profileSettings) Build()

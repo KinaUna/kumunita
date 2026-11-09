@@ -215,7 +215,7 @@ public sealed class RevocationStampFailClosedTests
             NullLogger<UserManager<User>>.Instance);
 
         um.FindByIdAsync(SubjectId)
-            .Returns(userPresent ? Task.FromResult(user) : Task.FromResult<User?>(null));
+            .Returns(Task.FromResult<User?>(userPresent ? user : null));
         um.GetSecurityStampAsync(user).Returns(Task.FromResult(currentStamp));
 
         return um;
@@ -247,19 +247,19 @@ public sealed class RevocationStampFailClosedTests
     /// </summary>
     private sealed class StubAuthService(AuthenticationTicket ticket) : IAuthenticationService
     {
-        public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string scheme)
+        public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme)
             => Task.FromResult(AuthenticateResult.Success(ticket));
 
-        public Task ChallengeAsync(HttpContext context, string scheme, AuthenticationProperties properties)
+        public Task ChallengeAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
             => throw new NotSupportedException();
 
-        public Task ForbidAsync(HttpContext context, string scheme, AuthenticationProperties properties)
+        public Task ForbidAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
             => throw new NotSupportedException();
 
-        public Task SignInAsync(HttpContext context, string scheme, ClaimsPrincipal principal, AuthenticationProperties properties)
+        public Task SignInAsync(HttpContext context, string? scheme, ClaimsPrincipal principal, AuthenticationProperties? properties)
             => throw new NotSupportedException();
 
-        public Task SignOutAsync(HttpContext context, string scheme, AuthenticationProperties properties)
+        public Task SignOutAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
             => throw new NotSupportedException();
     }
 }

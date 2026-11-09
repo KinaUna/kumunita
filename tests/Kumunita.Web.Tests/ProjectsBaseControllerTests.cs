@@ -46,7 +46,7 @@ public sealed class ProjectsBaseControllerTests
         {
         }
 
-        public static TodoRow ProjectRow(
+        public new static TodoRow ProjectRow(
             TodoItem todo, TodoItem? parent,
             IReadOnlyDictionary<string, string> authorNames,
             IReadOnlyDictionary<string, string> componentNames,
@@ -58,7 +58,7 @@ public sealed class ProjectsBaseControllerTests
         public static SortSpec? ParseTodoSort(string? sort, string? dir)
             => ProjectsBaseController.ParseSort(sort, dir, ProjectsBaseController.TodoFeedAllowedKeys);
 
-        public static bool HasSortParam(string? sort) => ProjectsBaseController.HasSortParam(sort);
+        public new static bool HasSortParam(string? sort) => ProjectsBaseController.HasSortParam(sort);
 
         public static IReadOnlyDictionary<string, string>? BoardFilter(string? componentId, string? sort, string? dir)
             => ProjectsBaseController.BuildBoardFilterParams(componentId, sort, dir);

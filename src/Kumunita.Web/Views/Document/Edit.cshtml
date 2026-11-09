@@ -12,6 +12,7 @@
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
+    var _tagsPagesExample = Translation is null ? "e.g. recipes, tips" : await Translation.GetAsync("tags.pages_example", _kwL);
     // ADR 0125 (U03) — the owner-only edit form. The audience editor is
     // pre-filled from the stored Document.Audience (ADR 0036 single source,
     // AudienceEditorModel.FromAudience — the controller did that on GET); the
@@ -209,7 +210,7 @@
                                data-tag-suggest
                                data-tag-suggest-initial='@System.Text.Json.JsonSerializer.Serialize(Model?.ExistingTagSlugs ?? [])'
                                maxlength="64"
-                               placeholder="@await Translation.GetAsync("tags.pages_example", _kwL)" />
+                               placeholder="@_tagsPagesExample" />
                         <div class="text-muted small mt-1">
                             <kw-l key="documents.tags_hint">Type to search existing tags, or start a new one.</kw-l>
                         </div>

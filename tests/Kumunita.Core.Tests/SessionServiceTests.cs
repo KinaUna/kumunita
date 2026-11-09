@@ -76,7 +76,7 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
         // The row is durable (the service's own LightweightSession commit
         // landed) — a fresh query session can load it by Id.
         await using var q = store.QuerySession();
-        var loaded = await q.LoadAsync<SessionDoc>(doc.Id);
+        var loaded = await q.LoadAsync<SessionDoc>(doc.Id, TestContext.Current.CancellationToken);
         Assert.NotNull(loaded);
         Assert.Equal(doc.Id, loaded.Id);
     }
@@ -236,7 +236,7 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
 
         // The doc is now revoked, with a timestamp within [before, after].
         await using var q = store.QuerySession();
-        var doc = await q.LoadAsync<SessionDoc>(sid);
+        var doc = await q.LoadAsync<SessionDoc>(sid, TestContext.Current.CancellationToken);
         Assert.NotNull(doc);
         Assert.NotNull(doc.RevokedAt);
         Assert.True(doc.RevokedAt!.Value >= before && doc.RevokedAt.Value <= after,
@@ -346,7 +346,7 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
 
         // The doc is still revoked (one row, one audit).
         await using var q = store.QuerySession();
-        var doc = await q.LoadAsync<SessionDoc>(sid);
+        var doc = await q.LoadAsync<SessionDoc>(sid, TestContext.Current.CancellationToken);
         Assert.NotNull(doc?.RevokedAt);
 
         var audits = await AuditsFor(store, targetKind: "session", action: "session.revoke");
@@ -386,7 +386,7 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
 
         // The doc is still active (the revoke did not take effect).
         await using var q = store.QuerySession();
-        var doc = await q.LoadAsync<SessionDoc>(sid);
+        var doc = await q.LoadAsync<SessionDoc>(sid, TestContext.Current.CancellationToken);
         Assert.NotNull(doc);
         Assert.Null(doc.RevokedAt);
 
@@ -429,7 +429,7 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
 
         // The doc is revoked (one <c>RevokedAt</c>, three calls).
         await using var q = store.QuerySession();
-        var doc = await q.LoadAsync<SessionDoc>(sid);
+        var doc = await q.LoadAsync<SessionDoc>(sid, TestContext.Current.CancellationToken);
         Assert.NotNull(doc?.RevokedAt);
 
         // Exactly **one** audit row for this sid (the C3 pin is
@@ -486,13 +486,13 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
 
         // The current session stays active.
         await using var q = store.QuerySession();
-        var cur = await q.LoadAsync<SessionDoc>(current);
+        var cur = await q.LoadAsync<SessionDoc>(current, TestContext.Current.CancellationToken);
         Assert.NotNull(cur);
         Assert.Null(cur.RevokedAt);
 
         // The other two are revoked.
-        var o1 = await q.LoadAsync<SessionDoc>(other1);
-        var o2 = await q.LoadAsync<SessionDoc>(other2);
+        var o1 = await q.LoadAsync<SessionDoc>(other1, TestContext.Current.CancellationToken);
+        var o2 = await q.LoadAsync<SessionDoc>(other2, TestContext.Current.CancellationToken);
         Assert.NotNull(o1?.RevokedAt);
         Assert.NotNull(o2?.RevokedAt);
 
@@ -548,8 +548,8 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
 
         // Both sessions are revoked (no current to preserve).
         await using var q = store.QuerySession();
-        var d1 = await q.LoadAsync<SessionDoc>(sid1);
-        var d2 = await q.LoadAsync<SessionDoc>(sid2);
+        var d1 = await q.LoadAsync<SessionDoc>(sid1, TestContext.Current.CancellationToken);
+        var d2 = await q.LoadAsync<SessionDoc>(sid2, TestContext.Current.CancellationToken);
         Assert.NotNull(d1?.RevokedAt);
         Assert.NotNull(d2?.RevokedAt);
 
@@ -596,9 +596,8 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
         // The doc's LastActive is now within [before, after] (the
         // service's dumb write set it to UtcNow inside the call).
         await using var q = store.QuerySession();
-        var doc = await q.LoadAsync<SessionDoc>(sid);
+        var doc = await q.LoadAsync<SessionDoc>(sid, TestContext.Current.CancellationToken);
         Assert.NotNull(doc);
-        Assert.NotNull(doc.LastActive);
         Assert.True(doc.LastActive >= before && doc.LastActive <= after,
             $"LastActive={doc.LastActive} not within [{before}, {after}].");
     }
@@ -636,7 +635,7 @@ public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture
         // — the service does not update the <c>LastActive</c> of a
         // revoked session).
         await using var q = store.QuerySession();
-        var doc = await q.LoadAsync<SessionDoc>(sid);
+        var doc = await q.LoadAsync<SessionDoc>(sid, TestContext.Current.CancellationToken);
         Assert.NotNull(doc);
         Assert.Equal(originalLastActive, doc.LastActive);
     }

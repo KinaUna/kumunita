@@ -67,7 +67,7 @@ public sealed class SessionRevocationMiddlewareTests
 
         Assert.True(nextCalled[0]);   // the downstream handler ran
         store.DidNotReceive().Dispose();
-        store.DidNotReceive().DisposeAsync();
+        await store.DidNotReceive().DisposeAsync();
     }
 
     // ── Revoked session → sign-out + redirect; the store must NOT be disposed ─
@@ -86,7 +86,7 @@ public sealed class SessionRevocationMiddlewareTests
             ctx.Response.Headers["Location"].ToString());
         Assert.False(nextCalled[0]);        // short-circuited — handler did not run
         store.DidNotReceive().Dispose();
-        store.DidNotReceive().DisposeAsync();
+        await store.DidNotReceive().DisposeAsync();
     }
 
     // ── No sid in the cookie → pass-through; the store must NOT be disposed ─
@@ -101,7 +101,7 @@ public sealed class SessionRevocationMiddlewareTests
 
         Assert.True(nextCalled[0]);
         store.DidNotReceive().Dispose();
-        store.DidNotReceive().DisposeAsync();
+        await store.DidNotReceive().DisposeAsync();
     }
 
     // ── Unauthenticated → pass-through; the store must NOT be disposed ─────
@@ -116,7 +116,7 @@ public sealed class SessionRevocationMiddlewareTests
 
         Assert.True(nextCalled[0]);
         store.DidNotReceive().Dispose();
-        store.DidNotReceive().DisposeAsync();
+        await store.DidNotReceive().DisposeAsync();
     }
 
     // ── Harness ─────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ public sealed class SessionRevocationMiddlewareTests
         var store = Substitute.For<IDocumentStore>();
         var querySession = Substitute.For<IQuerySession>();
         querySession.LoadAsync<SessionDoc>(SessionId)
-            .Returns(Task.FromResult(doc));
+            .Returns(Task.FromResult<SessionDoc?>(doc));
         store.QuerySession().Returns(querySession);
 
         var config = new ConfigurationBuilder().Build();
@@ -199,7 +199,7 @@ public sealed class SessionRevocationMiddlewareTests
             new IdentityErrorDescriber(),
             new EmptyServiceProvider(),
             NullLogger<UserManager<User>>.Instance);
-        um.FindByIdAsync(SubjectId).Returns(Task.FromResult(user));
+        um.FindByIdAsync(SubjectId).Returns(Task.FromResult<User?>(user));
         return um;
     }
 
@@ -227,15 +227,15 @@ public sealed class SessionRevocationMiddlewareTests
     /// </summary>
     private sealed class StubAuthService(AuthenticationTicket ticket) : IAuthenticationService
     {
-        public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string scheme)
+        public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme)
             => Task.FromResult(AuthenticateResult.Success(ticket));
-        public Task ChallengeAsync(HttpContext context, string scheme, AuthenticationProperties properties)
+        public Task ChallengeAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
             => throw new NotSupportedException();
-        public Task ForbidAsync(HttpContext context, string scheme, AuthenticationProperties properties)
+        public Task ForbidAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
             => throw new NotSupportedException();
-        public Task SignInAsync(HttpContext context, string scheme, ClaimsPrincipal principal, AuthenticationProperties properties)
+        public Task SignInAsync(HttpContext context, string? scheme, ClaimsPrincipal principal, AuthenticationProperties? properties)
             => throw new NotSupportedException();
-        public Task SignOutAsync(HttpContext context, string scheme, AuthenticationProperties properties)
+        public Task SignOutAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
             => throw new NotSupportedException();
     }
 }

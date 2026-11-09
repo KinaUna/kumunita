@@ -109,20 +109,20 @@ public sealed class PageService : IPageService
             Find = (IDocumentSession session, string id, string lang) => session.Query<PageTranslation>()
                 .Where(t => t.PageId == id && t.LanguageCode == lang)
                 .FirstOrDefaultAsync(),
-            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new PageTranslation
+            Create = (string id, string lang, string? title, string? body, string actorId, DateTimeOffset created) => new PageTranslation
             {
                 Id = Guid.NewGuid().ToString("N"),
                 PageId = id,
                 LanguageCode = lang,
                 Title = title,
-                Body = body,
+                Body = body!,
                 AuthorId = actorId,
                 Created = created
             },
-            ApplyUpdate = (PageTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            ApplyUpdate = (PageTranslation row, string? title, string? body, string actorId, DateTimeOffset now) =>
             {
                 row.Title = title;
-                row.Body = body;
+                row.Body = body!;
             }
         });
     }

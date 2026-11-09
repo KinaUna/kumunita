@@ -329,7 +329,7 @@ public class KioskControllerTests
 
         Assert.IsType<RedirectToActionResult>(action);
         Assert.Contains(message, controller.TempData["error"] as string ?? string.Empty);
-        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, default);
+        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, TestContext.Current.CancellationToken);
     }
 
     [Theory]
@@ -349,7 +349,7 @@ public class KioskControllerTests
 
         Assert.IsType<RedirectToActionResult>(action);
         Assert.NotNull(controller.TempData["error"]);
-        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, default);
+        await kiosk.DidNotReceiveWithAnyArgs().SavePlaylistAsync(default!, default!, TestContext.Current.CancellationToken);
     }
 
 
@@ -520,7 +520,7 @@ public class KioskControllerTests
         var kiosk    = Substitute.For<IKioskService>();
         var catalog  = Substitute.For<IKioskItemCatalog>();
         var events   = Substitute.For<IEventService>();
-        var store    = null as IDocumentStore; // IMPROVE-CODE C09 — the controller no longer takes a store; kept in the tuple for the other deconstruction sites.
+        IDocumentStore store = default!; // IMPROVE-CODE C09 — the controller no longer takes a store; kept in the tuple for the other deconstruction sites.
 
         var controller = new KioskController(kiosk, events, null, catalog);
 

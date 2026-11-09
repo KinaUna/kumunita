@@ -2,7 +2,6 @@ using Kumunita.Core.Notifications;
 using Kumunita.Core.Translations;
 using Marten;
 using Marten.Services;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Kumunita.Core.UserInfo;
 
@@ -11,7 +10,7 @@ namespace Kumunita.Core.UserInfo;
 /// profile-settings cluster split from <see cref="UserInfoService"/>.
 /// </summary>
 
-public sealed class ProfileSettingsService(IDocumentStore store, IServiceProvider? services = null) : IProfileSettingsService
+public sealed class ProfileSettingsService(IDocumentStore store) : IProfileSettingsService
 {
     /// <inheritdoc />
     public async Task SetProfileAvatarAsync(string subjectId, string? avatarId, string actorBy)

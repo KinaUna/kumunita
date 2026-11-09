@@ -165,7 +165,7 @@ public static class PortabilityValidate
         catch (JsonException) { /* malformed → empty set (dangling refs reject) */ }
 
         var mediaManifestIds = new HashSet<string>(StringComparer.Ordinal);
-        var mediaManifest = data.Manifest.MediaManifest;
+        var mediaManifest = data.Manifest!.MediaManifest;
         if (mediaManifest is not null)
             foreach (var m in mediaManifest)
                 if (!string.IsNullOrEmpty(m.Id))
@@ -361,7 +361,7 @@ public static class PortabilityValidate
     /// </summary>
     private static void CheckMedia(KumunitaArchiveData data, List<string> failures)
     {
-        foreach (var m in data.Manifest.MediaManifest)
+        foreach (var m in data.Manifest!.MediaManifest)
         {
             if (string.IsNullOrEmpty(m.Id))
                 continue;

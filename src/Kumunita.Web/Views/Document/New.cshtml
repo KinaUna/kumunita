@@ -12,6 +12,7 @@
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
+    var _tagsPagesExample = Translation is null ? "e.g. recipes, tips" : await Translation.GetAsync("tags.pages_example", _kwL);
     // Null-safe: U03's GET New() returns View("New") with no model (the form is
     // blank); the POST re-render path passes the bound form. So read the model
     // through Model? — both paths render.
@@ -212,7 +213,7 @@
                         <input class="form-control" type="text" id="tags"
                                data-tag-suggest
                                maxlength="64"
-                               placeholder="@await Translation.GetAsync("tags.pages_example", _kwL)" />
+                               placeholder="@_tagsPagesExample" />
                         <div class="text-muted small mt-1">
                             <kw-l key="documents.tags_hint">Type to search existing tags, or start a new one.</kw-l>
                         </div>

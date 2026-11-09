@@ -110,7 +110,7 @@ public sealed class ImportOwnershipGuardServiceSeamTests(PostgresFixture fixture
 
         // Every in-scope kind is present with an empty target-row set.
         foreach (var (type, _) in UserScopeInventory.Entries)
-            Assert.Equal(0, prepass.TargetRowsByType[type].Count);
+            Assert.Empty(prepass.TargetRowsByType[type]);
         // The principal set is empty (no Identity users in the scratch DB).
         Assert.Empty(prepass.PrincipalIds);
     }

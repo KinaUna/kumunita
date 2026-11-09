@@ -103,187 +103,22 @@ public static class ResidentAccountRowsEraser
         ArgumentException.ThrowIfNullOrEmpty(residentSubjectId);
 
         int touched = 0;
-        var tombstone = $"deleted:{residentSubjectId}";
 
-        // 1. SessionDoc — a session credential (IP + user agent, one per login).
-        //    Owner field: UserId. [DataClass] Delete (IS20b).
-        {
-            var rows = await session.Query<SessionDoc>()
-                .Where(s => s.UserId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-                session.Delete(row);
-            touched += rows.Count;
-        }
+        // IS22 — blocks 1–6 (the resident's own rows, matched by owner field).
+        touched += await EraseSessionDocsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseIdentityTokensAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseGuestAccessAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseDelegationGrantsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseNotificationStateAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseOutboxEmailsAsync(session, residentSubjectId, residentEmail, ct).ConfigureAwait(false);
 
-        // 2. IdentityToken — verify/setup tokens (a credential, single-use).
-        //    Owner field: UserId. [DataClass] Delete (IS20b).
-        {
-            var rows = await session.Query<IdentityToken>()
-                .Where(t => t.UserId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-                session.Delete(row);
-            touched += rows.Count;
-        }
-
-        // 3. GuestAccess — a bounded guest standing (one row per guest).
-        //    Owner field: SubjectId. [DataClass] Delete (IS20b).
-        {
-            var rows = await session.Query<GuestAccess>()
-                .Where(g => g.SubjectId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-                session.Delete(row);
-            touched += rows.Count;
-        }
-
-        // 4. DelegationGrant — either side: the grants the resident made
-        //    (OwnerId) AND the grants they hold (DelegateId). A grant between
-        //    two OTHER residents is untouched (its owner field never ==
-        //    residentSubjectId on either side). [DataClass] Delete (IS20b).
-        {
-            var rows = await session.Query<DelegationGrant>()
-                .Where(d => d.OwnerId == residentSubjectId
-                          || d.DelegateId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-                session.Delete(row);
-            touched += rows.Count;
-        }
-
-        // 5. The four Notification* types — per-recipient state. Owner field:
-        //    RecipientId (NotificationPreference / NotificationQuietSchedule pin
-        //    it as their identity; Notification / NotificationSubscription carry
-        //    a RecipientId column). [DataClass] Delete (IS20c).
-        {
-            var n1 = await session.Query<Notification>()
-                .Where(n => n.RecipientId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in n1)
-                session.Delete(row);
-            touched += n1.Count;
-
-            var n2 = await session.Query<NotificationPreference>()
-                .Where(n => n.RecipientId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in n2)
-                session.Delete(row);
-            touched += n2.Count;
-
-            var n3 = await session.Query<NotificationSubscription>()
-                .Where(n => n.RecipientId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in n3)
-                session.Delete(row);
-            touched += n3.Count;
-
-            var n4 = await session.Query<NotificationQuietSchedule>()
-                .Where(n => n.RecipientId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in n4)
-                session.Delete(row);
-            touched += n4.Count;
-        }
-
-        // 6. OutboxEmail — the recipient is the email STRING (not an id): match
-        //    on the resident's email, passed in by the composer. It is never
-        //    read from a doc and never logged (IS08); the match is exact.
-        if (!string.IsNullOrEmpty(residentEmail))
-        {
-            var rows = await session.Query<OutboxEmail>()
-                .Where(e => e.Recipient == residentEmail)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-                session.Delete(row);
-            touched += rows.Count;
-        }
-
-        // 7. GuardianTimeLimitSchedule — the supervised child's time-limit
-        //    schedule (identity = ChildId, pinned by CoreDocTypes). [DataClass]
-        //    Delete (IS20c/IS23): the child's schedule is the child's data.
-        {
-            var rows = await session.Query<GuardianTimeLimitSchedule>()
-                .Where(s => s.ChildId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-                session.Delete(row);
-            touched += rows.Count;
-        }
-
-        // 8. GuardianEventRequest — the supervised child's event-approval
-        //    requests (ChildId = the child's SubjectId). [DataClass] Delete
-        //    (IS20c/IS23): the child's requests are the child's data.
-        {
-            var rows = await session.Query<GuardianEventRequest>()
-                .Where(r => r.ChildId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-                session.Delete(row);
-            touched += rows.Count;
-        }
-
-        // 9. CommunityMembershipRequest — the supervised child's community
-        //    membership requests (UserId = the supervised child's SubjectId).
-        //    [DataClass] Delete (IS20c/IS23): the resident's requests are the
-        //    resident's data.
-        {
-            var rows = await session.Query<CommunityMembershipRequest>()
-                .Where(r => r.UserId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-                session.Delete(row);
-            touched += rows.Count;
-        }
-
-        // 10. ErrorReport — pseudonymize (the row STAYS; the Pseudonymize
-        //     precedent from PseudonymizeAuditRowsAsync). SubjectId →
-        //     tombstone; ContactEmail → null (the PII being nulled; never
-        //     logged — IS08 gate). [DataClass] Pseudonymize (IS20c,
-        //     principalField: "SubjectId").
-        {
-            var rows = await session.Query<ErrorReport>()
-                .Where(r => r.SubjectId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-            {
-                row.SubjectId = tombstone;
-                row.ContactEmail = null;
-                session.Store(row);
-            }
-            touched += rows.Count;
-        }
-
-        // 11. EscalationToken — pseudonymize: CreatedBy → tombstone (the row
-        //     STAYS; the token is operator-scoped but the creator's identity
-        //     is erased). [DataClass] Pseudonymize (IS20c,
-        //     principalField: "CreatedBy").
-        {
-            var rows = await session.Query<EscalationToken>()
-                .Where(t => t.CreatedBy == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-            {
-                row.CreatedBy = tombstone;
-                session.Store(row);
-            }
-            touched += rows.Count;
-        }
-
-        // 12. UsageEvent — pseudonymize: ActorId → tombstone (the row STAYS;
-        //     the usage metric is kept, the identity is erased).
-        //     [DataClass] Pseudonymize (IS20c, principalField: "ActorId").
-        {
-            var rows = await session.Query<UsageEvent>()
-                .Where(e => e.ActorId == residentSubjectId)
-                .ToListAsync(ct).ConfigureAwait(false);
-            foreach (var row in rows)
-            {
-                row.ActorId = tombstone;
-                session.Store(row);
-            }
-            touched += rows.Count;
-        }
+        // IS23 — blocks 7–12 (the supervised child's rows; 10–12 pseudonymize).
+        touched += await EraseChildTimeLimitSchedulesAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseChildEventRequestsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseChildMembershipRequestsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await PseudonymizeErrorReportsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await PseudonymizeEscalationTokensAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await PseudonymizeUsageEventsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
 
         if (logger is not null)
         {
@@ -295,5 +130,222 @@ public static class ResidentAccountRowsEraser
         }
 
         return touched;
+    }
+
+    // CODE-HYGIENE U6 — the 12 per-type erasures split out of
+    // <see cref="EraseAsync"/> so the public method stays under the 80-line /
+    // 15-cc ceiling (the part-vs-whole split the sibling
+    // <see cref="ResidentContentEraser"/> uses). Each helper is one query
+    // block — the same code, just extracted. Order and behaviour are unchanged;
+    // <see cref="HandledTypes"/> stays the closed-set spec the IS24 gate reads.
+
+    // 1. SessionDoc — a session credential (IP + user agent, one per login).
+    //    Owner field: UserId. [DataClass] Delete (IS20b).
+    private static async Task<int> EraseSessionDocsAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<SessionDoc>()
+            .Where(s => s.UserId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 2. IdentityToken — verify/setup tokens (a credential, single-use).
+    //    Owner field: UserId. [DataClass] Delete (IS20b).
+    private static async Task<int> EraseIdentityTokensAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<IdentityToken>()
+            .Where(t => t.UserId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 3. GuestAccess — a bounded guest standing (one row per guest).
+    //    Owner field: SubjectId. [DataClass] Delete (IS20b).
+    private static async Task<int> EraseGuestAccessAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<GuestAccess>()
+            .Where(g => g.SubjectId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 4. DelegationGrant — either side: the grants the resident made
+    //    (OwnerId) AND the grants they hold (DelegateId). A grant between
+    //    two OTHER residents is untouched (its owner field never ==
+    //    residentSubjectId on either side). [DataClass] Delete (IS20b).
+    private static async Task<int> EraseDelegationGrantsAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<DelegationGrant>()
+            .Where(d => d.OwnerId == residentSubjectId
+                      || d.DelegateId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 5. The four Notification* types — per-recipient state. Owner field:
+    //    RecipientId (NotificationPreference / NotificationQuietSchedule pin
+    //    it as their identity; Notification / NotificationSubscription carry
+    //    a RecipientId column). [DataClass] Delete (IS20c).
+    private static async Task<int> EraseNotificationStateAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        int touched = 0;
+        var n1 = await session.Query<Notification>()
+            .Where(n => n.RecipientId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in n1)
+            session.Delete(row);
+        touched += n1.Count;
+
+        var n2 = await session.Query<NotificationPreference>()
+            .Where(n => n.RecipientId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in n2)
+            session.Delete(row);
+        touched += n2.Count;
+
+        var n3 = await session.Query<NotificationSubscription>()
+            .Where(n => n.RecipientId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in n3)
+            session.Delete(row);
+        touched += n3.Count;
+
+        var n4 = await session.Query<NotificationQuietSchedule>()
+            .Where(n => n.RecipientId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in n4)
+            session.Delete(row);
+        touched += n4.Count;
+        return touched;
+    }
+
+    // 6. OutboxEmail — the recipient is the email STRING (not an id): match
+    //    on the resident's email, passed in by the composer. It is never
+    //    read from a doc and never logged (IS08); the match is exact.
+    private static async Task<int> EraseOutboxEmailsAsync(
+        IDocumentSession session, string residentSubjectId, string? residentEmail, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(residentEmail))
+            return 0;
+        var rows = await session.Query<OutboxEmail>()
+            .Where(e => e.Recipient == residentEmail)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 7. GuardianTimeLimitSchedule — the supervised child's time-limit
+    //    schedule (identity = ChildId, pinned by CoreDocTypes). [DataClass]
+    //    Delete (IS20c/IS23): the child's schedule is the child's data.
+    private static async Task<int> EraseChildTimeLimitSchedulesAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<GuardianTimeLimitSchedule>()
+            .Where(s => s.ChildId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 8. GuardianEventRequest — the supervised child's event-approval
+    //    requests (ChildId = the child's SubjectId). [DataClass] Delete
+    //    (IS20c/IS23): the child's requests are the child's data.
+    private static async Task<int> EraseChildEventRequestsAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<GuardianEventRequest>()
+            .Where(r => r.ChildId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 9. CommunityMembershipRequest — the supervised child's community
+    //    membership requests (UserId = the supervised child's SubjectId).
+    //    [DataClass] Delete (IS20c/IS23): the resident's requests are the
+    //    resident's data.
+    private static async Task<int> EraseChildMembershipRequestsAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<CommunityMembershipRequest>()
+            .Where(r => r.UserId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 10. ErrorReport — pseudonymize (the row STAYS; the Pseudonymize
+    //     precedent from PseudonymizeAuditRowsAsync). SubjectId →
+    //     tombstone; ContactEmail → null (the PII being nulled; never
+    //     logged — IS08 gate). [DataClass] Pseudonymize (IS20c,
+    //     principalField: "SubjectId").
+    private static async Task<int> PseudonymizeErrorReportsAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var tombstone = $"deleted:{residentSubjectId}";
+        var rows = await session.Query<ErrorReport>()
+            .Where(r => r.SubjectId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+        {
+            row.SubjectId = tombstone;
+            row.ContactEmail = null;
+            session.Store(row);
+        }
+        return rows.Count;
+    }
+
+    // 11. EscalationToken — pseudonymize: CreatedBy → tombstone (the row
+    //     STAYS; the token is operator-scoped but the creator's identity
+    //     is erased). [DataClass] Pseudonymize (IS20c,
+    //     principalField: "CreatedBy").
+    private static async Task<int> PseudonymizeEscalationTokensAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var tombstone = $"deleted:{residentSubjectId}";
+        var rows = await session.Query<EscalationToken>()
+            .Where(t => t.CreatedBy == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+        {
+            row.CreatedBy = tombstone;
+            session.Store(row);
+        }
+        return rows.Count;
+    }
+
+    // 12. UsageEvent — pseudonymize: ActorId → tombstone (the row STAYS;
+    //     the usage metric is kept, the identity is erased).
+    //     [DataClass] Pseudonymize (IS20c, principalField: "ActorId").
+    private static async Task<int> PseudonymizeUsageEventsAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var tombstone = $"deleted:{residentSubjectId}";
+        var rows = await session.Query<UsageEvent>()
+            .Where(e => e.ActorId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+        {
+            row.ActorId = tombstone;
+            session.Store(row);
+        }
+        return rows.Count;
     }
 }

@@ -181,7 +181,7 @@ public partial class BoardsController : ProjectsBaseController
         // read convenience, never a gate (the audience decision already ran
         // in GetBoardAsync's two-level decision, C-M5·3).
         IReadOnlyList<BoardItemPlacement> placements = [];
-        await using (var session = store.QuerySession())
+        await using (var session = store!.QuerySession())
         {
             placements = await session.Query<BoardItemPlacement>()
                 .Where(p => p.BoardId == id)

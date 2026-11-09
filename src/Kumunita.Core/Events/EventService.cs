@@ -98,20 +98,20 @@ public partial class EventService : IEventService
             Find = (IDocumentSession session, string id, string lang) => session.Query<EventTranslation>()
                 .Where(t => t.EventId == id && t.LanguageCode == lang)
                 .FirstOrDefaultAsync(),
-            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new EventTranslation
+            Create = (string id, string lang, string? title, string? body, string actorId, DateTimeOffset created) => new EventTranslation
             {
                 Id = Guid.NewGuid().ToString("N"),
                 EventId = id,
                 LanguageCode = lang,
                 Title = string.IsNullOrWhiteSpace(title) ? null : title,
-                Body = body,
+                Body = body!,
                 AuthorId = actorId,
                 Created = created
             },
-            ApplyUpdate = (EventTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            ApplyUpdate = (EventTranslation row, string? title, string? body, string actorId, DateTimeOffset now) =>
             {
                 row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-                row.Body = body;
+                row.Body = body!;
                 row.AuthorId = actorId;
                 row.Created = now;
             }

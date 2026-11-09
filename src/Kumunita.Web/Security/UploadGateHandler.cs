@@ -110,6 +110,6 @@ public static class UploadGateHandler
             }
             if (n < head.Length) Array.Resize(ref head, n);
         }
-        return UploadSignatureSniffer.Classify(contentType, head);
+        return UploadSignatureSniffer.Classify(contentType!, head);
     }
 }

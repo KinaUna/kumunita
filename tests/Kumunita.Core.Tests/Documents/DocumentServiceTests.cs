@@ -926,11 +926,12 @@ public class IDocumentServiceSeamTest
         var t = typeof(Kumunita.Core.Documents.IDocumentFolderService);
         // C2-04 added session-owning overloads, so GetMethod(name) throws AmbiguousMatchException —
         // assert by name ("the interface exposes a method with this name", not exactly one overload).
-        Assert.True(t.GetMethods().Any(m => m.Name == "CreateAsync"));
-        Assert.True(t.GetMethods().Any(m => m.Name == "ListByParentAsync"));
-        Assert.True(t.GetMethods().Any(m => m.Name == "MoveDocumentAsync"));
-        Assert.True(t.GetMethods().Any(m => m.Name == "RenameAsync"));
-        Assert.True(t.GetMethods().Any(m => m.Name == "MoveAsync"));
-        Assert.True(t.GetMethods().Any(m => m.Name == "DeleteAsync"));
+        var methodNames = t.GetMethods().Select(m => m.Name).ToList();
+        Assert.Contains("CreateAsync", methodNames);
+        Assert.Contains("ListByParentAsync", methodNames);
+        Assert.Contains("MoveDocumentAsync", methodNames);
+        Assert.Contains("RenameAsync", methodNames);
+        Assert.Contains("MoveAsync", methodNames);
+        Assert.Contains("DeleteAsync", methodNames);
     }
 }

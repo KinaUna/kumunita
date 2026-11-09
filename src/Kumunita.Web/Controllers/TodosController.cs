@@ -123,7 +123,7 @@ public sealed class TodosController : ProjectsBaseController
         if (todos.Count > 0)
         {
             var todoIds = todos.Select(t => t.Id).ToList();
-            await using var session = store.QuerySession();
+            await using var session = store!.QuerySession();
             var placements = await session.Query<BoardItemPlacement>()
                 .Where(p => todoIds.Contains(p.TodoItemId))
                 .ToListAsync(HttpContext!.RequestAborted);
@@ -271,7 +271,7 @@ public sealed class TodosController : ProjectsBaseController
 
         IReadOnlyList<BoardItemPlacement> placements = [];
         IReadOnlyList<KanbanLane> lanes = [];
-        await using (var session = store.QuerySession())
+        await using (var session = store!.QuerySession())
         {
             var allPlacements = await session.Query<BoardItemPlacement>()
                 .Where(p => p.TodoItemId == id)
@@ -1728,7 +1728,7 @@ public sealed class TodosController : ProjectsBaseController
 
         // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
         // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
-        await using var session = store.LightweightSession();
+        await using var session = store!.LightweightSession();
         try
         {
             await this.todos.TodoTranslationLane.AddAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
@@ -1796,7 +1796,7 @@ public sealed class TodosController : ProjectsBaseController
 
         // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
         // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
-        await using var session = store.LightweightSession();
+        await using var session = store!.LightweightSession();
         try
         {
             await this.todos.TodoTranslationLane.UpdateAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
@@ -1858,7 +1858,7 @@ public sealed class TodosController : ProjectsBaseController
 
         // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
         // session, C3 one SaveChangesAsync).
-        await using var session = store.LightweightSession();
+        await using var session = store!.LightweightSession();
         try
         {
             await this.todos.TodoTranslationLane.RemoveAsync(session, id, languageCode, actorId, RoleSet(User));

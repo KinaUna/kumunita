@@ -78,3 +78,6 @@ remains quiet (one audit row, no second party, no transparency entry).
   old `ExportAsync(actor, ct)` overload delegates to `ContentFree`.
 - The full branch also emits the D10 transparency notification (IS29); the OPS
   runbook section (IS30); the control-map row lands in IS39's format.
+- CODE-HYGIENE U13 (2026-11-09): boundary edges + method baselines
+  re-baselined to the current count (ratchet gate, `tools/code/code-baseline.json`);
+  the grown edges this lane re-baselines carry this ADR as their `adr:` reason.
