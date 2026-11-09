@@ -12,6 +12,7 @@ using Kumunita.Web.Security;
 using Kumunita.Web.SideEffects;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
@@ -1121,6 +1122,16 @@ app.Use(async (context, next) =>
         "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self), picture-in-picture=(), web-share=()";
     await next();
 });
+
+// R02 (IMPROVE-UX, D2) — bare HTML status returns land on the R01 status page.
+// UseStatusCodePagesWithReExecute("/status/{0}") has no per-request gate (it
+// re-executes on every failing response, and its StatusCodePagesOptions has no
+// ShouldTransformResponse — confirmed against the .NET 10 source), so we pass
+// the HTML-only handler instead: the same re-execute, but fetch/JSON, /health,
+// *.ics, /media/, /kiosk/slide, /settings/kiosk/items and /api/ keep their bare
+// status responses. Registered BEFORE UseRouting so the re-executed
+// /status/{code} reaches routing -> auth -> MVC (the R01 StatusController).
+app.UseStatusCodePages(StatusPageGate.ReExecuteHtmlOnly);
 
 app.UseRouting();
 

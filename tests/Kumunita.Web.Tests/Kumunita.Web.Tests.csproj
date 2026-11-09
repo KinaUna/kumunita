@@ -39,6 +39,16 @@
     <ProjectReference Include="..\..\src\Kumunita.Web\Kumunita.Web.csproj" />
   </ItemGroup>
 
+  <!-- R02 (IMPROVE-UX): the status-page gate integration tests boot a minimal
+       Kestrel host via WebApplication.CreateBuilder(). The Web SDK project
+       (Kumunita.Web) uses Microsoft.NET.Sdk.Web and has the shared framework
+       as a FrameworkReference, but that does not flow transitively to a
+       non-Web SDK test project — add it here so UseUrls, ClearProviders,
+       MapGet and the hosting/Kestrel types are available in tests. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <!-- e2e-m2.spec.ts (U13) is authored but the `kumunita` Playwright
        fixture still throws per the M3 runtime contract: see the
        "Not yet runnable" header in the spec itself and
