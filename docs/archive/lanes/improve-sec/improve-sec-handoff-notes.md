@@ -1742,3 +1742,53 @@ are the carried baseline drift.
   `MilestonesTests` untouched; move the lane files to
   `docs/archive/lanes/improve-sec/`). No DoD line failed, so there is no
   successor handoff required by this unit.
+
+## IS45 — Close flip + archive (the lane's final unit of three)
+
+- **Role:** closer, not fixer. One thing only — perform the **named-lane close
+  flip** (flip the docs / registry to "shipped") and **archive the lane files**.
+  No product code, no gate edit, no allowlist row, no config value. Measured on
+  `development` @ `5fdaab72` (IS00–IS44 committed; IS44 all-PASS).
+- **The six close-flip members (all flipped):**
+  1. `README.md` — the `## Status` paragraph now names the **`IMPROVE-SEC`**
+     lane as **done** with ADRs 0298/0299 (a named lane; the M1–M37 list is
+     untouched and not renumbered).
+  2. `src/Kumunita.Web/WhatsNew.cs` — a new **`0.87.0`** entry (date
+     **2026-11-09**) added as the head of `WhatsNew.All`, naming the IMPROVE-SEC
+     lane + ADRs 0298–0299. The historical `0.68.0` verify-lane text is
+     untouched (E11 is a doc-truth correction, not a registry rewrite).
+  3. `docs/STATUS.md` — a new **`IMPROVE-SEC is done`** named-lane paragraph
+     (data classes in code / complete deletion / retention / operator-gated
+     export / PII-out-of-logs / decision-free reads / CSP discipline /
+     traceable control map), with the ADR links and v0.87.0.
+  4. `docs/ARCHITECTURE.md` — a **data-classes-in-code** paragraph in §1
+     (the durable architecture fact: `[DataClass]` + `DataClassCatalog`, ADR 0298),
+     not a changelog.
+  5. ADR index (`docs/adr/README.md`) — **verified**: the `0298` and `0299`
+     rows are present and correctly numbered (they landed in IS16/IS25); no fix
+     needed.
+  6. `tests/Kumunita.Web.Tests/WhatsNewTests.cs` (the **missed member**) —
+     the head-pin test `The_ONB_OnboardingWALK_Entry_Is_Shipped` now pins
+     **`0.87.0`** as the head (version + date + lane/ADR substrings) and slides
+     `0.86.0` → second, `0.85.0` → third, … through `0.79.0` → ninth. This is
+     the required sixth member (ADR 0110 / `AGENTS.md`).
+- **`MilestonesTests` untouched:** `tests/Kumunita.Web.Tests/MilestonesTests.cs`
+  is byte-identical (IMPROVE-SEC is a named lane that reuses an already-Done
+  milestone letter; the roadmap order/shape is unchanged, so the pin must stay).
+- **The 3 known-reds left red (unchanged, successor scope):**
+  `SecGate.DataClassCoverageTests.EveryResidentExportType_IsInUserScopeInventory`,
+  `SecGate.DataClassCoverageTests.EveryDeleteOrPseudonymizeType_IsHandledByAnEraser`,
+  and `ImproveHarnessTests.CodeCheck_Gate_Passes`. None is touched by the flip;
+  they are the lane's recorded successor-scope drift (IS43 §2.7 / IS44), not a
+  close blocker.
+- **Archive move (this unit):** the lane's working files are `git mv`-ed to
+  `docs/archive/lanes/improve-sec/` — `plan-improve-sec.md`,
+  `improve-sec-handoff-notes.md`, and the `is*-prompt.md` briefs — from
+  `docs/plans-milestones/in-progress/`. The design doc
+  (`docs/design/improve-sec-design.md`) **stays in `docs/design/`** (no prior
+  archive dir — `sec/`, `improve/`, `improve-code/` — holds a design doc; the
+  lane archive is the plan + handoff + unit prompts).
+- **Verification:** `dotnet build Kumunita.slnx -c Debug` → 0 errors;
+  `WhatsNewTests` green (head = `0.87.0`, `0.86.0` second); `MilestonesTests`
+  green and untouched; `git status --short` clean (the flip edits + the moved
+  files, all committed). **Lane closed.**

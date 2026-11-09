@@ -105,6 +105,16 @@ specifics; the philosophy remains authoritative for *how to judge a design*.
 
 Rationale: ADR [0001](adr/0001-core-stack-and-identity-model.md) (stack); ADR [0004](adr/0004-data-persistence-and-schema-evolution.md) (persistence split & schema evolution).
 
+**Data classes in code.** The data-class policy for each Marten document — which
+class (PII / private content / audit / secret / media / operational / platform),
+the erasure decision, the export scope, and the retention key — is declared on
+the type by a `[DataClass]` attribute and read by a `DataClassCatalog`, not
+held in a doc (ADR [0298](adr/0298-data-classes-in-code.md)): the account-deletion
+eraser, the GDPR export inventory, and the retention tick all agree with it, and
+a `DataClassCoverage` gate fails when a registered doc type is missing the
+attribute or when those surfaces disagree with it — so a new PII type cannot
+register with no erasure / export / retention policy.
+
 ## 2. The sections
 
 The deeper sections are their own docs under [`architecture/`](architecture/)

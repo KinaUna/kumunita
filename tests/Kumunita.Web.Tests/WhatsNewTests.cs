@@ -61,109 +61,120 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-[Fact(DisplayName = "The newest-first head is the 0.86.0 entry (IMPROVE-CODE-3 code-quality reduction) — 0.85.0 (home feed) slides one row back")]
+[Fact(DisplayName = "The newest-first head is the 0.87.0 entry (IMPROVE-SEC security & privacy integration) — 0.86.0 (IMPROVE-CODE-3) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
         // ADR 0110 / AGENTS.md) so a copy-paste that drops or re-orders an
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
-        // when a milestone ships it becomes the head and the previous head
-        // slides down. The IMPROVE-CODE-3 lane (ADRs 0292–0297, 2026-11-06 —
-        // the code-quality reduction: the largest files split into named
-        // seams, the clean Marten-allowlist entries retired, the 3
-        // flagged-accidental boundary edges retired) is now the newest
-        // shipped (the 0.86.0 entry), so it is the head; the
+        // when a lane ships it becomes the head and the previous head slides
+        // down. The IMPROVE-SEC lane (ADRs 0298–0299, 2026-11-09 — security
+        // & privacy integrated: data classes in code, complete account
+        // deletion + retention, the operator-gated instance export, and the
+        // PII / decision-free-read / CSP gates) is now the newest shipped
+        // (the 0.87.0 entry), so it is the head; the IMPROVE-CODE-3 lane
+        // (ADRs 0292–0297, 2026-11-06) 0.86.0 entry slides one row back; the
         // home-feed-for-anonymous-visitors lane (ADR 0284, 2026-11-01) 0.85.0
-        // entry slides one row back; the sessions lane (ADR 0281, 2026-11-01)
-        // 0.84.0 entry slides two rows back; and so on.
+        // entry slides two rows back; and so on.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.86.0" && head.Date == "2026-11-06",
-            "The IMPROVE-CODE-3 0.86.0 (2026-11-06) entry must be the head of the registry; got "
+            head.Version == "0.87.0" && head.Date == "2026-11-09",
+            "The IMPROVE-SEC 0.87.0 (2026-11-09) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("round 3", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("IMPROVE-CODE", StringComparison.OrdinalIgnoreCase)
-                                 && c.Contains("measurably smaller", StringComparison.OrdinalIgnoreCase)),
-            "The 0.86.0 head entry must name the IMPROVE-CODE-3 code-quality-reduction lane.");
-        // The previous head (the home-feed-for-anonymous-visitors lane,
-        // 0.85.0) slides one row back — pin it too so a copy-paste that drops
-        // it is caught.
+            head.Changes.Any(c => c.Contains("IMPROVE-SEC", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("account deletion", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("ADRs 0298", StringComparison.OrdinalIgnoreCase)),
+            "The 0.87.0 head entry must name the IMPROVE-SEC lane + its ADRs 0298–0299.");
+        // The previous head (the IMPROVE-CODE-3 lane, 0.86.0) slides one row
+        // back — pin it too so a copy-paste that drops it is caught.
         var second = WhatsNew.All[1];
         Assert.True(
-            second.Version == "0.85.0" && second.Date == "2026-11-01",
-            "The home-feed-for-anonymous-visitors 0.85.0 (2026-11-01) entry must be the second entry; got "
+            second.Version == "0.86.0" && second.Date == "2026-11-06",
+            "The IMPROVE-CODE-3 0.86.0 (2026-11-06) entry must be the second entry; got "
                 + second.Version + " / " + second.Date + ".");
         Assert.True(
-            second.Changes.Any(c => c.Contains("What's new", StringComparison.OrdinalIgnoreCase)
+            second.Changes.Any(c => c.Contains("round 3", StringComparison.OrdinalIgnoreCase)
+                                   && c.Contains("IMPROVE-CODE", StringComparison.OrdinalIgnoreCase)
+                                   && c.Contains("measurably smaller", StringComparison.OrdinalIgnoreCase)),
+            "The 0.86.0 entry must name the IMPROVE-CODE-3 code-quality-reduction lane.");
+        // The home-feed-for-anonymous-visitors lane (0.85.0) slides two rows
+        // back — pin it too.
+        var third = WhatsNew.All[2];
+        Assert.True(
+            third.Version == "0.85.0" && third.Date == "2026-11-01",
+            "The home-feed-for-anonymous-visitors 0.85.0 (2026-11-01) entry must be the third entry; got "
+                + third.Version + " / " + third.Date + ".");
+        Assert.True(
+            third.Changes.Any(c => c.Contains("What's new", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("sign-in", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("ADR 0284", StringComparison.OrdinalIgnoreCase)),
             "The 0.85.0 entry must name the home-feed-for-anonymous lane + ADR 0284.");
-        // The sessions lane (0.84.0) slides two rows back — pin it too.
-        var third = WhatsNew.All[2];
+        // The sessions lane (0.84.0) slides three rows back — pin it too.
+        var fourth = WhatsNew.All[3];
         Assert.True(
-            third.Version == "0.84.0" && third.Date == "2026-11-01",
-            "The sessions 0.84.0 (2026-11-01) entry must be the third entry; got "
-                + third.Version + " / " + third.Date + ".");
+            fourth.Version == "0.84.0" && fourth.Date == "2026-11-01",
+            "The sessions 0.84.0 (2026-11-01) entry must be the fourth entry; got "
+                + fourth.Version + " / " + fourth.Date + ".");
         Assert.True(
-            third.Changes.Any(c => c.Contains("Sessions", StringComparison.OrdinalIgnoreCase)
+            fourth.Changes.Any(c => c.Contains("Sessions", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("revoke", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("ADR 0281", StringComparison.OrdinalIgnoreCase)),
             "The 0.84.0 entry must name the sessions lane + ADR 0281.");
-        // The change-password-into-the-Security-tab lane (0.83.0) slides three
+        // The change-password-into-the-Security-tab lane (0.83.0) slides four
         // rows back — pin it too.
-        var fourth = WhatsNew.All[3];
+        var fifth = WhatsNew.All[4];
         Assert.True(
-            fourth.Version == "0.83.0" && fourth.Date == "2026-10-31",
-            "The change-password-into-the-Security-tab 0.83.0 (2026-10-31) entry must be the fourth entry; got "
-                + fourth.Version + " / " + fourth.Date + ".");
+            fifth.Version == "0.83.0" && fifth.Date == "2026-10-31",
+            "The change-password-into-the-Security-tab 0.83.0 (2026-10-31) entry must be the fifth entry; got "
+                + fifth.Version + " / " + fifth.Date + ".");
         Assert.True(
-            fourth.Changes.Any(c => c.Contains("Security", StringComparison.OrdinalIgnoreCase)
+            fifth.Changes.Any(c => c.Contains("Security", StringComparison.OrdinalIgnoreCase)
                                   && c.Contains("Change password", StringComparison.OrdinalIgnoreCase)
                                   && c.Contains("ADR 0280", StringComparison.OrdinalIgnoreCase)),
             "The 0.83.0 entry must name the change-password-into-Security-tab lane + ADR 0280.");
-        // The group-messaging lane (GM, 0.82.0) slides four rows back — pin it too.
-        var fifth = WhatsNew.All[4];
+        // The group-messaging lane (GM, 0.82.0) slides five rows back — pin it too.
+        var sixth = WhatsNew.All[5];
         Assert.True(
-            fifth.Version == "0.82.0" && fifth.Date == "2026-10-30",
-            "The group messaging (GM) 0.82.0 (2026-10-30) entry must be the fifth entry; got "
-                + fifth.Version + " / " + fifth.Date + ".");
+            sixth.Version == "0.82.0" && sixth.Date == "2026-10-30",
+            "The group messaging (GM) 0.82.0 (2026-10-30) entry must be the sixth entry; got "
+                + sixth.Version + " / " + sixth.Date + ".");
         Assert.True(
-            fifth.Changes.Any(c => c.Contains("Group messages", StringComparison.OrdinalIgnoreCase)
+            sixth.Changes.Any(c => c.Contains("Group messages", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("multi-participant", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("ADR 0278", StringComparison.OrdinalIgnoreCase)),
             "The 0.82.0 entry must name the group-messaging (GM) lane + ADR 0278.");
-        // The directory sort & filter lane (0.81.0) slides five rows back — pin it too.
-        var sixth = WhatsNew.All[5];
+        // The directory sort & filter lane (0.81.0) slides six rows back — pin it too.
+        var seventh = WhatsNew.All[6];
         Assert.True(
-            sixth.Version == "0.81.0" && sixth.Date == "2026-10-30",
-            "The directory sort & filter 0.81.0 (2026-10-30) entry must be the sixth entry; got "
-                + sixth.Version + " / " + sixth.Date + ".");
+            seventh.Version == "0.81.0" && seventh.Date == "2026-10-30",
+            "The directory sort & filter 0.81.0 (2026-10-30) entry must be the seventh entry; got "
+                + seventh.Version + " / " + seventh.Date + ".");
         Assert.True(
-            sixth.Changes.Any(c => c.Contains("directory", StringComparison.OrdinalIgnoreCase)
+            seventh.Changes.Any(c => c.Contains("directory", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("Verified", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("ADR 0277", StringComparison.OrdinalIgnoreCase)),
             "The 0.81.0 entry must name the directory sort/filter lane + ADR 0277.");
-        // The locale-restore + escalation lane (0.80.0) slides six rows back — pin it too.
-        var seventh = WhatsNew.All[6];
+        // The locale-restore + escalation lane (0.80.0) slides seven rows back — pin it too.
+        var eighth = WhatsNew.All[7];
         Assert.True(
-            seventh.Version == "0.80.0" && seventh.Date == "2026-10-30",
-            "The portability-restore locale + escalation 0.80.0 (2026-10-30) entry must be the seventh entry; got "
-                + seventh.Version + " / " + seventh.Date + ".");
+            eighth.Version == "0.80.0" && eighth.Date == "2026-10-30",
+            "The portability-restore locale + escalation 0.80.0 (2026-10-30) entry must be the eighth entry; got "
+                + eighth.Version + " / " + eighth.Date + ".");
         Assert.True(
-            seventh.Changes.Any(c => c.Contains("time zone", StringComparison.OrdinalIgnoreCase)
+            eighth.Changes.Any(c => c.Contains("time zone", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("escalation", StringComparison.OrdinalIgnoreCase)
                                    && c.Contains("ADR 0276", StringComparison.OrdinalIgnoreCase)),
             "The 0.80.0 entry must name the locale-restore + escalation lane + ADR 0276.");
-        // The principal-merge lane (0.79.0) slides seven rows back — pin it too.
-        var eighth = WhatsNew.All[7];
+        // The principal-merge lane (0.79.0) slides eight rows back — pin it too.
+        var ninth = WhatsNew.All[8];
         Assert.True(
-            eighth.Version == "0.79.0" && eighth.Date == "2026-10-30",
-            "The portability-import principal-merge 0.79.0 (2026-10-30) entry must be the eighth entry; got "
-                + eighth.Version + " / " + eighth.Date + ".");
+            ninth.Version == "0.79.0" && ninth.Date == "2026-10-30",
+            "The portability-import principal-merge 0.79.0 (2026-10-30) entry must be the ninth entry; got "
+                + ninth.Version + " / " + ninth.Date + ".");
         Assert.True(
-            eighth.Changes.Any(c => c.Contains("directory", StringComparison.OrdinalIgnoreCase)
+            ninth.Changes.Any(c => c.Contains("directory", StringComparison.OrdinalIgnoreCase)
                                     && c.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
                                     && c.Contains("ADR 0275", StringComparison.OrdinalIgnoreCase)),
             "The 0.79.0 entry must name the principal-merge lane + ADR 0275.");

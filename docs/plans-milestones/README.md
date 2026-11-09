@@ -8,9 +8,9 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - docs/archive/README.md
   - docs/DOCS-CONVENTIONS.md
-  - docs/archive/lanes/improve-code/plan-improve-code-3.md
-  - docs/archive/lanes/improve-code/improve-code-3-handoff-notes.md
-updated: 2026-11-06
+  - docs/archive/lanes/improve-sec/plan-improve-sec.md
+  - docs/archive/lanes/improve-sec/improve-sec-handoff-notes.md
+updated: 2026-11-09
 ---
 
 > **Abstract:** where the *current* lane's register and in-progress unit plans
@@ -39,9 +39,16 @@ to live here are in
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
 
-**Current lane: `IMPROVE-SEC`** — [plan-improve-sec](plan-improve-sec.md)
-(units `IS00`…`IS45`, proposed 2026-11-06; the close unit, `IS45`, moves this
-register to [`archive/lanes/improve-sec/`](../archive/lanes/improve-sec/)).
+**Latest lane: `IMPROVE-SEC`** — the security & privacy integration lane
+(units `IS00`…`IS45`, proposed 2026-11-06) **shipped on 2026-11-09** — the
+close unit `IS45` landed the six-member "shipped" flip and moved its register,
+the `is*-prompt.md` unit prompts, and the handoff notes to the archive at
+[`archive/lanes/improve-sec/`](../archive/lanes/improve-sec/) (register
+[plan-improve-sec](../archive/lanes/improve-sec/plan-improve-sec.md), closing
+log
+[improve-sec-handoff-notes.md](../archive/lanes/improve-sec/improve-sec-handoff-notes.md)).
+When a new lane starts, its register + unit prompts land here first and move to
+that archive folder at its close.
 
 The lane before it, `IMPROVE-CODE-3`
 (`C3-00`–`C3-08`), **shipped on 2026-11-06** — it finished the two lines its
@@ -53,8 +60,6 @@ live in the archive at
 [plan-improve-code-3](../archive/lanes/improve-code/plan-improve-code-3.md),
 closing log
 [improve-code-3-handoff-notes.md](../archive/lanes/improve-code/improve-code-3-handoff-notes.md)).
-When a new lane starts, its register + unit prompts land here first and move to
-that archive folder at its close.
 
 The full code-quality history — `IMPROVE-CODE` (round 1), `IMPROVE-CODE-2`
 (round 2), and `IMPROVE-CODE-3` (round 3) — is archived together under
