@@ -594,3 +594,72 @@ the owner has promoted them to `ContentFree` before IS27 ships). `Full` is
 the M11 round-trip set (all 44 types, no fields blanked). The `Full` scope
 requires an active `AdminOverride` (IS28's gate, ADR 0299) and is audited
 `Via: BreakGlass` (IS28).
+
+### §2.7 — Run result (IS43)
+
+Measured 2026-11-09 on `development` @ `074e35c7` (IS00–IS42 committed; IS42 =
+`d15367fa`). This is the **record, not the control**: the numbers are green by
+the `SecGate` gates IS05–IS42 landed, not by anything IS43 does. The build and
+both full suites ran before this section was written.
+
+**The six baselines (IS04 start → this run), retired by their own gates:**
+
+| # | Baseline (IS04) | Gate that retires it | Expected now |
+|---|---|---|---|
+| M1 | control-map rows with a pinned seam **9/24** | `ControlMapTraceabilityTests` (IS40) | **all rows pinned** |
+| M2 | principal-bearing types with no erasure **25/65** | `DataClassCoverageTests.EveryDeleteOrPseudonymizeType_IsHandledByAnEraser` + `EveryResidentExportType_IsInUserScopeInventory` (IS24) | **0 unhandled** — the residual is now named by the gate (see known-reds below) |
+| M4 | PII log placeholders **7** | `LogTemplatePiiGateTests.NoLogTemplate_CarriesAPiiPlaceholder` (IS08) | **0** |
+| M7 | unmarked decision-free reads **52** | `DecisionFreeReadGateTests.EveryAudienceBearingRead_IsDecidedOrMarked` (IS15) | **0** |
+| — | inline `on*` handlers in views **8** | `CspInlineDisciplineGateTests.NoView_HasAnInlineEventHandler` + `NoView_HasAnInlineScriptBlock` (IS38 / IS38c) | **0** |
+| — | unaudited admin reads of class (c)/PII **3** | the three IS36 tests (`AuditLogView_IsItselfAudited`, `ErrorReportView_IsAudited`, `GuestListView_IsAudited`) | **0** (the reads are now audited) |
+
+Five of the six (M1, M4, M7, inline handlers, unaudited admin reads) are fully
+retired — their gates run green in this run. **M2 is the one whose gate is the
+recorded red:** the two `DataClassCoverageTests` agreement gates (IS24) are two
+of the three known-reds below. Per the IS20c / IS24 precedent, the gate is the
+pin and the red is the finding — the residual is now *explicitly named by the
+gate* (gate 1: the `Delete`/`Pseudonymize` types in no `HandledTypes` set;
+gate 2: the `Export.Resident` types absent from `UserScopeInventory`), down
+from 25/65 unrecorded. Closing the residual is the successor's scope (the IS24
+handoff names it), not this unit's.
+
+**Suite totals (full, in-process runner per `docs/dev/testing-and-ci.md`):**
+
+| Suite | Total | Failed | Errors | Skipped |
+|---|---|---|---|---|
+| `Kumunita.Web.Tests` | 1322 | **3** (the known-reds below) | 0 | 0 |
+| `Kumunita.Core.Tests` | 1901 | **0** | 0 | 2 |
+
+`Kumunita.Core.Tests` is 0-failed: the IS20c P-1 coverage gate
+(`DataClassCoverageTests.EveryRegisteredDocType_HasADataClass`) is **green
+(81/81)** (run in-class to confirm). `dotnet build` → **0 errors** (165
+pre-existing xUnit/nullability warnings, unchanged).
+
+**The three known-reds (pre-existing, in `Kumunita.Web.Tests`; recorded, not
+fixed, not skipped):**
+
+1. `SecGate.DataClassCoverageTests.EveryResidentExportType_IsInUserScopeInventory`
+   — the M2 export-agreement gate (IS24); the residual `Export.Resident` rows
+   are the IS31/IS32 scope (owner units IS24 / IS31 / IS32).
+2. `SecGate.DataClassCoverageTests.EveryDeleteOrPseudonymizeType_IsHandledByAnEraser`
+   — the M2 erasure-agreement gate (IS24); the residual `Delete`/`Pseudonymize`
+   rows are the IS21–IS23 scope (owner units IS24 / IS31 / IS32).
+3. `ImproveHarnessTests.CodeCheck_Gate_Passes`
+   — the pre-existing harness code-check gate; fails at IS43's HEAD too (owner
+   units IS38 / IS40 — the boundary-edge / god-file drift the harness names).
+
+**`tools/sec/sec-measure.py`:** **absent** at this HEAD — `git ls-files
+tools/sec/sec-measure.py` is empty and `ls tools/sec/` contains only
+`sec-report.ps1`. IS00's "delivered as `improve-sec-00-plan.patch`" never landed
+as a tracked file, so there is nothing to `git rm`. The plan's "delete it" is
+satisfied: its checks now live in the `SecGate` xunit gates, and the file does
+not exist in the repo.
+
+**Baseline intact:** `pwsh tools/sec/sec-report.ps1` still prints the IS04
+starting numbers (9/24 · 25/65 · 7 · 52 · 8 · 3) — the *before* column is
+unchanged; the *after* column comes from the six gates above, not from the
+script.
+
+**No other test fails.** Per the plan ("If a gate is red, stop and list it"),
+the only reds in either suite are the three named above; every other test is
+green.

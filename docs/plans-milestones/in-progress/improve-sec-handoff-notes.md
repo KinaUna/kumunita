@@ -1590,3 +1590,56 @@ the three doc/code divergences and lands the lane's four lessons as rules.
   `tools/sec/sec-measure.py`; **if a gate is red, stop and list it.** Then
   `IS44` (independent cold-read verification) and `IS45` (close flip +
   archive).
+
+## IS43 — Run and record (the six baselines, before → after, against the IS04 baseline)
+
+- **Scope:** the lane's close unit (1 of 3: `IS43 → IS44 → IS45`). One
+  thing only — prove with the build and the two full suites that the six
+  baselines are retired by their own `SecGate` gates, and record the
+  before → after in the design doc's `§2.7 Run result`. **No code, no new
+  test, no new ADR, no allowlist row, no config value.** The number goes down
+  because the code changed in IS05–IS42, not because of anything this unit
+  does.
+- **Files (2 docs appended):**
+  - `docs/design/improve-sec-design.md` — new `### §2.7 — Run result (IS43)`
+    section (the six before → after numbers, the two-suite totals, the three
+    known-reds verbatim with owner units, the `sec-measure.py` absence record,
+    the baseline-intact confirmation).
+  - this handoff append (`## IS43`).
+- **Verification (all run in this unit, results in the design doc §2.7):**
+  - `dotnet build Kumunita.slnx -c Debug` → **0 errors** (165 pre-existing
+    xUnit/nullability warnings, unchanged).
+  - `dotnet exec tests/Kumunita.Web.Tests/…/Kumunita.Web.Tests.dll` (full,
+    in-process runner per `docs/dev/testing-and-ci.md`) → **Total: 1322,
+    Failed: 3, Errors: 0, Skipped: 0**. The 3 failures are **exactly** the
+    three known-reds (verified by name); no other red.
+  - `dotnet exec tests/Kumunita.Core.Tests/…/Kumunita.Core.Tests.dll` (full)
+    → **Total: 1901, Failed: 0, Errors: 0, Skipped: 2**. The IS20c P-1
+    coverage gate (`EveryRegisteredDocType_HasADataClass`) is **green (81/81)**
+    (run in-class to confirm).
+  - `pwsh tools/sec/sec-report.ps1` → prints the **IS04 baseline** (9/24 ·
+    25/65 · 7 · 52 · 8 · 3) — the *before* column is intact.
+  - `git ls-files tools/sec/sec-measure.py` → **empty**; `ls tools/sec/` →
+    only `sec-report.ps1`. The file is **absent** (IS00's plan patch never
+    landed as a tracked file) — recorded, nothing to `git rm`.
+- **The three known-reds (verbatim, `Kumunita.Web.Tests`, recorded not fixed):**
+  - `SecGate.DataClassCoverageTests.EveryResidentExportType_IsInUserScopeInventory`
+  - `SecGate.DataClassCoverageTests.EveryDeleteOrPseudonymizeType_IsHandledByAnEraser`
+  - `ImproveHarnessTests.CodeCheck_Gate_Passes`
+
+  These are the lane's carried drift (the M2 gate's residual is the IS31/IS32
+  scope; `CodeCheck_Gate_Passes` is a pre-existing harness gate that fails at
+  IS43's HEAD too — the boundary-edge / god-file drift the harness names).
+  **Not new failures introduced by IS43.** Not fixed, not skipped (that is a
+  different unit's scope). Per rule 9 / the IS20c–IS24 precedent: the gate is
+  the pin, the red is the finding; I did not edit the gate to pass it.
+- **No build/test regressions introduced:** IS43 touches only the two doc
+  files. `git status` after the edits shows exactly those two files changed.
+- **Next unit: IS44** — Independent verification (cold read). A fresh agent
+  with no lane context gets only the DoD, the repo, and three probes
+  (throwaway doc type → `DataClassCoverageTests` must fail;
+  `logger.LogInformation("{Email}", e)` → the log gate must fail;
+  `admin/portability/export?scope=full` as a GlobalAdmin with no override →
+  403 + a content-free archive by default). It reports each DoD line PASS/FAIL
+  with evidence and reverts the probes; its report is appended verbatim to
+  this note. Then **IS45** (close flip + archive).
