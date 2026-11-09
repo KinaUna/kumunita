@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "generated": "2026-11-09",
+  "generated_from": "IMPROVE-UX X01 baseline on development",
+  "counts": {
+    "bare_status": 704,
+    "a11y": 95,
+    "empty_plain": 37,
+    "empty_none": 33,
+    "jargon": 13,
+    "notify_without_link": 7
+  }
+}

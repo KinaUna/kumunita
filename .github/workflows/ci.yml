@@ -101,6 +101,17 @@ jobs:
       - name: Run docs gate
         run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/docs-check.ps1
 
+  # IMPROVE-UX X01 — report-only measurements. The local --check ratchet is
+  # deliberately not run in CI; this job prints the table without gating PRs.
+  ux-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Report UX measurements
+        run: python3 tools/ux/ux-measure.py
+
   # ---------------------------------------------------------------------------
   # IMPROVE-CODE C00 — the code-size ratchet gate.
   #
