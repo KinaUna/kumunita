@@ -1,3 +1,4 @@
+using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -166,10 +167,27 @@ public interface IModerationService
     /// flag-flip inside that method is unchanged). Throws
     /// <see cref="KeyNotFoundException"/> when the report is absent
     /// (the controller maps to a 404).
+    /// <para>
+    /// IMPROVE-UX R03 — the optional <paramref name="outcome"/> /
+    /// <paramref name="resolutionNote"/> pair (both <c>null</c> by
+    /// default, so the pre-R03 two-parameter call shape — the
+    /// <c>ModerationController</c>'s <c>ResolvePost</c> action — keeps
+    /// compiling unchanged). When supplied, the lane writes them onto
+    /// the <see cref="Kumunita.Core.Posts.Report"/> row (the R03
+    /// resolution shape: <see cref="Kumunita.Core.Posts.Report.Outcome"/>
+    /// + <see cref="Kumunita.Core.Posts.Report.ResolutionNote"/>
+    /// + <see cref="Kumunita.Core.Posts.Report.ResolvedAt"/> +
+    /// <see cref="Kumunita.Core.Posts.Report.ResolvedBy"/>) in the
+    /// same transaction as the lane's existing
+    /// <c>AccessAudit</c> row — which is **unchanged** (the R03 pin:
+    /// same shape, same action/target).
+    /// </para>
     /// </summary>
     Task ResolveReportAsync(
         string reportId,
         string globalAdminId,
+        Kumunita.Core.Posts.ReportOutcome? outcome = null,
+        string? resolutionNote = null,
         CancellationToken ct = default);
 
     /// <summary>

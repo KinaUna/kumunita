@@ -773,6 +773,366 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         Assert.Empty(await AllAudits(store));
     }
 
+    // ── R03-1 — ResolveReportAsync_WithOutcome_WritesFullResolutionShape ──
+    //
+    // IMPROVE-UX R03 (the D1 "My reports" shape; the lane-enforces-shape
+    // second line of defense): the R03 seam carries the optional
+    // (outcome, resolutionNote) pair; when both are supplied, the lane
+    // writes the **full** resolution shape onto the Report row —
+    // Outcome / ResolutionNote / ResolvedAt (UTC) / ResolvedBy
+    // (the caller's SubjectId) — in the same transaction as the
+    // lane's existing AccessAudit row. The four fields were
+    // null before the call; after, all four are populated (the
+    // "filed → resolved-with-outcome" transition, the ADR 0004 §B.1
+    // additive pin: pre-R03 rows keep their nulls, the R03 lane's
+    // write is the one that fills them).
+
+    [Fact]
+    public async Task ResolveReportAsync_WithOutcome_WritesFullResolutionShape()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string globalAdmin = "u-r03-1-admin";
+        const string note = "removed — see the ADR 0142 discussion";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "r03-1-assign", UserId = globalAdmin, ComponentId = ComponentId,
+            GrantedBy = "u-r03-1-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "r03-1-post", ComponentId = ComponentId, AuthorId = "u-r03-1-author",
+            Body = "body r03-1", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-r03-1-member"),
+        });
+        await Plant(store, new Report
+        {
+            Id = "r03-1-report", PostId = "r03-1-post", ReporterId = "u-r03-1-reporter",
+            ComponentId = ComponentId, Reason = "r03-1-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+            // The four resolution fields are null on a filed row (the
+            // "filed → resolved" transition invariant).
+            Outcome = null, ResolutionNote = null, ResolvedAt = null, ResolvedBy = null,
+        });
+
+        var before = DateTimeOffset.UtcNow;
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "r03-1-report", globalAdmin, session,
+                outcome: ReportOutcome.Removed,
+                resolutionNote: note));
+        var after = DateTimeOffset.UtcNow;
+
+        // The four resolution fields are populated with the caller's
+        // exact values (the D1 closed vocabulary + the verbatim note).
+        await using (var s2 = store.QuerySession())
+        {
+            var report = await s2.LoadAsync<Report>("r03-1-report", TestContext.Current.CancellationToken);
+            Assert.NotNull(report);
+            Assert.Equal("resolved", report!.Status);          // pre-R03 literal pin unchanged
+            Assert.Equal(ReportOutcome.Removed, report.Outcome);
+            Assert.Equal(note, report.ResolutionNote);
+            Assert.Equal(globalAdmin, report.ResolvedBy);
+            Assert.NotNull(report.ResolvedAt);
+            // ResolvedAt is the lane's own UTC instant — between the
+            // test's before/after ticks (the "written in this call" pin).
+            Assert.InRange(report.ResolvedAt!.Value, before, after);
+        }
+    }
+
+    // ── R03-2 — ResolveReportAsync_WithOutcome_AuditRowUnchanged ─────────
+    //
+    // IMPROVE-UX R03 (the unit's pin, verbatim from the plan): the
+    // existing <c>AccessAudit</c> row is **unchanged** — same shape,
+    // same action/target, same outcome. The test asserts the
+    // full field set of the lane's own row (the
+    // TargetKind = "report" lane row, distinct from the M1-seam's
+    // TargetKind = "post" row) against the pre-R03 shape — the
+    // audit row's shape is the frozen M3b shape (C-M3b·4), not
+    // something R03 reshapes.
+
+    [Fact]
+    public async Task ResolveReportAsync_WithOutcome_AuditRowUnchanged()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string globalAdmin = "u-r03-2-admin";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "r03-2-assign", UserId = globalAdmin, ComponentId = ComponentId,
+            GrantedBy = "u-r03-2-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "r03-2-post", ComponentId = ComponentId, AuthorId = "u-r03-2-author",
+            Body = "body r03-2", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-r03-2-member"),
+        });
+        await Plant(store, new Report
+        {
+            Id = "r03-2-report", PostId = "r03-2-post", ReporterId = "u-r03-2-reporter",
+            ComponentId = ComponentId, Reason = "r03-2-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "r03-2-report", globalAdmin, session,
+                outcome: ReportOutcome.Hidden,
+                resolutionNote: "hidden — see ADR 0142"));
+
+        // The lane's own audit row (TargetKind = "report") is the
+        // pre-R03 shape, byte-for-byte — the R03 pin.
+        var rows = await ReportAudits(store, actor: globalAdmin);
+        var row = Assert.Single(rows, a => a.Action == "report.resolve");
+        Assert.Equal("report", row.TargetKind);
+        Assert.Equal("r03-2-report", row.TargetId);
+        Assert.Equal(globalAdmin, row.ActorId);
+        Assert.Equal(globalAdmin, row.EffectivePrincipalId);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.NotEqual(AccessOutcome.Deny, row.Outcome);
+    }
+
+    // ── R03-3 — ResolveReportAsync_NoteOnly_WritesResolutionShape ────────
+    //
+    // IMPROVE-UX R03 — the note-without-outcome shape (the moderator
+    // closes the report with a free-text note but no closed-vocabulary
+    // action, e.g. the "we've reviewed it" shape the D1
+    // <see cref="ReportOutcome.Other"/> lane would use): the lane
+    // still writes the full four-field shape, with Outcome null
+    // (the "no outcome recorded" state) and the note verbatim.
+
+    [Fact]
+    public async Task ResolveReportAsync_NoteOnly_WritesResolutionShape()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string globalAdmin = "u-r03-3-admin";
+        const string note = "reviewed — no action taken, see the discussion";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "r03-3-assign", UserId = globalAdmin, ComponentId = ComponentId,
+            GrantedBy = "u-r03-3-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "r03-3-post", ComponentId = ComponentId, AuthorId = "u-r03-3-author",
+            Body = "body r03-3", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-r03-3-member"),
+        });
+        await Plant(store, new Report
+        {
+            Id = "r03-3-report", PostId = "r03-3-post", ReporterId = "u-r03-3-reporter",
+            ComponentId = ComponentId, Reason = "r03-3-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "r03-3-report", globalAdmin, session,
+                outcome: null,
+                resolutionNote: note));
+
+        await using (var s2 = store.QuerySession())
+        {
+            var report = await s2.LoadAsync<Report>("r03-3-report", TestContext.Current.CancellationToken);
+            Assert.NotNull(report);
+            Assert.Equal("resolved", report!.Status);
+            Assert.Null(report.Outcome);           // note-only shape — Outcome stays null
+            Assert.Equal(note, report.ResolutionNote);
+            Assert.Equal(globalAdmin, report.ResolvedBy);
+            Assert.NotNull(report.ResolvedAt);
+        }
+    }
+
+    // ── R03-4 — ResolveReportAsync_PreR03Shape_KeepsResolutionFieldsNull ─
+    //
+    // IMPROVE-UX R03 (the backward-compat pin): the pre-R03 two-
+    // parameter call shape (no outcome, no note) keeps compiling and
+    // behaving unchanged — the lane flips Status to "resolved" but
+    // the four resolution fields stay null (the "resolved with no
+    // outcome recorded" legacy shape, the ModerationController's
+    // ResolvePost action's shape).
+
+    [Fact]
+    public async Task ResolveReportAsync_PreR03Shape_KeepsResolutionFieldsNull()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string globalAdmin = "u-r03-4-admin";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "r03-4-assign", UserId = globalAdmin, ComponentId = ComponentId,
+            GrantedBy = "u-r03-4-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "r03-4-post", ComponentId = ComponentId, AuthorId = "u-r03-4-author",
+            Body = "body r03-4", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-r03-4-member"),
+        });
+        await Plant(store, new Report
+        {
+            Id = "r03-4-report", PostId = "r03-4-post", ReporterId = "u-r03-4-reporter",
+            ComponentId = ComponentId, Reason = "r03-4-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow
+        });
+
+        // The pre-R03 call shape (no outcome, no note) — the
+        // ModerationController's ResolvePost action's shape.
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync("r03-4-report", globalAdmin, session));
+
+        await using (var s2 = store.QuerySession())
+        {
+            var report = await s2.LoadAsync<Report>("r03-4-report", TestContext.Current.CancellationToken);
+            Assert.NotNull(report);
+            Assert.Equal("resolved", report!.Status);       // the pre-R03 literal pin (unchanged)
+            Assert.Null(report.Outcome);                    // the R03 pin — no outcome recorded
+            Assert.Null(report.ResolutionNote);
+            Assert.Null(report.ResolvedAt);
+            Assert.Null(report.ResolvedBy);
+        }
+
+        // The pre-R03 audit row is unchanged (the same "unchanged" pin
+        // as R03-2 — this is the pre-R03 shape the R04/R05 read paths
+        // treat as the "legacy just closed" shape).
+        var rows = await ReportAudits(store, actor: globalAdmin);
+        Assert.Contains(rows, a => a.Action == "report.resolve"
+                                   && a.TargetId == "r03-4-report"
+                                   && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── R03-5 — ResolveReportAsync_NoteOverCap_Throws_NoPartialWrite ─────
+    //
+    // IMPROVE-UX R03 (the lane-enforces-shape second line of defense):
+    // a ResolutionNote over the D1 ≤500-char cap is a caller contract
+    // violation — the lane throws ArgumentException **before** any
+    // row is written (no Status flip, no audit row, no resolution
+    // shape — no partial write). The R04 form's own maxlength
+    // validation is the first line; this is the lane's.
+
+    [Fact]
+    public async Task ResolveReportAsync_NoteOverCap_Throws_NoPartialWrite()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string globalAdmin = "u-r03-5-admin";
+        var tooLong = new string('x', 501);   // 501 — one over the 500-char cap
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "r03-5-assign", UserId = globalAdmin, ComponentId = ComponentId,
+            GrantedBy = "u-r03-5-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "r03-5-post", ComponentId = ComponentId, AuthorId = "u-r03-5-author",
+            Body = "body r03-5", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-r03-5-member"),
+        });
+        await Plant(store, new Report
+        {
+            Id = "r03-5-report", PostId = "r03-5-post", ReporterId = "u-r03-5-reporter",
+            ComponentId = ComponentId, Reason = "r03-5-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow
+        });
+
+        // The lane throws before any row is written (the
+        // ResolveReportNote normalization runs before the session
+        // load — the lane-enforces-shape invariant).
+        await RunInSession(store, async session =>
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                svc.ResolveReportAsync(
+                    "r03-5-report", globalAdmin, session,
+                    outcome: ReportOutcome.Other,
+                    resolutionNote: tooLong));
+        });
+
+        // No partial write — the Status is still "filed" (not
+        // flipped to "resolved"), the four resolution fields are
+        // still null, and no lane-owned audit row was committed.
+        await using (var s2 = store.QuerySession())
+        {
+            var report = await s2.LoadAsync<Report>("r03-5-report", TestContext.Current.CancellationToken);
+            Assert.NotNull(report);
+            Assert.Equal("filed", report!.Status);
+            Assert.Null(report.Outcome);
+            Assert.Null(report.ResolutionNote);
+            Assert.Null(report.ResolvedAt);
+            Assert.Null(report.ResolvedBy);
+        }
+        Assert.Empty(await ReportAudits(store, actor: globalAdmin));
+    }
+
+    // ── R03-6 — ResolveReportAsync_NoteAtCap_WritesVerbatim ──────────────
+    //
+    // IMPROVE-UX R03 (the cap boundary pin): a ResolutionNote of
+    // exactly 500 chars is **accepted** (the cap is ≤500, not
+    // <500) and stored verbatim (no trim, no truncation — the
+    // "lane-enforces-shape" invariant allows the boundary value,
+    // the "R04 form's own maxlength" invariant is the first line,
+    // this test pins the lane's second line accepts the boundary).
+
+    [Fact]
+    public async Task ResolveReportAsync_NoteAtCap_WritesVerbatim()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string globalAdmin = "u-r03-6-admin";
+        var atCap = new string('a', 500);     // exactly 500 — the boundary
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "r03-6-assign", UserId = globalAdmin, ComponentId = ComponentId,
+            GrantedBy = "u-r03-6-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "r03-6-post", ComponentId = ComponentId, AuthorId = "u-r03-6-author",
+            Body = "body r03-6", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-r03-6-member"),
+        });
+        await Plant(store, new Report
+        {
+            Id = "r03-6-report", PostId = "r03-6-post", ReporterId = "u-r03-6-reporter",
+            ComponentId = ComponentId, Reason = "r03-6-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "r03-6-report", globalAdmin, session,
+                outcome: ReportOutcome.NoAction,
+                resolutionNote: atCap));
+
+        await using (var s2 = store.QuerySession())
+        {
+            var report = await s2.LoadAsync<Report>("r03-6-report", TestContext.Current.CancellationToken);
+            Assert.NotNull(report);
+            Assert.Equal("resolved", report!.Status);
+            Assert.Equal(ReportOutcome.NoAction, report.Outcome);
+            Assert.Equal(500, report.ResolutionNote!.Length);   // the boundary pin — verbatim
+            Assert.Equal(atCap, report.ResolutionNote);
+        }
+    }
 
     // ── Shared helpers (mirror the PostServiceTests shape) ──────────────
 

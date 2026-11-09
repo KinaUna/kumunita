@@ -644,15 +644,51 @@ public partial class ModerationService
     /// with <c>on = true</c> on success (the flag-flip — see
     /// <see cref="UnlockAsync"/>'s doc-comment for the "separate
     /// commit" note).
+    /// <para>
+    /// IMPROVE-UX R03 — the optional <paramref name="outcome"/> /
+    /// <paramref name="resolutionNote"/> pair (both <c>null</c> by
+    /// default — the pre-R03 call shape, the <c>ModerationController</c>'s
+    /// <c>ResolvePost</c> action, keeps compiling and behaving
+    /// unchanged). When supplied (the R04 web form will pass them; the
+    /// R07 notification body re-uses the stored note), the lane writes
+    /// the full resolution shape onto the <see cref="Report"/> row —
+    /// <see cref="Report.Outcome"/> + <see cref="Report.ResolutionNote"/>
+    /// + <see cref="Report.ResolvedAt"/> (UTC) + <see cref="Report.ResolvedBy"/>
+    /// (the <c>globalAdminId</c> parameter) — in the **same
+    /// transaction** as the lane's existing <c>AccessAudit</c> row,
+    /// which is **unchanged** (the R03 pin: same shape, same
+    /// <c>report.resolve</c> action / <c>report</c> target kind,
+    /// same <c>Allow</c> outcome — the unit tests assert the audit
+    /// row's field set is byte-identical to the pre-R03 lane's). The
+    /// <c>ResolutionNote</c> is trimmed and capped at 500 chars
+    /// (the D1 ≤500 pin); the cap is enforced here, in the lane, so
+    /// the Web form cannot bypass it (the same lane-enforces-shape
+    /// invariant the filing lane's <c>Reason</c> cap enforces). The
+    /// M6 <c>ReportResolved</c> notification emission is unchanged in
+    /// R03 (R07 re-wires the body + link; the <paramref
+    /// name="resolutionNote"/> is **not** yet in the body — that
+    /// flip is R07's scope, not this unit's).
+    /// </para>
     /// </summary>
     public async Task ResolveReportAsync(
         string reportId,
         string globalAdminId,
-        IDocumentSession session)
+        IDocumentSession session,
+        ReportOutcome? outcome = null,
+        string? resolutionNote = null)
     {
         if (string.IsNullOrEmpty(reportId))      throw new ArgumentException("A report id is required.",         nameof(reportId));
         if (string.IsNullOrEmpty(globalAdminId)) throw new ArgumentException("A GlobalAdmin actor id is required.", nameof(globalAdminId));
         if (session is null)                     throw new ArgumentNullException(nameof(session));
+
+        // IMPROVE-UX R03 — the ≤500-char cap (the D1 pin), enforced in
+        // the lane before the store (the Web form cannot bypass it).
+        // Whitespace-only notes are normalized to null (the "no note"
+        // shape — the same as the filing lane's reason handling); a
+        // note over 500 chars is a caller contract violation (the
+        // R04 form's own validation is the first line of defense;
+        // this is the second, the lane-enforces-shape invariant).
+        resolutionNote = ResolveReportNote(resolutionNote);
 
         var report = await session.LoadAsync<Report>(reportId).ConfigureAwait(false);
         if (report is null)
@@ -676,6 +712,26 @@ public partial class ModerationService
                     .ConfigureAwait(false);
 
             report.Status = "resolved";
+
+            // IMPROVE-UX R03 — the resolution shape (the D1 closed
+            // vocabulary + the ≤500-char note + the audit-shaped
+            // ResolvedAt/ResolvedBy pair). Written **only** when the
+            // caller supplied at least one of the two (the pre-R03
+            // no-outcome shape keeps the row's four resolution fields
+            // null — the "resolved with no outcome recorded" state,
+            // which the R04/R05 read paths treat as the legacy
+            // "just closed" shape). ResolvedAt is UTC (the same
+            // DateTimeOffset.UtcNow the AccessAudit row's At uses —
+            // the two are written in the same transaction, so a
+            // reader comparing them sees a consistent instant).
+            if (outcome is not null || resolutionNote is not null)
+            {
+                report.Outcome       = outcome;
+                report.ResolutionNote = resolutionNote;
+                report.ResolvedAt    = DateTimeOffset.UtcNow;
+                report.ResolvedBy    = globalAdminId;
+            }
+
             session.Store(report);
 
             session.Store(new AccessAudit

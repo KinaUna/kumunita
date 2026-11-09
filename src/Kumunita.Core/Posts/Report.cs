@@ -3,11 +3,47 @@ using Kumunita.Core.Privacy;
 namespace Kumunita.Core.Posts;
 
 /// <summary>
+/// The **resolution outcome** of a report (IMPROVE-UX R03). Written only
+/// by the <c>ResolveReportAsync</c> lane when a moderator closes the
+/// report — <see cref="Report.Outcome"/> is <c>null</c> until that
+/// moment. The closed vocabulary is the D1 "My reports" shape in
+/// <c>docs/plans-milestones/in-progress/plan-improve-ux.md</c>:
+/// the moderator's chosen action on the target, stored verbatim so
+/// the reporter's "My reports" page can render it and the A02
+/// outcome-execution lane can re-derive the same action on the
+/// target post (posts first).
+/// </summary>
+public enum ReportOutcome
+{
+    /// <summary>The moderator reviewed the report and took no action on the target.</summary>
+    NoAction,
+    /// <summary>The target was hidden (the A02 action: <c>HidePostAsync</c> — reversible via <c>UnhidePostAsync</c>).</summary>
+    Hidden,
+    /// <summary>The target was removed (the A02 action: <c>RemovePostAsync</c> — the hard lane).</summary>
+    Removed,
+    /// <summary>An outcome outside the closed three (a moderator free-text note explains).</summary>
+    Other
+}
+
+/// <summary>
 /// A *dormant* report row (M3b workflow). The **table** is registered in M3
 /// for forward compatibility (the Q1↔Q3 resolution: the table in M3, the flow
 /// in M3b); M3's surface ships **no** workflow, **no** tests, and **no**
 /// <see cref="Status"/> writes against it. <see cref="Status"/> is nullable
 /// until M3b lands a write lane that sets it.
+/// <para>
+/// IMPROVE-UX R03 adds the **resolution shape** — the <see
+/// cref="Outcome"/> enum (the D1 closed vocabulary), the
+/// <see cref="ResolutionNote"/> (≤500 chars, the moderator's
+/// free-text for the <see cref="ReportOutcome.Other"/> / nuance
+/// cases), and the <see cref="ResolvedAt"/> /
+/// <see cref="ResolvedBy"/> pair (the same audit shape
+/// <see cref="At"/> / <see cref="ReporterId"/> carries for the
+/// filing lane). All four are <c>null</c> until the
+/// <c>ResolveReportAsync</c> lane writes them (ADR 0004 §B.1
+/// additive — Marten delta-detects the new columns; pre-existing
+/// rows keep <c>null</c> and need no back-fill).
+/// </para>
 /// </summary>
 [DataClass(DataClassKind.AuditModeration, Erasure.Pseudonymize, ExportScope.Never,
     reason: "F1 §2C decision (now decided): moderation state, not authored content (IS23); M27 C-M27·3 excludes it from the delete set",
@@ -64,4 +100,65 @@ public sealed class Report
     /// </para>
     /// </summary>
     public string? ReplyId { get; set; }
+
+    // ── IMPROVE-UX R03 — the resolution shape (ADR 0004 §B.1 additive;
+    //    the single new surface on the Report POCO for the D1 "My
+    //    reports" + A02 outcome-execution lanes). All four are nullable
+    //    (a filed-but-not-yet-resolved report keeps them null; pre-
+    //    R03 rows stay null without back-fill; Marten delta-detects
+    //    the new columns idempotently at boot, the ADR 0004 §B.1
+    //    additive discipline) and written **only** by
+    //    <see cref="Kumunita.Core.Moderation.ModerationService"/>
+    //    <c>ResolveReportAsync</c> — the filing / assign / unlock
+    //    lanes do not touch them (the same lane-isolation invariant
+    //    the M3b Status-literal pins enforce). ──
+
+    /// <summary>
+    /// The moderator's chosen outcome on the report's target (IMPROVE-UX
+    /// R03, the D1 closed vocabulary). <c>null</c> until the
+    /// <c>ResolveReportAsync</c> lane writes it (the "filed" state). The
+    /// A02 outcome-execution lane re-derives the same action on the
+    /// target post from this value — the <see cref="ReportOutcome.Hidden"/>
+    /// value maps to <c>PostService.HidePostAsync</c>,
+    /// <see cref="ReportOutcome.Removed"/> to
+    /// <c>PostService.RemovePostAsync</c>, and the other two are
+    /// no-action / free-text (the A02 lane decides the post-target-only
+    /// scope and the reply-target TODO ❓).
+    /// </summary>
+    public ReportOutcome? Outcome { get; set; }
+
+    /// <summary>
+    /// The moderator's free-text note for the reporter (IMPROVE-UX R03;
+    /// ≤500 chars, enforced by the <c>ResolveReportAsync</c> lane before
+    /// the store). The D1 "My reports" page renders this verbatim
+    /// (the "moderator-picked outcome + optional note" shape); the
+    /// R07 <c>ReportResolved</c> notification body re-uses it.
+    /// <c>null</c> for no-note resolutions (the common
+    /// <see cref="ReportOutcome.Hidden"/> /
+    /// <see cref="ReportOutcome.Removed"/> shape) and for every
+    /// pre-resolution state.
+    /// </summary>
+    public string? ResolutionNote { get; set; }
+
+    /// <summary>
+    /// The instant (UTC) the <c>ResolveReportAsync</c> lane wrote the
+    /// <see cref="Outcome"/> + <see cref="ResolutionNote"/> pair
+    /// (IMPROVE-UX R03). Mirrors the filing lane's <see cref="At"/>
+    /// (same audit shape: the pair is written together, in the same
+    /// transaction as the lane's <c>AccessAudit</c> row).
+    /// </summary>
+    public DateTimeOffset? ResolvedAt { get; set; }
+
+    /// <summary>
+    /// The GlobalAdmin / standing-moderator's <c>SubjectId</c> who
+    /// resolved the report (IMPROVE-UX R03) — the <c>globalAdminId</c>
+    /// parameter the <c>ResolveReportAsync</c> lane carries. Mirrors the
+    /// filing lane's <see cref="ReporterId"/> (same principal shape;
+    /// the pseudonymizer's <see cref="DataClassAttribute.PrincipalField"/>
+    /// stays <c>ReporterId</c> — the resolution principal is the
+    /// moderator's, a different axis, and the ADR 0298 erasure rule
+    /// (principalField = the resident-facing principal) does not extend
+    /// to it).
+    /// </summary>
+    public string? ResolvedBy { get; set; }
 }

@@ -97,6 +97,32 @@ public partial class ModerationService : IModerationService
     }
 
     /// <summary>
+    /// IMPROVE-UX R03 — the <see cref="Report.ResolutionNote"/>
+    /// normalization (the D1 ≤500-char pin, lane-enforced so the Web
+    /// form cannot bypass it): trim the note, normalize
+    /// whitespace-only to <c>null</c> (the "no note" shape), and
+    /// reject a note over 500 chars with an
+    /// <see cref="ArgumentException"/> (the caller-contract violation
+    /// — the R04 form's own maxlength validation is the first line,
+    /// this the lane-enforces-shape second). Unlike
+    /// <see cref="Truncate"/> (which caps at 200 + ellipsis, the
+    /// emitter-snippet shape), this **throws** on over-cap input — the
+    /// resolution note is data the reporter sees verbatim on the
+    /// "My reports" page, not an inbox snippet; truncating would
+    /// silently lose the moderator's note.
+    /// </summary>
+    private static string? ResolveReportNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note)) return null;
+        var trimmed = note.Trim();
+        if (trimmed.Length > 500)
+            throw new ArgumentException(
+                $"The resolution note is {trimmed.Length} chars; the R03 cap is 500.",
+                nameof(note));
+        return trimmed;
+    }
+
+    /// <summary>
     /// ADR 0173 — the report-targets lane's shared helper: resolve the
     /// report's target (post OR one of the new surfaces) to the single
     /// <see cref="IAuditableResource"/> the SoD <c>Moderate</c>
@@ -236,17 +262,28 @@ public partial class ModerationService : IModerationService
     /// flag-flip inside that method is unchanged); the controller's
     /// <c>TempData</c> / <c>Redirect</c> / <c>NotFound</c> shape is
     /// unchanged.
+    /// <para>
+    /// IMPROVE-UX R03 — the optional <paramref name="outcome"/> /
+    /// <paramref name="resolutionNote"/> pair (both <c>null</c> by
+    /// default, so the pre-R03 two-parameter call shape keeps
+    /// compiling unchanged). When supplied, the lane writes them onto
+    /// the <see cref="Report"/> row in the same transaction as the
+    /// lane's existing <c>AccessAudit</c> row — which is **unchanged**
+    /// (the R03 pin).
+    /// </para>
     /// </summary>
     public async Task ResolveReportAsync(
         string reportId,
         string globalAdminId,
+        ReportOutcome? outcome = null,
+        string? resolutionNote = null,
         CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(reportId))      throw new ArgumentException("A report id is required.",         nameof(reportId));
         if (string.IsNullOrEmpty(globalAdminId)) throw new ArgumentException("A GlobalAdmin actor id is required.", nameof(globalAdminId));
 
         await using var session = _store.LightweightSession();
-        await ResolveReportAsync(reportId, globalAdminId, session).ConfigureAwait(false);
+        await ResolveReportAsync(reportId, globalAdminId, session, outcome, resolutionNote).ConfigureAwait(false);
         await session.SaveChangesAsync().ConfigureAwait(false);
     }
 
