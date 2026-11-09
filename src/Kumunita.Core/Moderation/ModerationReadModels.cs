@@ -1,4 +1,46 @@
+using Kumunita.Core.Posts;
+
 namespace Kumunita.Core.Moderation;
+
+/// <summary>
+/// One row of a reporter's <c>My reports</c> list (IMPROVE-UX R05 — the
+/// reporter-facing content-report read seam's row shape, the D1 "My reports"
+/// shape from <c>docs/plans-milestones/in-progress/plan-improve-ux.md</c>).
+/// The row carries the report's identity + context
+/// (<see cref="ReportId"/> / <see cref="PostId"/> / <see cref="ComponentId"/>
+/// / <see cref="Reason"/> / <see cref="At"/>), its status
+/// (<see cref="Status"/>), and the R03 resolution shape
+/// (<see cref="Outcome"/> + <see cref="ResolutionNote"/> +
+/// <see cref="ResolvedAt"/> / <see cref="ResolvedBy"/> — all four
+/// <c>null</c> until the <c>ResolveReportAsync</c> lane writes them).
+/// <para>
+/// <see cref="TargetTitle"/> is the target's title (the ADR 0173
+/// <c>TargetKind</c> switch), resolved the same way the
+/// <c>GetDetailAsync</c> read seam does — **but gated on the reporter's
+/// visibility**: for a <b>post</b> target (the original M3b shape,
+/// <c>TargetKind == null</c>) the title is shown only while the reporter can
+/// still read the post (denied / hidden / removed / deleted →
+/// <c>null</c>, the R05 DoD "target no longer visible → no title" pin). For
+/// the other target kinds (event / project / board / todo / grouppost) the
+/// title is resolved directly (their visibility rules are out of scope for
+/// R05 — the plan is posts-first, A02).
+/// </para>
+/// </summary>
+public sealed record MyReportRow
+{
+    public required string ReportId { get; init; }
+    public required string PostId { get; init; }
+    public string? ComponentId { get; init; }
+    public string? Reason { get; init; }
+    public required string Status { get; init; }
+    public required DateTimeOffset At { get; init; }
+    public string? TargetKind { get; init; }
+    public string? TargetTitle { get; init; }
+    public ReportOutcome? Outcome { get; init; }
+    public string? ResolutionNote { get; init; }
+    public DateTimeOffset? ResolvedAt { get; init; }
+    public string? ResolvedBy { get; init; }
+}
 
 /// <summary>
 /// One resolved row of the <c>/moderation</c> queue (IMPROVE-CODE C09 — the

@@ -1134,6 +1134,144 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         }
     }
 
+    // ── R05-1 — ListMyReportsAsync_ReturnsReportersRows_WithResolutionShape ─
+    //
+    // IMPROVE-UX R05 (the D1 "My reports" read shape; the R05 DoD a pin): the
+    // reporter's content reports (where Report.ReporterId == the reporter) are
+    // listed newest-first, each row carrying the report's context
+    // (PostId / Reason / At) + status + the R03 resolution shape
+    // (Outcome / ResolutionNote / ResolvedAt / ResolvedBy). For a **visible**
+    // post target (the reporter can still read it — in the audience) the
+    // TargetTitle is shown. A report filed by another reporter is NOT in the
+    // list (the ReporterId filter, the reporter's-own pin).
+
+    [Fact]
+    public async Task ListMyReportsAsync_ReturnsReportersRows_WithResolutionShape()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = ServicesWithPosts(store);
+        const string reporter = "u-r05-1-reporter";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        // The reporter is in the post's audience (a User grant) so
+        // PostService.GetPostAsync allows the read → the title is visible.
+        await Plant(store, new Post
+        {
+            Id = "r05-1-post", ComponentId = ComponentId, AuthorId = "u-r05-1-author",
+            Title = "visible post title", Body = "body r05-1", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+        await Plant(store, new Report
+        {
+            Id = "r05-1-report", PostId = "r05-1-post", ReporterId = reporter,
+            ComponentId = ComponentId, Reason = "r05-1-reason", Status = "resolved",
+            At = DateTimeOffset.UtcNow,
+            Outcome = ReportOutcome.Hidden, ResolutionNote = "hidden per policy",
+            ResolvedAt = DateTimeOffset.UtcNow, ResolvedBy = "u-r05-1-admin",
+        });
+        // A report filed by ANOTHER reporter must NOT appear in this reporter's list.
+        await Plant(store, new Report
+        {
+            Id = "r05-1-other", PostId = "r05-1-post", ReporterId = "u-r05-1-other-reporter",
+            ComponentId = ComponentId, Reason = "r05-1-other-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+        });
+
+        var rows = await svc.ListMyReportsAsync(reporter, TestContext.Current.CancellationToken);
+
+        var row = Assert.Single(rows);
+        Assert.Equal("r05-1-report", row.ReportId);
+        Assert.Equal("r05-1-post", row.PostId);
+        Assert.Equal("r05-1-reason", row.Reason);
+        Assert.Equal("resolved", row.Status);
+        Assert.Null(row.TargetKind);                       // the original M3b post shape
+        Assert.Equal("visible post title", row.TargetTitle); // visible → the title is shown
+        Assert.Equal(ReportOutcome.Hidden, row.Outcome);    // the R03 resolution shape
+        Assert.Equal("hidden per policy", row.ResolutionNote);
+        Assert.NotNull(row.ResolvedAt);
+        Assert.Equal("u-r05-1-admin", row.ResolvedBy);
+    }
+
+    // ── R05-2 — ListMyReportsAsync_TargetNoLongerVisible_NoTitle ──────────
+    //
+    // IMPROVE-UX R05 (the DoD pin, verbatim from the plan): a post target the
+    // reporter can no longer read yields TargetTitle == null. Two shapes —
+    // (a) the post was DELETED (no Post doc → GetPostAsync returns a null Post),
+    // (b) the post is live but the reporter is DENIED (not the author, not in
+    // the audience → CanAsync denies → GetPostAsync returns a null Post). Both
+    // are "no longer visible" — the row still appears (the reporter's own
+    // report) but with no title (the R05 DoD "target no longer visible → no
+    // title" pin).
+
+    [Fact]
+    public async Task ListMyReportsAsync_TargetNoLongerVisible_NoTitle()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = ServicesWithPosts(store);
+        const string reporter = "u-r05-2-reporter";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        // (a) A report against a DELETED post (no Post doc planted).
+        await Plant(store, new Report
+        {
+            Id = "r05-2-deleted", PostId = "r05-2-gone-post", ReporterId = reporter,
+            ComponentId = ComponentId, Reason = "r05-2-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+        });
+        // (b) A report against a live post the reporter is DENIED on (the
+        //     reporter is neither the author nor in the audience → CanAsync
+        //     denies → GetPostAsync returns a null Post).
+        await Plant(store, new Post
+        {
+            Id = "r05-2-denied", ComponentId = ComponentId, AuthorId = "u-r05-2-author",
+            Title = "denied post title", Body = "body r05-2", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-r05-2-someone-else"),
+        });
+        await Plant(store, new Report
+        {
+            Id = "r05-2-report", PostId = "r05-2-denied", ReporterId = reporter,
+            ComponentId = ComponentId, Reason = "r05-2-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+        });
+
+        var rows = await svc.ListMyReportsAsync(reporter, TestContext.Current.CancellationToken);
+
+        var byId = rows.ToDictionary(r => r.ReportId);
+        Assert.Equal(2, byId.Count);
+        // (a) deleted → no title (the reporter can no longer read the target)
+        Assert.Null(byId["r05-2-deleted"].TargetTitle);
+        Assert.Null(byId["r05-2-deleted"].TargetKind);
+        // (b) denied → no title (the live post is no longer readable by the reporter)
+        Assert.Null(byId["r05-2-report"].TargetTitle);
+    }
+
+    // ── R05-3 — ListMyReportsAsync_NoReports_ReturnsEmpty ──────────────────
+    //
+    // IMPROVE-UX R05 (the empty-list pin; the GetQueueAsync / ListAsync
+    // empty-list precedent): a reporter with no filed reports gets an empty
+    // list (not null, not a throw) — and reports filed by others do not leak
+    // in (the ReporterId filter).
+
+    [Fact]
+    public async Task ListMyReportsAsync_NoReports_ReturnsEmpty()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = ServicesWithPosts(store);
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        // A report filed by someone else must not leak into this reporter's list.
+        await Plant(store, new Report
+        {
+            Id = "r05-3-other", PostId = "r05-3-post", ReporterId = "u-r05-3-other",
+            ComponentId = ComponentId, Reason = "r05-3-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+        });
+
+        var rows = await svc.ListMyReportsAsync("u-r05-3-empty", TestContext.Current.CancellationToken);
+        Assert.NotNull(rows);
+        Assert.Empty(rows);
+    }
+
     // ── Shared helpers (mirror the PostServiceTests shape) ──────────────
 
     private async Task<IDocumentStore> BootStoreAsync()
@@ -1252,6 +1390,29 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var authz = new AuthorizationService(store, userInfo);
         var profileSettings = new ProfileSettingsService(store);
         var moderation = new ModerationService(profileSettings, authz, store);
+        return (userInfo, authz, moderation);
+    }
+
+    /// <summary>
+    /// IMPROVE-UX R05 — compose the same trio but wire the
+    /// <see cref="PostService"/> into the <see cref="ModerationService"/>
+    /// (the optional R05 posts read seam the <c>ListMyReportsAsync</c>
+    /// post-title visibility gate depends on): a real <see cref="PostService"/>
+    /// (userInfo / authz / store, the <c>PostServiceTests</c>
+    /// <c>new PostService(userInfo, authz, store)</c> shape) + the same
+    /// <see cref="UserInfoService"/> / <see cref="AuthorizationService"/> /
+    /// <see cref="ProfileSettingsService"/> trio. The
+    /// <c>ServicesWithPosts(store).Moderation</c> shape matches
+    /// <c>Services(store).Moderation</c> so the R05 tests read identically.
+    /// </summary>
+    private static (UserInfoService User, AuthorizationService Authz, ModerationService Moderation)
+        ServicesWithPosts(IDocumentStore store)
+    {
+        var userInfo = new UserInfoService(store);
+        var authz = new AuthorizationService(store, userInfo);
+        var posts = new PostService(userInfo, authz, store);
+        var profileSettings = new ProfileSettingsService(store);
+        var moderation = new ModerationService(profileSettings, authz, store, posts: posts);
         return (userInfo, authz, moderation);
     }
 

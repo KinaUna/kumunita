@@ -155,6 +155,27 @@ public sealed class ErrorReportService : IErrorReportService
     }
 
     /// <summary>
+    /// The filer's issues (IMPROVE-UX R05 — the "My reports" D1 shape's second
+    /// read seam): the <see cref="ErrorReport"/> rows where
+    /// <see cref="ErrorReport.SubjectId"/> == the subject, newest-first
+    /// (<c>Created</c> desc). A **read, not a decision** (the
+    /// <see cref="ListAsync"/> / M31·4 precedent) — the filer is the subject,
+    /// the fields are their own, so no <see cref="IAuthorizationService"/>
+    /// call, no <c>AccessAudit</c> row, and no visibility gate (the subject
+    /// is the owner). Returns an empty list when the filer has no issues.
+    /// </summary>
+    public async Task<IReadOnlyList<ErrorReport>> ListMineAsync(string subjectId, CancellationToken ct = default)
+    {
+        if (subjectId is null) throw new ArgumentNullException(nameof(subjectId));
+
+        using var session = _store.QuerySession();
+        return await session.Query<ErrorReport>()
+            .Where(x => x.SubjectId == subjectId)
+            .OrderByDescending(x => x.Created)   // the repo's pinned ordering shape (.OrderByDescending(.Created))
+            .ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Accept an inbound (escalated) report (ADR 0159, ESC·5 / ESC·7) — the
     /// M32 <c>MarkResolvedAsync</c> idempotent-write-lane shape (the ADR 0006
     /// C3 single-write-lane): re-validate the token → the idempotent lookup →

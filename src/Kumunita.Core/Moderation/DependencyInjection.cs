@@ -16,14 +16,18 @@ public static class ModerationModule
     public static IServiceCollection AddModeration(this IServiceCollection services)
     {
         // Factory preserves the composition root's explicit optional-dependency
-        // resolution (INotificationEmitter / IUserInfoService resolve to null
-        // when unregistered — the C03 emitter seam + the user-info seam).
+        // resolution (INotificationEmitter / IUserInfoService / Posts.PostService
+        // resolve to null when unregistered — the C03 emitter seam + the
+        // user-info seam + the R05 posts read seam). The Posts.PostService
+        // resolve is required here (the posts context is always composed before
+        // moderation at the Core composition root — GetRequiredService).
         services.AddTransient<IModerationService>(sp => new ModerationService(
             sp.GetRequiredService<Core.UserInfo.IProfileSettingsService>(),
             sp.GetRequiredService<Core.Authorization.IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetService<Core.Notifications.INotificationEmitter>(),
-            sp.GetService<Core.UserInfo.IUserInfoService>()));
+            sp.GetService<Core.UserInfo.IUserInfoService>(),
+            sp.GetRequiredService<Core.Posts.PostService>()));
         return services;
     }
 }

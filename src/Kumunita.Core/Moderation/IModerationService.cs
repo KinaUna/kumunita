@@ -68,6 +68,45 @@ public interface IModerationService
         CancellationToken ct = default);
 
     /// <summary>
+    /// The reporter's <c>My reports</c> read (IMPROVE-UX R05 — the D1 "My
+    /// reports" shape the <c>MyReportRow</c> record models): the content
+    /// reports <paramref name="reporterId"/> filed (where
+    /// <see cref="Kumunita.Core.Posts.Report.ReporterId"/> == the
+    /// reporter's id), newest-first (<c>At</c> desc), each row carrying the
+    /// report's context (<c>PostId</c> / <c>ComponentId</c> /
+    /// <c>Reason</c> / <c>At</c>), its status, and the R03 resolution shape
+    /// (<see cref="Kumunita.Core.Posts.Report.Outcome"/> +
+    /// <see cref="Kumunita.Core.Posts.Report.ResolutionNote"/> +
+    /// <see cref="Kumunita.Core.Posts.Report.ResolvedAt"/> /
+    /// <see cref="Kumunita.Core.Posts.Report.ResolvedBy"/> — all four
+    /// <c>null</c> until the <c>ResolveReportAsync</c> lane writes them).
+    /// <para>
+    /// The row's <c>TargetTitle</c> is the target's title (the ADR 0173
+    /// <c>TargetKind</c> switch the <c>GetDetailAsync</c> read seam uses),
+    /// resolved the same way — **but gated on the reporter's visibility**:
+    /// for a <b>post</b> target (the original M3b shape,
+    /// <c>TargetKind == null</c>) the title is shown only while the reporter
+    /// can still read the post (a <c>null</c> <c>Post</c> in the
+    /// <see cref="Kumunita.Core.Posts.PostDetailResult"/> — denied / hidden /
+    /// removed / deleted — means no title, the R05 DoD "target no longer
+    /// visible → no title" pin). For the other target kinds (event / project
+    /// / board / todo / grouppost) the title is resolved directly (their
+    /// visibility rules are out of scope for R05 — the plan is posts-first,
+    /// A02).
+    /// </para>
+    /// <para>
+    /// A **read, not a decision** (the <c>GetQueueAsync</c> /
+    /// <c>GetDetailAsync</c> precedent): the report is the reporter's own;
+    /// the read is a list, not a scoped-read gate — no
+    /// <see cref="IAuthorizationService"/> call, no <c>AccessAudit</c> row.
+    /// Returns an empty list when the reporter filed no reports.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<MyReportRow>> ListMyReportsAsync(
+        string reporterId,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// The standing-moderator scope read for the assign form (the
     /// <c>ModeratorAssignment</c> rows on <paramref name="componentId"/>):
     /// the <c>UserId</c> + the display name (resolved via

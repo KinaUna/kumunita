@@ -391,6 +391,102 @@ public class ErrorReportServiceTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal(expected, actual);
     }
 
+    // ── R05 — ListMineAsync: the filer's issues (IMPROVE-UX R05 DoD c) ──────
+    //
+    // IMPROVE-UX R05 (the "My reports" D1 shape's second read seam): the
+    // filer's platform-error issues (where ErrorReport.SubjectId == the
+    // filer) are listed newest-first, each row carrying the M32 resolution
+    // fields (ResolvedAt / ResolvedBy / ResolutionNote — null until
+    // MarkResolvedAsync). A **read, not a decision** (the ListAsync / M31·4
+    // precedent) — no AccessAudit row, no visibility gate (the filer is the
+    // subject, the fields are their own).
+
+    [Fact(DisplayName = "R05_1_ListMineAsync_Returns_Filers_Issues_With_Resolution")]
+    public async Task R05_1_ListMineAsync_Returns_Filers_Issues_With_Resolution()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new ErrorReportService(store);
+        const string filer = "r05-filer";
+
+        // Seed the filer's two issues (distinct Created instants, oldest → newest)
+        // + one issue filed by ANOTHER subject (must not appear).
+        var t0 = DateTimeOffset.UtcNow.AddHours(-2);
+        var t1 = DateTimeOffset.UtcNow.AddHours(-1);
+        await using (var w = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            w.Store(new ErrorReport { Id = "r05-mine-new",  SubjectId = filer,         Description = "newest issue",  RequestId = "r-1", Created = t1, TriageStatus = "new" });
+            w.Store(new ErrorReport { Id = "r05-mine-old",  SubjectId = filer,         Description = "older issue",   RequestId = "r-0", Created = t0, TriageStatus = "new" });
+            w.Store(new ErrorReport { Id = "r05-someone-else", SubjectId = "other-sub", Description = "not this filer", RequestId = "r-2", Created = t1, TriageStatus = "new" });
+            await w.SaveChangesAsync(ct);
+        }
+
+        // Resolve the older issue (the M32 MarkResolvedAsync lane stamps the
+        // three resolution fields); leave the newer one unresolved.
+        var before = DateTimeOffset.UtcNow;
+        var resolved = await svc.MarkResolvedAsync("r05-mine-old", "u-r05-admin", "fixed — see the ADR discussion", ct);
+        var after = DateTimeOffset.UtcNow;
+        Assert.NotNull(resolved);
+        Assert.Equal("resolved", resolved.TriageStatus);
+        Assert.Equal("fixed — see the ADR discussion", resolved.ResolutionNote);
+        Assert.Equal("u-r05-admin", resolved.ResolvedBy);
+        Assert.NotNull(resolved.ResolvedAt);
+        Assert.InRange(resolved.ResolvedAt!.Value, before, after);
+
+        var listed = await svc.ListMineAsync(filer, ct);
+
+        // Only the filer's two issues (the other-subject's row is filtered
+        // out — the SubjectId filter), newest-first (Created DESC).
+        Assert.Equal(2, listed.Count);
+        Assert.Equal("r05-mine-new", listed[0].Id);
+        Assert.Equal("r05-mine-old", listed[1].Id);
+
+        // The unresolved issue carries null resolution fields (the "filed" shape).
+        var unres = listed.First(r => r.Id == "r05-mine-new");
+        Assert.Equal("new", unres.TriageStatus);
+        Assert.Null(unres.ResolvedAt);
+        Assert.Null(unres.ResolvedBy);
+        Assert.Null(unres.ResolutionNote);
+
+        // The resolved issue carries the M32 resolution shape (R05 DoD c).
+        var res = listed.First(r => r.Id == "r05-mine-old");
+        Assert.Equal("resolved", res.TriageStatus);
+        Assert.Equal("u-r05-admin", res.ResolvedBy);
+        Assert.Equal("fixed — see the ADR discussion", res.ResolutionNote);
+        Assert.NotNull(res.ResolvedAt);
+    }
+
+    // ── R05-2 — ListMineAsync: empty list when the filer has no issues ─────
+    //
+    // IMPROVE-UX R05 (the empty-list pin; the ListAsync / M31·4 empty-list
+    // precedent): a filer with no filed issues gets an empty list (not null,
+    // not a throw) — and issues filed by others do not leak in (the
+    // SubjectId filter). The read writes no AccessAudit row (M31·4).
+
+    [Fact(DisplayName = "R05_2_ListMineAsync_NoIssues_Returns_Empty")]
+    public async Task R05_2_ListMineAsync_NoIssues_Returns_Empty()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new ErrorReportService(store);
+
+        // An issue filed by someone else must not leak into this filer's list.
+        await using (var w = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            w.Store(new ErrorReport { Id = "r05-empty-other", SubjectId = "other-sub", Description = "other filer", RequestId = "r-x", Created = DateTimeOffset.UtcNow, TriageStatus = "new" });
+            await w.SaveChangesAsync(ct);
+        }
+
+        var before = await CountErrorReportAuditsAsync(store, ct);
+        var listed = await svc.ListMineAsync("r05-empty-filer", ct);
+        var after = await CountErrorReportAuditsAsync(store, ct);
+
+        Assert.NotNull(listed);
+        Assert.Empty(listed);
+        // A read, not an access decision — no AccessAudit row (M31·4).
+        Assert.Equal(before, after);
+    }
+
     // ─── Shared helpers ─────────────────────────────────────────────────────
 
     private static async Task<int> CountErrorReportAuditsAsync(IDocumentStore store, CancellationToken ct)

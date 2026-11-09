@@ -64,18 +64,30 @@ public partial class ModerationService : IModerationService
     // (the write lanes are unaffected — they never read profiles).
     private readonly IUserInfoService? _userInfo;
 
+    // IMPROVE-UX R05 — the posts read seam (the "My reports" read's post-title
+    // visibility gate: the post target's title is shown only while the
+    // reporter can still read the post, resolved via PostService.GetPostAsync).
+    // Optional so the existing positional test call sites (the Services store,
+    // BootTargetStoreAsync) keep compiling (CS1736, the _userInfo precedent);
+    // production wiring (the DI factory) passes the DI-registered instance.
+    // The read seam throws when it is absent (the other read lanes never read
+    // a post's visibility, so they are unaffected).
+    private readonly Posts.PostService? _posts;
+
     public ModerationService(
         IProfileSettingsService profileSettings,
         IAuthorizationService authz,
         IDocumentStore store,
         INotificationEmitter? notifications = null,
-        IUserInfoService? userInfo = null)
+        IUserInfoService? userInfo = null,
+        Posts.PostService? posts = null)
     {
         _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _authz    = authz    ?? throw new ArgumentNullException(nameof(authz));
         _store    = store    ?? throw new ArgumentNullException(nameof(store));
         _notifications = notifications;
         _userInfo = userInfo;
+        _posts = posts;
     }
 
     private IUserInfoService UserInfo =>
@@ -588,6 +600,95 @@ public partial class ModerationService : IModerationService
                 : (await UserInfo.GetProfileAsync(targetAuthorId).ConfigureAwait(false))?.DisplayName,
             Moderators       = moderators,
         };
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<MyReportRow>> ListMyReportsAsync(
+        string reporterId,
+        CancellationToken ct = default)
+    {
+        // SEC-READ: the reporter's own reports (a read, not a decision — the
+        // GetQueueAsync / GetDetailAsync precedent: no IAuthorizationService
+        // call, no AccessAudit row; the report is the reporter's own, the read
+        // is a list, not a scoped-read gate).
+        if (string.IsNullOrEmpty(reporterId))
+            throw new ArgumentException("A reporter id is required.", nameof(reporterId));
+        if (_posts is null)
+            throw new InvalidOperationException(
+                "The posts read seam (Posts.PostService) is not wired — the " +
+                "ModerationService ListMyReportsAsync read seam (IMPROVE-UX R05) requires it.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var reports = await session
+            .Query<Report>()
+            .Where(r => r.ReporterId == reporterId)
+            .OrderByDescending(r => r.At)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var rows = new List<MyReportRow>(reports.Count);
+        foreach (var r in reports)
+        {
+            string? targetKind = r.TargetKind;
+            string? targetTitle = null;
+
+            if (targetKind is not null && r.TargetId is not null)
+            {
+                // The other target kinds (ADR 0173) — resolved directly (the
+                // GetDetailAsync target switch); their visibility rules are out
+                // of scope for R05 (the plan is posts-first, A02).
+                string? title = null;
+                switch (targetKind)
+                {
+                    case "event":
+                        title = (await session.LoadAsync<Kumunita.Core.Events.Event>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                    case "project":
+                        title = (await session.LoadAsync<Project>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                    case "board":
+                        title = (await session.LoadAsync<KanbanBoard>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                    case "todo":
+                        title = (await session.LoadAsync<TodoItem>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                    case "grouppost":
+                        title = (await session.LoadAsync<Post>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                }
+                targetTitle = title;
+            }
+            else
+            {
+                // The original M3b shape (a post target): the title is gated on
+                // the reporter's visibility — a null Post in the
+                // PostDetailResult (denied / hidden / removed / deleted) means
+                // the reporter can no longer read it → no title (the R05 DoD
+                // "target no longer visible → no title" pin).
+                if (r.PostId.Length > 0)
+                {
+                    var detail = await _posts.GetPostAsync(r.PostId, reporterId).ConfigureAwait(false);
+                    targetTitle = detail.Post?.Title;
+                }
+            }
+
+            rows.Add(new MyReportRow
+            {
+                ReportId        = r.Id,
+                PostId          = r.PostId,
+                ComponentId     = r.ComponentId,
+                Reason          = r.Reason,
+                Status          = r.Status ?? "filed",
+                At              = r.At,
+                TargetKind      = targetKind,
+                TargetTitle     = targetTitle,
+                Outcome         = r.Outcome,
+                ResolutionNote  = r.ResolutionNote,
+                ResolvedAt      = r.ResolvedAt,
+                ResolvedBy      = r.ResolvedBy,
+            });
+        }
+        return rows;
     }
 
     /// <inheritdoc />

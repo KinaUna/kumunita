@@ -35,6 +35,28 @@ public interface IErrorReportService
     /// </summary>
     Task<IReadOnlyList<ErrorReport>> ListAsync(int maxCount = 100, CancellationToken ct = default);
 
+    /// <summary>
+    /// Newest-first listing of the filer's platform-error issues (IMPROVE-UX
+    /// R05 — the "My reports" D1 shape's second read seam, the
+    /// <c>Issue</c> section): the <see cref="ErrorReport"/> rows where
+    /// <see cref="ErrorReport.SubjectId"/> == <paramref name="subjectId"/>,
+    /// ordered by <c>Created</c> desc, each row carrying
+    /// <see cref="ErrorReport.Id"/> / <see cref="ErrorReport.TriageStatus"/>
+    /// / <see cref="ErrorReport.Description"/> / <see cref="ErrorReport.Created"/>
+    /// / <see cref="ErrorReport.Origin"/> + the M32 resolution fields
+    /// (<see cref="ErrorReport.ResolvedAt"/> /
+    /// <see cref="ErrorReport.ResolvedBy"/> /
+    /// <see cref="ErrorReport.ResolutionNote"/> — all <c>null</c> until the
+    /// <c>MarkResolvedAsync</c> lane writes them). A **read, not a decision**
+    /// (the <c>ListAsync</c> / M31·4 precedent) — the filer is the subject,
+    /// the fields are their own, so no <see cref="IAuthorizationService"/>
+    /// call, no <c>AccessAudit</c> row, and no visibility gate (the subject
+    /// is the owner). Returns the raw <see cref="ErrorReport"/> documents (they
+    /// already carry every field; no read-model record). Returns an empty list
+    /// when the filer has no issues.
+    /// </summary>
+    Task<IReadOnlyList<ErrorReport>> ListMineAsync(string subjectId, CancellationToken ct = default);
+
     // ── M32 additive seam (ADR 0155, M32·8) ───────────────────────────────
 
     /// <summary>
