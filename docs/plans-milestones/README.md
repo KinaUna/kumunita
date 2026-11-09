@@ -39,6 +39,10 @@ to live here are in
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
 
+## Current in-progress lane
+
+**IMPROVE-UX** is underway in [`in-progress/plan-improve-ux.md`](in-progress/plan-improve-ux.md); R01 (the status page) has shipped — begin its next unit with the [R02 prompt](in-progress/r02-prompt.md).
+
 **Latest lane: `CODE-HYGIENE`** — the code-hygiene lane (units `U00`–`U14`,
 proposed 2026-11-06) **shipped and closed on 2026-11-09** — the close unit
 `CH14` verified the six close criteria green and moved the register, the
