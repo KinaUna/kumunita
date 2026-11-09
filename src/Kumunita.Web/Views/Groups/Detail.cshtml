@@ -413,7 +413,7 @@
                tab's view-locals are threaded via Model; activeTab via
                ViewData["ActiveTab"]). *@
             @{ ViewData["ActiveTab"] = activeTab; }
-            @{ var _gmModel = new Kumunita.Web.Models.GroupMembersModel(Model, canManage, subject, filterNamePlaceholder, addHref); }
+            @{ var _gmModel = new Kumunita.Web.Models.GroupMembersModel(Model, canManage, subject, filterNamePlaceholder, addHref!); }
             <partial name="_GroupMembers" model="_gmModel" />
 
             @* ── Settings (About + Privacy + Translations; canManage only) ──── *@

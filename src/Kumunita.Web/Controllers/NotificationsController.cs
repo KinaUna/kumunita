@@ -105,8 +105,8 @@ public sealed class NotificationsController(
 
                 try
                 {
-                    var detail = await todos.GetTodoAsync(row.SourceId, actorId);
-                    var linkedBoards = await boards.ListBoardsForTodoAsync(row.SourceId, actorId);
+                    var detail = await todos!.GetTodoAsync(row.SourceId, actorId);
+                    var linkedBoards = await boards!.ListBoardsForTodoAsync(row.SourceId, actorId);
                     todoCards[row.SourceId] = new TodoCard(detail.Todo, linkedBoards, detail.Subtasks);
                 }
                 catch (Exception ex) when (

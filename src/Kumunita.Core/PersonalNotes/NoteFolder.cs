@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.PersonalNotes;
 
 /// <summary>
@@ -16,6 +18,8 @@ namespace Kumunita.Core.PersonalNotes;
 /// <c>ParentId</c> of <c>null</c> is the root of the owner's tree.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A; the E6 gap this lane closes (IS31)")]
 public sealed class NoteFolder
 {
     /// <summary>Surrogate document identity (Marten's default <c>string</c>

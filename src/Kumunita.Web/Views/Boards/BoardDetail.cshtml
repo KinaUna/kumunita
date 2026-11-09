@@ -70,13 +70,11 @@
     // text next to the fallback circle (C3 — the view renders what the
     // service stored). The <c>title</c> attr + a <kw-l> text sibling keep
     // the icon accessible / screen-reader-legible.
-    // U06 — the status glyph / label-key mapping is now the shared
+    // U06 — the status glyph / label-key mapping is the shared
     // BoardCardStatuses helper (Views/Shared/BoardCardStatuses.cs), shared
     // with the _BoardCard partial (one definition, not two drifting copies —
-    // the "silent coupling" the IMPROVE lane closes). Byte-identical to the
-    // prior inline copies (the served-page diff is the evidence).
-    static string StatusGlyph(string? status) => BoardCardStatuses.StatusGlyph(status);
-    static string StatusLabelKey(string? status) => BoardCardStatuses.StatusLabelKey(status);
+    // the "silent coupling" the IMPROVE lane closes). The prior inline local
+    // function copies here were removed (CS8321 — declared but never used).
     // ADR 0082 — the LangName helper: resolve a language code to its native
     // name from Model.Languages (the ADR 0082 idiom; the fallback is the raw
     // code). Used by the ⋮ dropdown's translation add / edit / remove items.

@@ -123,7 +123,7 @@ public class C03_NotificationEmitterContractTests
         // notification:message.new:{messageId} shape.
         var call = emitter.ReceivedCalls()
             .First(c => c.GetMethodInfo().Name == nameof(INotificationEmitter.EmitAsync));
-        var key = (string)call.GetArguments()[3];
+        var key = (string)call.GetArguments()[3]!;
         Assert.StartsWith($"notification:{NotificationKinds.MessageNew}:", key, StringComparison.Ordinal);
     }
 }

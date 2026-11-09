@@ -11,7 +11,7 @@
 @{
     ViewData["Title"] = $"Admin — {Model.Account.DisplayName ?? Model.Account.Email ?? Model.Account.SubjectId}";
     var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
-    string ariaBreadcrumb = await Translation.GetAsync("a11y.breadcrumb", effLang);
+    string ariaBreadcrumb = Translation is null ? "Breadcrumb" : await Translation.GetAsync("a11y.breadcrumb", effLang);
 }
 
 <nav aria-label="@ariaBreadcrumb">

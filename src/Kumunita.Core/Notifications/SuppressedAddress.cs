@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Notifications;
 
 /// <summary>
@@ -14,6 +16,8 @@ namespace Kumunita.Core.Notifications;
 /// <see cref="Created"/> / <see cref="Source"/> with the latest values
 /// (last-write-wins on a same-Id document; pin §3.4).
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Delete, ExportScope.Never,
+    reason: "the resident opted out of notifications; the row is theirs; D2: declared on the type")]
 public sealed class SuppressedAddress
 {
     public string Id { get; set; } = string.Empty;          // the lowercased recipient e-mail — the document identity (pin §1)

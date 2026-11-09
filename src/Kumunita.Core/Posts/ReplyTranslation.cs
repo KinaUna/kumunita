@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Posts;
 
 /// <summary>
@@ -26,6 +28,8 @@ namespace Kumunita.Core.Posts;
 /// analog; re-adding a language is a follow-up).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A; ADR 0022")]
 public sealed class ReplyTranslation
 {
     public string Id { get; set; } = string.Empty;

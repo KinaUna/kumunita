@@ -74,7 +74,7 @@ public sealed class BoardLaneService : ProjectsStore, IBoardLaneService
 
         var board = await session.LoadAsync<KanbanBoard>(lane.BoardId, ct).ConfigureAwait(false);
         if (board is null)
-            throw new KeyNotFoundException($"The board '{board.Id}' for lane '{laneId}' was not found in the session; nothing to update.");
+            throw new KeyNotFoundException($"The board '{lane.BoardId}' for lane '{laneId}' was not found in the session; nothing to update.");
 
         // Standing re-check (server-side, C3 single-source) over the **board**
         // (C-M5·6): creator ∪ GlobalAdmin — the assignee branch does not apply
@@ -128,7 +128,7 @@ public sealed class BoardLaneService : ProjectsStore, IBoardLaneService
 
         var board = await session.LoadAsync<KanbanBoard>(lane.BoardId, ct).ConfigureAwait(false);
         if (board is null)
-            throw new KeyNotFoundException($"The board '{board.Id}' for lane '{laneId}' was not found in the session; nothing to move.");
+            throw new KeyNotFoundException($"The board '{lane.BoardId}' for lane '{laneId}' was not found in the session; nothing to move.");
 
         // Standing re-check (server-side, C3 single-source) over the **board**
         // (C-M5·6): creator ∪ GlobalAdmin — the assignee branch does not apply

@@ -31,6 +31,7 @@ public partial class PostService
     /// </summary>
     public async Task<Post?> FindPostByImageIdAsync(string mediaId)
     {
+        // SEC-READ: caller-gated by ContentImageController.Image (PostReadDecision.ResolveAsync, one Read decision for the owner it resolves)
         if (string.IsNullOrEmpty(mediaId))
             throw new ArgumentException("A media id is required.", nameof(mediaId));
 
@@ -52,6 +53,7 @@ public partial class PostService
     /// </summary>
     public async Task<PostReply?> FindReplyByImageIdAsync(string mediaId)
     {
+        // SEC-READ: caller-gated by ContentImageController.Image (PostReadDecision.ResolveAsync against the parent post, C-M3·1)
         if (string.IsNullOrEmpty(mediaId))
             throw new ArgumentException("A media id is required.", nameof(mediaId));
 
@@ -76,6 +78,7 @@ public partial class PostService
     /// </summary>
     public async Task<Post?> FindPostByAttachmentIdAsync(string mediaId)
     {
+        // SEC-READ: caller-gated by AttachmentController.Download (PostReadDecision.ResolveAsync, one Read decision for the owner it resolves)
         if (string.IsNullOrEmpty(mediaId))
             throw new ArgumentException("A media id is required.", nameof(mediaId));
 
@@ -97,6 +100,7 @@ public partial class PostService
     /// </summary>
     public async Task<PostReply?> FindReplyByAttachmentIdAsync(string mediaId)
     {
+        // SEC-READ: caller-gated by AttachmentController.Download (PostReadDecision.ResolveAsync against the parent post, C-M3·1)
         if (string.IsNullOrEmpty(mediaId))
             throw new ArgumentException("A media id is required.", nameof(mediaId));
 

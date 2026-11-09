@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Notifications;
 
 /// <summary>
@@ -7,6 +9,9 @@ namespace Kumunita.Core.Notifications;
 /// adapter, no audit row on read). The inbox is the **durable** record
 /// (D5); the email is the best-effort nudge staged alongside it.
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): received per-resident state, not authored (IS22); D6: read 90 days, unread 365 days",
+    retentionKey: "NotificationUnreadDays")]
 public sealed class Notification
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)

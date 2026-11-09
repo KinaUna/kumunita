@@ -12,6 +12,7 @@
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
+    var _tagsPagesExample = Translation is null ? "e.g. recipes, tips" : await Translation.GetAsync("tags.pages_example", _kwL);
     // ADR 0125 (U03) — the owner-only edit form. The audience editor is
     // pre-filled from the stored Document.Audience (ADR 0036 single source,
     // AudienceEditorModel.FromAudience — the controller did that on GET); the
@@ -180,7 +181,7 @@
                         <label class="form-label" for="folder" style="font-weight:600;">
                             <kw-l key="documents.folder">Folder</kw-l>
                         </label>
-                        <select class="form-control" id="folder" name="FolderId">
+                        <select class="form-control" id="folder" name="FolderId" data-document-folder-picker>
                             <option value=""><kw-l key="documents.folder_unfiled">Unfiled</kw-l></option>
                         </select>
                         <div class="text-muted small mt-1">
@@ -209,7 +210,7 @@
                                data-tag-suggest
                                data-tag-suggest-initial='@System.Text.Json.JsonSerializer.Serialize(Model?.ExistingTagSlugs ?? [])'
                                maxlength="64"
-                               placeholder="@await Translation.GetAsync("tags.pages_example", _kwL)" />
+                               placeholder="@_tagsPagesExample" />
                         <div class="text-muted small mt-1">
                             <kw-l key="documents.tags_hint">Type to search existing tags, or start a new one.</kw-l>
                         </div>
@@ -236,30 +237,9 @@
     <script type="module" src="~/js/lib/tag-suggest.js"></script>
 
     @* The folder picker — a small client-side script that fetches the
-       folder tree from /documents/folders and populates the <select>
-       (the PostController / PageController "seed the picker" idiom — the
-       folder tree is dynamic, so a server-rendered <select> would be
-       stale). The folder picker is a plain HTML <select> (the
-       PostController's <select> shape — the ADR 0039 Pages "folder" is a
-       pure organizational aid, not a navigation tree). *@
-    <script type="module">
-        (async () => {
-            const select = document.getElementById('folder');
-            if (!select) return;
-            const current = select.value;
-            try {
-                const res = await fetch('/documents/folders', { credentials: 'same-origin' });
-                if (!res.ok) return;
-                const { folders } = await res.json();
-                for (const f of folders) {
-                    const opt = document.createElement('option');
-                    opt.value = f.Id;
-                    const depth = f.ParentId ? '  ' : '';
-                    opt.textContent = depth + f.Name;
-                    select.appendChild(opt);
-                }
-                select.value = current;
-            } catch { /* leave the "Unfiled" option only */ }
-        })();
-    </script>
+       folder tree (the PostController / PageController "seed the picker"
+       idiom — the tree is dynamic). IS38c / E14: the picker now lives in the
+       tsc-built document-folder-picker.ts module (data-document-folder-picker
+       on the <select> above); the inline <script> it replaced was silently
+       blocked by script-src 'self'. *@
 }

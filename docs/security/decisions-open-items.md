@@ -13,7 +13,7 @@ related:
   - docs/adr/0018-ugc-authored-in-language-tag.md
   - docs/adr/0050-admin-managed-signup-gate-open-or-invitation-only.md
   - docs/adr/0172-password-hash-posture-pbkdf2-identity-default.md
-updated: 2026-11-02
+updated: 2026-11-07
 ---
 
 > **Abstract:** the *decided* controls — supply-chain pinning, rate limiting,
@@ -159,6 +159,23 @@ sent to it** — translation is per-item, user-initiated, and always labeled
 metadata field (for future search and reader-added language versions), carries
 no content to a third party, and changes none of this posture.
 
+**Verify-lane link credential (decided 2026-10-31; owner decision U23, protects A3):**
+the email-verification / reset link's credential is the `IdentityToken` **row
+`Id`** — the row itself is the credential (single-use, TTL-bounded), so the
+verify lane needs **no separate at-rest token hash**. This supersedes the
+historical "tokens hashed at rest" phrasing for the *verify* lane
+([`WhatsNew.cs`](../../src/Kumunita.Web/WhatsNew.cs) 0.68.0, F2;
+[`STATUS.md`](../STATUS.md) — both historical, not rewritten here); the F2
+SHA-256-hex write applies to the **setup** mint, which is a different lane.
+
+**Retention policy (decided 2026-11-06; owner D6 "Moderate", protects A3/A6):**
+the previously unbounded types now carry a retention key with a day-count
+default in [`RetentionOptions`](../../src/Kumunita.Core/Privacy/RetentionOptions.cs)
+(keys `Retention__*`; `0` = keep): sessions 30 d, outbox body nulled 7 d (row
+90 d), dead letters 30 d, notifications read 90 / unread 365, resolved error
+reports 180 d, consumed/expired tokens 7 d. One `RetentionTick` enforces them
+(IS33 / IS34a / IS35).
+
 ### Open items (decide before shipping the surface they protect)
 
 <a id="open-items"></a>
@@ -172,8 +189,9 @@ register and its per-finding test rows are in [the audit log](audit-log.md).
 
 | Item | Protects | Decision needed |
 |------|----------|-----------------|
-| Log hygiene: sanitize user-supplied strings (newlines/CR) before logging so logs can't be forged — **still open (SEC L8c, parked 2026-10-31, no owner decision; the open-ended scope is why it parked)** | A3 (log integrity) | M1 — undecided |
-| Named invariant tests (empty-audience-denies, delegation action-scope) referenced from [`ARCHITECTURE.md`](../ARCHITECTURE.md) §4.4 | A3 | M1 |
+| Log hygiene — **PII half (closed):** no PII in log templates and nothing below Warning reaches a third party — **decided and closed by [IS08](../plans-milestones/plan-improve-sec.md)** (`LogTemplatePiiGateTests.NoLogTemplate_CarriesAPiiPlaceholder` gate + the [IS05](../plans-milestones/plan-improve-sec.md) `MinimumBreadcrumbLevel = Warning` floor) | A3 (PII in logs) | **Closed** — IM-SEC IS08 (2026-11-07) |
+| Log hygiene — **log-forging half (still open):** sanitize user-supplied strings (newlines/CR) before logging so logs can't be forged — **SEC L8c, parked 2026-10-31, no owner decision (the open-ended scope is why it parked)** | A3 (log integrity) | **Still open** — L8c, no owner decision |
+| Named invariant tests (empty-audience-denies, delegation action-scope) referenced from [`ARCHITECTURE.md`](../ARCHITECTURE.md) §4.4 | A3 | **Closed** — both tests exist and are pinned by the IS04 deny-matrix gate: `EvaluateAudience_EmptyAudience_AllMode_Denies` and `C2_Delegate_OutOfScope_Denies_WithDelegationViaRecorded` ([`AccessViaDenyMatrixTests.EmptyAudienceDenies_AndDelegationScope_ArePinned`](../../tests/Kumunita.Web.Tests/SecGate/AccessViaDenyMatrixTests.cs), IM-SEC [IS04](../plans-milestones/plan-improve-sec.md)) |
 | **Sign-up gate ([ADR 0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)) + the invitation mechanism it closes to.** The gate is landed: a GlobalAdmin flips the instance open / invitation-only (`/admin/signup`; `LocaleSettings.IsSignupOpen`, `false` floor as amended 2026-10-05 — a fresh instance ships **invitation-only** so the admin can set up the platform first), and when closed the `/account/signup` write lane and the nav/login sign-up affordances are authoritative — new self-service accounts are refused (existing residents unaffected). That is the control that answers A2 better than rate-limiting alone. **Still open:** the *invitation mechanism* a closed instance closes the door *to* — an invited resident self-serves their password from an admin-sent link rather than registering (token lifecycle, expiry, admin UX). Decide it before the community is open to residents beyond the development team. | A2 (signup bots) | Gate: landed ([ADR 0050](../adr/0050-admin-managed-signup-gate-open-or-invitation-only.md)); invitation mechanism: before wider rollout |
 
 Decisions taken here should link back into [`hardening-checklist`](../ops/hardening-checklist.md) (checklist) and, where they

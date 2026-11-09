@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.GroupMessaging;
 
 /// <summary>
@@ -25,6 +27,8 @@ namespace Kumunita.Core.GroupMessaging;
 /// thread until they accept.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Keep, ExportScope.Resident,
+    reason: "D3: group threads stay for the other participants (IS21)")]
 public sealed class GroupConversation
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)

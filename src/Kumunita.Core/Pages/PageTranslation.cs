@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Pages;
 
 /// <summary>
@@ -38,6 +40,8 @@ namespace Kumunita.Core.Pages;
 /// yet have."
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A; the E6 gap this lane closes (IS31)")]
 public sealed class PageTranslation
 {
     public string Id { get; set; } = string.Empty;

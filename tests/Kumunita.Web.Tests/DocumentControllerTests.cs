@@ -886,7 +886,7 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var store = Substitute.For<IDocumentStore>();
         var read = Substitute.For<IQuerySession>();
-        read.LoadAsync<Document>(DocId).Returns(doc);
+        read.LoadAsync<Document>(DocId, Arg.Any<CancellationToken>()).Returns(doc);
         store.QuerySession().Returns(read);
 
         var authz = Substitute.For<IAuthorizationService>();
@@ -973,10 +973,10 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var store = Substitute.For<IDocumentStore>();
         var read = Substitute.For<IQuerySession>();
-        read.LoadAsync<Document>(DocId).Returns(doc);
+        read.LoadAsync<Document>(DocId, Arg.Any<CancellationToken>()).Returns(doc);
         store.QuerySession().Returns(read);
         var write = Substitute.For<IDocumentSession>();
-        write.LoadAsync<Document>(DocId).Returns(doc);
+        write.LoadAsync<Document>(DocId, Arg.Any<CancellationToken>()).Returns(doc);
         store.LightweightSession().Returns(write);
 
         var authz = Substitute.For<IAuthorizationService>();
@@ -1012,11 +1012,11 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
 
         var store = Substitute.For<IDocumentStore>();
         var read = Substitute.For<IQuerySession>();
-        read.LoadAsync<Document>(DocId).Returns(doc);
+        read.LoadAsync<Document>(DocId, Arg.Any<CancellationToken>()).Returns(doc);
         store.QuerySession().Returns(read);
 
         var write = Substitute.For<IDocumentSession>();
-        write.LoadAsync<Document>(DocId).Returns(doc);
+        write.LoadAsync<Document>(DocId, Arg.Any<CancellationToken>()).Returns(doc);
         store.LightweightSession().Returns(write);
 
         var authz = Substitute.For<IAuthorizationService>();

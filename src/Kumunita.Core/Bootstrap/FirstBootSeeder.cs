@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Logging;
 using Kumunita.Core.Pages;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -227,7 +228,7 @@ public static class FirstBootSeeder
         // the outer IsPristineAsync gate normally blocks this). Either way, skip.
         if (await userManager.FindByEmailAsync(email) is not null)
         {
-            logger.LogInformation("First boot: seed admin '{Email}' already exists; skipping the seed lane (idempotent).", email);
+            logger.LogInformation("First boot: seed admin '{EmailDomain}' already exists; skipping the seed lane (idempotent).", LogRedact.EmailDomain(email));
             return;
         }
 
@@ -292,8 +293,8 @@ public static class FirstBootSeeder
             ct: ct);
         await session.SaveChangesAsync();
 
-        logger.LogInformation("First boot: seeded GlobalAdmin '{Email}' (userId {UserId}); setup token staged to outbox.",
-            email, user.Id);
+        logger.LogInformation("First boot: seeded GlobalAdmin '{EmailDomain}' (userId {UserId}); setup token staged to outbox.",
+            LogRedact.EmailDomain(email), user.Id);
     }
     /// <summary>
     /// Step 4 — the language-catalog rows + the instance default (ADR 0005 B:

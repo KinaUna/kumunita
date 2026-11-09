@@ -7,15 +7,23 @@ namespace Kumunita.Core.Identity;
 /// <see cref="IdentityService"/>, extracted along the F1 (DB-13 GDPR) §2A
 /// "residential content" closed-list seam the method already comments: the one
 /// place the §2A set (posts, announcements, events, projects, pages, inventory,
-/// documents, bookmarks, tags, conversations, personal notes, and the
+/// documents, bookmarks, tags, personal notes, and the
 /// <c>MediaObject</c> catalog) is queried-by-owner and deleted in a single
-/// Marten session.
+/// Marten session, and the resident's <b>messaging threads are
+/// pseudonymized</b> (D3, IS21) rather than deleted — the 1:1 / group
+/// <c>Conversation</c> + <c>Message</c> + <c>GroupConversation</c> +
+/// <c>GroupMessage</c> + <c>GroupMessagingInvitation</c> set routes through
+/// <see cref="ResidentThreadPseudonymizer"/> (the resident's seats and sent
+/// messages are tombstoned, the rows stay for the other participants).
 /// <para>
-/// <b>Behaviour is unchanged:</b> the same §2A doc set (only the resident's
+/// <b>Behaviour:</b> the same §2A doc set (only the resident's
 /// own rows, owner field == <paramref name="residentSubjectId"/>), the same
 /// <see cref="Kumunita.Core.Projects.KanbanBoard"/> cascade (placements + lanes
 /// first, then the board — the <c>ProjectService.DeleteBoardAsync</c> shape),
-/// and the same <c>MediaObject</c> catalog read. Only the <b>byte</b> delete
+/// and the same <c>MediaObject</c> catalog read. The one deliberate exception
+/// is the messaging set — D3 (IMPROVE-SEC IS21) changed it from *delete the
+/// conversation* to *pseudonymize the thread* (see
+/// <see cref="ResidentThreadPseudonymizer"/>). Only the <b>byte</b> delete
 /// is the composer's (it runs after the commit, the §5 ordering pin).
 /// </para>
 /// <para>
@@ -35,6 +43,50 @@ namespace Kumunita.Core.Identity;
 /// </summary>
 public static class ResidentContentEraser
 {
+    /// <summary>
+    /// IS24 (S2/E2 gate) — the closed set of doc types <see cref="EraseAsync"/>
+    /// touches, one <c>typeof(T)</c> per query block in the same order, so the
+    /// set and the queries sit side by side (the part-vs-whole "one fact in one
+    /// place" contract). The <c>[DataClass]</c> rows (IS17–IS20, 81/81) are the
+    /// spec; this set is the execution; <c>SecGate.DataClassCoverageTests</c>
+    /// (the IS24 gate) asserts the agreement, so the next doc type that is
+    /// annotated <c>Delete</c>/<c>Pseudonymize</c> but not listed here — or
+    /// listed here but annotated <c>Keep</c> — fails the build.
+    /// </summary>
+    public static IReadOnlySet<Type> HandledTypes { get; } = new HashSet<Type>
+    {
+        typeof(Kumunita.Core.Posts.Post),                // IS21 — §2A primary set
+        typeof(Kumunita.Core.Posts.PostReply),           // IS21
+        typeof(Kumunita.Core.Posts.PostTranslation),     // IS21
+        typeof(Kumunita.Core.Posts.ReplyTranslation),    // IS21
+        typeof(Kumunita.Core.Announcements.Announcement),          // IS21
+        typeof(Kumunita.Core.Announcements.AnnouncementTranslation), // IS21
+        typeof(Kumunita.Core.Announcements.AnnouncementComment),    // IS21
+        typeof(Kumunita.Core.Events.Event),              // IS21
+        typeof(Kumunita.Core.Events.EventTranslation),   // IS21
+        typeof(Kumunita.Core.Events.EventRsvp),          // IS21
+        typeof(Kumunita.Core.Projects.Project),          // IS21
+        typeof(Kumunita.Core.Projects.ProjectGoal),      // IS21
+        typeof(Kumunita.Core.Projects.TodoItem),         // IS21
+        typeof(Kumunita.Core.Projects.TodoComment),      // IS21
+        typeof(Kumunita.Core.Projects.TodoTranslation),  // IS21
+        typeof(Kumunita.Core.Projects.BoardTranslation), // IS21
+        typeof(Kumunita.Core.Projects.ProjectTranslation), // IS21
+        typeof(Kumunita.Core.Projects.KanbanBoard),      // IS21 — cascade set (placements + lanes travel with it)
+        typeof(Kumunita.Core.Pages.Page),                // IS21
+        typeof(Kumunita.Core.Pages.PageTranslation),     // IS21
+        typeof(Kumunita.Core.Inventory.InventoryItem),   // IS21
+        typeof(Kumunita.Core.Documents.Document),        // IS21
+        typeof(Kumunita.Core.Documents.DocumentFolder),  // IS21
+        typeof(Kumunita.Core.Bookmarks.Bookmark),        // IS21
+        typeof(Kumunita.Core.Bookmarks.BookmarkFolder),  // IS21
+        typeof(Kumunita.Core.Tags.Tag),                  // IS21
+        typeof(Kumunita.Core.Tags.TagTranslation),       // IS21
+        typeof(Kumunita.Core.Media.MediaObject),         // IS21 — F1.U4 catalog rows (bytes are the composer's, §5)
+        typeof(Kumunita.Core.PersonalNotes.PersonalNote),    // IS21
+        typeof(Kumunita.Core.PersonalNotes.NoteFolder),      // IS21
+    };
+
     /// <summary>
     /// Deletes the resident's §2A residential content docs (and the
     /// <c>MediaObject</c> catalog rows) in the caller's <paramref
@@ -109,10 +161,19 @@ public static class ResidentContentEraser
         contentDocs += await DeleteResidentRows<Kumunita.Core.Bookmarks.BookmarkFolder>(b => b.OwnerId == residentSubjectId);
         contentDocs += await DeleteResidentRows<Kumunita.Core.Tags.Tag>(t => t.CreatedBy == residentSubjectId);
         contentDocs += await DeleteResidentRows<Kumunita.Core.Tags.TagTranslation>(t => t.AuthorId == residentSubjectId);
-        // Conversation — the two-principal union (the resident holds a seat).
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Messaging.Conversation>(
-            c => c.ParticipantA == residentSubjectId || c.ParticipantB == residentSubjectId);
-        contentDocs += await DeleteResidentRows<Kumunita.Core.Messaging.Message>(m => m.SenderId == residentSubjectId);
+        // Conversation / Message / group threads — D3 (IMPROVE-SEC IS21):
+        // pseudonymize, don't delete. The F1-era *delete* of the resident's
+        // 1:1 Conversation + Message rows (which also destroyed the other
+        // party's copy) is replaced by the D3 rule in
+        // <see cref="ResidentThreadPseudonymizer"/>: the resident's message
+        // bodies are erased and their sender becomes the tombstone, their
+        // conversation seat is tombstoned, they leave the group thread, and
+        // their pending invites are dropped — the rows STAY so the other
+        // participants' threads remain coherent. The group types are the
+        // pseudonymizer's alone (one fact lives in one place; IS24's
+        // HandledTypes gate depends on this split).
+        contentDocs += await ResidentThreadPseudonymizer.PseudonymizeAsync(
+            session, residentSubjectId, null, ct).ConfigureAwait(false);
         contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.PersonalNote>(n => n.OwnerId == residentSubjectId);
         contentDocs += await DeleteResidentRows<Kumunita.Core.PersonalNotes.NoteFolder>(n => n.OwnerId == residentSubjectId);
 

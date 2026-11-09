@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Usage;
 
 /// <summary>
@@ -23,6 +25,8 @@ namespace Kumunita.Core.Usage;
 /// instance** (M33·6).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Keep, ExportScope.Never,
+    reason: "a sample of platform storage; no resident principal")]
 public sealed class StorageMetricsSample
 {
     /// <summary>The deterministic <c>"smh-" + yyyy-MM-dd</c> id (M33·2).</summary>

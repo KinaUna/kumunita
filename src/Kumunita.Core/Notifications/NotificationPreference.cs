@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Notifications;
 
 /// <summary>
@@ -8,6 +10,8 @@ namespace Kumunita.Core.Notifications;
 /// <c>KanbanLane.MaxItems?</c> nullable precedent). The preference governs the
 /// **email** nudge, never the inbox row (D7).
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): the resident's own preference (IS22)")]
 public sealed class NotificationPreference
 {
     public string RecipientId { get; set; } = string.Empty;    // the document id — one preference row per recipient (Marten identity)

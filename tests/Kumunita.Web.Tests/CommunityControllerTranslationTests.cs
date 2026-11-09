@@ -286,8 +286,8 @@ public class CommunityControllerTranslationTests
 
     private static CommunityController Build(
         IUserInfoService userInfo,
-        ICommunityMembershipService community = null,
-        IProfileSettingsService profileSettings = null,
+        ICommunityMembershipService community = null!,
+        IProfileSettingsService profileSettings = null!,
         string[]? roles = null,
         bool IsAuthenticated = false,
         string? subjectId = null)

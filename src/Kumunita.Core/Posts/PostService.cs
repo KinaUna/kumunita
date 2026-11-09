@@ -107,12 +107,12 @@ public partial class PostService
             Create = (id, lang, title, body, actor, created) => new PostTranslation
             {
                 Id = Guid.NewGuid().ToString("N"), PostId = id, LanguageCode = lang,
-                Title = title, Body = body, AuthorId = actor, Created = created,
+                Title = title, Body = body!, AuthorId = actor, Created = created,
             },
             ApplyUpdate = (row, title, body, _, _) =>
             {
                 row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-                row.Body = body;
+                row.Body = body!;
             },
         });
 
@@ -140,9 +140,9 @@ public partial class PostService
             Find = (session, id, lang) => session.Query<ReplyTranslation>().Where(t => t.ReplyId == id && t.LanguageCode == lang).FirstOrDefaultAsync(),
             Create = (id, lang, _, body, actor, created) => new ReplyTranslation
             {
-                Id = Guid.NewGuid().ToString("N"), ReplyId = id, Body = body, AuthorId = actor, Created = created,
+                Id = Guid.NewGuid().ToString("N"), ReplyId = id, Body = body!, AuthorId = actor, Created = created,
             },
-            ApplyUpdate = (row, _, body, _, _) => { row.Body = body; },
+            ApplyUpdate = (row, _, body, _, _) => { row.Body = body!; },
         });
     }
 
@@ -446,6 +446,7 @@ public partial class PostService
     public async Task<Post> CreatePostAsync(PostDraft draft, string actorId,
         IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
+        // SEC-READ: owner-only — posting-right gate reads the actor's own effective community set (GetEffectiveCommunityIdsAsync); the write is the actor's own post
         ArgumentNullException.ThrowIfNull(draft);
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An authoring actor is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(actorRoles);
@@ -700,6 +701,7 @@ public partial class PostService
         // silently preserving them.
         IReadOnlyList<string>? tagSlugs = null)
     {
+        // SEC-READ: owner-only — author-only edit lane (ADR 0014; the load is followed by post.AuthorId == actorId, non-author throws)
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(audience);
@@ -807,6 +809,7 @@ public partial class PostService
     /// </summary>
     public async Task<PostReply> CreateReplyAsync(string postId, string actorId, string body, IDocumentSession session, string? languageCode = null, IReadOnlyList<string>? attachmentIds = null)
     {
+        // SEC-READ: no disclosure — the parent-post load is to route the reply-mention notification to the parent author (internal routing, not a read surface)
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A parent post id is required.", nameof(postId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("A reply author is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(session);
@@ -980,6 +983,7 @@ public partial class PostService
         IDocumentSession session,
         IReadOnlyList<string>? attachmentIds = null)
     {
+        // SEC-READ: owner-only — author-only reply-edit lane (ADR 0016; the load is followed by reply.AuthorId == actorId, non-author throws)
         if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(session);
@@ -1042,6 +1046,7 @@ public partial class PostService
     /// <exception cref="UnauthorizedAccessException">The actor is not the post's author.</exception>
     public async Task<Post> DeletePostAsync(string postId, string actorId, IDocumentSession session)
     {
+        // SEC-READ: owner-only — author-only soft-delete lane (ADR 0024; the load is followed by post.AuthorId == actorId, non-author throws)
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(session);
@@ -1084,6 +1089,7 @@ public partial class PostService
     /// <exception cref="UnauthorizedAccessException">The actor is not the reply's author.</exception>
     public async Task<PostReply> DeleteReplyAsync(string replyId, string actorId, IDocumentSession session)
     {
+        // SEC-READ: owner-only — author-only reply-soft-delete lane (ADR 0024; the load is followed by reply.AuthorId == actorId, non-author throws)
         if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(session);
@@ -1139,6 +1145,7 @@ public partial class PostService
     /// <exception cref="UnauthorizedAccessException">The actor is not the post's author.</exception>
     public async Task<Post> PublishPostAsync(string postId, string actorId, IDocumentSession session)
     {
+        // SEC-READ: owner-only — author-only draft publish lane (ADR 0037; the load is followed by post.AuthorId == actorId, non-author throws)
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(session);
@@ -1192,6 +1199,7 @@ public partial class PostService
     /// </summary>
     public async Task<IReadOnlyList<Post>> ListMyDraftsAsync(string actorId)
     {
+        // SEC-READ: owner-only — the read is scoped to the actor's own drafts (p.AuthorId == actorId, ADR 0037 drafts invisible to all but the author)
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
 
         await using var session = _store.QuerySession();
@@ -1351,6 +1359,7 @@ public partial class PostService
     /// </summary>
     public async Task<IReadOnlyList<PostTranslation>> GetPostTranslationsAsync(string postId)
     {
+        // SEC-READ: caller-gated by PostsController.Detail / GroupsController.GroupPostDetail / HomeController.Index (the parent post's Read decision, already made by the caller — C-M3·1)
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
 
         await using var session = _store.QuerySession();
@@ -1377,6 +1386,7 @@ public partial class PostService
     /// </summary>
     public async Task<IReadOnlyDictionary<string, int>> CountRepliesAsync(IReadOnlyCollection<string> postIds)
     {
+        // SEC-READ: no disclosure — returns only post-id → reply-count; no audience-bearing field is exposed (ADR 0226 feed-card count)
         ArgumentNullException.ThrowIfNull(postIds);
         if (postIds.Count == 0)
             return new Dictionary<string, int>();
@@ -1408,6 +1418,7 @@ public partial class PostService
     /// </summary>
     public async Task<IReadOnlyList<ReplyTranslation>> GetReplyTranslationsAsync(IReadOnlyCollection<string> replyIds)
     {
+        // SEC-READ: caller-gated by PostsController.Detail / GroupsController.GroupPostDetail (the parent post's Read decision, already made by the caller — C-M3·1)
         ArgumentNullException.ThrowIfNull(replyIds);
         if (replyIds.Count == 0)
             return [];

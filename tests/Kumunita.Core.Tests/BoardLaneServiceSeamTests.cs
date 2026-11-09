@@ -60,11 +60,11 @@ public class BoardLaneServiceSeamTests(PostgresFixture fixture) : IClassFixture<
         });
 
         var lane = await svc.UpdateLaneAsync(
-            "bl-lane-l1", author, NoRoles, new UpdateLaneRequest { Title = "new" });
+            "bl-lane-l1", author, NoRoles, new UpdateLaneRequest { Title = "new" }, TestContext.Current.CancellationToken);
         Assert.Equal("new", lane.Title);
 
         await using (var s = store.QuerySession())
-            Assert.Equal("new", (await s.LoadAsync<KanbanLane>("bl-lane-l1")).Title);
+            Assert.Equal("new", (await s.LoadAsync<KanbanLane>("bl-lane-l1", TestContext.Current.CancellationToken))!.Title);
 
         var row = Assert.Single(await BoardAudits(store, action: "board.update_lane", actor: author));
         Assert.Equal("board", row.TargetKind);
@@ -110,7 +110,7 @@ public class BoardLaneServiceSeamTests(PostgresFixture fixture) : IClassFixture<
         });
 
         var placement = await svc.MoveTodoToAdjacentLaneAsync(
-            "bl-adj-p1", "right", author, NoRoles);
+            "bl-adj-p1", "right", author, NoRoles, TestContext.Current.CancellationToken);
         Assert.Equal("bl-adj-l2", placement.LaneId);
 
         var row = Assert.Single(await BoardAudits(store, action: "todo.move_to_lane", actor: author));
@@ -151,7 +151,7 @@ public class BoardLaneServiceSeamTests(PostgresFixture fixture) : IClassFixture<
         });
 
         var placement = await svc.MoveTodoWithinLaneAsync(
-            "bl-edge-p1", "up", author, NoRoles);
+            "bl-edge-p1", "up", author, NoRoles, TestContext.Current.CancellationToken);
         Assert.Equal(0, placement.Order);
         Assert.Empty(await BoardAudits(store, action: "todo.move_within_lane", actor: author));
     }
@@ -190,7 +190,7 @@ public class BoardLaneServiceSeamTests(PostgresFixture fixture) : IClassFixture<
 
         // Move card B (p @ Order 1) to the front (index 0) of the same lane.
         var placement = await svc.MoveTodoToLanePositionAsync(
-            "bl-pos-pb", "bl-pos-l1", 0, author, NoRoles);
+            "bl-pos-pb", "bl-pos-l1", 0, author, NoRoles, TestContext.Current.CancellationToken);
         Assert.Equal("bl-pos-l1", placement.LaneId);
 
         var aOrder = await LoadOrder(store, "bl-pos-pa");
@@ -232,7 +232,7 @@ public class BoardLaneServiceSeamTests(PostgresFixture fixture) : IClassFixture<
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.MoveTodoWithinLaneAsync("bl-deny-p1", "up", stranger, NoRoles));
+            () => svc.MoveTodoWithinLaneAsync("bl-deny-p1", "up", stranger, NoRoles, TestContext.Current.CancellationToken));
     }
 
     // ── the harness ────────────────────────────────────────────────────────
@@ -292,7 +292,7 @@ public class BoardLaneServiceSeamTests(PostgresFixture fixture) : IClassFixture<
     {
         var ct = TestContext.Current.CancellationToken;
         await using var s = store.QuerySession();
-        return (await s.LoadAsync<BoardItemPlacement>(placementId, ct)).Order;
+        return (await s.LoadAsync<BoardItemPlacement>(placementId, ct))!.Order;
     }
 
     /// <summary>The board-lane movement's audit rows (filter by action).</summary>

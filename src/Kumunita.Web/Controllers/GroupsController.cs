@@ -1959,7 +1959,7 @@ public sealed class GroupsController(
         // lane mismatch" and "membership denied" (Core doesn't
         // distinguish; the audit row does) — both map to the 404 fail-
         // closed shape (the register's non-member-404 pin).
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2014,7 +2014,7 @@ public sealed class GroupsController(
         // it) is the pre-write gate: a non-member, a missing post, or a lane
         // mismatch all return Post = null → 404 (the group lane's non-leaky
         // fail-closed shape, the register's non-member-404 pin).
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2076,7 +2076,7 @@ public sealed class GroupsController(
         // The parent's single group-lane decision (G·7) is the pre-write gate:
         // a non-member, a missing post, or a lane mismatch all return Post =
         // null → 404 (the group lane's non-leaky fail-closed shape).
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2131,7 +2131,7 @@ public sealed class GroupsController(
         // a non-member, a missing post, a lane mismatch, or a draft the actor
         // is not the author of all return Post = null → 404 (the group lane's
         // non-leaky fail-closed shape, the ADR 0037 author-only draft gate).
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2177,7 +2177,7 @@ public sealed class GroupsController(
 
         // The parent's single group-lane decision (G·7 — the reply inherits it)
         // is the pre-write gate (the <see cref="EditGroupPostReply"/> precedent).
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2726,7 +2726,7 @@ public sealed class GroupsController(
 
         // The parent's single group-lane decision (G·7) is the precondition:
         // non-member, missing post, or lane mismatch all return Post = null → 404.
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2790,7 +2790,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
         if (parent.Replies.All(r => r.Id != replyId))
@@ -2850,7 +2850,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2900,7 +2900,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
 
@@ -2952,7 +2952,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
         if (parent.Replies.All(r => r.Id != replyId))
@@ -3001,7 +3001,7 @@ public sealed class GroupsController(
             return Redirect($"/groups/{id}/posts/{postId}");
         }
 
-        var parent = await groupPosts.GetGroupPostAsync(id, postId, actor);
+        var parent = await groupPosts!.GetGroupPostAsync(id, postId, actor);
         if (parent.Post is null)
             return NotFound();
         if (parent.Replies.All(r => r.Id != replyId))

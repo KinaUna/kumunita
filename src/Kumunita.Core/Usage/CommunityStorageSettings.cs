@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Usage;
 
 /// <summary>
@@ -7,6 +9,8 @@ namespace Kumunita.Core.Usage;
 /// <c>null</c> ⇒ env <c>Media__MaxBytes</c> fallback; <see
 /// cref="PerUserQuotaBytes"/> <c>0</c> ⇒ unlimited.
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Keep, ExportScope.Never,
+    reason: "the community's storage cap; no resident principal")]
 public sealed class CommunityStorageSettings
 {
     public string Id { get; set; } = "community";

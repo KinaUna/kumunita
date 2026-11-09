@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.ErrorReports;
 
 /// <summary>
@@ -17,6 +19,10 @@ namespace Kumunita.Core.ErrorReports;
 /// two new docs ride a **new** <c>EscalationDocTypes</c> parallel surface).
 /// The conventional <c>string Id</c> identity is Marten-generated.
 /// </summary>
+[DataClass(DataClassKind.Secret, Erasure.Pseudonymize, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): an operator credential, but the `CreatedBy` is the resident's (IS23); D6: 7 days after revocation or expiry",
+    retentionKey: "TokenDays",
+    principalField: "CreatedBy")]
 public sealed class EscalationToken
 {
     public string Id { get; set; } = default!;        // conventional — Marten-generated

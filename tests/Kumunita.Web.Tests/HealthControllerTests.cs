@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Security.Claims;
 using Kumunita.Core.Identity;
 using Kumunita.Web.Controllers;
 using Marten;
@@ -241,8 +240,8 @@ public class HealthControllerTests
         Assert.Equal("ok", payload.GetType().GetProperty("status")!.GetValue(payload));
 
         // No side effects for an anonymous caller: no relay handshake, no count.
-        await smtpHealth.DidNotReceiveWithAnyArgs().CheckAsync(default);
-        await deadLetters.DidNotReceiveWithAnyArgs().GetCountAsync(default);
+        await smtpHealth.DidNotReceiveWithAnyArgs().CheckAsync(TestContext.Current.CancellationToken);
+        await deadLetters.DidNotReceiveWithAnyArgs().GetCountAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]

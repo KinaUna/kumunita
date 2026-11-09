@@ -26,6 +26,7 @@ folder (no per-file rows are needed).
 | Old path (former `plans-milestones/done/`) | New path |
 |---|---|
 | docs/plans-milestones/improve-docs/… | [docs/archive/lanes/improve-docs/…](lanes/improve-docs/) |
+| docs/plans-milestones/plan-code-hygiene.md (+ the `u00`–`u14` unit prompts) · `in-progress/code-hygiene-handoff-notes.md` | [docs/archive/lanes/code-hygiene/…](lanes/code-hygiene/) (U14 close, shipped 2026-11-09: the plan register + the 16 `u*-prompt.md` briefs + the handoff notes; the design doc stays living in `docs/design/code-hygiene-design.md`) |
 | docs/plans-milestones/done/esc/… | [docs/archive/lanes/esc/…](lanes/esc/) |
 | docs/plans-milestones/done/ev-dwm/… | [docs/archive/lanes/ev-dwm/…](lanes/ev-dwm/) |
 | docs/plans-milestones/done/events-calendar/… | [docs/archive/lanes/events-calendar/…](lanes/events-calendar/) |
@@ -37,6 +38,7 @@ folder (no per-file rows are needed).
 | docs/plans-milestones/done/guardian-controls/… | [docs/archive/lanes/guardian-controls/…](lanes/guardian-controls/) |
 | docs/plans-milestones/done/improve/… | [docs/archive/lanes/improve/…](lanes/improve/) |
 | docs/plans-milestones/plan-improve-code.md (+ the c00–c13 prompts + handoff-notes.md) · `plan-improve-code-2.md` / `plan-improve-code-3.md` (+ the c2-00–c2-08 / c3-00–c3-08 prompts) · `improve-code-2-handoff-notes.md` / `improve-code-3-handoff-notes.md` | [docs/archive/lanes/improve-code/…](lanes/improve-code/) (all three rounds: `plan-improve-code.md` + `c00`–`c13` (round 1) · `plan-improve-code-2.md` + `c2-00`–`c2-08` (round 2) · `plan-improve-code-3.md` + `c3-00`–`c3-08` (round 3, shipped 2026-11-06) + the three handoff notes) |
+| docs/plans-milestones/plan-improve-sec.md (+ the `is00`–`is45` unit prompts, incl. the `is17a`/`is27b`/`is34a`/`is34b`/`is38b`/`is38c` lettered splits) · `in-progress/improve-sec-handoff-notes.md` | [docs/archive/lanes/improve-sec/…](lanes/improve-sec/) (IS45 close, shipped 2026-11-09: the plan register + the 47 `is*-prompt.md` briefs + the handoff notes; the design doc stays living in `docs/design/improve-sec-design.md`) |
 | docs/plans-milestones/done/inline-editor/… | [docs/archive/lanes/inline-editor/…](lanes/inline-editor/) |
 | docs/plans-milestones/done/ip/… | [docs/archive/lanes/ip/…](lanes/ip/) |
 | docs/plans-milestones/done/languages-seeded/… | [docs/archive/lanes/languages-seeded/…](lanes/languages-seeded/) |

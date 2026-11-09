@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Projects;
 
 /// <summary>
@@ -20,6 +22,8 @@ namespace Kumunita.Core.Projects;
 /// creation; the ADR 0037 draft lane is a follow-on lane).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A")]
 public sealed class TodoItem
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)

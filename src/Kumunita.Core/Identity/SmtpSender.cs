@@ -1,3 +1,4 @@
+using Kumunita.Core.Logging;
 using MailKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
@@ -292,7 +293,7 @@ public sealed class SmtpSender(
         {
             await ConnectAndAuthenticateAsync(client, _cfg, ct).ConfigureAwait(false);
             await client.SendAsync(msg, ct).ConfigureAwait(false);
-            logger.LogInformation("Delivered email {Idp} to {Recipient} (attempt sent).", email.IdempotencyKey, email.Recipient);
+            logger.LogInformation("Delivered email {Idp} to {RecipientHash} (attempt sent).", email.IdempotencyKey, LogRedact.Hash8(email.Recipient));
         }
         catch (MailKit.Net.Smtp.SmtpCommandException)
         {

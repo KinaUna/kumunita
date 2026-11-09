@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.UserInfo;
 
 /// <summary>
@@ -36,6 +38,8 @@ public enum TimeLimitMode
 /// empty array means "all" (a schedule with only hours set is restricted on
 /// every day during those hours, in <see cref="TimeLimitMode.Blocked"/> mode).
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Delete, ExportScope.Never,
+    reason: "IS23: the child's schedule is the child's data")]
 public sealed class GuardianTimeLimitSchedule
 {
     /// <summary>Document identity — the child's subject id (one schedule per

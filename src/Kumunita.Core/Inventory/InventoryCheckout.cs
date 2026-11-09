@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Inventory;
 
 /// <summary>
@@ -21,6 +23,10 @@ namespace Kumunita.Core.Inventory;
 /// app code).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Pseudonymize,
+    ExportScope.Never,
+    reason: "a stock record; the checkout state (who/when) is PII, the item count is operational",
+    principalField: "BorrowerId")]
 public sealed class InventoryCheckout
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)

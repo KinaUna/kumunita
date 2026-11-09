@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.SiteContent;
 
 /// <summary>
@@ -17,6 +19,8 @@ namespace Kumunita.Core.SiteContent;
 /// this is a new doc, not a new field on the existing one (SITE·6, the ADR
 /// 0150 D6 pin).
 /// </summary>
+[DataClass(DataClassKind.Platform, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "F1 §2C excluded: platform singletons, not resident content")]
 public sealed class SiteContent
 {
     public const string SingletonId = "singleton";

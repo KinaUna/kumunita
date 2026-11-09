@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Posts;
 
 /// <summary>
@@ -25,6 +27,8 @@ public enum PostStatus
 /// <see cref="Status"/> is the M3b hide/remove surface (C-M3b·3) — the single
 /// M3b ADD on this POCO (ADR 0004 §B.1 additive).
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A: resident-authored content")]
 public sealed class Post
 {
     public string Id { get; set; } = string.Empty;

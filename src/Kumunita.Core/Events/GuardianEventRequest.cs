@@ -1,3 +1,4 @@
+using Kumunita.Core.Privacy;
 using Kumunita.Core.UserInfo;
 
 namespace Kumunita.Core.Events;
@@ -65,6 +66,8 @@ public enum GuardianEventRequestStatus
 /// "a re-assignment writes a fresh row, not a revival" precedent.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Delete, ExportScope.Never,
+    reason: "IS23: a child's event request is the child's data")]
 public sealed class GuardianEventRequest
 {
     public string Id { get; set; } = string.Empty;

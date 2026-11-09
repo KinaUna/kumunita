@@ -33,7 +33,10 @@ public static class PortabilityModule
             sp.GetRequiredService<RoleManager<IdentityRole>>(),
             sp.GetRequiredService<IOptions<CommunityOptions>>(),
             sp.GetRequiredService<IMediaStore>(),
-            sp.GetRequiredService<IMediaFileStore>()));
+            sp.GetRequiredService<IMediaFileStore>(),
+            // IS29 (ADR 0299 §4, D10) — the transparency emission seam (the
+            // last ctor parameter; the C03 INotificationEmitter contract).
+            sp.GetRequiredService<Notifications.INotificationEmitter>()));
 
         services.AddTransient<IUserPortabilityService>(sp => new UserPortabilityService(
             sp.GetRequiredService<Marten.IDocumentStore>(),

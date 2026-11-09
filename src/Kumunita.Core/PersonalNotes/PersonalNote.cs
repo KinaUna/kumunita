@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.PersonalNotes;
 
 /// <summary>
@@ -35,6 +37,8 @@ namespace Kumunita.Core.PersonalNotes;
 /// <c>NoteCannotLiveInAnotherResidentFolder</c> pin).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A; M37 / ADR 0167; the E6 gap this lane closes (IS31)")]
 public sealed class PersonalNote
 {
     /// <summary>Surrogate document identity (Marten's default <c>string</c>

@@ -381,6 +381,20 @@ public partial class IdentityService
             await ResidentContentEraser.EraseAsync(session, targetSubjectId, ct)
                 .ConfigureAwait(false);
 
+        // 8d. S2/E2 (IMPROVE-SEC IS22) — delete the target's identity-adjacent
+        //     rows (the F1 §2C "decision" rows now decided [DataClass] Delete in
+        //     IS20b/IS20c): SessionDoc, IdentityToken, GuestAccess,
+        //     DelegationGrant (either side), the 4 Notification* types, and
+        //     OutboxEmail where Recipient == the target's email. Same session /
+        //     same commit (C3 — the composer's single SaveChangesAsync below
+        //     commits it; the eraser does not commit). target.Email is passed in
+        //     (the OutboxEmail match is on the email string, not an id); it is
+        //     never logged (the IS08 gate — the eraser's log line carries only
+        //     {Resident} = the subject id and {AccountRows} = an int).
+        await ResidentAccountRowsEraser.EraseAsync(
+                session, targetSubjectId, target.Email, null, ct)
+            .ConfigureAwait(false);
+
         // 8b. ADR 0143 — dissolve every GuardianLink row for the deleted
         //     child (any status) in this same session (C·5 — no dangling
         //     standing; C4 strong-consistency). The ADR 0142 self/admin

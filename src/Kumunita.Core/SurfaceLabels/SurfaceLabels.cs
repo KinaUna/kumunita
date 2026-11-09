@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.SurfaceLabels;
 
 /// <summary>
@@ -24,6 +26,8 @@ namespace Kumunita.Core.SurfaceLabels;
 /// Labels</c>), not a new field on an existing one (ADR 0150 D6 / ADR 0006
 /// module-boundary contract, M29·6).
 /// </summary>
+[DataClass(DataClassKind.Platform, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "F1 §2C excluded: the admin's surface labels")]
 public sealed class SurfaceLabels
 {
     /// <summary>

@@ -284,6 +284,7 @@ public partial class ModerationService : IModerationService
         bool isStanding,
         CancellationToken ct = default)
     {
+        // SEC-READ: report-gated (ADR 0003) — the queue self-filters: a standing-moderator sees only reports on their assigned components with ModeratorAccess ON; a plain resident sees none; a GlobalAdmin sees all
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
 
         // The raw queue — sorted At desc + Status desc (the plan's line-254
@@ -428,6 +429,7 @@ public partial class ModerationService : IModerationService
         string reportId,
         CancellationToken ct = default)
     {
+        // SEC-READ: report-gated (ADR 0003) — ModerationController.Resolve scopes the read to a GlobalAdmin or a standing-moderator on the report's component (IsInActorScopeAsync, C-M3b·4 SoD)
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
 
         var report = await session.LoadAsync<Report>(reportId).ConfigureAwait(false);
@@ -556,6 +558,7 @@ public partial class ModerationService : IModerationService
         string? componentId,
         CancellationToken ct = default)
     {
+        // SEC-READ: report-gated (ADR 0003) — the standing-moderator list for the report's component is surfaced only from GetDetailAsync (which is report-gated)
         if (componentId is null)
             return [];   // C-M3b·4 "no fabricated component"
 

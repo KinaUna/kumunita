@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Projects;
 
 /// <summary>
@@ -27,6 +29,8 @@ namespace Kumunita.Core.Projects;
 /// *outward* — a project points at its goal, not the reverse — D2).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A")]
 public sealed class ProjectGoal
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)

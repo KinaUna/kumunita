@@ -80,7 +80,7 @@
     // The "(matched)" marker: a browser-matched active language is a
     // suggestion, not a saved preference — the label says so (ADR 0046).
     string LangMatchedLabel = "matched";
-    var matchedMap = await Translation.GetManyAsync(
+    var matchedMap = Translation is null ? new Dictionary<string, string>() : await Translation.GetManyAsync(
         new[] { "locale.browser_matched" }, currentLang);
     if (matchedMap.TryGetValue("locale.browser_matched", out var m))
         LangMatchedLabel = m;

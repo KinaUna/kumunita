@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Documents;
 
 /// <summary>
@@ -9,6 +11,8 @@ namespace Kumunita.Core.Documents;
 /// written verbatim and projected as-is to the frozen
 /// <see cref="Authorization.IAuthorizationService"/> Read path (C-M21·1, C-M21·3).
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A: the resident's uploads")]
 public sealed class Document
 {
     public string Id { get; set; } = string.Empty;

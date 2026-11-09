@@ -1,3 +1,4 @@
+using Kumunita.Core.Logging;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -156,8 +157,8 @@ public partial class IdentityService(
         {
             var blockedDomain = email[(email.LastIndexOf('@') + 1)..];
             logger.LogInformation(
-                "Signup rejected: disposable-email domain {Domain} (email {Email}).",
-                blockedDomain, email);
+                "Signup rejected: disposable-email domain {Domain} (email {EmailDomain}).",
+                blockedDomain, LogRedact.EmailDomain(email));
             throw new DisallowedEmailDomainException(email, blockedDomain);
         }
 
@@ -215,7 +216,7 @@ public partial class IdentityService(
 
         await session.SaveChangesAsync();
 
-        logger.LogInformation("Registered unverified resident {UserId} (email {Email}).", user.Id, email);
+        logger.LogInformation("Registered unverified resident {UserId} (email {EmailDomain}).", user.Id, LogRedact.EmailDomain(email));
         return new ThinPrincipal(user.Id, user.ExternalId, IsVerifiedResident: false, ThinPrincipal.NoRoles);
     }
 
@@ -268,8 +269,8 @@ public partial class IdentityService(
             await session.SaveChangesAsync();
 
             logger.LogInformation(
-                "Re-issued verification (attempt {Attempt}) for resident {UserId} (email {Email}).",
-                nextAttempt, user.Id, email);
+                "Re-issued verification (attempt {Attempt}) for resident {UserId} (email {EmailDomain}).",
+                nextAttempt, user.Id, LogRedact.EmailDomain(email));
         }
 
         return new ResendVerificationResult(Success: true);

@@ -517,6 +517,29 @@ public partial class AdminController(
         // Fully-qualify the Marten async extension (same EF/Marten ambiguity as elsewhere).
         var rows = await Marten.QueryableExtensions.ToListAsync(query.Take(page));
 
+        // IS36 (D9) — the audit log is itself a disclosure surface (class c). A
+        // GlobalAdmin reading it leaves exactly one aggregate AccessAudit row
+        // (the ADR 0108 "portability.export" precedent, adapted to a read view
+        // — the AdminAnalyticsController.Export shape): TargetKind "audit-log",
+        // Action "audit-log.view", VisibleCount = rows.Count, TargetId null,
+        // Via Admin, Outcome Allow. The row is a side effect of the view; the
+        // response is unchanged. Counts only — no PII (the IS08 gate applies).
+        await using (var auditSession = store.LightweightSession())
+        {
+            auditSession.Store(new AccessAudit
+            {
+                Id           = Guid.NewGuid().ToString("N"),
+                At           = DateTimeOffset.UtcNow,
+                ActorId      = AdminSubjectId(User) ?? string.Empty,
+                Action       = "audit-log.view",
+                TargetKind   = "audit-log",
+                VisibleCount = rows.Count,
+                Via          = AccessVia.Admin,
+                Outcome      = AccessOutcome.Allow
+            });
+            await auditSession.SaveChangesAsync();
+        }
+
         return View(new AdminAuditPageViewModel
         {
             Rows = rows.Select(r => new AdminAuditPageViewModel.Row

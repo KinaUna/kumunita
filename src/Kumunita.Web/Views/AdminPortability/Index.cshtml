@@ -22,19 +22,31 @@
 <p class="text-muted">
     <kw-l key="admin.portability.lede">The whole instance as one portable archive — the content, the media, the identity graph (without the credential material), and the settings. Export it as a *.kumunita file, or restore an existing archive into this instance.</kw-l></p>
 
-@* Export — the operator downloads the one complete, versioned archive
-   (the loop closes out of the platform — F1). A plain link (no form): the
-   archive streams as a download (the ADR 0034 attachment shape). *@
+@* Export — IS28 (ADR 0299) — the operator downloads the archive in one of
+   two scopes. The content-free default (no gate, audited Via: Admin) and the
+   full export (operator-gated: requires an active AdminOverride break-glass,
+   audited Via: BreakGlass, residents notified by IS29). Both stream as a
+   download (the ADR 0034 attachment shape) — plain links, no forms, no
+   inline handlers (P-8). *@
 <div class="card mb-4">
-    <div class="card-body d-flex justify-content-between align-items-center gap-3 flex-wrap">
-        <div>
-            <div class="fw-semibold"><kw-l key="portability.export">Export</kw-l></div>
+    <div class="card-body">
+        <div class="fw-semibold mb-2"><kw-l key="portability.export">Export</kw-l></div>
+
+        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-2">
             <small class="text-muted">
-                <kw-l key="admin.portability.export_desc">One *.kumunita archive — the content, the media, the identity graph (never the credential material), and the instance settings.</kw-l></small>
+                <kw-l key="admin.portability.content_free_desc">Structure, public content, and the admin's own data. No private messages, no restricted posts, no PII contact fields.</kw-l></small>
+            <a class="btn btn-primary" href="~/admin/portability/export">
+                <kw-l key="admin.portability.export_content_free">Export (content-free)</kw-l>
+            </a>
         </div>
-        <a class="btn btn-primary" href="~/admin/portability/export">
-            <kw-l key="portability.export">Export</kw-l>
-        </a>
+
+        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+            <small class="text-muted">
+                <kw-l key="admin.portability.full_desc">The complete archive — every private row, every PII field. Requires an active operator-granted AdminOverride (break-glass). Audited Via: BreakGlass. Residents are notified.</kw-l></small>
+            <a class="btn btn-outline-secondary" href="~/admin/portability/export?scope=full">
+                <kw-l key="admin.portability.export_full">Full export (operator-gated)</kw-l>
+            </a>
+        </div>
     </div>
 </div>
 

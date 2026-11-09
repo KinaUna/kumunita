@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Events;
 
 /// <summary>
@@ -49,6 +51,8 @@ namespace Kumunita.Core.Events;
 /// the authored-in language, *not* the translation mechanism.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A")]
 public sealed class Event
 {
     public string Id { get; set; } = string.Empty;            // surrogate (Marten default)

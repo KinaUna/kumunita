@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.GroupMessaging;
 
 /// <summary>
@@ -11,6 +13,9 @@ namespace Kumunita.Core.GroupMessaging;
 /// reading in different orders converge to the same row state).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Pseudonymize, ExportScope.Resident,
+    reason: "D3 (IS21); shipped after F1 — the E2 gap this lane closes",
+    principalField: "SenderId")]
 public sealed class GroupMessage
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)

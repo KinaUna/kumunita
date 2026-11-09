@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Bookmarks;
 
 /// <summary>
@@ -15,6 +17,8 @@ namespace Kumunita.Core.Bookmarks;
 /// and the <c>AccessAudit</c> rows already emit (D1).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A")]
 public sealed class Bookmark
 {
     public string Id { get; set; } = string.Empty;            // string surrogate (Marten default)

@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Identity;
 
 /// <summary>
@@ -5,6 +7,9 @@ namespace Kumunita.Core.Identity;
 /// side effect; a handler publishes this within its command's transaction, and the
 /// Wolverine transactional outbox dispatches only on a successful commit).
 /// </summary>
+[DataClass(DataClassKind.Pii, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided); D6: body nulled 7 days after delivery, row deleted 90 days",
+    retentionKey: "OutboxBodyDays")]
 public sealed class OutboxEmail
 {
     public string Id { get; set; } = string.Empty;
@@ -32,6 +37,9 @@ public sealed class OutboxEmail
 /// retries over ~24 hours are exhausted (§6.2). A non-empty count drives <c>/health</c>'s
 /// **degraded** state (OPS §8); the operator re-queues or discards rows (OPS §7).
 /// </summary>
+[DataClass(DataClassKind.Operational, Erasure.Delete, ExportScope.Never,
+    reason: "D6: 30 days; the recipient is the resident's address (IS34a)",
+    retentionKey: "DeadLetterDays")]
 public sealed class EmailDeadLetter
 {
     public string Id { get; set; } = string.Empty;

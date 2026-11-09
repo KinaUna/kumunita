@@ -92,6 +92,15 @@ public sealed class UserPortabilityAcceptanceTests(PostgresFixture fixture) : IC
             InventoryDocTypes.Configure(opts);
             DocumentDocTypes.Configure(opts);
             BookmarkDocTypes.Configure(opts);
+            // IS31 (E6) — the PersonalNotes surface so the new closed-set
+            // rows (PersonalNote + NoteFolder) can be queried by the export
+            // loop. BookmarkFolder rides on BookmarkDocTypes (above);
+            // PageTranslation rides on PageDocTypes (above).
+            PersonalNotesDocTypes.Configure(opts);
+            // IS32 (E6) — the GroupMessaging surface so the new closed-set
+            // rows (GroupConversation + GroupMessage) can be queried by the
+            // export loop.
+            GroupMessagingDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

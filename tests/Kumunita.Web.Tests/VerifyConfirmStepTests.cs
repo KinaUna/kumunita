@@ -106,7 +106,7 @@ public sealed class VerifyConfirmStepTests(PostgresFixture fixture) : IClassFixt
         // Re-load the token from the store: ConsumedAt must still be null
         // (the GET did NOT consume the one-time token — only the POST does).
         await using var session = store.OpenSession(new Marten.Services.SessionOptions());
-        var token = await session.LoadAsync<IdentityToken>(TokenId);
+        var token = await session.LoadAsync<IdentityToken>(TokenId, TestContext.Current.CancellationToken);
         Assert.NotNull(token);
         // The GET must not consume the one-time token — only the POST (the
         // ConfirmAndSignInAsync / VerifyAndSetPasswordAsync lane) does.

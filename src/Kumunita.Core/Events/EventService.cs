@@ -98,20 +98,20 @@ public partial class EventService : IEventService
             Find = (IDocumentSession session, string id, string lang) => session.Query<EventTranslation>()
                 .Where(t => t.EventId == id && t.LanguageCode == lang)
                 .FirstOrDefaultAsync(),
-            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new EventTranslation
+            Create = (string id, string lang, string? title, string? body, string actorId, DateTimeOffset created) => new EventTranslation
             {
                 Id = Guid.NewGuid().ToString("N"),
                 EventId = id,
                 LanguageCode = lang,
                 Title = string.IsNullOrWhiteSpace(title) ? null : title,
-                Body = body,
+                Body = body!,
                 AuthorId = actorId,
                 Created = created
             },
-            ApplyUpdate = (EventTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            ApplyUpdate = (EventTranslation row, string? title, string? body, string actorId, DateTimeOffset now) =>
             {
                 row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-                row.Body = body;
+                row.Body = body!;
                 row.AuthorId = actorId;
                 row.Created = now;
             }
@@ -392,6 +392,7 @@ public partial class EventService : IEventService
     /// </summary>
     public async Task<IReadOnlyList<EventRsvp>> GetRsvpsAsync(string eventId, CancellationToken ct = default)
     {
+        // SEC-READ: caller-gated by EventController.Detail — that action is author-scoped (the isAuthor branch) before it calls this seam (EventController.cs:968-971: `if (isAuthor) { rsvpRows = await this.events.GetRsvpsAsync(id, …) }`).
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
 
         await using var session = _store.QuerySession();
@@ -476,6 +477,7 @@ public partial class EventService : IEventService
     /// </summary>
     public async Task<IReadOnlyList<Event>> ListMineAsync(string actorId, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the candidate set is scoped to the actor's own RSVP rows ∪ the actor's authored events (EventService.cs:489/495: `r.UserId == actorId` / `e.AuthorId == actorId`), so every row is one the actor may already read.
         if (string.IsNullOrEmpty(actorId))
             throw new UnauthorizedAccessException("An actor is required to read their events.");
 
@@ -513,6 +515,7 @@ public partial class EventService : IEventService
     /// <inheritdoc cref="IEventService.ListDraftsAsync"/>
     public async Task<IReadOnlyList<Event>> ListDraftsAsync(string actorId, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the query is scoped to the actor's own drafts (EventService.cs:524: `e.IsDraft && e.AuthorId == actorId && !e.IsDeleted`).
         if (string.IsNullOrEmpty(actorId))
             throw new UnauthorizedAccessException("An actor is required to read their draft events.");
 
@@ -653,6 +656,7 @@ public partial class EventService : IEventService
     /// </summary>
     public async Task<Event> CreateAsync(string actorId, CreateEventRequest request, CancellationToken ct = default)
     {
+        // SEC-READ: no disclosure — a write lane with no audience-bearing read (the only store read is the LocaleSettings singleton for the authored-in code, EventService.cs:693); standing is in-method (CheckCreateStanding, EventService.cs:698 — any signed-in resident).
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrEmpty(actorId))
             throw new UnauthorizedAccessException("An acting actor is required to create an event.");
@@ -786,6 +790,7 @@ public partial class EventService : IEventService
     /// </summary>
     public async Task<Event> UpdateAsync(string eventId, string actorId, IReadOnlySet<string> actorRoles, UpdateEventRequest request, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the load is followed by the in-method standing gate CheckEditStanding (author ∪ GlobalAdmin, EventService.cs:810), then the write.
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to edit an event.");
@@ -990,6 +995,7 @@ public partial class EventService : IEventService
 
         // ADR 0037 — author-only (GlobalAdmin explicitly denied). A pure
         // ordinal check; the Web layer maps the exception to a 403.
+        // SEC-READ: owner-only — the load is followed by the in-method author gate (ADR 0037 author-only publish, GlobalAdmin explicitly denied; EventService.cs:999-1000).
         if (!string.Equals(existing.AuthorId, actorId, StringComparison.Ordinal))
             throw new UnauthorizedAccessException("Only the author may publish this event.");
 
@@ -1029,6 +1035,7 @@ public partial class EventService : IEventService
     /// </summary>
     public async Task DeleteAsync(string eventId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the load is followed by the in-method standing gate CheckEditStanding (author ∪ GlobalAdmin, ADR 0017; EventService.cs:1052), then the write.
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
         if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete an event.");
         ArgumentNullException.ThrowIfNull(actorRoles);
@@ -1089,6 +1096,7 @@ public partial class EventService : IEventService
     /// </summary>
     public async Task<Event> SkipOccurrenceAsync(string eventId, string actorId, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the load is followed by the in-method author gate (ADR 0037 author-only; a non-author gets the no-leak 404, EventService.cs:1113-1115).
         if (string.IsNullOrEmpty(eventId))
             throw new KeyNotFoundException("An event id is required.");
 
@@ -1136,6 +1144,7 @@ public partial class EventService : IEventService
     /// </summary>
     public async Task<Event> UndeleteOccurrenceAsync(string eventId, string actorId, CancellationToken ct = default)
     {
+        // SEC-READ: owner-only — the load is followed by the in-method author gate (ADR 0037 author-only, the SkipOccurrenceAsync shape, EventService.cs:1159).
         if (string.IsNullOrEmpty(eventId))
             throw new KeyNotFoundException("An event id is required.");
 
@@ -1190,6 +1199,7 @@ public partial class EventService : IEventService
     /// </summary>
     public async Task<IReadOnlyList<EventTranslation>> GetEventTranslationsAsync(string eventId)
     {
+        // SEC-READ: caller-gated by EventController.Detail / the feed reads — the parent event's single Read decision (GetAsync's CanAsync(Read) / the feed's CanSeeAsync) already ran before the caller reads this seam (C-M3·1: a translation carries no own audience, it inherits the parent's decision).
         if (string.IsNullOrEmpty(eventId))
             throw new ArgumentException("An event id is required.", nameof(eventId));
 

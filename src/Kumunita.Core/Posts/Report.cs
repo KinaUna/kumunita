@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Posts;
 
 /// <summary>
@@ -7,6 +9,9 @@ namespace Kumunita.Core.Posts;
 /// <see cref="Status"/> writes against it. <see cref="Status"/> is nullable
 /// until M3b lands a write lane that sets it.
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Pseudonymize, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): moderation state, not authored content (IS23); M27 C-M27·3 excludes it from the delete set",
+    principalField: "ReporterId")]
 public sealed class Report
 {
     public string Id { get; set; } = string.Empty;

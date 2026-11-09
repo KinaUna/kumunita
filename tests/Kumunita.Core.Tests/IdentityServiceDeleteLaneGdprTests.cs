@@ -226,6 +226,11 @@ public sealed class IdentityServiceDeleteLaneGdprTests(PostgresFixture fixture) 
             CoreDocTypes.Configure(opts);
             PostDocTypes.Configure(opts);
             MediaDocTypes.Configure(opts);
+            // IS22 gotcha: DeleteCoreAsync now runs ResidentAccountRowsEraser,
+            // which queries the pinned-identity NotificationPreference /
+            // NotificationQuietSchedule — register the NotificationDocTypes
+            // surface (or the query throws InvalidDocumentException).
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

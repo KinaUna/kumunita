@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Localization;
 
 /// <summary>
@@ -9,6 +11,8 @@ namespace Kumunita.Core.Localization;
 /// (the provider floor, ADR 0015 D1 — code is the floor; the first-run
 /// seeder's <c>en</c> rows remain the stored copy).
 /// </summary>
+[DataClass(DataClassKind.Platform, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "the UI translation strings; no resident principal")]
 public sealed class TranslationResource
 {
     public string Id { get; set; } = string.Empty;            // surrogate (Marten default) — the pair idiom

@@ -96,20 +96,20 @@ public partial class AnnouncementService : IAnnouncementService
             Find = (IDocumentSession session, string id, string lang) => session.Query<AnnouncementTranslation>()
                 .Where(t => t.AnnouncementId == id && t.LanguageCode == lang)
                 .FirstOrDefaultAsync(),
-            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new AnnouncementTranslation
+            Create = (string id, string lang, string? title, string? body, string actorId, DateTimeOffset created) => new AnnouncementTranslation
             {
                 Id = Guid.NewGuid().ToString("N"),
                 AnnouncementId = id,
                 LanguageCode = lang,
                 Title = title,
-                Body = body,
+                Body = body!,
                 AuthorId = actorId,
                 Created = created
             },
-            ApplyUpdate = (AnnouncementTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            ApplyUpdate = (AnnouncementTranslation row, string? title, string? body, string actorId, DateTimeOffset now) =>
             {
                 row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-                row.Body = body;
+                row.Body = body!;
             }
         });
     }

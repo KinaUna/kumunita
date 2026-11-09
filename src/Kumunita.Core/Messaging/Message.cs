@@ -1,9 +1,14 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Messaging;
 
 /// <summary>
 /// One plain-text message (D7). Immutable in M9 — no Modified, no DeletedAt,
 /// no Audience (C-M9·5/D4), no attachments.
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Pseudonymize, ExportScope.Resident,
+    reason: "D3: 1:1 direct messages survive under the tombstone, not deleted (IS21)",
+    principalField: "SenderId")]
 public sealed class Message
 {
     public string Id { get; set; } = string.Empty;                 // surrogate (Marten default)

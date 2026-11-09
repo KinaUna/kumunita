@@ -63,7 +63,7 @@ public partial class BoardsController
 
         // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
         // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
-        await using var session = store.LightweightSession();
+        await using var session = store!.LightweightSession();
         try
         {
             await this.boards.BoardTranslationLane.AddAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
@@ -132,7 +132,7 @@ public partial class BoardsController
 
         // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
         // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
-        await using var session = store.LightweightSession();
+        await using var session = store!.LightweightSession();
         try
         {
             await this.boards.BoardTranslationLane.UpdateAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
@@ -194,7 +194,7 @@ public partial class BoardsController
 
         // C2-02 (ADR 0288) — the shared write lane (M3 shape: the controller
         // owns the in-flight session; one SaveChangesAsync, C3).
-        await using var session = store.LightweightSession();
+        await using var session = store!.LightweightSession();
         try
         {
             await this.boards.BoardTranslationLane.RemoveAsync(session, id, languageCode, actorId, RoleSet(User));

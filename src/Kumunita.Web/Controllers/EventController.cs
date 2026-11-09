@@ -1013,7 +1013,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         IReadOnlyList<LinkedTodoRow>? linkedTodos = null;
         if (projects is not null)
         {
-            var linkedPage = await todos.ListTodosForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
+            var linkedPage = await todos!.ListTodosForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
             if (linkedPage.Items.Count > 0)
             {
                 linkedTodos = linkedPage.Items
@@ -1040,7 +1040,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         IReadOnlyList<LinkedBoardRow>? linkedBoards = null;
         if (projects is not null)
         {
-            var linkedBoardsPage = await boards.ListBoardsForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
+            var linkedBoardsPage = await boards!.ListBoardsForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
             if (linkedBoardsPage.Items.Count > 0)
             {
                 linkedBoards = linkedBoardsPage.Items
@@ -1182,7 +1182,7 @@ this.profileSettings = profileSettings ?? throw new ArgumentNullException(nameof
         TodoItem todo;
         try
         {
-            todo = await todos.CreateTodoAsync(actorId, RoleSet(User), request, HttpContext.RequestAborted);
+            todo = await todos!.CreateTodoAsync(actorId, RoleSet(User), request, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)
         {

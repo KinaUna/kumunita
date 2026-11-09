@@ -77,6 +77,7 @@ This repo uses **Marten and Wolverine** on **.NET 10**. The idiomatic patterns i
   and the **comment rule** (what/when/throws + ADR number) — live in
   [`docs/philosophy/in-code.md`](docs/philosophy/in-code.md#the-ratchet-the-split-the-comment)
   and are enforced by [`tools/code/code-check.ps1`](tools/code/code-check.ps1).
+- Security/privacy integration (IMPROVE-SEC, [ADR 0298](docs/adr/0298-data-classes-in-code.md)): a new registered doc type carries `[DataClass]`; a new read of an audience-bearing type is decided in-method or marked `// SEC-READ:`; log templates never carry a PII placeholder; views never carry an inline `on*` handler or `<script>` block. Each is enforced by a `SecGate` test in [`tests/Kumunita.Web.Tests/SecGate/`](tests/Kumunita.Web.Tests/SecGate/).
 
 ## Don't pause mid-task to check in
 

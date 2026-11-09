@@ -53,7 +53,7 @@ public class TodoCommentServiceSeamTests(PostgresFixture fixture) : IClassFixtur
         await PlantTodo(store, "tc-create-todo", author);
 
         var comment = await svc.CreateTodoCommentAsync(
-            "tc-create-todo", author, NoRoles, "a comment", null);
+            "tc-create-todo", author, NoRoles, "a comment", null, null, TestContext.Current.CancellationToken);
         Assert.Equal("tc-create-todo", comment.TodoId);
         Assert.Null(comment.ParentId);
         Assert.Equal(author, comment.AuthorId);
@@ -92,7 +92,7 @@ public class TodoCommentServiceSeamTests(PostgresFixture fixture) : IClassFixtur
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.CreateTodoCommentAsync("tc-deny-todo", stranger, NoRoles, "nope", null));
+            () => svc.CreateTodoCommentAsync("tc-deny-todo", stranger, NoRoles, "nope", null, null, TestContext.Current.CancellationToken));
     }
 
     // ── 3 — delete: the author soft-deletes their comment ──────────────────
@@ -116,7 +116,7 @@ public class TodoCommentServiceSeamTests(PostgresFixture fixture) : IClassFixtur
         });
 
         var comment = await svc.DeleteTodoCommentAsync(
-            "tc-delete-todo", "tc-delete-comment", author, NoRoles);
+            "tc-delete-todo", "tc-delete-comment", author, NoRoles, TestContext.Current.CancellationToken);
         Assert.NotNull(comment.DeletedAt);
 
         var row = Assert.Single(await CommentAudits(store, action: "todo.comment.delete", actor: author));
@@ -148,7 +148,7 @@ public class TodoCommentServiceSeamTests(PostgresFixture fixture) : IClassFixtur
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.DeleteTodoCommentAsync("tc-deldeny-todo", "tc-deldeny-comment", stranger, NoRoles));
+            () => svc.DeleteTodoCommentAsync("tc-deldeny-todo", "tc-deldeny-comment", stranger, NoRoles, TestContext.Current.CancellationToken));
     }
 
     // ── the harness ────────────────────────────────────────────────────────

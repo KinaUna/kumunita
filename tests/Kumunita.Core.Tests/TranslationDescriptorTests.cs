@@ -40,20 +40,20 @@ public class TranslationDescriptorTests
             => PostTranslationPolicy.ResolveTranslationStanding(p.GroupId.Length > 0, p.ComponentId, p.AuthorId, actorId, actorRoles),
         LoadParent = (_, _) => throw new NotSupportedException("session seam — not exercised by this pure test"),
         Find = (_, _, _) => throw new NotSupportedException("session seam — not exercised by this pure test"),
-        Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new PostTranslation
+        Create = (string id, string lang, string? title, string? body, string actorId, DateTimeOffset created) => new PostTranslation
         {
             Id = Guid.NewGuid().ToString("N"),
             PostId = id,
             LanguageCode = lang,
             Title = title,
-            Body = body,
+            Body = body!,
             AuthorId = actorId,
             Created = created
         },
-        ApplyUpdate = (PostTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+        ApplyUpdate = (PostTranslation row, string? title, string? body, string actorId, DateTimeOffset now) =>
         {
             row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
-            row.Body = body;
+            row.Body = body!;
         }
     };
 

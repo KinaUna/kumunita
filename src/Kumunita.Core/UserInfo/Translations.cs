@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.UserInfo;
 
 // ── ADR 0026 — group & community name/description translations ─────────────
@@ -51,6 +53,8 @@ namespace Kumunita.Core.UserInfo;
 /// translation of a language the group does not yet have."
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "F1 §2A sub-entities: under `Group`; carries only `GroupId` + `LanguageCode`, no principal field (the `Group` row's `Keep(reason)` is what governs it)")]
 public sealed class GroupTranslation
 {
     public string Id { get; set; } = string.Empty;
@@ -120,6 +124,8 @@ public sealed class GroupTranslation
 /// translation of a language the community does not yet have."
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "F1 §2A sub-entities: under `Group`/`Component`; carries only `GroupId`/`ComponentId` + `LanguageCode`, no principal field")]
 public sealed class CommunityTranslation
 {
     public string Id { get; set; } = string.Empty;

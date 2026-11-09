@@ -9,7 +9,9 @@ related:
   - docs/SECURITY.md
   - docs/adr/0003-roles-and-moderator-scoping.md
   - docs/adr/0142-delete-account.md
-updated: 2026-11-02
+  - docs/adr/0298-data-classes-in-code.md
+  - docs/adr/0299-instance-export-operator-gated.md
+updated: 2026-11-08
 ---
 
 > **Abstract:** the resident-facing data operations — viewing the audit log,
@@ -65,6 +67,34 @@ Most of this is an **in-app GlobalAdmin** action; a few need the operator at the
      `BreakGlass` audit rows. **Record the reason** in the incident log
      ([incident response](incident-response.md)) — the DB
      write itself is invisible to the app's audit trail.
+- **Full instance export** (whole-neighborhood migration, or a legal hold where
+  the private content must move) → the content-free export is the everyday
+  default (a GlobalAdmin, one audit row, nothing residents see); the **full**
+  scope is an operator act and is the right tool only when the private content
+  (messaging threads, audience-restricted rows, profile contact fields) has to
+  leave with the archive. It is a three-part break-glass, **operator at the DB
+  first**, per [ADR 0299](../adr/0299-instance-export-operator-gated.md):
+  1. **Grant + consume the override** — the operator writes the DB-level
+     `AdminOverride` row above (no in-app endpoint creates one;
+     [ADR 0003](../adr/0003-roles-and-moderator-scoping.md)), and the
+     GlobalAdmin who will run the export **consumes** it by entering the token
+     at `/admin/break-glass` (break-glass step 3). The gate
+     (`BreakGlassProbe.HasActiveAsync`) is satisfied only while that row is
+     **consumed and unexpired** at the moment the export runs — the full scope
+     is refused (403) otherwise.
+  2. **Run the export** — the GlobalAdmin opens the portability surface
+     (`/admin/portability`) and chooses the **full** scope (the second button;
+     the content-free button is the default and needs no override). The audit row
+     records `Action = portability.export.full`, `Via = BreakGlass`.
+  3. **Confirm it landed** — a transparency notification
+     (`kind: instance.full-export`, the D10 mechanism in
+     [ADR 0299](../adr/0299-instance-export-operator-gated.md) §4) reaches
+     every non-guest resident's inbox, and the `portability.export.full` /
+     `Via: BreakGlass` row is in the audit log. **Record the reason** in the
+     incident log as in step 4 above.
+
+  This is distinct from the **resident's own** export above (that is the
+  resident's data out; this is the whole instance out) — do not conflate them.
 
 ## Related
 

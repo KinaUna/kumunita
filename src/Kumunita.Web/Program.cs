@@ -92,6 +92,15 @@ builder.Services.Configure<HealthOptions>(
 builder.Services.Configure<MediaOptions>(
     builder.Configuration.GetSection(MediaOptions.SectionName));
 
+// Retention (IMPROVE-SEC D6 / E5): per-instance retention config (the
+// `Retention__*` keys, bound in RetentionOptions — IS33). Same bind shape as
+// CommunityOptions / MediaOptions. Without this binding IOptions<RetentionOptions>
+// resolves a bare RetentionOptions and the RetentionTickHandler (IS34b) reads
+// the D6 defaults — which is correct, but an operator's `Retention__*` env
+// overrides would never reach it (the AuditPurgeOptions binding precedent).
+builder.Services.Configure<Kumunita.Core.Privacy.RetentionOptions>(
+    builder.Configuration.GetSection(Kumunita.Core.Privacy.RetentionOptions.SectionName));
+
 // Marten: the domain document store (ADR 0001/0004). All domain documents live in the `mt`
 // schema; the custom KumunitaFeature contributes the first versioned schema change.
 var kumunitaConnection = builder.Configuration.GetConnectionString("Kumunita")
@@ -440,8 +449,11 @@ builder.Services.AddSingleton<Kumunita.Core.Identity.IBotChallengeVerifier>(sp =
 //     of the pin's §3a line is preserved)
 //   · pin §3c target 4 (breadcrumb data redaction) → structurally infeasible
 //     in the callback (Breadcrumb.Data is immutable, SentryEvent.Breadcrumbs
-//     has no setter) AND vacuous (DisableSentryHttpMessageHandler prevents
-//     http-category breadcrumbs; the app adds zero manual breadcrumbs).
+//     has no setter). Note: it is no longer moot — UseSentry registers the
+//     Sentry logging integration (SentryAspNetCoreLoggerProvider), so log lines
+//     become breadcrumbs. The safe control is the breadcrumb floor (IS05,
+//     o.MinimumBreadcrumbLevel = Warning) plus PII-free log templates
+//     (IS07/IS08) — not in-callback redaction.
 // See the ## F10.U2 handoff section for the full drift table.
 var kumunitaSentryDsn = builder.Configuration["SENTRY_DSN"];
 if (!string.IsNullOrWhiteSpace(kumunitaSentryDsn))
@@ -455,6 +467,14 @@ if (!string.IsNullOrWhiteSpace(kumunitaSentryDsn))
     builder.WebHost.UseSentry(o =>
     {
         o.Dsn = kumunitaSentryDsn;
+        // IMPROVE-SEC IS05 (D4): UseSentry registers the Sentry logging
+        // integration (SentryAspNetCoreLoggerProvider), which turns log lines
+        // into breadcrumbs. Floor them so Information-level lines — which carry
+        // {Email}/{Recipient} in this codebase — never become breadcrumbs:
+        // only Warning-and-above reach the third party, and the scrubber
+        // (SetBeforeSend below) still redacts request PII on the event.
+        o.MinimumBreadcrumbLevel = LogLevel.Warning;
+        o.MinimumEventLevel = LogLevel.Error;
         // PII-scrubbing contract (pin §3a): default PII off.
         o.SendDefaultPii = false;
         // Pin §3a "AddNetworkLogBreadcrumbs = false" — no such member in 6.12.1;
@@ -1329,6 +1349,13 @@ await bus.PublishAsync(new StorageMetricsCaptureTick());
 // LocalVolumeFileStore bytes accumulate forever — the M13 UsagePurgeTick seed
 // precedent, re-using F1's idempotent DeleteIfExistsAsync byte-delete seam).
 await bus.PublishAsync(new MediaLifecycleTick());
+// IS34b (IMPROVE-SEC D6 / E5) — the D6 retention sweep tick (the
+// RetentionTickHandler self-schedules 1 day ahead after each run; this seed is
+// the first-boot scheduling. Without this line the handler never fires and the
+// D6 types — SessionDoc, IdentityToken, EscalationToken, EmailDeadLetter,
+// OutboxEmail — accumulate forever, the M13 UsagePurgeTick / F15
+// MediaLifecycleTick seed precedent).
+await bus.PublishAsync(new Kumunita.Core.Privacy.RetentionTick());
 // F18 (MAIL-06, T4 code leg) — the in-repo bounce/complaint ingest-rate alarm
 // (the MailAlarmsHandler self-reschedules hourly after each run; this seed is
 // the first-boot scheduling. Without this line the handler never fires and the
@@ -1361,10 +1388,11 @@ finally
 // pin §3c targets are redacted (request headers, cookies, query-string params);
 // the fourth (breadcrumb data) is structurally infeasible in the callback
 // (Breadcrumb.Data is IReadOnlyDictionary with private init; SentryEvent.
-// Breadcrumbs is IReadOnlyCollection with no setter) AND vacuous
-// (DisableSentryHttpMessageHandler prevents http-category breadcrumbs; the
-// app adds zero manual breadcrumbs — a codebase-wide grep for
-// Sentry.AddBreadcrumb returns zero hits). Public so F10.U3's
+// Breadcrumbs is IReadOnlyCollection with no setter). It is no longer moot:
+// UseSentry wires the Sentry logging integration, so log lines become
+// breadcrumbs — the safe control is the floor (IS05,
+// o.MinimumBreadcrumbLevel = Warning) plus PII-free log templates (IS07/IS08),
+// and this scrubber redacts request PII on the event itself. Public so F10.U3's
 // Error_TrackerRegisteredWhenDsnSet test (pin §4a leg-3) can invoke it on a
 // synthetic SentryEvent without an InternalsVisibleTo (none exists in this
 // repo).
@@ -1436,11 +1464,13 @@ public static class SentryPiiScrubber
                 }
             }
 
-            // Pin §3c target 4 (breadcrumbs): structurally infeasible here
-            // (Breadcrumb.Data is immutable; SentryEvent.Breadcrumbs has no
-            // setter) and vacuous (DisableSentryHttpMessageHandler + zero
-            // manual breadcrumbs). See the DRIFT NOTE above and the handoff
-            // section.
+            // Pin §3c target 4 (breadcrumb data): still structurally infeasible
+            // here (Breadcrumb.Data is immutable; SentryEvent.Breadcrumbs has no
+            // setter), but no longer moot — the Sentry logging integration
+            // makes log lines into breadcrumbs. Safety comes from the floor
+            // (IS05, o.MinimumBreadcrumbLevel = Warning) + PII-free templates
+            // (IS07/IS08); this scrubber redacts request PII on the event.
+            // See the DRIFT NOTE above and the handoff section.
 
             return e;
         }

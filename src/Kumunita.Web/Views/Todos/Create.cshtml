@@ -11,7 +11,7 @@
     // cleanup/social/garden set, the Event/Create.cshtml idiom).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
-    var tagsExample = await Translation.GetAsync("tags.events_example", _kwL);
+    var tagsExample = Translation is null ? "e.g. community, garden" : await Translation.GetAsync("tags.events_example", _kwL);
     // The assignee picker draws on the same option list the _GrantPickers
     // partial draws on (the M2/M3/M4 shared shape, seeded by the controller's
     // SeedGrantPickerOptionsAsync) — display + standing, never a gate (C-M5·6).

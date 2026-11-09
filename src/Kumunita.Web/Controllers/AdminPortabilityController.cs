@@ -1,6 +1,8 @@
+using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Portability;
 using Kumunita.Web.Security;
+using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,9 +16,15 @@ namespace Kumunita.Web.Controllers;
 /// shape: <see cref="Kumunita.Core.Identity.Roles.GlobalAdmin"/>-gated, a
 /// thin wrapper over the <see cref="IPortabilityService"/> export seam, and
 /// the audit row is the **service's** (exactly one <c>AccessAudit</c>,
-/// <c>Via = Admin</c>, <c>TargetKind "portability"</c>, verb <c>export</c>
-/// — the <c>messaging.toggle</c> one-audit-row shape the controller adds
-/// none).
+/// <c>TargetKind "portability"</c>, verb <c>export</c>, the one-audit-row
+/// shape the controller adds none). **IS28 (ADR 0299):** the export is
+/// **operator-gated** — <c>?scope=full</c> requires an active
+/// operator-granted <c>AdminOverride</c> (checked via
+/// <see cref="BreakGlassProbe.HasActiveAsync"/> on the injected
+/// <see cref="IDocumentStore"/>) and is audited <c>Via: BreakGlass</c> with
+/// <c>Action = "portability.export.full"</c>; the content-free default
+/// (the absent/`content-free` scope) is audited <c>Via: Admin</c> with
+/// <c>Action = "portability.export.content-free"</c>.
 /// <para>
 /// Both halves are shipped: the export half (the <c>Export</c> action + the
 /// service's <c>ExportAsync</c> audit row, U04) and the import half — the
@@ -37,7 +45,14 @@ namespace Kumunita.Web.Controllers;
 public sealed class AdminPortabilityController(
     IPortabilityService portability,
     ILocalizationService localization,
-    ITranslationProvider? translationProvider = null) : Controller
+    ITranslationProvider? translationProvider = null,
+    // IS28 (ADR 0299) — the break-glass gate seam: the full export
+    // (<c>?scope=full</c>) reads <see cref="BreakGlassProbe.HasActiveAsync"/>
+    // on this store. Last parameter with a <c>= null</c> default so the
+    // existing test-construction site (which passes three args) keeps
+    // compiling; the <c>null</c> floor means the full branch is forbidden
+    // (no probe → no active override → 403), which is the fail-closed rule.
+    IDocumentStore? store = null) : Controller
 {
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -54,21 +69,67 @@ public sealed class AdminPortabilityController(
     public IActionResult Index() => View();
 
     /// <summary>
-    /// <c>GET /admin/portability/export</c> — streams the complete
-    /// <c>*.kumunita</c> archive (the design doc §surface:
-    /// <c>Content-Disposition: attachment</c>, the ADR 0034 attachment
-    /// lane's shape — the same serve headers
+    /// <c>GET /admin/portability/export</c> — streams a <c>*.kumunita</c>
+    /// archive (the design doc §surface: <c>Content-Disposition: attachment</c>,
+    /// the ADR 0034 attachment lane's shape — the same serve headers
     /// <see cref="AttachmentController"/>/C-ATT·2 uses). Delegates to
-    /// <see cref="IPortabilityService.ExportAsync"/> — which emits exactly
-    /// one <c>portability.export</c> <c>AccessAudit</c> row
-    /// (<c>TargetKind "portability"</c>, <c>Via = Admin</c>, verb
-    /// <c>export</c>; the controller adds none — C-M11·6).
+    /// <see cref="IPortabilityService.ExportAsync"/> — which emits exactly one
+    /// <c>portability.export.*</c> <c>AccessAudit</c> row (the controller adds
+    /// none — C-M11·6).
     /// </summary>
+    /// <param name="scope">
+    /// **IS28 (ADR 0299)** — optional; <c>null</c> or <c>"content-free"</c>
+    /// (the default) exports the content-free archive (<see
+    /// cref="PortabilityExportScope.ContentFree"/> — no gate, audited
+    /// <c>Via: Admin</c>). <c>"full"</c> exports the complete archive
+    /// (<see cref="PortabilityExportScope.Full"/>) but is **operator-gated**:
+    /// it requires an active operator-granted <c>AdminOverride</c> (checked via
+    /// <see cref="BreakGlassProbe.HasActiveAsync"/> on the injected
+    /// <see cref="IDocumentStore"/>); without one it returns <c>403 Forbid</c>
+    /// and no service call is made. With one it is audited
+    /// <c>Via: BreakGlass</c>, <c>Action = "portability.export.full"</c>.
+    /// Any other value is treated as the content-free default (no unknown
+    /// scope can widen what is exported).
+    /// </param>
     [HttpGet("export")]
-    public async Task<IActionResult> Export()
+    public async Task<IActionResult> Export(string? scope = null)
     {
         var actor = ActorId(User) ?? string.Empty;
-        var stream = await portability.ExportAsync(actor);
+
+        // IS28 (ADR 0299) — the scope is closed: "full" is the only value
+        // that can widen the export, and it is operator-gated. Any other
+        // value (null, "content-free", or an unknown string) is the
+        // content-free default — a fail-closed rule: unknown scopes can
+        // never widen the export.
+        var isFull = string.Equals(scope, "full", StringComparison.OrdinalIgnoreCase);
+
+        if (isFull)
+        {
+            // The gate (ADR 0299) — BreakGlassProbe.HasActiveAsync, run on a
+            // query session opened from the injected IDocumentStore. A null
+            // store (the test floor) is a fail-closed no-override → 403,
+            // matching the production rule (no active override → no full export).
+            var hasOverride = false;
+            if (store is not null)
+            {
+                await using var session = store.QuerySession();
+                hasOverride = await BreakGlassProbe.HasActiveAsync(
+                    session, actor, HttpContext.RequestAborted);
+            }
+            if (!hasOverride)
+            {
+                // No active override — the full export is refused before any
+                // service call is made (the C-M11·6 one-audit-row shape is
+                // preserved: no audit row for a refused export).
+                return Forbid();
+            }
+        }
+
+        var scopeEnum = isFull
+            ? PortabilityExportScope.Full
+            : PortabilityExportScope.ContentFree;
+
+        var stream = await portability.ExportAsync(actor, scopeEnum);
 
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         Response.Headers["Content-Disposition"] =

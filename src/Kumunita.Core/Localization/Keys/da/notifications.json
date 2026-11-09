@@ -80,5 +80,8 @@
   "notifications.kind.guardian.group_invite": "Gruppindbydelse til dit barn",
   "notifications.preference.guardian.group_invite.label": "N\u00E5r en gruppe inviterer dit barn",
   "notifications.kind.guardian.community_invite": "Communitymedlemskab til dit barn",
-  "notifications.preference.guardian.community_invite.label": "N\u00E5r en community tilf\u00F8jer dit barn"
+  "notifications.preference.guardian.community_invite.label": "N\u00E5r en community tilf\u00F8jer dit barn",
+  "notifications.kind.instance.full-export": "Fuld eksport af instansen godkendt",
+  "notification.instance.full-export.subject": "Fuld eksport af instansen godkendt",
+  "notification.instance.full-export.body": "En operat\u00f8r har godkendt en fuld eksport af denne instans. Eksporten blev udf\u00f8rt og er registreret i revisionsloggen."
 }

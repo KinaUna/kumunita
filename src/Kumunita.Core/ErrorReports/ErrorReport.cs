@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.ErrorReports;
 
 /// <summary>
@@ -12,6 +14,10 @@ namespace Kumunita.Core.ErrorReports;
 /// M32·3 / ESC·2). The four ESC additive fields are each null for
 /// locally-filed rows.
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Pseudonymize, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): an operator-facing report the resident filed (IS23); D6: 180 days after resolution",
+    retentionKey: "ErrorReportDays",
+    principalField: "SubjectId")]
 public sealed class ErrorReport
 {
     public string Id { get; set; } = string.Empty;

@@ -80,6 +80,31 @@ D7 `FilterParams` mechanism). An absent/unknown pair preserves the surface's
 current order (C-SORT·2). There is nothing to audit, back up, or rotate
 for it — a sorted read emits **no `AccessAudit` row** (C-SORT·4).
 
+**Retention (IMPROVE-SEC D6, the "Moderate" defaults).** A daily retention
+sweep (the `RetentionTick`, IS33–IS35) purges accumulated rows of the D6 types
+once they cross their cutoff; every key is a **day-count**, and a value of
+`0` (or an absent key) means **keep** — that type is never purged (the
+fail-safe). All keys bind under the `Retention` section (`Retention__*`). Omit
+to keep the default.
+
+| Variable | Req | Secret | Description |
+|---|---|---|---|
+| `Retention__Sessions` | Optional | No | D6: a session row is purged **30 days** after it is revoked (`0` = keep). Active (unrevoked) sessions are always kept |
+| `Retention__Tokens` | Optional | No | D6: consumed/expired identity tokens and revoked escalation tokens are purged **7 days** after their terminal state (`0` = keep) |
+| `Retention__OutboxBodyNullDays` | Optional | No | D6: the outbox email **body** is nulled **7 days** after delivery (the row is kept until `Retention__OutboxDays`) (`0` = never null the body) |
+| `Retention__OutboxDays` | Optional | No | D6: the outbox email **row** is kept **90 days** after delivery, then deleted (`0` = keep) |
+| `Retention__DeadLetters` | Optional | No | D6: email dead-letter rows are purged **30 days** after dead (`0` = keep) |
+| `Retention__NotificationsRead` | Optional | No | D6: a **read** notification is purged **90 days** after it is read (`0` = keep) |
+| `Retention__NotificationsUnread` | Optional | No | D6: an **unread** notification is purged **365 days** after creation (`0` = keep) |
+| `Retention__ErrorReports` | Optional | No | D6: a **resolved** error report is purged **180 days** after resolution. **Unresolved reports are always kept** (`0` = keep) |
+
+The **file-log `Retain`** (the dated `app-*.log` files under
+`Logging__File__Directory`) now **also runs daily via the retention tick**
+(D6: the file-log `Retain` runs daily, not only at boot) — the boot pass at
+startup is kept, and the sweep re-runs `RollingFileSink.Retain` each tick using
+`Logging__File__RetentionDays` (default `14`). That log leg is driven by the
+`Logging__File` section (above), not a `Retention__*` key.
+
 ## Instance inventory
 
 Keep one row per neighborhood. This is your map.

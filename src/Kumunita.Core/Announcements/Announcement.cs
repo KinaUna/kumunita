@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Announcements;
 
 /// <summary>
@@ -36,6 +38,8 @@ public enum AnnouncementScope
 /// decision on the read path; visibility is the flat two-way <see cref="Scope"/> split).
 /// <see cref="Modified"/> is null until the announcement is edited after creation.
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Resident,
+    reason: "F1 §2A (condition: `AuthorId == resident`; platform `AuthorId == \"\"` are kept)")]
 public sealed class Announcement
 {
     public string Id { get; set; } = string.Empty;

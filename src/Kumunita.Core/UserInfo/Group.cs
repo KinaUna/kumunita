@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.UserInfo;
 
 /// <summary>
@@ -5,6 +7,8 @@ namespace Kumunita.Core.UserInfo;
 /// audiences; membership is the strong-consistency resolution the authorization path reads
 /// (invariant C4).
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Keep, ExportScope.InstanceOnly,
+    reason: "IS03 §2C decision (now decided): the resident is the **owner**; the group outlives the account (the E2 gap this lane closes)")]
 public sealed class Group
 {
     public string Id { get; set; } = string.Empty;
@@ -46,6 +50,8 @@ public sealed class Group
 /// (via: Moderator/Admin), not on this document.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.InstanceOnly,
+    reason: "F1 §2B: already handled by `DeleteCoreAsync` (step 6)")]
 public sealed class GroupMembership
 {
     /// <summary>Surrogate PK; (GroupId, UserId) remains the business key.</summary>
@@ -76,6 +82,8 @@ public sealed class GroupMembership
 /// actions by default (ADR 0006-E).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): the delegation is meaningless once either side's account is gone (IS22)")]
 public sealed class DelegationGrant
 {
     public string Id { get; set; } = string.Empty;

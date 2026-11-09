@@ -38,7 +38,7 @@ public sealed class KumunitaArchiveLimitsTests
     }
 
     [Fact]
-    public void Rejects_TotalDecompressedOverLimit()
+    public async Task Rejects_TotalDecompressedOverLimit()
     {
         // 256 KB of zero bytes compresses to a few hundred bytes, but
         // decompresses to 256 KB — over a 16 KB per-entry limit.
@@ -46,13 +46,13 @@ public sealed class KumunitaArchiveLimitsTests
         var archive = BuildZip(("media/aa/bbbbbbbb", payload));
         var limits = new ArchiveLimits(1_000, 16L * 1024, 512L * 1024 * 1024);
 
-        var ex = Assert.ThrowsAnyAsync<InvalidDataException>(() =>
-            KumunitaArchive.ReadAsync(archive, limits: limits)).Result;
+        var ex = await Assert.ThrowsAnyAsync<InvalidDataException>(() =>
+            KumunitaArchive.ReadAsync(archive, TestContext.Current.CancellationToken, limits: limits));
         Assert.Contains("16384", ex.Message);
     }
 
     [Fact]
-    public void Rejects_EntryCountOverLimit()
+    public async Task Rejects_EntryCountOverLimit()
     {
         // 4 entries against a limit of 2 — the count is checked before
         // any bytes are read (the entry count is the zip header, not a
@@ -63,27 +63,27 @@ public sealed class KumunitaArchiveLimitsTests
             ("a3", new byte[] { 3 }),
             ("a4", new byte[] { 4 }));
 
-        var ex = Assert.ThrowsAnyAsync<InvalidDataException>(() =>
-            KumunitaArchive.ReadAsync(archive, limits: new ArchiveLimits(2, 1L * 1024 * 1024, 1L * 1024 * 1024))).Result;
+        var ex = await Assert.ThrowsAnyAsync<InvalidDataException>(() =>
+            KumunitaArchive.ReadAsync(archive, TestContext.Current.CancellationToken, limits: new ArchiveLimits(2, 1L * 1024 * 1024, 1L * 1024 * 1024)));
         Assert.Contains("4", ex.Message);
         Assert.Contains("2", ex.Message);
     }
 
     [Fact]
-    public void Rejects_DuplicateEntryNames()
+    public async Task Rejects_DuplicateEntryNames()
     {
         var archive = BuildZip(
             ("docs/Post.json", new byte[] { 1 }),
             ("docs/Post.json", new byte[] { 2 }));
 
-        var ex = Assert.ThrowsAnyAsync<InvalidDataException>(() =>
-            KumunitaArchive.ReadAsync(archive, limits: new ArchiveLimits(100, 1L * 1024 * 1024, 1L * 1024 * 1024))).Result;
+        var ex = await Assert.ThrowsAnyAsync<InvalidDataException>(() =>
+            KumunitaArchive.ReadAsync(archive, TestContext.Current.CancellationToken, limits: new ArchiveLimits(100, 1L * 1024 * 1024, 1L * 1024 * 1024)));
         Assert.Contains("duplicate", ex.Message);
         Assert.Contains("docs/Post.json", ex.Message);
     }
 
     [Fact]
-    public void NormalArchive_StillReads()
+    public async Task NormalArchive_StillReads()
     {
         // A genuine archive in the writer's own layout — manifest, one doc
         // type, one media object, principals, config — reads end-to-end.
@@ -112,7 +112,7 @@ public sealed class KumunitaArchiveLimitsTests
         }
         ms.Position = 0;
 
-        var data = KumunitaArchive.ReadAsync(ms).Result;
+        var data = await KumunitaArchive.ReadAsync(ms, TestContext.Current.CancellationToken);
 
         Assert.NotNull(data.Manifest);
         Assert.Equal("Test Community", data.Manifest.CommunityName);

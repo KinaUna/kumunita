@@ -109,20 +109,20 @@ public sealed class PageService : IPageService
             Find = (IDocumentSession session, string id, string lang) => session.Query<PageTranslation>()
                 .Where(t => t.PageId == id && t.LanguageCode == lang)
                 .FirstOrDefaultAsync(),
-            Create = (string id, string lang, string? title, string body, string actorId, DateTimeOffset created) => new PageTranslation
+            Create = (string id, string lang, string? title, string? body, string actorId, DateTimeOffset created) => new PageTranslation
             {
                 Id = Guid.NewGuid().ToString("N"),
                 PageId = id,
                 LanguageCode = lang,
                 Title = title,
-                Body = body,
+                Body = body!,
                 AuthorId = actorId,
                 Created = created
             },
-            ApplyUpdate = (PageTranslation row, string? title, string body, string actorId, DateTimeOffset now) =>
+            ApplyUpdate = (PageTranslation row, string? title, string? body, string actorId, DateTimeOffset now) =>
             {
                 row.Title = title;
-                row.Body = body;
+                row.Body = body!;
             }
         });
     }
@@ -140,6 +140,7 @@ public sealed class PageService : IPageService
     /// <inheritdoc />
     public async Task<Page> GetByPathAsync(string path)
     {
+        // SEC-READ: caller-gated by PageController.Show (CanAsync Read) / AdminController (GlobalAdmin) / StaticPagesController (public) / KioskItemCatalog (CanAsync Read)
         if (string.IsNullOrWhiteSpace(path))
             throw new KeyNotFoundException("A page path is required.");
 
@@ -164,6 +165,7 @@ public sealed class PageService : IPageService
     /// <inheritdoc />
     public async Task<Page> GetBySlugUnderParentAsync(string? parentId, string slug)
     {
+        // SEC-READ: caller-gated by PageController.Translations (PageToAuditableResource, the per-translation read seam)
         if (string.IsNullOrWhiteSpace(slug))
             throw new KeyNotFoundException("A page slug is required.");
         var page = await LoadByParentAndSlugAsync(parentId, slug).ConfigureAwait(false);
@@ -175,6 +177,7 @@ public sealed class PageService : IPageService
     /// <inheritdoc />
     public async Task<IReadOnlyList<Page>> GetTreeAsync()
     {
+        // SEC-READ: caller-gated by PageController.Index (CanSeeAsync C6) / HomeController (CanSeeAsync C6) / BlogController (title+href only) / SearchController (title+href only)
         await using var session = _store.QuerySession();
         return await session.Query<Page>()
             .Where(p => p.IsDeleted == false)   // ADR 0024 soft-delete filter (U02, not U03)
@@ -187,6 +190,7 @@ public sealed class PageService : IPageService
     /// <inheritdoc />
     public async Task<IReadOnlyList<PageTranslation>> GetTranslationsAsync(string pageId)
     {
+        // SEC-READ: caller-gated by PageController.Show / PageController.Translations / HomeController (after the CanSeeAsync C6 already ran, C-M3·1)
         if (string.IsNullOrWhiteSpace(pageId))
             throw new KeyNotFoundException("A page id is required.");
 
@@ -205,6 +209,7 @@ public sealed class PageService : IPageService
     /// <inheritdoc />
     public async Task<(Page, IReadOnlyList<PageTranslation>)> ResolvePageAsync(string path)
     {
+        // SEC-READ: caller-gated by StaticPagesController (the page's Read decision, the ADR 0039 §3.4 shape)
         if (string.IsNullOrWhiteSpace(path))
             throw new KeyNotFoundException("A page path is required.");
 
@@ -245,6 +250,7 @@ public sealed class PageService : IPageService
     /// <inheritdoc />
     public async Task<Page?> GetByMountPointAsync(string slot)
     {
+        // SEC-READ: caller-gated by PageMountResolver (the Web route's CanSeeAsync)
         if (string.IsNullOrWhiteSpace(slot))
             return null;   // a mount point is a display concern — unmounted ⇒ null (no 404)
 
@@ -285,6 +291,7 @@ public sealed class PageService : IPageService
     /// </summary>
     public async Task<int> GetDepthAsync(string pageId)
     {
+        // SEC-READ: no disclosure: returns an int (depth count); no audience-bearing field is exposed
         if (string.IsNullOrWhiteSpace(pageId))
             return 0;
 
@@ -317,6 +324,7 @@ public sealed class PageService : IPageService
     /// </summary>
     public async Task<string?> GetPathAsync(string pageId)
     {
+        // SEC-READ: no disclosure: returns a slug-path string; no audience-bearing field (the ADR 0039 §3.3 derived path)
         if (string.IsNullOrWhiteSpace(pageId))
             return null;
 
@@ -353,6 +361,7 @@ public sealed class PageService : IPageService
     /// <exception cref="InvalidOperationException">The move would create a cycle.</exception>
     public async Task EnsureNoCycleAsync(string nodeId, string? newParentId)
     {
+        // SEC-READ: no disclosure: a hierarchy guard (cycle check); no content field is read or exposed
         if (string.IsNullOrWhiteSpace(nodeId))
             throw new ArgumentException("A node id is required.", nameof(nodeId));
 
@@ -381,6 +390,7 @@ public sealed class PageService : IPageService
     /// <exception cref="InvalidOperationException">The move would exceed the max depth.</exception>
     public async Task EnsureDepthWithinLimitAsync(string? newParentId)
     {
+        // SEC-READ: no disclosure: a hierarchy guard (depth cap); no content field is read or exposed
         if (newParentId is null)
             return; // becoming a root — depth 1, always within the cap
 
@@ -394,6 +404,7 @@ public sealed class PageService : IPageService
 
     public async Task<Page?> GetBlogRootAsync(string actorId)
     {
+        // SEC-READ: owner-only — scoped to the actor's own blog root (AuthorId == actorId, PageKind.User)
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("An actor id is required.", nameof(actorId));
 
@@ -410,6 +421,7 @@ public sealed class PageService : IPageService
 
     public async Task<IReadOnlyList<Page>> GetBlogPagesAsync(string authorId)
     {
+        // SEC-READ: owner-only — scoped to the author's own blog pages (AuthorId == authorId, PageKind.User)
         if (string.IsNullOrEmpty(authorId))
             throw new ArgumentException("An author id is required.", nameof(authorId));
 
@@ -425,6 +437,7 @@ public sealed class PageService : IPageService
 
     public async Task<bool> IsUnderBlogAsync(string pageId)
     {
+        // SEC-READ: no disclosure: returns a bool (is-under-blog probe); no content field is exposed
         if (string.IsNullOrEmpty(pageId))
             return false;
 
@@ -483,6 +496,7 @@ public sealed class PageService : IPageService
     public async Task<Page> CreateAsync(
         Page page, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
+        // SEC-READ: owner-only — standing is in-method (PageStandingPolicy.CheckCreateStanding, ADR 0040)
         ArgumentNullException.ThrowIfNull(page);
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An authoring actor is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(actorRoles);
@@ -711,6 +725,7 @@ public sealed class PageService : IPageService
     public async Task<Page> UpdateAsync(
         Page updated, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
+        // SEC-READ: owner-only — standing is in-method (PageStandingPolicy.CheckEditStanding, ADR 0040)
         ArgumentNullException.ThrowIfNull(updated);
         if (string.IsNullOrEmpty(updated.Id)) throw new ArgumentException("A page id is required.", nameof(updated.Id));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
@@ -811,6 +826,7 @@ public sealed class PageService : IPageService
     /// </summary>
     public async Task<Page> PublishAsync(string pageId, string actorId, IDocumentSession session)
     {
+        // SEC-READ: owner-only — author-only publish lane (ADR 0037, AuthorId == actorId)
         if (string.IsNullOrEmpty(pageId)) throw new ArgumentException("A page id is required.", nameof(pageId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(session);
@@ -866,6 +882,7 @@ public sealed class PageService : IPageService
         string pageId, string? newParentId, string? newSlug,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
+        // SEC-READ: owner-only — standing is in-method (ResolveMoveDeleteStanding, ADR 0040)
         if (string.IsNullOrEmpty(pageId)) throw new ArgumentException("A page id is required.", nameof(pageId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(actorRoles);
@@ -951,6 +968,7 @@ public sealed class PageService : IPageService
     public async Task DeleteAsync(
         string pageId, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
+        // SEC-READ: owner-only — standing is in-method (ResolveMoveDeleteStanding, ADR 0040)
         if (string.IsNullOrEmpty(pageId)) throw new ArgumentException("A page id is required.", nameof(pageId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
         ArgumentNullException.ThrowIfNull(actorRoles);
@@ -1092,6 +1110,7 @@ public sealed class PageService : IPageService
     public async Task ResetToSeededAsync(
         string pageId, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
+        // SEC-READ: owner-only — standing is in-method (PageStandingPolicy.CheckEditStanding, ADR 0058 D3)
         if (string.IsNullOrEmpty(pageId))
             throw new ArgumentException("A page id is required.", nameof(pageId));
         if (string.IsNullOrEmpty(actorId))
@@ -1149,6 +1168,7 @@ public sealed class PageService : IPageService
     /// <inheritdoc />
     public async Task<IReadOnlyList<SeededPageStatus>> GetSeededPageStatusAsync()
     {
+        // SEC-READ: caller-gated by AdminHelpController (GlobalAdmin, [Authorize])
         // Read-only: opens its own query session (the read-lane convention,
         // the same as GetTreeAsync / GetTranslationsAsync). Writes nothing,
         // no audit row — the status is a display probe for the admin, not a
@@ -1274,6 +1294,7 @@ public sealed class PageService : IPageService
     public async Task<int> ResetAllSeededPagesAsync(
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
+        // SEC-READ: owner-only — standing is in-method (GlobalAdmin check, ADR 0058 D3)
         if (string.IsNullOrEmpty(actorId))
             throw new UnauthorizedAccessException("An acting actor is required.");
         ArgumentNullException.ThrowIfNull(actorRoles);

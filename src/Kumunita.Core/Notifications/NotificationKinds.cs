@@ -312,6 +312,26 @@ public static class NotificationKinds
     /// </summary>
     public const string GuardianEventRsvp = "guardian.event_rsvp";
 
+    // ── IS29 (ADR 0299 §4, D10) — the operator-lane transparency kind ──────
+
+    /// <summary>
+    /// IS29 (ADR 0299 §4, D10 — owner decision 2026-11-06) — a **full**
+    /// instance export (the operator-gated <c>Full</c> scope of the
+    /// <see cref="Kumunita.Core.Portability.PortabilityService"/> export) was
+    /// authorised by the operator. Every non-guest resident receives one inbox
+    /// row; the body carries the date + the operator authorisation and **no
+    /// actor name / id** (the kind label
+    /// <c>notifications.kind.instance.full-export</c> is the resident-facing
+    /// text).
+    /// <para>
+    /// Deliberately **not** in <see cref="Known"/>: the closed <c>Known</c>
+    /// set is the resident's preference-toggle vocabulary (the 31-kind
+    /// settings page; ADR 0076 D2), and this is a one-time system
+    /// transparency notice, not a toggleable lane.
+    /// </para>
+    /// </summary>
+    public const string InstanceFullExport = "instance.full-export";
+
     public static readonly IReadOnlySet<string> OptInKinds = new HashSet<string>(StringComparer.Ordinal)
     {
         Announcement, PageChild,

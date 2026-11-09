@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Identity;
 
 /// <summary>
@@ -17,6 +19,9 @@ namespace Kumunita.Core.Identity;
 /// </list>
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.Secret, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): a credential (verify/setup tokens) (IS22); D6: 7 days after consumption or expiry",
+    retentionKey: "TokenDays")]
 public sealed class IdentityToken
 {
     public const string KindVerify = "verify";

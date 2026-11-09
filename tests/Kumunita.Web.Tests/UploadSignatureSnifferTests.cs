@@ -72,7 +72,7 @@ public class UploadSignatureSnifferTests
     {
         Assert.False(UploadSignatureSniffer.Matches("application/vnd.ms-powerpoint", WordHead));
         Assert.False(UploadSignatureSniffer.Matches("application/octet-stream", PngHead));
-        Assert.False(UploadSignatureSniffer.Matches(null, PngHead));
+        Assert.False(UploadSignatureSniffer.Matches(null!, PngHead));
         Assert.False(UploadSignatureSniffer.Matches("", PngHead));
         Assert.False(UploadSignatureSniffer.Matches("   ", PngHead));
     }

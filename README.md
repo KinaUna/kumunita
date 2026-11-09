@@ -42,7 +42,11 @@ directory & profiles, posts + moderation, multilingual, rich content, guardian
 controls, pages, events + calendar, projects, notifications, messaging, PWA,
 portability, storage, analytics, kiosk, @mentions, personal notes, and the
 `IMPROVE` + `IMPROVE-3` + prod-hardening integration lanes — on one
-server-rendered stack over a single Postgres. The detailed,
+server-rendered stack over a single Postgres. The **`IMPROVE-SEC`** lane is
+**done** — security & privacy integrated into the code, not bolted on: data
+classes in code, complete account deletion + retention, and the operator-gated
+instance export (ADRs [0298](docs/adr/0298-data-classes-in-code.md) and
+[0299](docs/adr/0299-instance-export-operator-gated.md)). The detailed,
 milestone-by-milestone report lives in
 [`docs/STATUS.md`](docs/STATUS.md); the roadmap's source of truth is
 [`src/Kumunita.Web/Milestones.cs`](src/Kumunita.Web/Milestones.cs) (narrated at

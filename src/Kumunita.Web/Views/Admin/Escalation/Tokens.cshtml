@@ -97,7 +97,7 @@
         <div class="d-flex align-items-center gap-2">
             <code class="flex-grow-1 break-all p-2 bg-white border rounded" id="new-token">@token</code>
             <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
-                    onclick="navigator.clipboard.writeText(document.getElementById('new-token').textContent)">
+                    data-copy-target="new-token">
                 <kw-l key="escalation.tokens.copy">Copy</kw-l>
             </button>
         </div>

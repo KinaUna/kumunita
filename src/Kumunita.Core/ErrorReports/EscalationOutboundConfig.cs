@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.ErrorReports;
 
 /// <summary>
@@ -21,6 +23,8 @@ namespace Kumunita.Core.ErrorReports;
 /// header (ESC·6).
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.Secret, Erasure.Keep, ExportScope.Never,
+    reason: "the outbound webhook config; the `Token` is an operator secret, not a resident PII field")]
 public sealed class EscalationOutboundConfig
 {
     public string Id { get; set; } = default!;       // conventional — a fixed singleton id (the Web layer sets it, e.g. "outbound-config")

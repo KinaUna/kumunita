@@ -7,16 +7,15 @@
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var ariaClose = Translation is null ? "Close" : await Translation.GetAsync("a11y.close", _kwL);
-    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
+    var optionalPlaceholder = Translation is null ? "Optional" : await Translation.GetAsync("common.optional", _kwL);
     // ADR 0072 — the initial-lane suggested-title placeholder (was the
     // hardcoded "Planned"), resolved the same way as optionalPlaceholder.
-    var firstLanePlaceholder = await Translation.GetAsync("projects.board.lane.first_title_placeholder", _kwL);
+    var firstLanePlaceholder = Translation is null ? "Planned" : await Translation.GetAsync("projects.board.lane.first_title_placeholder", _kwL);
     // ADR 0044 / 0147 — the tag input's placeholder example (the
     // tags.events_example registry key — the neighborhood-appropriate
     // cleanup/social/garden set, the Event/Create.cshtml idiom).
-    var tagsExample = await Translation.GetAsync("tags.events_example", _kwL);
+    var tagsExample = Translation is null ? "e.g. community, garden" : await Translation.GetAsync("tags.events_example", _kwL);
 }
-
 <div class="row justify-content-center">
     <div class="col-md-12 col-lg-12">
         <h1><kw-l key="projects.board.new">New board</kw-l></h1>

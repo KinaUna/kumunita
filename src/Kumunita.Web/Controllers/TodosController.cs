@@ -123,7 +123,7 @@ public sealed class TodosController : ProjectsBaseController
         if (todos.Count > 0)
         {
             var todoIds = todos.Select(t => t.Id).ToList();
-            await using var session = store.QuerySession();
+            await using var session = store!.QuerySession();
             var placements = await session.Query<BoardItemPlacement>()
                 .Where(p => todoIds.Contains(p.TodoItemId))
                 .ToListAsync(HttpContext!.RequestAborted);
@@ -260,29 +260,32 @@ public sealed class TodosController : ProjectsBaseController
         // F2 — the to-do's board placements: which boards + lanes it sits on
         // (a read over the frozen store, after the to-do's own Read decision
         // ran; the board titles are a display lookup, never a gate).
+        // C6/C3 — the board-title lookup is a **decided** display lookup
+        // (IS10, E4): <see cref="IBoardService.ListBoardsForTodoAsync"/>
+        // runs the per-request <c>CanSeeAsync(Read)</c> decision for each
+        // board, so a board the actor may not read never reaches this view —
+        // and placements + lanes are display data, kept only for boards in
+        // the visible set (a lane's visibility is its board's).
+        var visibleBoards = await boards.ListBoardsForTodoAsync(id, actorId, HttpContext.RequestAborted);
+        var visibleBoardIds = new HashSet<string>(visibleBoards.Select(b => b.Id), StringComparer.Ordinal);
+
         IReadOnlyList<BoardItemPlacement> placements = [];
-        IReadOnlyList<KanbanBoard> boards = [];
         IReadOnlyList<KanbanLane> lanes = [];
-        await using (var session = store.QuerySession())
+        await using (var session = store!.QuerySession())
         {
-            placements = await session.Query<BoardItemPlacement>()
+            var allPlacements = await session.Query<BoardItemPlacement>()
                 .Where(p => p.TodoItemId == id)
                 .OrderBy(p => p.Order)
                 .ToListAsync(HttpContext.RequestAborted);
-            var boardIds = placements.Select(p => p.BoardId).Distinct(StringComparer.Ordinal).ToList();
+            placements = allPlacements.Where(p => visibleBoardIds.Contains(p.BoardId)).ToList();
             var laneIds = placements.Select(p => p.LaneId).Distinct(StringComparer.Ordinal).ToList();
-            boards = boardIds.Count > 0
-                ? await session.Query<KanbanBoard>()
-                    .Where(b => boardIds.Contains(b.Id))
-                    .ToListAsync(HttpContext.RequestAborted)
-                : [];
             lanes = laneIds.Count > 0
                 ? await session.Query<KanbanLane>()
-                    .Where(l => laneIds.Contains(l.Id))
+                    .Where(l => laneIds.Contains(l.Id) && visibleBoardIds.Contains(l.BoardId))
                     .ToListAsync(HttpContext.RequestAborted)
                 : [];
         }
-        var boardTitle = boards.ToDictionary(b => b.Id, b => b.Title);
+        var boardTitle = visibleBoards.ToDictionary(b => b.Id, b => b.Title);
         var laneTitle = lanes.ToDictionary(l => l.Id, l => l.Title);
         var placementRows = placements
             .Select(p => new TodoPlacementRow(
@@ -1725,7 +1728,7 @@ public sealed class TodosController : ProjectsBaseController
 
         // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
         // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
-        await using var session = store.LightweightSession();
+        await using var session = store!.LightweightSession();
         try
         {
             await this.todos.TodoTranslationLane.AddAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
@@ -1793,7 +1796,7 @@ public sealed class TodosController : ProjectsBaseController
 
         // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
         // session, C3 one SaveChangesAsync); the descriptor normalizes title/body.
-        await using var session = store.LightweightSession();
+        await using var session = store!.LightweightSession();
         try
         {
             await this.todos.TodoTranslationLane.UpdateAsync(session, id, languageCode, title, body, actorId, RoleSet(User));
@@ -1855,7 +1858,7 @@ public sealed class TodosController : ProjectsBaseController
 
         // C2-02 (ADR 0288) — the shared write lane (M3: controller owns the
         // session, C3 one SaveChangesAsync).
-        await using var session = store.LightweightSession();
+        await using var session = store!.LightweightSession();
         try
         {
             await this.todos.TodoTranslationLane.RemoveAsync(session, id, languageCode, actorId, RoleSet(User));

@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.GroupMessaging;
 
 /// <summary>
@@ -39,6 +41,8 @@ public enum GroupMessagingInvitationStatus
 /// via <see cref="IGroupMessagingService.AcceptInviteAsync"/>.
 /// </para>
 /// </summary>
+[DataClass(DataClassKind.PrivateContent, Erasure.Delete, ExportScope.Never,
+    reason: "an invitation to a thread; deleting the account drops the pending invite (IS21)")]
 public sealed class GroupMessagingInvitation
 {
     public string Id { get; set; } = string.Empty;             // surrogate (Marten default)

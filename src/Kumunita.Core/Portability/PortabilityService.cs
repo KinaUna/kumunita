@@ -1,5 +1,7 @@
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
+using Kumunita.Core.Notifications;
+using Kumunita.Core.UserInfo;
 using Marten;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
@@ -42,13 +44,24 @@ public sealed record PortabilityImportResult(bool Ok, IReadOnlyList<string> Fail
 public interface IPortabilityService
 {
     /// <summary>
-    /// U02–U03 (export) — one complete, valid <c>*.kumunita</c> archive
-    /// (the §layout: the docs + the no-secret principals + the config,
-    /// then the media bytes + the finalized manifest). Emits exactly one
-    /// <c>portability.export</c> <c>AccessAudit</c> row (<c>Via = Admin</c>).
+    /// U02–U03 (export) — one valid <c>*.kumunita</c> archive (the §layout: the
+    /// docs + the no-secret principals + the config, then the media bytes +
+    /// the finalized manifest). Emits exactly one <c>portability.export.*</c>
+    /// <c>AccessAudit</c> row (the controller adds none — C-M11·6).
     /// </summary>
+    /// <remarks>
+    /// **IS28 (ADR 0299):** the audit row is **scope-aware** —
+    /// <c>Action = "portability.export.content-free"</c> / <c>Via: Admin</c> for
+    /// <see cref="PortabilityExportScope.ContentFree"/>, and
+    /// <c>Action = "portability.export.full"</c> / <c>Via: BreakGlass</c> for
+    /// <see cref="PortabilityExportScope.Full"/> (the full scope is the
+    /// operator-gated path: an active <c>AdminOverride</c> is required by the
+    /// controller's gate before this is called, ADR 0299).
+    /// </remarks>
     /// <param name="actorId">The GlobalAdmin actor's <c>subjectId</c> (the audit row's actor).</param>
-    Task<Stream> ExportAsync(string actorId, CancellationToken ct = default);
+    /// <param name="scope">The export scope (ADR 0299).</param>
+    /// <param name="ct">Cancellation.</param>
+    Task<Stream> ExportAsync(string actorId, PortabilityExportScope scope, CancellationToken ct = default);
 
     /// <summary>
     /// U05–U06 (import) — validate-then-apply, fail-closed (C-M11·4): the
@@ -114,13 +127,23 @@ public sealed class PortabilityService(
     RoleManager<IdentityRole> roleManager,
     IOptions<CommunityOptions> communityOptions,
     IMediaStore mediaStore,
-    IMediaFileStore mediaFileStore) : IPortabilityService
+    IMediaFileStore mediaFileStore,
+    // IS29 (ADR 0299 §4, D10) — the transparency-emission seam (the C03
+    // INotificationEmitter contract). Resolved by DI in production; `null`
+    // in the existing test floor (the IS27/IS28 7-arg constructions keep
+    // compiling) — a `null` emitter simply skips the D10 loop below, so the
+    // round-trip / scope tests are unaffected.
+    INotificationEmitter? notificationEmitter = null) : IPortabilityService
 {
     /// <inheritdoc />
-    public async Task<Stream> ExportAsync(string actorId, CancellationToken ct = default)
+    public async Task<Stream> ExportAsync(string actorId, PortabilityExportScope scope, CancellationToken ct = default)
     {
         // U02 — the docs + the no-secret principals + the config.
-        var (docs, docCounts) = await PortabilityExportDocuments.ExportAsync(documentStore, ct);
+        // IS27 (ADR 0299 §2.6): the scope is forwarded to the docs export
+        // (the §2.6 strip rules, driven by DataClassCatalog — Full is the
+        // pre-IS27 behaviour, unchanged).
+        var (docs, docCounts) = await PortabilityExportDocuments.ExportAsync(
+            documentStore, scope, ct);
         // C3-07 (ADR 0297) — the principal source read through the
         // IIdentityPrincipalStore contract (the extractor now takes the user
         // list, not the EF Core context).
@@ -142,11 +165,14 @@ public sealed class PortabilityService(
             mediaManifest,
             DateTimeOffset.UtcNow);
 
-        // U04 — the one `portability.export` AccessAudit row (C-M11·6, the
+        // U04 — the one `portability.export.*` AccessAudit row (C-M11·6, the
         // ADR 0105 `messaging.toggle` one-audit-row shape — the controller adds
-        // none; `Action` is the verb, `TargetKind`/`TargetId` are
-        // "portability"). Emitted after the archive is built (a failed build
-        // throws before this point, so no audit row for a refused export).
+        // none; `TargetKind`/`TargetId` are "portability"). Emitted after the
+        // archive is built (a failed build throws before this point, so no
+        // audit row for a refused export).
+        // IS28 (ADR 0299) — the `Action` + `Via` are scope-aware: the
+        // content-free default is `portability.export.content-free` / `Via: Admin`;
+        // the full (operator-gated) path is `portability.export.full` / `Via: BreakGlass`.
         await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
         session.Store(new Authorization.AccessAudit
         {
@@ -154,13 +180,57 @@ public sealed class PortabilityService(
             At = DateTimeOffset.UtcNow,
             ActorId = actorId,
             EffectivePrincipalId = actorId,
-            Action = "portability.export",
+            Action = scope == PortabilityExportScope.Full
+                ? "portability.export.full"
+                : "portability.export.content-free",
             TargetKind = "portability",
             TargetId = "portability",
-            Via = Authorization.AccessVia.Admin,
+            Via = scope == PortabilityExportScope.Full
+                ? Authorization.AccessVia.BreakGlass
+                : Authorization.AccessVia.Admin,
             Outcome = Authorization.AccessOutcome.Allow
         });
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // IS29 (ADR 0299 §4, D10) — the transparency entry: a `Full` export
+        // (the operator-gated path) notifies **every non-guest resident** with
+        // kind `instance.full-export`, stating the date + the operator
+        // authorisation and carrying **no actor name / id** (the kind label —
+        // `notifications.kind.instance.full-export`, the IS29b key — is the
+        // resident-facing text; `body: null` keeps the body actor-free).
+        // A `ContentFree` export emits **zero** notifications (D10). The
+        // `notificationEmitter` guard keeps the existing test floor
+        // (`null`) green — the loop is simply skipped there. The idempotency
+        // key is **per recipient** (`:recipientId`) — the emitter's dedup is
+        // keyed on `IdempotencyKey` alone (no recipient in the predicate),
+        // so a single shared key would deliver to the first resident only.
+        if (scope == PortabilityExportScope.Full && notificationEmitter is not null)
+        {
+            // OpenSession (a write session) — the C03 EmitAsync seam takes an
+            // IDocumentSession and the caller commits (D5), the
+            // AnnouncementService publish-lane shape (the multi-recipient
+            // emission + one SaveChangesAsync).
+            await using var notifySession = documentStore.OpenSession(new Marten.Services.SessionOptions());
+            var profiles = (await notifySession.Query<Profile>()
+                .ToListAsync(ct).ConfigureAwait(false))
+                .ToDictionary(p => p.SubjectId, StringComparer.Ordinal);
+            var allUsers = await identityPrincipals.GetUsersAsync(ct).ConfigureAwait(false);
+            var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss");
+            foreach (var user in allUsers)
+            {
+                profiles.TryGetValue(user.Id, out var profile);
+                if (profile?.IsGuest == true)
+                    continue;   // D10 — non-guest residents only (a missing Profile defaults to non-guest)
+                await notificationEmitter.EmitAsync(
+                    notifySession,
+                    user.Id,
+                    NotificationKinds.InstanceFullExport,
+                    $"instance.full-export:{stamp}:{user.Id}",   // per-recipient key (one export, one stamp)
+                    body: null,
+                    ct: ct).ConfigureAwait(false);
+            }
+            await notifySession.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
 
         var stream = new MemoryStream();
         await KumunitaArchive.WriteAsync(stream, manifest, docs, media, principals, config, ct);

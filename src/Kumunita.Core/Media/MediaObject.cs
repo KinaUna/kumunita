@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Media;
 
 /// <summary>
@@ -7,6 +9,8 @@ namespace Kumunita.Core.Media;
 /// <c>{root}/{Id[0..2]}/{Id}</c> (C-MED·3/7); this document is the surviving
 /// catalog reference that a <c>pg_dump</c> restore always carries.
 /// </summary>
+[DataClass(DataClassKind.Media, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2A: the catalog rows + their bytes (U4's set); the bytes live on a dedicated volume, not in the export")]
 public sealed class MediaObject
 {
     public string Id { get; set; } = "";                    // = lowercase-hex SHA-256 of payload

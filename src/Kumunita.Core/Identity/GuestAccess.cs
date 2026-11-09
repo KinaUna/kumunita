@@ -1,3 +1,5 @@
+using Kumunita.Core.Privacy;
+
 namespace Kumunita.Core.Identity;
 
 /// <summary>
@@ -10,6 +12,8 @@ namespace Kumunita.Core.Identity;
 /// (an empty set is a valid, least-privileged state, not an error —
 /// C-M19·4).
 /// </summary>
+[DataClass(DataClassKind.AuditModeration, Erasure.Delete, ExportScope.Never,
+    reason: "F1 §2C decision (now decided): a credential; arguably should go on delete (IS22)")]
 public sealed class GuestAccess
 {
     /// <summary>Document identity — the guest's subject id (one allowance per

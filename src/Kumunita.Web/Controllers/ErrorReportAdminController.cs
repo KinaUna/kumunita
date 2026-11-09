@@ -1,8 +1,10 @@
+using Kumunita.Core.Authorization;
 using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Kumunita.Web.Services;
+using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -75,7 +77,20 @@ public sealed class ErrorReportAdminController(
     // errorreport.escalate.not_configured source text via the
     // KnownTranslationKeys.EnValues floor (the kw-l provider floor, ADR 0015
     // D1). DI always supplies the live EscalationForwarder singleton (Program.cs).
-    IEscalationForwarder? escalationForwarder = null) : Controller
+    IEscalationForwarder? escalationForwarder = null,
+    // IS36 (D9) — the ADR 0015 D1 "kw-l floor" optional-ctor-param idiom the
+    // localisation / forwarder seams above already use: optional (default null)
+    // so any test-construction site that builds this controller without the
+    // store keeps compiling (AdminErrorReportTests / AdminErrorReportDetailTests
+    // / EscalationInboundEndpointTests build `new ErrorReportAdminController(svc)`
+    // with no store); DI always supplies the live IDocumentStore in the app.
+    // When null (a test harness that does not supply it), the audit write in
+    // Index is skipped (a read is a no-op without a store — the "no
+    // disclosure" shape); when supplied (the app, and the new IS36 tests),
+    // exactly one aggregate AccessAudit row is written (TargetKind
+    // "error-reports", Action "error-reports.view"). No new AccessVia, no new
+    // IAuthorizationService method (the AccessAuditFactory "no new seam" shape).
+    IDocumentStore? store = null) : Controller
 {
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -163,6 +178,35 @@ public sealed class ErrorReportAdminController(
         // referenced by explicit virtual path (the UserPortabilityController
         // "~/Views/...cshtml" idiom; the extension is part of the name under the
         // published precompiled-assembly deployment — see _AdminNav.cshtml).
+
+        // IS36 (D9) — the error-report list is a disclosure surface (the
+        // resident-filed reports, ContactEmail PII). A GlobalAdmin reading it
+        // leaves exactly one aggregate AccessAudit row (the ADR 0108
+        // "portability.export" precedent, adapted to a read view): TargetKind
+        // "error-reports", Action "error-reports.view", VisibleCount = the rows
+        // the view is about to render, TargetId null, Via Admin, Outcome Allow.
+        // Guarded: when the optional store is null (a test harness that did not
+        // supply it) the write is skipped — a read is a no-op without a store
+        // (the "no disclosure" shape). Counts only — no PII (the IS08 gate).
+        if (store is not null)
+        {
+            await using (var auditSession = store.LightweightSession())
+            {
+                auditSession.Store(new AccessAudit
+                {
+                    Id           = Guid.NewGuid().ToString("N"),
+                    At           = DateTimeOffset.UtcNow,
+                    ActorId      = ActorId(User) ?? string.Empty,
+                    Action       = "error-reports.view",
+                    TargetKind   = "error-reports",
+                    VisibleCount = reports.Count,
+                    Via          = AccessVia.Admin,
+                    Outcome      = AccessOutcome.Allow
+                });
+                await auditSession.SaveChangesAsync();
+            }
+        }
+
         return View("~/Views/Admin/ErrorReports/Index.cshtml", new AdminErrorReportViewModel { Reports = reports, Filter = normalized });
     }
 
