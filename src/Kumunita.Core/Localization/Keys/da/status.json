@@ -1,0 +1,19 @@
+{
+  "status.400.title": "Anmodningen kunne ikke gennemføres",
+  "status.400.message": "Adressen eller oplysningerne er muligvis ufuldstændige. Kontrollér dem, og prøv igen.",
+  "status.403.title": "Du har ikke adgang til denne side",
+  "status.403.message": "Du har ikke tilladelse til at se denne side.",
+  "status.404.title": "Siden blev ikke fundet",
+  "status.404.message": "Siden er muligvis flyttet eller findes ikke længere.",
+  "status.413.title": "Filen er for stor",
+  "status.413.message": "Vælg en mindre fil, og prøv igen.",
+  "status.415.title": "Denne filtype understøttes ikke",
+  "status.415.message": "Vælg et andet filformat, og prøv igen.",
+  "status.429.title": "Vent et øjeblik",
+  "status.429.message": "Der kom for mange anmodninger på kort tid. Prøv igen om lidt.",
+  "status.500.title": "Noget gik galt",
+  "status.500.message": "Vi kunne ikke gennemføre din anmodning. Prøv igen.",
+  "status.back": "Tilbage",
+  "status.home": "Hjem",
+  "status.search": "Søg"
+}

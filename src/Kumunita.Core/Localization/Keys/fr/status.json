@@ -1,0 +1,19 @@
+{
+  "status.400.title": "La demande n'a pas abouti",
+  "status.400.message": "L'adresse ou les informations sont peut-être incomplètes. Vérifiez-les et réessayez.",
+  "status.403.title": "Cette page ne vous est pas accessible",
+  "status.403.message": "Vous n'avez pas l'autorisation de consulter cette page.",
+  "status.404.title": "Page introuvable",
+  "status.404.message": "Cette page a peut-être été déplacée ou n'est plus disponible.",
+  "status.413.title": "Ce fichier est trop volumineux",
+  "status.413.message": "Choisissez un fichier plus petit et réessayez.",
+  "status.415.title": "Ce type de fichier n'est pas accepté",
+  "status.415.message": "Choisissez un autre format de fichier et réessayez.",
+  "status.429.title": "Veuillez patienter un instant",
+  "status.429.message": "Trop de demandes ont été envoyées en peu de temps. Réessayez bientôt.",
+  "status.500.title": "Une erreur s'est produite",
+  "status.500.message": "Votre demande n'a pas pu aboutir. Veuillez réessayer.",
+  "status.back": "Retour",
+  "status.home": "Accueil",
+  "status.search": "Rechercher"
+}

@@ -1,0 +1,19 @@
+{
+  "status.400.title": "Die Anfrage hat nicht funktioniert",
+  "status.400.message": "Die Adresse oder die Angaben sind möglicherweise unvollständig. Bitte prüfen Sie sie und versuchen Sie es erneut.",
+  "status.403.title": "Diese Seite ist für Sie nicht verfügbar",
+  "status.403.message": "Sie dürfen diese Seite nicht ansehen.",
+  "status.404.title": "Seite nicht gefunden",
+  "status.404.message": "Diese Seite wurde möglicherweise verschoben oder ist nicht mehr verfügbar.",
+  "status.413.title": "Diese Datei ist zu groß",
+  "status.413.message": "Wählen Sie eine kleinere Datei und versuchen Sie es erneut.",
+  "status.415.title": "Dieser Dateityp wird nicht unterstützt",
+  "status.415.message": "Wählen Sie ein anderes Dateiformat und versuchen Sie es erneut.",
+  "status.429.title": "Bitte warten Sie einen Moment",
+  "status.429.message": "In kurzer Zeit gab es zu viele Anfragen. Bitte versuchen Sie es gleich noch einmal.",
+  "status.500.title": "Etwas ist schiefgelaufen",
+  "status.500.message": "Ihre Anfrage konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
+  "status.back": "Zurück",
+  "status.home": "Startseite",
+  "status.search": "Suche"
+}

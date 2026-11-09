@@ -1,0 +1,16 @@
+@model Kumunita.Web.Controllers.StatusPageViewModel
+@{
+    ViewData["Title"] = Model.Code.ToString();
+    var titleKey = $"status.{Model.Code}.title";
+    var messageKey = $"status.{Model.Code}.message";
+}
+
+<section class="py-4" aria-labelledby="status-title">
+    <h1 id="status-title"><kw-l key="@titleKey">Request unavailable</kw-l></h1>
+    <p class="lead"><kw-l key="@messageKey">We couldn't complete that request.</kw-l></p>
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <a class="btn btn-outline-secondary" href="@Model.BackUrl"><kw-l key="status.back">Back</kw-l></a>
+        <a class="btn btn-primary" href="/"><kw-l key="status.home">Home</kw-l></a>
+        <a class="btn btn-outline-secondary" href="/search"><kw-l key="status.search">Search</kw-l></a>
+    </div>
+</section>
