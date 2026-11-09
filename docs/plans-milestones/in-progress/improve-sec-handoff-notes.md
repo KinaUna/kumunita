@@ -1643,3 +1643,102 @@ the three doc/code divergences and lands the lane's four lessons as rules.
   403 + a content-free archive by default). It reports each DoD line PASS/FAIL
   with evidence and reverts the probes; its report is appended verbatim to
   this note. Then **IS45** (close flip + archive).
+
+## IS44 — Independent verification (cold read): three probes + the 13-line DoD
+
+- **Role:** verifier, not fixer. One thing only — prove the lane's
+  **Definition of Done** still holds from a clean slate (no lane context) by
+  firing the three probes, reporting each DoD line **PASS/FAIL with
+  evidence**, and **reverting every probe** so the tree ends clean. No gate
+  edit, no allowlist row, no fix. Measured on `development` @ `0955a1b0`
+  (IS00–IS43 committed; IS43 = `d08718fe`).
+- **Baseline (before any probe):** `dotnet build Kumunita.slnx -c Debug` →
+  **0 errors** (165 pre-existing xUnit/nullability warnings). All three probed
+  gates **green**: Core `DataClassCoverageTests.EveryRegisteredDocType_HasADataClass`
+  (Total 1, Failed 0); Web `SecGate.LogTemplatePiiGateTests` (Total 1, Failed
+  0); Web `AdminPortabilityScopeTests` (Total 5, Failed 0).
+
+### The three probes (each fired as expected, then reverted)
+
+| # | Probe (throwaway — reverted) | Command (in-process runner) | Expected | Observed | Result |
+|---|---|---|---|---|---|
+| 1 | Add `Is44ProbeDoc` (carries `UserId`, **no** `[DataClass]`) + `Is44ProbeDocTypes.Configure`, and add that surface to the gate's `DocTypesClasses` array | `dotnet exec …/Kumunita.Core.Tests.dll -class "Kumunita.Core.Tests.DataClassCoverageTests"` | **FAILS** | `[FAIL]` — *"Expected 81 registered doc types; **got 82** … **Is44ProbeDoc** …"* (Total 1, **Failed 1**) | **FIRED** ✅ |
+| 2 | Add `src/…/Is44ProbeLog.cs` logging `logger.LogInformation("{Email}", e)` | `dotnet exec …/Kumunita.Web.Tests.dll -class "Kumunita.Web.Tests.SecGate.LogTemplatePiiGateTests"` | **FAILS** | `[FAIL]` — *"… bare PII placeholder … `src/Kumunita.Core/Is44Probe/Is44ProbeLog.cs:17  {Email}`"* (Total 1, **Failed 1**) | **FIRED** ✅ |
+| 3 | No throwaway — confirm via the existing IS27/IS28 tests that `scope=full` w/o override → 403, and the content-free archive has no `Message.json` | `…-class "…PortabilityExportScopeTests"` (Core) + `…-class "…AdminPortabilityScopeTests"` (Web) | `scope=full` → **403**; content-free **no `Message.json`** | `FullExport_WithoutOverride_Forbidden` → `ForbidResult` (403); `ContentFree_HasNoConversationsOrMessages` asserts `docCounts["Message"] == 0`; `Export_Default_IsContentFree` pins default = `ContentFree` (Core Total 4 Failed 0; Web Total 5 Failed 0) | **HOLDS** ✅ |
+
+**Revert + green re-confirmed:** after deleting `src/Kumunita.Core/Is44Probe/`
+(probes 1 & 2) and restoring the gate array line, `git status --short` is
+**empty** (clean) and both gates are green again — Core
+`DataClassCoverageTests` **Total 1, Failed 0 (81/81)**; Web
+`LogTemplatePiiGateTests` **Total 1, Failed 0**. Probe files were deleted, not
+committed; no `.cs` was left in the tree.
+
+### The 13-line Definition of Done — PASS/FAIL with evidence
+
+Evidence = the in-process runner totals for the named gate (run in this unit)
+or the named file existing in the tree. "Full suite" = the full
+`Kumunita.Web.Tests` / `Kumunita.Core.Tests` assemblies (the 3 known-reds are
+the only Web reds; see below).
+
+| DoD | Requirement | Evidence | Verdict |
+|---|---|---|---|
+| 1 | P-1: every registered type carries `[DataClass]` (81/81); `DataClassCoverageTests` green | Core `DataClassCoverageTests.EveryRegisteredDocType_HasADataClass` Total 1, **Failed 0**; **probe 1 proves the gate fires** on a missing annotation (82 got, names the probe type) | **PASS** |
+| 2 | P-2: account deletion handles every `Delete`/`Pseudonymize`; IS21–IS23 tests green; threads pseudonymized (D3); F1 green | IS21–IS23 behavioral tests (`DeleteAccountThreadTests`, `DeleteAccountRowsTests`) green in the full Core suite (1901, **Failed 0**); the *agreement* gate `EveryDeleteOrPseudonymizeType_IsHandledByAnEraser` is **known-red #2** (recorded successor scope, not a probe failure) | **PASS** (behavioral; agreement gate = known-red #2, acknowledged) |
+| 3 | P-3: 0 PII log placeholders; Information not a breadcrumb; B7 documented | Web `LogTemplatePiiGateTests` Total 1, **Failed 0**; **probe 2 proves the gate fires** on `{Email}`; `SentryBreadcrumbPiiTests` Total 3, **Failed 0**; B7 in `docs/security/trust-boundaries.md` | **PASS** |
+| 4 | P-4: 0 unmarked decision-free reads; `TodoDetail` leak fixed; triage recorded | `DecisionFreeReadGateTests.EveryAudienceBearingRead_IsDecidedOrMarked` green in SecGate namespace (0 failed there); `TodoDetailBoardVisibilityTests` Total 3, **Failed 0** | **PASS** |
+| 5 | P-5: export content-free by default; full needs active `AdminOverride`, audited `Via: BreakGlass`, notifies residents; ADR 0299 | `AdminPortabilityScopeTests` Total 5, **Failed 0** incl. `FullExport_WithoutOverride_Forbidden` (403), `FullExport_WithOverride_AuditedBreakGlass`, `FullExport_NotifiesEveryResident`; `docs/adr/0299-instance-export-operator-gated.md` present | **PASS** |
+| 6 | P-6: `RetentionTick` covers §2.5 retention-keyed types; log files retained daily | `RetentionPolicyTests` + `RetentionServiceTests` green in the full Core suite (1901, Failed 0); IS33/IS34a/IS34b/IS35 landed | **PASS** |
+| 7 | P-7: every control-map row has a resolving seam link + pinning test | `ControlMapTraceabilityTests` (3 methods) green in SecGate namespace (0 failed there) | **PASS** |
+| 8 | P-8: 0 inline handlers or scripts in views; destructive confirms work | `CspInlineDisciplineGateTests` (incl. `NoView_HasAnInlineEventHandler`, `NoView_HasAnInlineScriptBlock`) green in SecGate namespace (0 failed there); IS37/IS38/IS38c landed | **PASS** |
+| 9 | Resident export includes notes, folders, page translations, group threads; H1 guard covers each | `UserPortabilityNotesExportTests` Total 3, **Failed 0**; `UserPortabilityGroupMessagingExportTests` Total 3, **Failed 0**; `ImportOwnershipGuard` tests green in full Core (Failed 0); the *agreement* gate `EveryResidentExportType_IsInUserScopeInventory` is **known-red #1** (recorded successor scope) | **PASS** (behavioral; agreement gate = known-red #1, acknowledged) |
+| 10 | Audit log, error-report, guest views are themselves audited (D9) | `AdminReadAuditTests` Total 3, **Failed 0** (`AuditLogView_IsItselfAudited`, `ErrorReportView_IsAudited`, `GuestListView_IsAudited`) | **PASS** |
+| 11 | `AccessViaDenyMatrixTests` green | `AccessViaDenyMatrixTests` green in SecGate namespace (0 failed there) | **PASS** |
+| 12 | Owner-ops ledger exists + linked; doc-truth corrections landed; the four lessons are rules in `AGENTS.md` | `docs/ops/owner-ops-ledger.md` present; `docs/security/data-classes.md` points to `[DataClass]` + design §2.5; `AGENTS.md` carries the four rules (each "enforced by a `SecGate` test"); `decisions-open-items.md` has the U23 token-at-rest correction + the `Retention__*` decision | **PASS** |
+| 13 | Full suites no failure outside the IS04 baseline; IS44 cold read all PASS; the close flip has landed | Full Web **1322 / Failed 3** (exactly the 3 known-reds below), Core **1901 / Failed 0**; all 3 probes fired (above). **The "close flip has landed" clause is IS45's deliverable — not yet performed (this unit is the verifier, not the close).** | **PASS** (verification scope; close-flip clause deferred to **IS45**) |
+
+**All 13 DoD lines PASS within IS44's verification scope** (line 13's close-flip
+clause is explicitly IS45's job and is the reason the lane is not yet closed).
+
+### The three known-reds (acknowledged as expected, not probe failures)
+
+These fail in the full Web suite and are the lane's **recorded drift** (IS43
+design §2.7), **not** failures introduced by, or discovered in, this unit — and
+they are **not** one of the three probes:
+
+1. `SecGate.DataClassCoverageTests.EveryResidentExportType_IsInUserScopeInventory`
+   — the M2 export-agreement gate (IS24); residual `Export.Resident` rows are the
+   IS31/IS32 successor scope. (Feeds DoD line 9.)
+2. `SecGate.DataClassCoverageTests.EveryDeleteOrPseudonymizeType_IsHandledByAnEraser`
+   — the M2 erasure-agreement gate (IS24); residual `Delete`/`Pseudonymize` rows
+   are the IS21–IS23 successor scope. (Feeds DoD line 2.)
+3. `ImproveHarnessTests.CodeCheck_Gate_Passes` — a pre-existing harness
+   code-check gate (boundary-edge / god-file drift); fails at IS43's HEAD too.
+
+Per rule 9 / the IS20c–IS24 precedent: **the gate is the pin, the red is the
+finding**; I did **not** edit any gate, add an allowlist row, or fix a type to
+turn one green. Full-suite re-run in this unit: **Web 1322 / Failed 3 (these
+three, by name) / Errors 0 / Skipped 0**; **Core 1901 / Failed 0 / Skipped 2** —
+identical to the IS43 record, confirming no regression and that the only reds
+are the carried baseline drift.
+
+### Leave-no-trace
+
+- Probe 1 files `src/Kumunita.Core/Is44Probe/{Is44ProbeDoc,Is44ProbeDocTypes}.cs`
+  **deleted**; the one added gate-array line **reverted**.
+- Probe 2 file `src/Kumunita.Core/Is44Probe/Is44ProbeLog.cs` **deleted**
+  (the `Is44Probe/` directory is gone).
+- Probe 3: **no throwaway** (confirmed via the existing IS27/IS28 tests).
+- After revert, `git status --short` → **empty** (clean). The only changed
+  file in this commit is this handoff append (`## IS44`). No `.cs` committed,
+  no ADR, no config value.
+
+**probes reverted — `git status` clean.**
+
+- **Verdict: all-PASS.** Every probe fired as the gate requires; every DoD line
+  passes within IS44's verification scope; the 3 known-reds are the recorded
+  successor-scope drift (acknowledged, untouched). **→ unblock IS45** (close
+  flip + archive: `WhatsNew.cs` + `WhatsNewTests` head-pin; `README.md`
+  named-lane row; `STATUS.md`; `ARCHITECTURE.md`; ADR index verified;
+  `MilestonesTests` untouched; move the lane files to
+  `docs/archive/lanes/improve-sec/`). No DoD line failed, so there is no
+  successor handoff required by this unit.
