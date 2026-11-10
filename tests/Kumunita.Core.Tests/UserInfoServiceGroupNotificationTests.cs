@@ -61,6 +61,21 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
         // shape the PostService / EventService emitters use).
         Assert.Contains(GroupName, row.Body);
 
+        // IMPROVE-UX R09 (E14) — the group.added row now lands the resident
+        // on the group (the E14 "inbox row has no clickable destination"
+        // fix): the stored destination is <see cref="Notification.LinkPath"/>.
+        // The <c>targetId: groupId</c> supplied at the emission site is the
+        // ADR 0084 per-target subscription-gate id — it is **not** a stored
+        // column on the <c>Notification</c> doc (the closest stored id,
+        // <see cref="Notification.SourceId"/>, is derived from the
+        // idempotency key and here is the <c>(groupId,userId)</c> pair).
+        // <c>group.added</c> is opt-out (not in
+        // <see cref="NotificationKinds.OptInKinds"/>), so supplying
+        // <c>targetId</c> does **not** suppress the row (the D5 "inbox row
+        // is the durable record" holds — this test proves it still stores).
+        Assert.Equal($"/groups/{GroupId}", row.LinkPath);
+        Assert.Equal($"{GroupId}:{AddedResident}", row.SourceId);
+
         // The recipient has a planted profile with an email, so the M6
         // conditional stage ran (the recording mailer captured one envelope).
         var email = Assert.Single(boot.Staged);

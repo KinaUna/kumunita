@@ -4835,4 +4835,91 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
         Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.TodoMention);
     }
+
+    // ── IMPROVE-UX R09 — the todo.assign emission now lands the assignee ──
+
+    /// <summary>
+    /// **IMPROVE-UX R09** (the E14 "inbox row has no clickable destination"
+    /// fix): the <see cref="TodoService.AssignTodoAsync"/> emission now uses
+    /// the <c>targetId</c>/<c>linkPath</c> overload, so the stored
+    /// <c>todo.assign</c> row lands the assignee on the to-do.
+    /// <para>
+    /// The stored destination is <see cref="Notification.LinkPath"/>
+    /// (<c>/projects/todos/{todoId}</c>). The <c>targetId: todo.Id</c>
+    /// supplied at the emission site is the ADR 0084 per-target
+    /// subscription-gate id — **not** a stored column on the
+    /// <c>Notification</c> doc (the closest stored id,
+    /// <see cref="Notification.SourceId"/>, equals <c>todoId</c> here —
+    /// derived from the <c>notification:todo.assign:{todoId}</c> key).
+    /// <c>todo.assign</c> is opt-out (not in
+    /// <see cref="NotificationKinds.OptInKinds"/>), so supplying
+    /// <c>targetId</c> does **not** suppress the row (this test proves the
+    /// D5 "inbox row is the durable record" still holds).
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task AssignTodo_ToAssignee_StoresRow_WithLinkPath_ToToDo()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, ProjectDocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new TodoService(boot.Store, authz, boot.UserInfo, boot.Notifications);
+
+        const string author = "u-r09-todo-author";
+        const string assignee = "u-r09-todo-assignee";
+        const string todoId = "r09-todo-1";
+        await MentionEmitters.PlantResidents(boot.Store, (assignee, "R09 Assignee"));
+        await Plant(boot.Store, new TodoItem { Id = todoId, Title = "Water the plants", AuthorId = author });
+
+        // The creator holds standing to assign the to-do to another resident
+        // (creator ∪ GlobalAdmin ∪ assignee standing matrix); the
+        // self-assign guard is bypassed (author != assignee) so the
+        // emission fires.
+        var assigned = await svc.AssignTodoAsync(
+            todoId, author, MemberRoles, assignee,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(assignee, assigned.AssigneeId);
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.TodoAssign);
+        Assert.Equal(assignee, row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.TodoAssign}:{todoId}", row.IdempotencyKey);
+        // IMPROVE-UX R09 — the stored destination lands the assignee on the to-do.
+        Assert.Equal($"/projects/todos/{todoId}", row.LinkPath);
+        // The closest stored id (derived from the idempotency key) is todoId.
+        Assert.Equal(todoId, row.SourceId);
+    }
+
+    /// <summary>
+    /// **IMPROVE-UX R09** (no-op pin): **unassigning** a to-do
+    /// (<paramref name="assigneeId"/> = <c>null</c>) emits **no**
+    /// <c>todo.assign</c> row — the <c>!string.IsNullOrWhiteSpace(assigneeId)</c>
+    /// guard skips the self/notification path. The <c>LinkPath</c> must not
+    /// appear on a row that was never created.
+    /// </summary>
+    [Fact]
+    public async Task AssignTodo_Unassign_StoresNoTodoAssignRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, ProjectDocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new TodoService(boot.Store, authz, boot.UserInfo, boot.Notifications);
+
+        const string author = "u-r09-todo-unassign";
+        const string currentAssignee = "u-r09-todo-current";
+        const string todoId = "r09-todo-unassign";
+        await MentionEmitters.PlantResidents(boot.Store,
+            (author, "R09 Author"), (currentAssignee, "R09 Assignee"));
+        // The to-do is currently assigned; unassigning clears the assignee.
+        await Plant(boot.Store, new TodoItem
+        {
+            Id = todoId, Title = "Water the plants", AuthorId = author, AssigneeId = currentAssignee,
+        });
+
+        var unassigned = await svc.AssignTodoAsync(
+            todoId, author, MemberRoles, null,
+            TestContext.Current.CancellationToken);
+        Assert.Null(unassigned.AssigneeId);
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.TodoAssign);
+    }
 }
