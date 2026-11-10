@@ -51,7 +51,6 @@
   "validation.current_password_wrong": "Your current password is incorrect.",
   "validation.confirm_deletion": "You must confirm that you understand your account will be permanently deleted.",
   "validation.password_wrong": "Your password is incorrect.",
-  "validation.delete_admin_only": "The self-serve delete-account lane is only available to a GlobalAdmin. A non-GlobalAdmin resident cannot delete their own account \u2014 contact an administrator to remove the account.",
   "validation.domain_not_accepted": "The email domain \u0027{0}\u0027 is not accepted for new accounts.",
   "validation.domain_not_accepted_permanent": "The email domain \u0027{0}\u0027 is not accepted for new accounts. Please use a permanent email address.",
   "validation.pick_one_end": "Pick exactly one end: \u0022Ends after\u0022 a number of occurrences, or \u0022Ends on\u0022 a date.",

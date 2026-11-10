@@ -5,6 +5,7 @@
 @{
     var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var _deleteConfirm = Translation is null ? "Delete your account permanently? This cannot be undone." : await Translation.GetAsync("account.delete_confirm_dialog", _aL);
+    var _cancelConfirm = Translation is null ? "Cancel your scheduled deletion? Your account will remain active." : await Translation.GetAsync("account.delete_cancel_confirm", _aL);
 }
 @{
     ViewData["Title"] = "Settings — Delete account";
@@ -22,52 +23,148 @@
         <div class="kmb-auth">
         <h1><kw-l key="account.delete_title">Delete account</kw-l></h1>
 
-        @if (Model.SelfDeletionRefused)
+        @* ── ADR 0301 D2 — the scheduled state ─────────────────────────────
+           When the resident has a pending DeletionRequest row, the form is
+           replaced by the "deletion scheduled for {date} — sign in to
+           cancel" notice + a Cancel button (the ADR 0301 D2 "no extra
+           button, no extra form" — the Cancel button is the explicit lane
+           the R13 prompt calls for; the ADR defines the rule, this surface
+           renders it). The ADR 0142 D5 GlobalAdmin gate (the old
+           SelfDeletionRefused notice) is removed by ADR 0301 D1 — every
+           resident sees this surface. *@
+        @if (Model.IsScheduled)
         {
-            @* ADR 0142 D5 gate — the resident is not a GlobalAdmin. The
-               ADR 0138 "surface-replaced-by-notice" shape: the form is
-               still rendered below (a crafted POST is refused server-side
-               with the same message), but the page makes the gate visible
-               rather than letting the resident discover it only on submit. *@
-            <div class="alert alert-warning">
-                <kw-l key="account.delete_refused">The self-serve delete-account lane is only available to a GlobalAdmin. A non-GlobalAdmin resident cannot delete their own account — contact an administrator to remove the account.</kw-l>
+            <div class="alert alert-info">
+                <strong><kw-l key="account.delete_scheduled_title">Deletion scheduled</kw-l></strong>
+                <p class="mb-2">
+                    <kw-l key="account.delete_scheduled_body">Your account is scheduled for deletion. Sign in and cancel any time before the date to keep your account.</kw-l>
+                </p>
+                @* The date is rendered as a separate <time> element (not a
+                   {0}-placeholder inside the kw-l key — the kw-l TagHelper
+                   resolves static text, the {0}-format idiom is the
+                   FlashAsync/TempData surface). The value is the controller's
+                   FormatDueAtAsync output (the resident's effective time
+                   zone, the ADR 0019 seam — the UTC floor in the test
+                   harness shape). *@
+                <p class="mb-3">
+                    <span class="fw-semibold">
+                        <kw-l key="account.delete_scheduled_date">Scheduled for</kw-l>:
+                    </span>
+                    <time>@Model.ScheduledFor</time>
+                </p>
+                @* The Cancel form (the ADR 0301 D2 "the Cancel button is the
+                   explicit lane the R13 prompt calls for"). Targets the
+                   POST /account/delete/cancel action (the [Route] attribute
+                   on the DeleteCancel action — the sub-path the R13 prompt
+                   specifies). The password + checkbox guards match the
+                   POST /account/delete shape (the ADR 0142 D7 dangerous-
+                   action lane, generalized to the cancel). *@
+                @* The literal action URL matches the [Route("account/delete/cancel")]
+                   attribute on the DeleteCancel action (the R13 prompt specifies
+                   POST /account/delete/cancel as a sub-path of the delete
+                   surface, not the convention route /Account/DeleteCancel). *@
+                <form action="/account/delete/cancel" method="post"
+                      data-confirm="@_cancelConfirm">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-2 align-items-end">
+                        <div class="col-sm-8">
+                            <label for="cancel-password" class="form-label">
+                                <kw-l key="account.delete_password">Password</kw-l>
+                            </label>
+                            <input type="password" name="Password" id="cancel-password"
+                                   class="form-control" autocomplete="current-password" required />
+                        </div>
+                        <div class="col-sm-4 d-grid">
+                            <button type="submit" class="btn btn-outline-secondary">
+                                <kw-l key="account.delete_cancel">Cancel deletion</kw-l>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-2 form-check">
+                        <input type="checkbox" name="Confirmed" id="cancel-confirmed" class="form-check-input" />
+                        <label for="cancel-confirmed" class="form-check-label">
+                            <kw-l key="account.delete_confirm_checkbox">I understand my account will be permanently deleted and this cannot be undone.</kw-l>
+                        </label>
+                    </div>
+                </form>
             </div>
+
+            @* ADR 0301 D1 — the export link offered first (the R13 prompt:
+               "export link offered first; the existing /account/portability
+               surface"). The resident can export their data before the
+               grace period expires. The link is above the scheduled notice
+               (the R13 prompt: "offer the export link first"). *@
+            <div class="mb-4">
+                <a class="btn btn-outline-primary" href="~/account/portability">
+                    <kw-l key="account.delete_export_link">Export your data before it's gone</kw-l>
+                </a>
+            </div>
+
+            <p class="mt-3 text-muted">
+                <a href="/profile/edit"><kw-l key="account.change_password_back">Back to your profile</kw-l></a>.
+            </p>
         }
+        else
+        {
+            @* ── ADR 0301 D3 — the child rule notice ───────────────────────
+               When the resident is a child under an active GuardianLink, the
+               R11 seam refused the schedule (UnauthorizedAccessException).
+               The distinct "contact a parent/guardian" notice (the ADR 0301
+               D3 "the same shape as 0142 D5's old SelfDeletionRefused, with
+               a different reason"). The ADR 0142 D5 GlobalAdmin gate is
+               removed by ADR 0301 D1. *@
+            @if (Model.IsChildRefused)
+            {
+                <div class="alert alert-warning">
+                    <kw-l key="account.delete_child_refused">This account is under a guardian's supervision. Contact a parent or guardian to manage the deletion (ADR 0301 D3).</kw-l>
+                </div>
+            }
 
-        <p class="text-muted">
-            <kw-l key="account.delete_lede">Deleting your account removes your sign-in, your profile, and your group and community memberships. Your past actions in the platform's audit trail are preserved with your identity replaced by a placeholder (the platform's privacy policy, OPS.md §9). This cannot be undone.</kw-l>
-        </p>
-
-        @* data-confirm — a plain literal string (the admin Block/Unblock
-           form idiom: a hardcoded client confirm() copy, the repo's
-           "not HTML attributes" kw-l exclusion). The form's checkbox +
-           the lede text (both kw-l-resolved) carry the localized
-           confirmation; this dialog is a second, English-only layer. *@
-        <form asp-action="Delete" method="post"
-              data-confirm="@_deleteConfirm">
-            @Html.AntiForgeryToken()
-            <div asp-validation-summary="All" class="text-danger"></div>
-
-            <div class="mb-3">
-                <label asp-for="Password" class="form-label"><kw-l key="account.delete_password">Password</kw-l></label>
-                <input asp-for="Password" class="form-control" autocomplete="current-password" />
-                <span asp-validation-for="Password" class="text-danger"></span>
+            @* ADR 0301 D1 — the export link offered first (the R13 prompt:
+               "export link offered first; the existing /account/portability
+               surface"). The resident can export their data before
+               scheduling the deletion. *@
+            <div class="mb-4">
+                <a class="btn btn-outline-primary" href="~/account/portability">
+                    <kw-l key="account.delete_export_link">Export your data before it's gone</kw-l>
+                </a>
             </div>
 
-            <div class="mb-3 form-check">
-                <input asp-for="Confirmed" class="form-check-input" />
-                <label asp-for="Confirmed" class="form-check-label">
-                    <kw-l key="account.delete_confirm_checkbox">I understand my account will be permanently deleted and this cannot be undone.</kw-l>
-                </label>
-                <span asp-validation-for="Confirmed" class="text-danger d-block"></span>
-            </div>
+            <p class="text-muted">
+                <kw-l key="account.delete_lede">Deleting your account removes your sign-in, your profile, and your group and community memberships. Your past actions in the platform's audit trail are preserved with your identity replaced by a placeholder (the platform's privacy policy, OPS.md §9). This cannot be undone.</kw-l>
+            </p>
 
-            <button type="submit" class="btn btn-danger"><kw-l key="account.delete_submit">Delete account</kw-l></button>
-        </form>
+            @* data-confirm — a plain literal string (the admin Block/Unblock
+               form idiom: a hardcoded client confirm() copy, the repo's
+               "not HTML attributes" kw-l exclusion). The form's checkbox +
+               the lede text (both kw-l-resolved) carry the localized
+               confirmation; this dialog is a second, English-only layer. *@
+            <form asp-action="Delete" method="post"
+                  data-confirm="@_deleteConfirm">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="All" class="text-danger"></div>
 
-        <p class="mt-3 text-muted">
-            <a href="/profile/edit"><kw-l key="account.change_password_back">Back to your profile</kw-l></a>.
-        </p>
+                <div class="mb-3">
+                    <label asp-for="Password" class="form-label"><kw-l key="account.delete_password">Password</kw-l></label>
+                    <input asp-for="Password" class="form-control" autocomplete="current-password" />
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3 form-check">
+                    <input asp-for="Confirmed" class="form-check-input" />
+                    <label asp-for="Confirmed" class="form-check-label">
+                        <kw-l key="account.delete_confirm_checkbox">I understand my account will be permanently deleted and this cannot be undone.</kw-l>
+                    </label>
+                    <span asp-validation-for="Confirmed" class="text-danger d-block"></span>
+                </div>
+
+                <button type="submit" class="btn btn-danger"><kw-l key="account.delete_submit">Delete account</kw-l></button>
+            </form>
+
+            <p class="mt-3 text-muted">
+                <a href="/profile/edit"><kw-l key="account.change_password_back">Back to your profile</kw-l></a>.
+            </p>
+        }
         </div>
     </div>
 </div>

@@ -51,7 +51,6 @@
   "validation.current_password_wrong": "Dein aktuelles Passwort ist falsch.",
   "validation.confirm_deletion": "Du musst best\u00E4tigen, dass du verstehst, dass dein Konto dauerhaft gel\u00F6scht wird.",
   "validation.password_wrong": "Dein Passwort ist falsch.",
-  "validation.delete_admin_only": "Das L\u00F6schen des eigenen Kontos ist nur f\u00FCr einen GlobalAdmin verf\u00FCgbar. Bewohner ohne GlobalAdmin-Rolle k\u00F6nnen ihr Konto nicht selbst l\u00F6schen \u2013 wende dich an einen Administrator, um das Konto entfernen zu lassen.",
   "validation.domain_not_accepted": "Die E-Mail-Domain \u201E{0}\u201C wird f\u00FCr neue Konten nicht akzeptiert.",
   "validation.domain_not_accepted_permanent": "Die E-Mail-Domain \u201E{0}\u201C wird f\u00FCr neue Konten nicht akzeptiert. Bitte nutze eine dauerhafte E-Mail-Adresse.",
   "validation.pick_one_end": "W\u00E4hle genau ein Ende: \u201EEndet nach\u201C einer Anzahl von Terminen oder \u201EEndet am\u201C einem Datum.",
