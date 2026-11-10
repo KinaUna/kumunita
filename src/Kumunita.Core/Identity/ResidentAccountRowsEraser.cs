@@ -74,6 +74,7 @@ public static class ResidentAccountRowsEraser
         typeof(ErrorReport),                  // IS23 — block 10: pseudonymized (SubjectId → tombstone, ContactEmail → null)
         typeof(EscalationToken),              // IS23 — block 11: pseudonymized (CreatedBy → tombstone)
         typeof(UsageEvent),                   // IS23 — block 12: pseudonymized (ActorId → tombstone)
+        typeof(DeletionRequest),              // ADR 0301 (R11) — block 13: the pending self-delete request (never exportable; erased with the account, the GuardianLink shape)
     };
 
     /// <summary>
@@ -119,6 +120,7 @@ public static class ResidentAccountRowsEraser
         touched += await PseudonymizeErrorReportsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
         touched += await PseudonymizeEscalationTokensAsync(session, residentSubjectId, ct).ConfigureAwait(false);
         touched += await PseudonymizeUsageEventsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseDeletionRequestAsync(session, residentSubjectId, ct).ConfigureAwait(false);
 
         if (logger is not null)
         {
@@ -346,6 +348,24 @@ public static class ResidentAccountRowsEraser
             row.ActorId = tombstone;
             session.Store(row);
         }
+        return rows.Count;
+    }
+
+    // 13. DeletionRequest — the pending self-delete request row (ADR 0301,
+    //     IMPROVE-UX R11). Owner field: SubjectId (identity). [DataClass]
+    //     Delete (R11 — never exportable, erased with the account): the
+    //     resident's own pending request must not survive the deletion
+    //     (either the due-job already ran it — the row is Executed — or the
+    //     deletion came through the admin / guardian lane and the resident
+    //     never ran it).
+    private static async Task<int> EraseDeletionRequestAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<DeletionRequest>()
+            .Where(r => r.SubjectId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
         return rows.Count;
     }
 }

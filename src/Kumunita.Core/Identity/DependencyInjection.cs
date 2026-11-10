@@ -29,6 +29,13 @@ public static class IdentityModule
     public static IServiceCollection AddIdentity(this IServiceCollection services)
     {
         services.AddTransient<IIdentityService, IdentityService>();
+        // ADR 0301 (IMPROVE-UX R11) — the self-service deletion SCHEDULING
+        // lane (the grace period above the IIdentityService.DeleteAccountAsync
+        // seam — ADR 0301 D4 keeps that contract unchanged; the scheduler is a
+        // sibling service, not a change to IIdentityService). The R12 due-job
+        // resolves IDeletionScheduler for the ListDueAsync / MarkExecutedAsync
+        // seams.
+        services.AddTransient<IDeletionScheduler, DeletionScheduler>();
         // C3-07 (ADR 0297, D5 contract extraction) — the IInstanceBaseUrlReader
         // read contract over the host-bound VerificationOptions.BaseUrl value.
         // The Identity module owns both the source options and the contract, so

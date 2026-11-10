@@ -98,6 +98,13 @@ public static class CoreDocTypes
         // SubjectId). The additive-surface delta is applied idempotently at
         // boot (ADR 0004 §B.1, zero migration).
         opts.Schema.For<Identity.GuestAccess>().Identity(g => g.SubjectId);
+        // ADR 0301 (IMPROVE-UX R11) — the pending self-service deletion request
+        // (the grace-period row ADR 0301 D2 schedules and R12's due-job runs).
+        // One row per resident (the Profile / GuestAccess SubjectId-as-identity
+        // precedent) — a re-schedule overwrites the same row (the
+        // GroupInvitation / GroupJoinRequest "reset the existing row" shape;
+        // the identity IS the business key, so no UniqueIndex pair).
+        opts.Schema.For<Identity.DeletionRequest>().Identity(d => d.SubjectId);
 
         // Outbox (plan M1 step 6/7): the staged email row the domain write commits with
         // (IMailerStage / OutboxEmailStager, invariant C3) and the domain dead-letter

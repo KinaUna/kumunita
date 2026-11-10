@@ -1549,7 +1549,8 @@
       "from": "Identity",
       "to": "UserInfo",
       "symbol": "GuardianLink",
-      "count": 1
+      "count": 2,
+      "adr": "0301"
     },
     {
       "from": "Identity",

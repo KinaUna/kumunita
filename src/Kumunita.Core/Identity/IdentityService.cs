@@ -495,7 +495,15 @@ public partial class IdentityService(
         ExpiresAt = now.AddDays(verificationOptions.Value.TtlDays)
     };
 
-    private static Authorization.AccessAudit AuditRow(
+    /// <summary>
+    /// The single <c>AccessAudit</c> row shape the whole <c>Identity</c>
+    /// context writes (the "one summary" shape, the ADR 0142 D5 / 0301 D1
+    /// precedent). <c>internal</c> so the ADR 0301 (IMPROVE-UX R11)
+    /// <see cref="DeletionScheduler"/> sibling shares the SAME implementation
+    /// rather than duplicating the field mapping in a second file (the
+    /// <see cref="Sha256Hex"/> "internal so the sibling shares it" precedent).
+    /// </summary>
+    internal static Authorization.AccessAudit AuditRow(
         DateTimeOffset at, string actorId, string effective, string action,
         string targetKind, string targetId, Authorization.AccessVia via,
         Authorization.AccessOutcome outcome) => new()
