@@ -67,5 +67,19 @@
   "kiosk.settings.remove_entry": "Entfernen",
   "kiosk.settings.entry_heading": "Eintrag {0}",
   "kiosk.settings.empty": "Noch keine Eintr\u00E4ge. Mit \u201EEintrag hinzuf\u00FCgen\u201C bringst du etwas auf deinen Kiosk.",
-  "kiosk.settings.calendar_all": "Alle Gemeinschaften"
+  "kiosk.settings.calendar_all": "Alle Gemeinschaften",
+  "kiosk.settings.shared_heading": "Gemeinsamer Link",
+  "kiosk.settings.shared_intro": "Ein gemeinsamer Link erlaubt es jedem, der ihn hat, deine Kiosk-Anzeige ohne Anmeldung zu betrachten. Es werden nur Elemente angezeigt, die für die gesamte Gemeinschaft sichtbar sind (private Elemente werden übersprungen). Der Link ist widerrufbar; nach dem Widerruf kann er nicht wiederhergestellt werden.",
+  "kiosk.settings.link_created": "Dein gemeinsamer Link ist bereit. Kopiere ihn jetzt — er wird nicht erneut angezeigt.",
+  "kiosk.settings.token_label": "Gemeinsamer Link",
+  "kiosk.settings.copy": "Kopieren",
+  "kiosk.settings.copied": "Kopiert",
+  "kiosk.settings.create_link": "Link erstellen",
+  "kiosk.settings.col_created": "Erstellt",
+  "kiosk.settings.col_last_used": "Zuletzt verwendet",
+  "kiosk.settings.col_actions": "Aktionen",
+  "kiosk.settings.never_used": "Nie",
+  "kiosk.settings.revoke_confirm": "Diesen gemeinsamen Link widerrufen? Er hört sofort auf zu funktionieren und kann nicht zurückgenommen werden.",
+  "kiosk.settings.revoke": "Widerrufen",
+  "kiosk.settings.shared_empty": "Noch keine gemeinsamen Links. Mit \u201ELink erstellen\u201C kannst du einen für eine Wandanzeige oder ein gemeinsames Display anlegen."
 }

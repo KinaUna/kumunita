@@ -598,11 +598,27 @@ public class KioskControllerTests
     /// precedent never hit a <c>TempData</c>-writing POST, so this is new.</summary>
     private sealed class InMemoryTempDataProvider : ITempDataProvider
     {
-        private readonly ConcurrentDictionary<string, object?> _values = new();
-        public IDictionary<string, object> LoadTempData(HttpContext context) => new Dictionary<string, object>();
+        // Retain saved values across Load/Save so a redirect-after-POST
+        // (the R18 LinkCreate → SettingsGet copy-once token round-trip, the
+        // ADR 0302 D2 reveal) resolves the token the POST wrote. The existing
+        // M35 SettingsPost test reads its own TempData within the same request
+        // (the controller's provider round-trip), so this retention does not
+        // change its behavior.
+        private readonly IDictionary<string, object?> _stored =
+            new ConcurrentDictionary<string, object?>();
+        public IDictionary<string, object> LoadTempData(HttpContext context)
+        {
+            var result = new Dictionary<string, object>();
+            foreach (var (key, value) in _stored)
+            {
+                if (value is not null) result[key] = value;
+            }
+            return result;
+        }
         public void SaveTempData(HttpContext context, IDictionary<string, object> values)
         {
-            foreach (var (key, value) in values) _values[key] = value;
+            _stored.Clear();
+            foreach (var (key, value) in values) _stored[key] = value;
         }
     }
 
@@ -635,5 +651,313 @@ public class KioskControllerTests
         public bool IsLocalUrl(string? url) => false;
         public string RouteUrl(UrlRouteContext routeContext) => "stub-route";
         public string Link(string? linkName, object? values) => "stub-link";
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ADR 0302 (IMPROVE-UX R18) — the /settings/kiosk shared-link lifecycle.
+//
+// The DoD tests (plan-improve-ux.md, R18 row): create link (copy-once
+// token, the row stores the hash not the raw token), list with last used
+// (a revoked link is out of the list), revoke (terminal, a second revoke is
+// a no-op), the owner-scope pin (another owner's link is a no-op), and the
+// ADR 0302 D5 personal-kiosk-untouched pin.
+//
+// Harness: the project's standing direct-construction idiom (the
+// KioskControllerTests.Build shape) + the ADR 0302 IKioskLinkService seam
+// and the KioskLinkListReader read seam (both substituted). The
+// InMemoryTempDataProvider (retaining saved values) pins the copy-once
+// token round-trip.
+// ─────────────────────────────────────────────────────────────────────────
+
+public class KioskLinkSettingsTests
+{
+    private const string Owner = "r18-owner-001";
+    private const string Member = Kumunita.Core.Identity.Roles.Member;
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    // ── 1 — Create link — the happy path (the copy-once token + the row) ──
+
+    [Fact]
+    public async Task R18_CreateLink_ReturnsTokenOnce_AndRedirectsToSettings()
+    {
+        var (controller, _, _, linkService, _) = BuildR18(role: Member);
+        var newLink = new KioskLink
+        {
+            Id = "link-abc123",
+            PlaylistId = Owner,
+            OwnerSubjectId = Owner,
+            TokenHash = "fake-hash-for-test",
+            CreatedAt = new DateTimeOffset(2026, 11, 10, 12, 0, 0, TimeSpan.Zero),
+        };
+        linkService.CreateAsync(Owner, Owner, Arg.Any<CancellationToken>())
+            .Returns((token: "kskl_test-token", link: newLink));
+
+        var action = await controller.LinkCreate(Ct);
+
+        // The redirect-after-POST (the SettingsPost precedent) — the token
+        // rides TempData for the single round-trip, never the URL (ADR 0302 D2).
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(KioskController.SettingsGet), redirect.ActionName);
+        Assert.Equal("kskl_test-token", controller.TempData["kiosk.link.token"] as string);
+        Assert.Equal("link-abc123", controller.TempData["kiosk.link.id"] as string);
+        await linkService.Received(1).CreateAsync(Owner, Owner, Arg.Any<CancellationToken>());
+    }
+
+    // ── 2 — The token is shown once, then gone (no "show again") ──────────
+
+    [Fact]
+    public async Task R18_CreateLink_TokenShownOnce_NotRecoverableOnRefresh()
+    {
+        var (controller, _, _, _, links) = BuildR18(role: Member);
+        links.ListActiveAsync(Owner, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<KioskLink>>([
+                new KioskLink
+                {
+                    Id = "link-xyz", PlaylistId = Owner, OwnerSubjectId = Owner,
+                    TokenHash = "hash-xyz",
+                    CreatedAt = new DateTimeOffset(2026, 11, 10, 12, 0, 0, TimeSpan.Zero),
+                    LastUsedAt = new DateTimeOffset(2026, 11, 10, 14, 30, 0, TimeSpan.Zero),
+                },
+            ]));
+
+        // First GET (the reveal): the token LinkCreate wrote to TempData is
+        // read once and handed to the view for the copy-once input.
+        controller.TempData["kiosk.link.token"] = "kskl_secret";
+        var firstVm = Assert.IsType<KioskSettingsViewModel>(
+            Assert.IsType<ViewResult>(await controller.SettingsGet(Ct)).Model);
+        Assert.Equal("kskl_secret", firstVm.SharedLinkToken);
+
+        // Second GET (a refresh): the token is cleared (the ADR 0302 D2
+        // "no show again" floor) — the list row carries metadata only, and
+        // the raw token is nowhere in the view model.
+        var secondVm = Assert.IsType<KioskSettingsViewModel>(
+            Assert.IsType<ViewResult>(await controller.SettingsGet(Ct)).Model);
+        Assert.Null(secondVm.SharedLinkToken);
+        Assert.Single(secondVm.SharedLinks);
+        Assert.Equal("link-xyz", secondVm.SharedLinks[0].Id);
+        Assert.NotNull(secondVm.SharedLinks[0].LastUsedAt);
+    }
+
+    // ── 3 — List with last used (newest first, active only) ────────────────
+
+    [Fact]
+    public async Task R18_SettingsGet_ListsActiveLinksWithLastUsed()
+    {
+        var (controller, _, _, _, links) = BuildR18(role: Member);
+        var older = new DateTimeOffset(2026, 11, 9, 9, 0, 0, TimeSpan.Zero);
+        var now = new DateTimeOffset(2026, 11, 10, 12, 0, 0, TimeSpan.Zero);
+        links.ListActiveAsync(Owner, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<KioskLink>>([
+                new KioskLink { Id = "link-2", PlaylistId = Owner, OwnerSubjectId = Owner,
+                    TokenHash = "h2", CreatedAt = now, LastUsedAt = null },
+                new KioskLink { Id = "link-1", PlaylistId = Owner, OwnerSubjectId = Owner,
+                    TokenHash = "h1", CreatedAt = older, LastUsedAt = older.AddHours(2) },
+            ]));
+
+        var vm = Assert.IsType<KioskSettingsViewModel>(
+            Assert.IsType<ViewResult>(await controller.SettingsGet(Ct)).Model);
+        Assert.Equal(2, vm.SharedLinks.Count);
+        Assert.Equal("link-2", vm.SharedLinks[0].Id);
+        Assert.Equal("link-1", vm.SharedLinks[1].Id);
+        Assert.Null(vm.SharedLinks[0].LastUsedAt);
+        Assert.NotNull(vm.SharedLinks[1].LastUsedAt);
+        await links.Received(1).ListActiveAsync(Owner, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task R18_SettingsGet_NoActiveLinks_EmptyList()
+    {
+        var (controller, _, _, _, links) = BuildR18(role: Member);
+        links.ListActiveAsync(Owner, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<KioskLink>>([]));
+
+        var vm = Assert.IsType<KioskSettingsViewModel>(
+            Assert.IsType<ViewResult>(await controller.SettingsGet(Ct)).Model);
+        Assert.Empty(vm.SharedLinks);
+        Assert.Null(vm.SharedLinkToken);
+    }
+
+    // ── 4 — Revoke — happy path + the idempotent no-op ─────────────────────
+
+    [Fact]
+    public async Task R18_RevokeLink_CallsTheSeam_ReturnsTrue()
+    {
+        var (controller, _, _, linkService, _) = BuildR18(role: Member);
+        linkService.RevokeAsync("link-1", Owner, Arg.Any<CancellationToken>()).Returns(true);
+
+        var action = await controller.LinkRevoke("link-1", Ct);
+        var json = Assert.IsType<JsonResult>(action);
+        Assert.True(BoolOf(json!, "revoked"));
+        await linkService.Received(1).RevokeAsync("link-1", Owner, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task R18_RevokeLink_SecondCall_IsANoop()
+    {
+        var (controller, _, _, linkService, _) = BuildR18(role: Member);
+        // The R15 ADR 0302 D3 idempotent shape: an already-revoked link
+        // returns false (no audit row, no state change) — the controller
+        // still returns JSON 200 (revoked: false; the row is already out of
+        // the owner's list).
+        linkService.RevokeAsync("link-1", Owner, Arg.Any<CancellationToken>()).Returns(false);
+
+        var action = await controller.LinkRevoke("link-1", Ct);
+        Assert.False(BoolOf(Assert.IsType<JsonResult>(action)!, "revoked"));
+    }
+
+    // ── 5 — Revoke — the owner-scope pin (another owner's link is a no-op) ─
+
+    [Fact]
+    public async Task R18_RevokeLink_AnotherOwnersLink_IsANoop()
+    {
+        var (controller, _, _, linkService, _) = BuildR18(role: Member);
+        // The R15 seam's owner-scope check (ADR 0302 D3): a link the actor
+        // does not own is a no-op returning false (not a 404/403 — the
+        // idempotent precedent; the owner's own list never contains another
+        // owner's link, so the UI shows absence, not an error).
+        linkService.RevokeAsync("someone-elses-link", Owner, Arg.Any<CancellationToken>()).Returns(false);
+
+        var action = await controller.LinkRevoke("someone-elses-link", Ct);
+        Assert.False(BoolOf(Assert.IsType<JsonResult>(action)!, "revoked"));
+        await linkService.Received(1).RevokeAsync("someone-elses-link", Owner, Arg.Any<CancellationToken>());
+    }
+
+    // ── 6 — Personal mode untouched (the ADR 0302 D5 pin) ─────────────────
+
+    [Fact]
+    public void R18_PersonalKioskActions_RoutesUnchanged()
+    {
+        // R18 is additive: the personal-kiosk routes (SettingsGet /
+        // SettingsPost) are re-pointed to none; the shared-link routes
+        // (/settings/kiosk/link, /settings/kiosk/link/revoke) are NEW. The
+        // existing KioskControllerTests (M35_7, ADR0285_SettingsGet, the
+        // save lane) still pass unchanged (the D5 pin).
+        var getAttr = typeof(KioskController).GetMethod(nameof(KioskController.SettingsGet))!
+            .GetCustomAttribute<HttpGetAttribute>();
+        Assert.Contains("/settings/kiosk", getAttr!.Template ?? string.Empty);
+
+        var postAttr = typeof(KioskController).GetMethod(nameof(KioskController.SettingsPost))!
+            .GetCustomAttribute<HttpPostAttribute>();
+        Assert.Contains("/settings/kiosk", postAttr!.Template ?? string.Empty);
+
+        var createAttr = typeof(KioskController).GetMethod(nameof(KioskController.LinkCreate))!
+            .GetCustomAttribute<HttpPostAttribute>();
+        Assert.Contains("/settings/kiosk/link", createAttr!.Template ?? string.Empty);
+    }
+
+    // ── 7 — The shared-link actions are owner-guarded (a blank actor 403s) ─
+
+    [Fact]
+    public async Task R18_CreateLink_NoActorId_Is403()
+    {
+        var (controller, _, _, linkService, _) = BuildR18(role: null);
+        var action = await controller.LinkCreate(Ct);
+        Assert.IsType<ForbidResult>(action);
+        await linkService.DidNotReceiveWithAnyArgs().CreateAsync(default!, default!, Ct);
+    }
+
+    [Fact]
+    public async Task R18_RevokeLink_NoActorId_Is403()
+    {
+        var (controller, _, _, linkService, _) = BuildR18(role: null);
+        var action = await controller.LinkRevoke("link-1", Ct);
+        Assert.IsType<ForbidResult>(action);
+        await linkService.DidNotReceiveWithAnyArgs().RevokeAsync(default!, default!, Ct);
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────────
+
+    private static bool BoolOf(JsonResult json, string prop) =>
+        (bool)(json!.Value!.GetType().GetProperty(prop)!.GetValue(json.Value)!);
+
+    /// <summary>A retaining TempData provider for the R18 copy-once token
+    /// round-trip (LinkCreate → redirect → SettingsGet reads the token the
+    /// POST wrote, then clears it). The KioskControllerTests'
+    /// InMemoryTempDataProvider is nested and inaccessible here, so this is a
+    /// local copy with the same retention semantics.</summary>
+    private sealed class R18TempData : ITempDataProvider
+    {
+        private readonly IDictionary<string, object?> _stored =
+            new ConcurrentDictionary<string, object?>();
+        public IDictionary<string, object> LoadTempData(HttpContext context)
+        {
+            var result = new Dictionary<string, object>();
+            foreach (var (key, value) in _stored)
+            {
+                if (value is not null) result[key] = value;
+            }
+            return result;
+        }
+        public void SaveTempData(HttpContext context, IDictionary<string, object> values)
+        {
+            _stored.Clear();
+            foreach (var (key, value) in values) _stored[key] = value;
+        }
+    }
+
+    /// <summary>A minimal <see cref="IUrlHelperFactory"/> so
+    /// <c>RedirectToAction</c> (the R18 LinkCreate success path) resolves in
+    /// the direct-construction harness (the KioskControllerTests
+    /// StubUrlHelperFactory shape).</summary>
+    private sealed class R18UrlFactory : IUrlHelperFactory
+    {
+        public IUrlHelper GetUrlHelper(ActionContext actionContext) => new R18UrlHelper(actionContext);
+    }
+
+    private sealed class R18UrlHelper : IUrlHelper
+    {
+        public R18UrlHelper(ActionContext actionContext) { ActionContext = actionContext; }
+        public ActionContext ActionContext { get; }
+        public string Action(UrlActionContext actionContext) => "stub-action";
+        public string Content(string? content) => content ?? string.Empty;
+        public bool IsLocalUrl(string? url) => false;
+        public string RouteUrl(UrlRouteContext routeContext) => "stub-route";
+        public string Link(string? linkName, object? values) => "stub-link";
+    }
+
+    private static (KioskController controller, IKioskService kiosk,
+        IKioskItemCatalog catalog, IKioskLinkService linkService,
+        Kumunita.Web.Services.IKioskLinkListReader links) BuildR18(string? role)
+    {
+        var kiosk = Substitute.For<IKioskService>();
+        var catalog = Substitute.For<IKioskItemCatalog>();
+        var events = Substitute.For<IEventService>();
+        var linkService = Substitute.For<IKioskLinkService>();
+        var links = Substitute.For<Kumunita.Web.Services.IKioskLinkListReader>();
+
+        var controller = new KioskController(kiosk, events, null, catalog, linkService, links);
+
+        var services = new ServiceCollection();
+        services.AddHttpContextAccessor();
+        services.AddSingleton<ITempDataProvider, R18TempData>();
+        services.AddTransient<ITempDataDictionaryFactory, TempDataDictionaryFactory>();
+        services.AddSingleton(Substitute.For<IModelMetadataProvider>());
+        services.AddSingleton<IUrlHelperFactory, R18UrlFactory>();
+        services.AddSingleton(kiosk);
+        services.AddSingleton(catalog);
+        services.AddSingleton(events);
+        services.AddSingleton(linkService);
+        services.AddSingleton(links);
+        var provider = services.BuildServiceProvider();
+
+        var httpContext = new DefaultHttpContext
+        {
+            Request = { Scheme = "http", Host = new HostString("localhost") },
+            RequestServices = provider,
+            User = role is null
+                ? new ClaimsPrincipal()
+                : new ClaimsPrincipal(new ClaimsIdentity(
+                    new[]
+                    {
+                        new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, Owner),
+                        new Claim(Kumunita.Core.Identity.ClaimTypes.Role, role),
+                    },
+                    authenticationType: "test")),
+        };
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        return (controller, kiosk, catalog, linkService, links);
     }
 }

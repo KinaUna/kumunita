@@ -60,12 +60,16 @@ public sealed class KioskController : Controller
     private readonly IEventService events;
     private readonly EffectiveTimezoneResolver? timezone;
     private readonly IKioskItemCatalog? catalog;
+    private readonly IKioskLinkService? linkService;
+    private readonly IKioskLinkListReader? sharedLinks;
 
     public KioskController(
         IKioskService kiosk,
         IEventService events,
         EffectiveTimezoneResolver? timezone = null,
-        IKioskItemCatalog? catalog = null)
+        IKioskItemCatalog? catalog = null,
+        IKioskLinkService? linkService = null,
+        IKioskLinkListReader? sharedLinks = null)
     {
         this.kiosk = kiosk ?? throw new ArgumentNullException(nameof(kiosk));
         this.events = events ?? throw new ArgumentNullException(nameof(events));
@@ -74,6 +78,18 @@ public sealed class KioskController : Controller
         // test can construct the controller without it; DI always supplies it
         // (Program.cs). Without it every non-calendar entry resolves hidden.
         this.catalog = catalog;
+        // ADR 0302 (IMPROVE-UX R18) — the shared-kiosk-link Core seam (the
+        // create / revoke / validate trio, the R15 frozen surface). Optional so
+        // a test can construct the controller without it; DI always supplies it
+        // (Program.cs registers IKioskLinkService → KioskLinkService). The
+        // shared-link actions throw if it is absent (they cannot mint or revoke
+        // a link without the seam).
+        this.linkService = linkService;
+        // ADR 0302 (IMPROVE-UX R18) — the shared-link list read seam. Optional
+        // so a test can construct the controller without it; DI always supplies
+        // it (Program.cs). Without it the shared-link section renders empty
+        // (the EscalationForwarder "store seam absent → degrade" shape).
+        this.sharedLinks = sharedLinks;
     }
 
     /// <summary>
@@ -175,6 +191,27 @@ public sealed class KioskController : Controller
             rows.Add(new KioskEntryEditorRow(entry, resolved.Title, resolved.Visible));
         }
 
+        // ADR 0302 (IMPROVE-UX R18) — the owner's active shared kiosk links
+        // (the shared-link section's list). Owner-scoped (the read seam
+        // filters OwnerSubjectId = the actor), active only (RevokedAt null),
+        // newest first. The seam is a read-only metadata read — no token
+        // material (ADR 0302 D2), no audit row (the M35·5 "the read is a
+        // config load, not an access decision" floor).
+        var links = sharedLinks is null
+            ? new List<KioskLink>()
+            : await sharedLinks.ListActiveAsync(actorId, ct).ConfigureAwait(false);
+
+        // ADR 0302 (IMPROVE-UX R18) — the copy-once reveal: the token of the
+        // link just created rides TempData for this one render (the
+        // LinkCreate redirect), then is cleared (the "shown exactly once"
+        // rule — a second GET has no token, the ADR 0302 D2 "no show again"
+        // floor). Read + remove in the same request so a refresh cannot
+        // re-display it.
+        string? justCreatedToken = TempData["kiosk.link.token"] as string;
+        TempData.Remove("kiosk.link.token");
+        TempData.Remove("kiosk.link.id");
+        TempData.Remove("kiosk.link.created");
+
         var vm = new KioskSettingsViewModel
         {
             Entries = rows,
@@ -182,11 +219,116 @@ public sealed class KioskController : Controller
             RefreshIntervalSeconds = playlist?.RefreshIntervalSeconds ?? 10,
             DisplayMode = playlist?.DisplayMode ?? KioskDisplayMode.FullPage,
             ScrollSpeed = playlist?.ScrollSpeed ?? KioskScrollSpeed.Medium,
+            SharedLinks = links,
+            SharedLinkToken = justCreatedToken,
         };
 
         ViewData["Title"] = "Kiosk settings";
         return View("Settings", vm);
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // The shared kiosk link lifecycle (ADR 0302, IMPROVE-UX R18). A
+    // per-playlist, revocable, long-random-token credential the R16 middleware
+    // authenticates on /kiosk + its slides. The Core seam
+    // (IKioskLinkService) owns create + revoke (each exactly one AccessAudit
+    // row, Via: Owner, TargetKind "kiosk"); this surface is the resident's
+    // create / list / revoke on /settings/kiosk. The raw token is returned by
+    // CreateAsync exactly once and never stored (ADR 0302 D2) — the row keeps
+    // only its SHA-256 digest, so a re-read cannot recover it (there is no
+    // "show again"). The personal-kiosk settings (SettingsGet / SettingsPost /
+    // Items) are untouched (ADR 0302 D5).
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>POST /settings/kiosk/link</c> — mints a shared kiosk link for the
+    /// signed-in resident (the ADR 0302 D3 <see cref="IKioskLinkService
+    /// .CreateAsync"/> seam: generates the long random token, stores only its
+    /// SHA-256 hex digest, commits exactly one <c>kiosk.link.create</c>
+    /// <c>AccessAudit</c> row). The owner's personal playlist id is the actor
+    /// (ADR 0164: one <c>KioskPlaylist</c> row per signed-in user, <c>Id</c> =
+    /// the subject id) — the link plays that playlist read-only,
+    /// community-visible items only (R17).
+    /// <para>
+    /// **The raw token is shown exactly once (ADR 0302 D2):** it is carried in
+    /// <c>TempData</c> for the single redirect round-trip (never in the URL —
+    /// the token must not ride a referer / history entry the server renders),
+    /// then read and cleared by <see cref="SettingsGet"/>, which hands it to
+    /// the view for the copy-once reveal. The row holds only the hash, so a
+    /// re-read cannot recover the token (there is no "show again" endpoint).
+    /// The redirect-after-POST shape (the <see cref="SettingsPost"/>
+    /// precedent) means the flow works with or without scripts, and the
+    /// <see cref="SettingsGet"/> re-query puts the new link in the list.
+    /// </para>
+    /// </summary>
+    [HttpPost("/settings/kiosk/link")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LinkCreate(CancellationToken ct)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrEmpty(actorId))
+        {
+            return Forbid();
+        }
+
+        // ADR 0164 — the personal playlist's Id is the owner's subject id
+        // (one row per signed-in user). The link plays it read-only; a missing
+        // playlist row (a resident who has never saved one) is still linkable
+        // (CreateAsync takes the playlistId; an empty playlist renders the
+        // kiosk.empty shape, the R15/0164 precedent).
+        var (token, link) = await KumunitaLinkService.CreateAsync(actorId, actorId, ct).ConfigureAwait(false);
+
+        // The token + the new link's metadata ride TempData for one round-trip
+        // (the SettingsGet success-message precedent); cleared on read.
+        TempData["kiosk.link.token"] = token;
+        TempData["kiosk.link.id"] = link.Id;
+        TempData["kiosk.link.created"] = link.CreatedAt.ToString("O", CultureInfo.InvariantCulture);
+        return RedirectToAction(nameof(SettingsGet));
+    }
+
+    /// <summary>
+    /// <c>POST /settings/kiosk/link/revoke</c> — revokes the signed-in
+    /// resident's shared kiosk link (the ADR 0302 D3 <see cref="IKioskLinkService
+    /// .RevokeAsync"/> seam: sets <c>RevokedAt</c> + exactly one
+    /// <c>kiosk.link.revoke</c> audit row; owner-scoped, idempotent — a missing
+    /// link, an already-revoked one, or another owner's link is a no-op). The
+    /// state machine is terminal (ADR 0302 D1) — there is no undo. The row
+    /// disappears from the owner's list on the next <c>SettingsGet</c>.
+    /// </summary>
+    [HttpPost("/settings/kiosk/link/revoke")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LinkRevoke(string linkId, CancellationToken ct)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrEmpty(actorId))
+        {
+            return Forbid();
+        }
+        if (string.IsNullOrWhiteSpace(linkId))
+        {
+            return BadRequest();
+        }
+
+        // The Core seam enforces the owner-scope pin (RevokeAsync returns false
+        // when the link is not the actor's) — the controller does not re-check;
+        // a mismatch is a no-op, not an error (the R15 idempotent precedent).
+        var revoked = await KumunitaLinkService.RevokeAsync(linkId, actorId, ct).ConfigureAwait(false);
+        return Json(new { revoked });
+    }
+
+    /// <summary>
+    /// The <see cref="IKioskLinkService"/> seam (ADR 0302 D3) — the create /
+    /// revoke trio this surface calls (validate is the R16 middleware's). The
+    /// R15 Core seam is **frozen** (R18 adds no method to it); this is the
+    /// R18 surface's only coupling to it. Throws when the seam is absent (the
+    /// constructor allows it for test harnesses that exercise the personal
+    /// kiosk only — a shared-link action cannot run without the seam, so the
+    /// failure is loud, not a silent no-op).
+    /// </summary>
+    private IKioskLinkService KumunitaLinkService =>
+        this.linkService ?? throw new InvalidOperationException(
+            "The IKioskLinkService seam is not registered — the /settings/kiosk " +
+            "shared-link lifecycle requires it (ADR 0302 D3).");
 
     /// <summary>
     /// <c>GET /settings/kiosk/items?type=&lt;KioskItemType&gt;&amp;q=&lt;text&gt;</c>

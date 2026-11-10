@@ -333,9 +333,67 @@ function initKioskEditor(editor: HTMLElement): void {
   form?.addEventListener('submit', () => renumber());
 }
 
+// ── ADR 0302 (IMPROVE-UX R18) — the shared-link copy-once affordance ──────
+
+function L(key: string, fallback: string): string {
+  try {
+    const el = document.getElementById('kumunita-strings');
+    if (el?.textContent) {
+      const s = JSON.parse(el.textContent) as Record<string, string>;
+      return s[key] ?? fallback;
+    }
+  } catch { /* fall through to the en floor */ }
+  return fallback;
+}
+
+/**
+ * The copy-token button in the reveal alert (rendered by the Settings view
+ * only when `Model.SharedLinkToken` is non-null — i.e. the single render
+ * right after `POST /settings/kiosk/link` → the redirect → SettingsGet).
+ *
+ * The button copies the token to the clipboard and shows "Copied" (localized
+ * via the #kumunita-strings bundle, en floor). The token is **never** written
+ * to a URL, a log, or any DOM attribute other than the read-only input's
+ * value (the ADR 0302 D2 "shown exactly once" rule — the row holds only the
+ * hash, so there is no "show again" endpoint and no re-fetch path).
+ */
+function initKioskLinkCopy(): void {
+  const btn = document.querySelector<HTMLButtonElement>('[data-kiosk-copy-token]');
+  const input = document.getElementById('kiosk-link-token') as HTMLInputElement | null;
+  if (!btn || !input) return;
+
+  const copiedText = L('kiosk.settings.copied', 'Copied');
+  let done = false;
+
+  btn.addEventListener('click', async () => {
+    if (done) return;
+    try {
+      await navigator.clipboard.writeText(input.value);
+    } catch {
+      // Clipboard API unavailable (non-secure context, permission denied) —
+      // select the input so the user can Ctrl+C.
+      input.select();
+    }
+    done = true;
+    btn.textContent = copiedText;
+    btn.disabled = true;
+  });
+}
+
 if (typeof document !== 'undefined') {
-  const editor = document.getElementById('kiosk-entries-editor');
-  if (editor) initKioskEditor(editor);
+  // The editor is above this <script> tag (in the form) and is therefore
+  // already parsed; the shared-link copy button is below it, so both inits
+  // run at DOMContentLoaded to be safe (the module loads without defer).
+  const boot = () => {
+    const editor = document.getElementById('kiosk-entries-editor');
+    if (editor) initKioskEditor(editor);
+    initKioskLinkCopy();
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
 }
 
 export {};

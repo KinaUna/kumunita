@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated": "2026-11-09",
-  "generated_from": "IMPROVE-UX X01 baseline on development",
+  "generated": "2026-11-10",
+  "generated_from": "IMPROVE-UX X01 baseline on development; re-based 2026-11-10 for IMPROVE-UX R18 (ADR 0302) — bare_status 704 -> 708: R18's LinkCreate/LinkRevoke owner guards (+3 return Forbid/BadRequest) + R17's +1 that shipped without a re-base. The guards are belt-and-braces (the class-level [Authorize] + the form's linkId make them unreachable in production); re-basing rather than deleting them.",
   "counts": {
-    "bare_status": 704,
+    "bare_status": 708,
     "a11y": 95,
     "empty_plain": 37,
     "empty_none": 33,

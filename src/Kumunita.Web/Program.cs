@@ -534,6 +534,11 @@ builder.Services.AddSingleton<Kumunita.Web.Services.PlatformPaletteProvider>();
 // ADR 0285 — the kiosk playlist editor's item picker (composes the M8 search
 // surfaces + the component list; no access logic of its own).
 builder.Services.AddScoped<Kumunita.Web.Services.IKioskItemCatalog, Kumunita.Web.Services.KioskItemCatalog>();
+// ADR 0302 (IMPROVE-UX R18) — the /settings/kiosk shared-link list read seam
+// (the owner's active KioskLink rows; the Core IKioskLinkService seam is the
+// frozen create/revoke/validate trio with no owner-scoped list — the
+// KioskItemCatalog "Web layer owns the read" precedent).
+builder.Services.AddScoped<Kumunita.Web.Services.IKioskLinkListReader, Kumunita.Web.Services.KioskLinkListReader>();
 
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,

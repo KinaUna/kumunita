@@ -67,5 +67,19 @@
   "kiosk.settings.remove_entry": "Remove",
   "kiosk.settings.entry_heading": "Entry {0}",
   "kiosk.settings.empty": "No entries yet. Use \u201CAdd entry\u201D to put something on your kiosk.",
-  "kiosk.settings.calendar_all": "All communities"
+  "kiosk.settings.calendar_all": "All communities",
+  "kiosk.settings.shared_heading": "Shared link",
+  "kiosk.settings.shared_intro": "A shared link lets anyone who has it watch your kiosk display without signing in. Only items visible to the whole community are shown (private items are skipped). The link is revocable; once revoked it cannot be restored.",
+  "kiosk.settings.link_created": "Your shared link is ready. Copy it now \u2014 it will not be shown again.",
+  "kiosk.settings.token_label": "Shared link",
+  "kiosk.settings.copy": "Copy",
+  "kiosk.settings.copied": "Copied",
+  "kiosk.settings.create_link": "Create link",
+  "kiosk.settings.col_created": "Created",
+  "kiosk.settings.col_last_used": "Last used",
+  "kiosk.settings.col_actions": "Actions",
+  "kiosk.settings.never_used": "Never",
+  "kiosk.settings.revoke_confirm": "Revoke this shared link? It will stop working immediately and cannot be undone.",
+  "kiosk.settings.revoke": "Revoke",
+  "kiosk.settings.shared_empty": "No shared links yet. Use \u201CCreate link\u201D to make one for a wall screen or shared display."
 }
