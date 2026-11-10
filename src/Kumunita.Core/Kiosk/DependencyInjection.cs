@@ -19,6 +19,12 @@ public static class KioskModule
         services.AddTransient<IKioskService>(sp => new KioskService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<Core.Authorization.IAuthorizationService>()));
+        // ADR 0302 (IMPROVE-UX R15) — the shared kiosk link's Core seam
+        // (create / revoke / validate). Pure Core — the R16 middleware and
+        // the R18 settings surface resolve it (the IKioskService precedent
+        // above; the KioskLinkService carries no IAuthorizationService —
+        // the owner-scope check is data-scoped, not a Decide() branch).
+        services.AddTransient<IKioskLinkService, KioskLinkService>();
         return services;
     }
 }

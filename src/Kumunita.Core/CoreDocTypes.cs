@@ -105,6 +105,14 @@ public static class CoreDocTypes
         // GroupInvitation / GroupJoinRequest "reset the existing row" shape;
         // the identity IS the business key, so no UniqueIndex pair).
         opts.Schema.For<Identity.DeletionRequest>().Identity(d => d.SubjectId);
+        // ADR 0302 (IMPROVE-UX R15) — the shared kiosk link (the per-playlist,
+        // revocable, long-random-token read-only credential). One row per link;
+        // the conventional string Id (the IdentityToken / EscalationToken
+        // credential shape). TokenHash is the SHA-256 digest only — the raw
+        // token is never stored (ADR 0302 D2, the F2 / 0159 hash-at-rest rule).
+        // Looked up by (TokenHash, OwnerSubjectId) in ValidateAsync — a plain
+        // query, no index needed (the link count per instance is small).
+        opts.Schema.For<Kiosk.KioskLink>();
 
         // Outbox (plan M1 step 6/7): the staged email row the domain write commits with
         // (IMailerStage / OutboxEmailStager, invariant C3) and the domain dead-letter
