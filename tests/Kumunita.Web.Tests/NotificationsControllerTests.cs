@@ -269,7 +269,10 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // improve-check gate pins / the site.css media-block pin).
         // 30 → 31 (the group-messaging invitation flow, ADR 0278 amendment —
         // group.message.invite joins the closed set).
-        Assert.Equal(31, vm.AllKinds.Count);
+        // 31 → 32 (IMPROVE-UX R08, ADR 0300 — issue.resolved joins the
+        // closed set: the resolved platform-issue loop closes for the
+        // signed-in filer).
+        Assert.Equal(32, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

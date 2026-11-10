@@ -329,3 +329,4 @@ Decision / Consequences. New decisions take the next number.
 | 0297 | IMPROVE-CODE-3 C3-07: the 3 flagged-accidental boundary edges — 2 contract extractions (`IInstanceBaseUrlReader`, `IIdentityPrincipalStore`) + the 4 name-collision retires (the Web `TagSlugs`→`TagSlugParser` rename) → boundary_violations 465→459 | Proposed |
 | 0298 | Data classes in code — the `[DataClass]` attribute + `DataClassCatalog` (one policy row per registered doc type; `Keep` → reason, `Pseudonymize` → principal field) | Accepted |
 | 0299 | The instance export is operator-gated — content-free by default; full only under an active AdminOverride, audited Via: BreakGlass, with resident transparency (D1/D10) | Accepted |
+| 0300 | The resolved platform-issue loop closes — the `issue.resolved` kind notifies the signed-in filer; the anonymous-filer mailing path is a held SEC decision | Accepted |

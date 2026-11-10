@@ -1,7 +1,11 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.ErrorReports;
+using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
+using Kumunita.Core.UserInfo;
 using Marten;
+using NSubstitute;
 using Xunit;
 
 namespace Kumunita.Core.Tests;
@@ -320,6 +324,279 @@ public class ErrorReportResolveTests(PostgresFixture fixture) : IClassFixture<Po
         var reloaded = await q.LoadAsync<ErrorReport>(stored.Id, ct);
         Assert.NotNull(reloaded);
         Assert.Equal("general", reloaded!.Origin);
+    }
+
+    // ── R08 — the signed-in filer hears back (E5; ADR 0300) ─────────────
+    // IMPROVE-UX R08: MarkResolvedAsync closes the platform-issue loop — a
+    // resolved issue now comes back to its **signed-in filer** as an inbox
+    // row (kind issue.resolved, linkPath /reports/mine#i-{id}, the R06 row
+    // anchor). The emission is staged into the same write session (the R07
+    // ModerationService.ReportIntake precedent). The anonymous filer (a
+    // blank SubjectId) gets NO emission (the ContactEmail is "never
+    // mailed" by design — a held SEC decision, the // TODO ❓). An
+    // already-resolved / missing report no-ops and emits nothing
+    // (idempotency). These wire the INotificationEmitter as an NSubstitute
+    // seam (the R07 ModerationServiceTests shape) + the optional
+    // translation seam resolving each key to its en floor.
+
+    /// <summary>
+    /// Build the <see cref="ErrorReportService"/> with the R08 seams: an
+    /// NSubstitute <see cref="INotificationEmitter"/> (the seam under test)
+    /// + an <see cref="ITranslationProvider"/> substitute that resolves each
+    /// key to its <see cref="KnownTranslationKeys.EnValues"/> floor (the
+    /// ADR 0005 en-floor the provider guarantees, so the asserted body is
+    /// the exact en sentence) + a real <see cref="IUserInfoService"/> (the
+    /// filer's Profile is not required — the lang resolves to null = the en
+    /// floor).
+    /// </summary>
+    private async Task<(IDocumentStore store, ErrorReportService svc, INotificationEmitter emitter)>
+        R08_ServiceWithEmitter(IDocumentStore store)
+    {
+        var translator = Substitute.For<ITranslationProvider>();
+        translator.GetAsync(Arg.Any<string>(), Arg.Any<string?>())
+            .Returns(ci =>
+            {
+                var key = (string)ci[0]!;
+                return Task.FromResult(
+                    KnownTranslationKeys.EnValues.TryGetValue(key, out var en) ? en : key);
+            });
+        var emitter = Substitute.For<INotificationEmitter>();
+        var svc = new ErrorReportService(
+            store,
+            tokenService: null,
+            notifications: emitter,
+            userInfo: new UserInfoService(store),
+            translationProvider: translator);
+        return (store, svc, emitter);
+    }
+
+    /// <summary>Plant a Profile for the filer (so GetProfileAsync resolves —
+    /// EmailLanguage null = the en floor, mirroring the R07 PlantProfile shape).</summary>
+    private static async Task R08_PlantFilerProfile(IDocumentStore store, string subjectId)
+    {
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        session.Store(new Profile
+        {
+            SubjectId = subjectId,
+            DisplayName = "R08 filer",
+            Email = $"{subjectId}@example.com"
+        });
+        await session.SaveChangesAsync();
+    }
+
+    [Fact(DisplayName = "R08_MarkResolved_SignedInFiler_EmitsIssueResolved_WithLinkPath")]
+    public async Task R08_MarkResolved_SignedInFiler_EmitsIssueResolved_WithLinkPath()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var (s, svc, emitter) = await R08_ServiceWithEmitter(store);
+
+        const string filer = "sub-r08-filer";
+        await R08_PlantFilerProfile(store, filer);
+        var created = await svc.CreateAsync(new ErrorReportDraft(
+            SubjectId: filer,
+            Description: "The kiosk slides are blank",
+            ContactEmail: null,
+            RequestId: "req-r08-1",
+            ExceptionType: null,
+            UserAgent: null,
+            Origin: "general"), ct);
+
+        const string admin = "admin-r08-1";
+        const string note = "Restarted the slide renderer";
+        var stamped = await svc.MarkResolvedAsync(created.Id, admin, note, ct);
+        Assert.NotNull(stamped);
+        Assert.Equal("resolved", stamped!.TriageStatus);
+
+        // (a) kind + recipient (the filer).
+        // (b) linkPath EXACTLY /reports/mine#i-{reportId}; targetId == reportId.
+        // (c) body carries the ResolutionNote verbatim when one was passed.
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: filer,
+            kind: NotificationKinds.IssueResolved,
+            idempotencyKey: $"notification:issue.resolved:{created.Id}",
+            body: Arg.Any<string?>(),
+            targetId: created.Id,
+            linkPath: $"/reports/mine#i-{created.Id}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        var call = emitter.ReceivedCalls()
+            .First(c => c.GetMethodInfo().Name == nameof(INotificationEmitter.EmitAsync));
+        var body = (string)call.GetArguments()[4]!;
+        Assert.StartsWith(KnownTranslationKeys.EnValues["notifications.issue.resolved_body"], body);
+        Assert.EndsWith(note, body);
+        Assert.Contains(note, body);
+    }
+
+    [Fact(DisplayName = "R08_MarkResolved_SignedInFiler_NoNote_BodyIsPlainSentence")]
+    public async Task R08_MarkResolved_SignedInFiler_NoNote_BodyIsPlainSentence()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var (s, svc, emitter) = await R08_ServiceWithEmitter(store);
+
+        const string filer = "sub-r08-nonote";
+        await R08_PlantFilerProfile(store, filer);
+        var created = await svc.CreateAsync(new ErrorReportDraft(
+            SubjectId: filer,
+            Description: "Search errored",
+            ContactEmail: null,
+            RequestId: "req-r08-2",
+            ExceptionType: null,
+            UserAgent: null,
+            Origin: "general"), ct);
+
+        const string admin = "admin-r08-2";
+        var stamped = await svc.MarkResolvedAsync(created.Id, admin, null, ct);
+        Assert.NotNull(stamped);
+
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: filer,
+            kind: NotificationKinds.IssueResolved,
+            idempotencyKey: $"notification:issue.resolved:{created.Id}",
+            body: Arg.Any<string?>(),
+            targetId: created.Id,
+            linkPath: $"/reports/mine#i-{created.Id}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        var call = emitter.ReceivedCalls()
+            .First(c => c.GetMethodInfo().Name == nameof(INotificationEmitter.EmitAsync));
+        var body = (string)call.GetArguments()[4]!;
+        Assert.Equal(KnownTranslationKeys.EnValues["notifications.issue.resolved_body"], body);
+    }
+
+    [Fact(DisplayName = "R08_MarkResolved_AnonymousFiler_NoEmission")]
+    public async Task R08_MarkResolved_AnonymousFiler_NoEmission()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var (s, svc, emitter) = await R08_ServiceWithEmitter(store);
+
+        // Anonymous (blank SubjectId) — the filer has no recipient; the
+        // emission is skipped (the ContactEmail is "never mailed" by design,
+        // the held SEC decision).
+        var created = await svc.CreateAsync(new ErrorReportDraft(
+            SubjectId: string.Empty,
+            Description: "Anonymous 500 report",
+            ContactEmail: "anon@example.com",
+            RequestId: "req-r08-3",
+            ExceptionType: "NullReferenceException",
+            UserAgent: null,
+            Origin: "error-page"), ct);
+        Assert.Equal(string.Empty, created.SubjectId);
+
+        const string admin = "admin-r08-3";
+        var stamped = await svc.MarkResolvedAsync(created.Id, admin, "fixed", ct);
+        Assert.NotNull(stamped);
+        Assert.Equal("resolved", stamped!.TriageStatus);
+
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact(DisplayName = "R08_MarkResolved_AlreadyResolved_NoEmission")]
+    public async Task R08_MarkResolved_AlreadyResolved_NoEmission()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var (s, svc, emitter) = await R08_ServiceWithEmitter(store);
+
+        const string filer = "sub-r08-idem";
+        await R08_PlantFilerProfile(store, filer);
+        var created = await svc.CreateAsync(new ErrorReportDraft(
+            SubjectId: filer,
+            Description: "Idempotency filer",
+            ContactEmail: null,
+            RequestId: "req-r08-4",
+            ExceptionType: null,
+            UserAgent: null,
+            Origin: "general"), ct);
+
+        const string admin1 = "admin-r08-4-first";
+        var first = await svc.MarkResolvedAsync(created.Id, admin1, "first", ct);
+        Assert.NotNull(first);
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+
+        // A second resolve no-ops → NO second emission (idempotency).
+        const string admin2 = "admin-r08-4-second";
+        var second = await svc.MarkResolvedAsync(created.Id, admin2, "second", ct);
+        Assert.Null(second);
+        // No second emission: still exactly one emission on the 10-arg
+        // overload (the one MarkResolvedAsync uses).
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact(DisplayName = "R08_MarkResolved_Missing_NoEmission")]
+    public async Task R08_MarkResolved_Missing_NoEmission()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var (s, svc, emitter) = await R08_ServiceWithEmitter(store);
+
+        const string missingId = "er-r08-5-missing";
+        const string admin = "admin-r08-5";
+        var result = await svc.MarkResolvedAsync(missingId, admin, "note", ct);
+        Assert.Null(result);
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
     }
 
     // ─── Shared helper ────────────────────────────────────────────────────

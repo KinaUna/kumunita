@@ -17,7 +17,17 @@ public static class ErrorReportsModule
     {
         services.AddTransient<ErrorReports.IErrorReportService>(sp => new ErrorReports.ErrorReportService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
-            sp.GetRequiredService<ErrorReports.IEscalationTokenService>()));
+            sp.GetRequiredService<ErrorReports.IEscalationTokenService>(),
+            // IMPROVE-UX R08 (ADR 0300) — the optional emitter + body
+            // localisation seams (the ModerationService R07 idiom): resolved
+            // with GetService so they degrade to null when unregistered
+            // (a test / partial wiring) — the emission then skips, and the
+            // body degrades to the en floor. The Notifications context is
+            // not guaranteed composed before this one, so GetService (not
+            // GetRequiredService).
+            sp.GetService<Core.Notifications.INotificationEmitter>(),
+            sp.GetService<Core.UserInfo.IUserInfoService>(),
+            sp.GetService<Core.Localization.ITranslationProvider>()));
         services.AddTransient<ErrorReports.IEscalationTokenService>(sp => new ErrorReports.EscalationTokenService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
         services.AddTransient<ErrorReports.IEscalationOutboundConfigService>(sp => new ErrorReports.EscalationOutboundConfigService(

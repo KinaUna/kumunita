@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Notifications;
 using Marten;
 
 namespace Kumunita.Core.ErrorReports;
@@ -24,10 +25,51 @@ public sealed class ErrorReportService : IErrorReportService
     /// </summary>
     private readonly IEscalationTokenService? _tokenService;
 
-    public ErrorReportService(IDocumentStore store, IEscalationTokenService? tokenService = null)
+    /// <summary>
+    /// IMPROVE-UX R08 (ADR 0300) — the notification-emitter seam (the
+    /// C03 <see cref="INotificationEmitter"/>): present on a production
+    /// wiring (the DI line, the <c>ModerationService</c> /
+    /// <c>EventReminderService</c> idiom), <c>null</c> on a test-construction
+    /// site that builds the service with only the store (the
+    /// <c>tokenService</c> optional-seam precedent). When <c>null</c>,
+    /// <see cref="MarkResolvedAsync"/> simply skips the emission (the
+    /// pre-R08 behaviour) so those sites keep compiling + passing.
+    /// </summary>
+    private readonly INotificationEmitter? _notifications;
+
+    /// <summary>
+    /// IMPROVE-UX R08 (ADR 0300) — the profile-read seam
+    /// (<see cref="UserInfo.IUserInfoService"/>) the R08 body's recipient
+    /// language comes from (the <c>ModerationService</c> R07 _userInfo
+    /// precedent). Optional: <c>null</c> on a test harness that omits it —
+    /// the body then degrades to the <c>en</c> floor (the ADR 0005
+    /// provider guarantee), never throws.
+    /// </summary>
+    private readonly UserInfo.IUserInfoService? _userInfo;
+
+    /// <summary>
+    /// IMPROVE-UX R08 (ADR 0300) — the translation seam
+    /// (<see cref="Localization.ITranslationProvider"/>) the R08 body's
+    /// localized sentence comes from (the <c>ModerationService</c> R07
+    /// <c>_translationProvider</c> precedent). Optional: <c>null</c> on a
+    /// test harness that omits it — the body degrades to the plain
+    /// <c>en</c> sentence (the <c>KnownTranslationKeys.EnValues</c> floor),
+    /// never throws.
+    /// </summary>
+    private readonly Localization.ITranslationProvider? _translationProvider;
+
+    public ErrorReportService(
+        IDocumentStore store,
+        IEscalationTokenService? tokenService = null,
+        INotificationEmitter? notifications = null,
+        UserInfo.IUserInfoService? userInfo = null,
+        Localization.ITranslationProvider? translationProvider = null)
     {
-        _store        = store;
-        _tokenService = tokenService;
+        _store             = store;
+        _tokenService      = tokenService;
+        _notifications     = notifications;
+        _userInfo          = userInfo;
+        _translationProvider = translationProvider;
     }
 
     /// <summary>Store one ErrorReport row (new) + exactly one AccessAudit row (one session).</summary>
@@ -141,7 +183,92 @@ public sealed class ErrorReportService : IErrorReportService
             Outcome              = AccessOutcome.Allow
         });
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // IMPROVE-UX R08 (ADR 0300) — the filer hears back (E5): the
+        // previously-empty "resolved" loop closes. Only a **signed-in**
+        // filer (a non-blank <see cref="ErrorReport.SubjectId"/>) gets an
+        // inbox row — an **anonymous** filer has no recipient and gets
+        // nothing. The <c>ContactEmail</c> is **never** mailed here
+        // (SEC: "never mailed" by design — mailing it is a held SEC
+        // decision, the // TODO ❓ on this unit). The emission is staged
+        // into the **same** write session as the stamp + audit row (the
+        // R07 <c>ModerationService.ReportIntake</c> session-owning
+        // precedent — the <c>INotificationEmitter.EmitAsync</c> call takes
+        // the caller's <c>session</c>; it is a no-op when the emitter seam
+        // is absent or the filer is anonymous, so the pre-R08 behaviour is
+        // the exact degrade path).
+        // // TODO ❓ anonymous filers: mail the ContactEmail? (SEC: currently
+        // // "never mailed" — a held decision, NOT made by this unit.)
+        if (!string.IsNullOrWhiteSpace(stored.SubjectId) && _notifications is not null)
+        {
+            var body = await BuildIssueResolvedBodyAsync(stored).ConfigureAwait(false);
+            await _notifications.EmitAsync(
+                session,
+                recipientId: stored.SubjectId,
+                kind: NotificationKinds.IssueResolved,
+                idempotencyKey: $"notification:issue.resolved:{stored.Id}",
+                body: body,
+                targetId: stored.Id,
+                linkPath: $"/reports/mine#i-{stored.Id}",
+                ct: ct).ConfigureAwait(false);
+        }
+
         return stored;
+    }
+
+    /// <summary>
+    /// IMPROVE-UX R08 (ADR 0300) — build the <c>issue.resolved</c>
+    /// notification body: a localized "your issue was resolved" sentence
+    /// (the <c>notifications.issue.resolved_body</c> key), with the
+    /// moderator's <see cref="ErrorReport.ResolutionNote"/> appended
+    /// **verbatim** when present (the free-text note is **never**
+    /// translated). Localizes to the filer's
+    /// <c>Profile.EmailLanguage</c> (the <see cref="UserInfo.IUserInfoService"/>
+    /// read seam; the <c>ModerationService.BuildReportResolvedBodyAsync</c>
+    /// / <c>EventReminderService.BuildLocalizedReminder</c> precedent).
+    /// Degrades gracefully: no <see cref="Localization.ITranslationProvider"/>
+    /// or no <see cref="UserInfo.IUserInfoService"/> → the plain <c>en</c>
+    /// sentence (the <see cref="Localization.KnownTranslationKeys.EnValues"/>
+    /// floor), never throws.
+    /// </summary>
+    private async Task<string> BuildIssueResolvedBodyAsync(ErrorReport stored)
+    {
+        const string key = "notifications.issue.resolved_body";
+        string sentence;
+        if (_translationProvider is null)
+        {
+            // No provider wired (a test harness that omits the seam): the
+            // plain <c>en</c> floor the ADR 0005 registry guarantees.
+            sentence = Localization.KnownTranslationKeys.EnValues.TryGetValue(key, out var en)
+                ? en
+                : "Your issue report has been resolved.";
+        }
+        else
+        {
+            string? lang = null;
+            if (_userInfo is not null && !string.IsNullOrWhiteSpace(stored.SubjectId))
+            {
+                try
+                {
+                    var profile = await _userInfo.GetProfileAsync(stored.SubjectId).ConfigureAwait(false);
+                    lang = profile?.EmailLanguage;
+                }
+                catch
+                {
+                    // The read seam is best-effort here — the emission
+                    // itself must never be blocked by a profile lookup
+                    // failure (the filer still gets the row).
+                }
+            }
+            sentence = await _translationProvider.GetAsync(key, lang).ConfigureAwait(false);
+        }
+
+        // The moderator's free-text note: appended verbatim (never
+        // translated), on a second sentence when present.
+        var note = stored.ResolutionNote;
+        return string.IsNullOrWhiteSpace(note)
+            ? sentence
+            : sentence + " " + note;
     }
 
     /// <summary>Newest-first listing (Created DESC); a read, never audited (M31·4).</summary>

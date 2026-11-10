@@ -52,6 +52,19 @@ public static class NotificationKinds
     /// <summary>A report the resident filed (or was assigned to) was resolved (wired, U04).</summary>
     public const string ReportResolved = "report.resolved";
 
+    /// <summary>
+    /// IMPROVE-UX R08 (ADR 0300) — a platform-issue report
+    /// (<see cref="ErrorReports.ErrorReport"/>) filed by a signed-in resident
+    /// was resolved. The recipient is the filer
+    /// (<see cref="ErrorReports.ErrorReport.SubjectId"/>). Resident-facing,
+    /// opt-OUT default (not in <see cref="OptInKinds"/>). Emitter:
+    /// <see cref="ErrorReports.ErrorReportService
+    /// .MarkResolvedAsync"/> (the idempotency key
+    /// <c>notification:issue.resolved:{reportId}</c>, <c>LinkPath =
+    /// /reports/mine#i-{reportId}</c>, <c>targetId = reportId</c>).
+    /// </summary>
+    public const string IssueResolved = "issue.resolved";
+
     /// <summary>A to-do was assigned to the resident (person-only; wired, U04).</summary>
     public const string TodoAssign = "todo.assign";
 
@@ -349,7 +362,7 @@ public static class NotificationKinds
     [
         PostReply, PostMention, GroupPost, GroupAdded, GroupInvite,
         EventRsvp, EventReminder,
-        ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
+        ReportFiled, ReportAssigned, ReportResolved, IssueResolved, TodoAssign,
         AccountSignup, AccountVerified,
         Announcement, CommunityPost, PageChild, MessageNew,
         // M36 (ADR 0165, M36·3) — the six sibling mention kinds (the reserved
