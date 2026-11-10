@@ -7,6 +7,7 @@ status: current
 audiences: [developer, agent]
 related:
   - docs/plans-milestones/in-progress/plan-improve-ux.md
+  - docs/adr/0302-shared-kiosk-link.md
   - docs/adr/0301-self-service-deletion-grace-period.md
   - docs/adr/0142-delete-account.md
   - docs/adr/0028-guardian-controls-account-scope-supervision.md
@@ -18,16 +19,114 @@ updated: 2026-11-10
 > **Abstract:** the running handoff log for the **IMPROVE-UX** lane — each
 > unit appends its section here as it ships, so a successor agent (or the
 > X02 cold read) gets the honest before → after, not the intended one. This
-> note opens with **R14**, the SEC review of the ADR 0301 grace period
-> (R10–R13): the four review foci (audit rows, re-auth before scheduling,
-> the child rule, guard ordering + the scheduling-vs-execution asymmetry)
-> each with its verdict, the two ADR 0301 `// TODO ❓` open questions
-> resolved, and the Findings list (each filed with an owner).
+> note opens with **R15**, the ADR 0302 shared-kiosk-link Core seam
+> (the `KioskLink` doc + the `IKioskLinkService` create/revoke/validate
+> service + the P-1 gate count 82 → 83, the `// TODO ❓` open questions
+> for R19, and the R16 notes), then **R14**, the SEC review of the ADR 0301
+> grace period (R10–R13): the four review foci (audit rows, re-auth before
+> scheduling, the child rule, guard ordering + the scheduling-vs-execution
+> asymmetry) each with its verdict, the two ADR 0301 `// TODO ❓` open
+> questions resolved, and the Findings list (each filed with an owner).
 > **Who is it for:** the next agent in this lane and the X02 cold read.
 > **When to read the rest:** before starting a unit, or when a DoD line
 > "looks done" and you want to know if it actually is.
 
 # IMPROVE-UX — handoff notes
+
+## R15 — ADR 0302 + KioskLink doc + create/revoke/validate service
+
+**Scope:** the Core seam + ADR for the shared kiosk link (IMPROVE-UX R15 —
+the first kiosk unit, a new lane). The Web surface (R16–R18) and the SEC
+review (R19) are separate later units and were **not** started.
+
+**Outcome:** ADR 0302 + the `KioskLink` doc + the
+`IKioskLinkService`/`KioskLinkService` + the DI registration + 8 new Core
+tests, all in one `feat(ux):` commit (`8de9751a`). The personal kiosk
+(0164/0285) is unchanged — R15 is purely additive.
+
+### What landed
+
+- **ADR 0302** — the shared-kiosk-link decision. Six decisions:
+  - **D1** — the `KioskLink` doc: `Id`, `PlaylistId`, `OwnerSubjectId`,
+    `TokenHash` (SHA-256 hex digest only — **never** the raw token),
+    `CreatedAt`, `LastUsedAt?`, `RevokedAt?`. Registered on the existing
+    `CoreDocTypes` surface (the ADR 0004 §B.1 additive precedent — no DDL,
+    no new `*DocTypes`). Carries `[DataClass(Secret, Delete, Never)]`
+    (the ADR 0298 SecGate rule).
+  - **D2** — token shape: `kskl_` + 32 CSPRNG bytes base64url (256 bits,
+    the 0159 `kesc_` shape), shown exactly once at creation, stored only
+    as the SHA-256 hex digest (the 0159 ESC·3 / F2 hash-at-rest rule).
+  - **D3** — `IKioskLinkService` (3-method seam, pure Core — the R16
+    middleware can call it): `CreateAsync(playlistId, ownerSubjectId)`,
+    `RevokeAsync(linkId, ownerSubjectId)`, `ValidateAsync(tokenHash,
+    ownerSubjectId)`. Audit: one `kiosk.link.create` + one
+    `kiosk.link.revoke` row each (`Via: Owner`, `TargetKind = "kiosk"`);
+    `ValidateAsync` writes **zero** rows (the M35·5 "read = config load"
+    floor) and stamps `LastUsedAt` on a match (the ESC·9 read-then-write).
+  - **D4** — invariants the R16–R18 units build against: revocable,
+    read-only, `/kiosk` + slides only, community-visible items only,
+    audited under the owner as via-kiosk-link.
+  - **D5** — the personal kiosk (0164/0285) and all its invariants stand
+    unchanged.
+  - **D6** — open questions (the R19 SEC review settles): (a) token length
+    (proposed 256 bits), (b) expiry (none in this ADR), (c) max links per
+    playlist (no ceiling in this ADR).
+- **Core files** (all new or modified in `src/Kumunita.Core/`):
+  - `Kiosk/KioskLink.cs` — the `[DataClass]` doc.
+  - `Kiosk/IKioskLinkService.cs` — the 3-method seam.
+  - `Kiosk/KioskLinkService.cs` — the impl (CSPRNG token, SHA-256 hash at
+    rest via `IdentityService.Sha256Hex`, audit rows, `ValidateAsync`
+    zero-audit + `LastUsedAt` stamp, owner-scoped `RevokeAsync`).
+  - `CoreDocTypes.cs` — `opts.Schema.For<Kiosk.KioskLink>()` added (after
+    the `DeletionRequest` registration).
+  - `Kiosk/DependencyInjection.cs` — `IKioskLinkService` →
+    `KioskLinkService` registered.
+- **Tests** — `tests/Kumunita.Core.Tests/Kiosk/KioskLinkServiceTests.cs`
+  (8 tests, `KioskLinkServiceTests` class):
+  1. `ADR0302_Create_ReturnsRawTokenOnce_AndStoresRow`
+  2. `ADR0302_Store_HoldsHashNotRawToken` — the "hash only at rest" pin
+  3. `ADR0302_Validate_AnotherOwnersLink_IsRefused` — owner-scope pin
+  4. `ADR0302_Validate_UnknownToken_IsRefused`
+  5. `ADR0302_Validate_RevokedToken_IsRefused`
+  6. `ADR0302_Validate_MatchesOnlyValidOwnLink` — the full matrix
+  7. `ADR0302_Revoke_OwnerScoped_Idempotent_Audited` — audit-row pin
+  8. `ADR0302_Validate_WritesNoAuditRow_StampedLastUsed` — zero-audit +
+     `LastUsedAt` pin
+- **P-1 gate update** — `DataClassCoverageTests` (Core.Tests): registered-
+  type count raised 82 → 83 for the new `KioskLink` row.
+
+### Test results
+
+- `KioskLinkServiceTests` (8) — **all green**
+- `KioskServiceTests` (6) — **all green** (the existing `KioskPlaylist`
+  seam is intact)
+- `DataClassCoverageTests` (1) — **green** (83/83 after the count update)
+- `dotnet build` — **0 errors**
+- Translation parity — **unaffected** (R15 adds no localized keys)
+
+### `// TODO ❓` open questions flagged for R19's SEC review
+
+1. **Token length** — D2 proposes 256 bits (32 CSPRNG bytes). The R19
+   SEC review may adjust.
+2. **Expiry** — this ADR ships no expiry (a link lives until revoked).
+   Whether a long-lived shared credential needs a max age is a SEC call.
+3. **Max links per playlist** — this ADR ships no ceiling. The R18
+   settings surface can list and revoke them; whether a hard limit is
+   needed is a SEC call.
+
+### Notes for R16
+
+- The `ValidateAsync` seam takes the **hash** (not the raw token). The
+  R16 middleware must hash the presented token with the same
+  `IdentityService.Sha256Hex` algorithm before calling it (the
+  `FindTokenAsync` local-constant pattern — the digest is a query
+  constant, never inside a `.Where(...)` expression).
+- The `KioskLinkService` does **not** carry `IAuthorizationService` —
+  the owner-scope check is data-scoped (the `OwnerSubjectId` field), not
+  a `Decide()` branch. The R16 restricted principal (owner + `kiosk-link`
+  claim) is a Web-side concern.
+- `LastUsedAt` is stamped on every successful validate — the R18 surface
+  reads this field for the "last used" display.
 
 ## R14 — SEC review of the ADR 0301 grace period (R10–R13)
 
