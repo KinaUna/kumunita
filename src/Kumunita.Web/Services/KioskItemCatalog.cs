@@ -3,6 +3,7 @@ using System.Text;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
+using Kumunita.Core.Identity;
 using Kumunita.Core.Kiosk;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
@@ -168,6 +169,24 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         if (string.IsNullOrWhiteSpace(actorId))
             return KioskResolvedItem.Hidden;
 
+        // ADR 0302 D4 (IMPROVE-UX R17) — the shared-kiosk-link community-
+        // visible filter. R16's restricted principal carries the "kiosk-link"
+        // role value and no other, so the role's presence is the mode signal.
+        // The link authenticates the OWNER's reads — the owner branch of the
+        // frozen Decide() and the group-lane membership gate both pass for the
+        // owner — so the existing read seams' standing check is NOT sufficient
+        // to enforce "community-visible items only" (the owner's own audience
+        // grants and group memberships always admit the owner). The filter is
+        // applied here, after the read seam, per item type: a resource whose
+        // Audience is grant-restricted (a user / group grant list with no
+        // community flag), a group item in a private group (ADR 0010), a
+        // community-targeted announcement (ADR 0017), or a draft of any kind
+        // is denied — the same Hidden shape as a missing one (M35-5: no leak,
+        // no 404). The personal-kiosk path (the owner's own session, Member /
+        // Moderator / GlobalAdmin) is untouched — the filter applies only in
+        // kiosk-link mode (ADR 0302 D5).
+        var kioskLink = roles is not null && roles.Contains(Roles.KioskLink);
+
         // The calendar has no item to read: "All" or one component. The
         // calendar route itself filters events by the viewer's access.
         if (entry.Type == KioskItemType.Calendar)
@@ -179,18 +198,33 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
 
         try
         {
-            return entry.Type switch
+            var resolved = entry.Type switch
             {
-                KioskItemType.Board         => await ResolveBoardAsync(entry, id, actorId, ct).ConfigureAwait(false),
-                KioskItemType.Todo          => await ResolveTodoAsync(entry, id, actorId, ct).ConfigureAwait(false),
-                KioskItemType.Project       => await ResolveProjectAsync(id, actorId, ct).ConfigureAwait(false),
-                KioskItemType.Event         => await ResolveEventAsync(entry, id, actorId, ct).ConfigureAwait(false),
-                KioskItemType.Page          => await ResolvePageAsync(id, actorId).ConfigureAwait(false),
-                KioskItemType.Announcement  => await ResolveAnnouncementAsync(entry, id, actorId, roles).ConfigureAwait(false),
-                KioskItemType.CommunityPost => await ResolvePostAsync(entry, id, actorId).ConfigureAwait(false),
-                KioskItemType.GroupPost     => await ResolveGroupPostAsync(entry, id, actorId).ConfigureAwait(false),
+                KioskItemType.Board         => await ResolveBoardAsync(entry, id, actorId, ct, kioskLink).ConfigureAwait(false),
+                KioskItemType.Todo          => await ResolveTodoAsync(entry, id, actorId, ct, kioskLink).ConfigureAwait(false),
+                KioskItemType.Project       => await ResolveProjectAsync(id, actorId, ct, kioskLink).ConfigureAwait(false),
+                KioskItemType.Event         => await ResolveEventAsync(entry, id, actorId, ct, kioskLink).ConfigureAwait(false),
+                KioskItemType.Page          => await ResolvePageAsync(id, actorId, kioskLink).ConfigureAwait(false),
+                KioskItemType.Announcement  => await ResolveAnnouncementAsync(entry, id, actorId, roles, kioskLink).ConfigureAwait(false),
+                KioskItemType.CommunityPost => await ResolvePostAsync(entry, id, actorId, kioskLink).ConfigureAwait(false),
+                KioskItemType.GroupPost     => await ResolveGroupPostAsync(entry, id, actorId, kioskLink).ConfigureAwait(false),
                 _ => KioskResolvedItem.Hidden,
             };
+
+            // Group-lane items (GroupPost / group Event) additionally require
+            // the group to be non-private (ADR 0010): the read seam's
+            // membership gate ran for the owner (a member) and passed, but a
+            // wall viewer must not see a private group's item through the
+            // owner's link. The group doc is a community-visible reference
+            // (not an audience-restricted resource), so a direct load is the
+            // right seam — no access decision is being made, just reading a
+            // display field.
+            if (resolved.Visible && kioskLink &&
+                !string.IsNullOrEmpty(entry.GroupId) &&
+                !await KioskLinkGroupIsNonPrivateAsync(entry.GroupId).ConfigureAwait(false))
+                return KioskResolvedItem.Hidden;
+
+            return resolved;
         }
         catch (KeyNotFoundException)
         {
@@ -204,6 +238,60 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         {
             return KioskResolvedItem.Hidden;   // a malformed stored id
         }
+    }
+
+    // ── ADR 0302 D4 — the kiosk-link community-visible filter (R17) ──
+
+    /// <summary>
+    /// The ADR 0302 D4 (R17) community-visible predicate over a resource's
+    /// <see cref="Kumunita.Core.Authorization.Audience"/> — the shared guard
+    /// <see cref="ResolveAsync"/> applies in kiosk-link mode. Public so the
+    /// <c>KioskLinkCommunityFilterTests</c> can pin the pure decision
+    /// directly (a null / Community / AllResidents audience is
+    /// community-visible; a grant-restricted one is not).
+    /// <para>
+    /// The invariant (ADR 0036 / 0102 / 0041, the frozen <c>Decide()</c>
+    /// branches 4 / 4.5 / 5): <c>null</c> (public, world-readable) ⇒
+    /// community-visible; the <c>Community</c> flag (the "all communities" /
+    /// "all residents of the named community" shape — ADR 0036 / 0102) ⇒
+    /// community-visible; the <c>AllResidents</c> flag (the "every signed-in
+    /// resident" shape — ADR 0041) ⇒ community-visible. Any other audience
+    /// (a user / group grant list with no community flag — the
+    /// grant-restricted shape) ⇒ denied for the link viewer (the owner's
+    /// grants are not the community's). The group-lane items do not carry an
+    /// <c>Audience</c> at all (their visibility is the group's membership +
+    /// <c>IsPrivate</c> — the separate group guard in
+    /// <see cref="ResolveAsync"/>); this check applies only to the
+    /// <c>Audience</c>-bearing types.
+    /// </para>
+    /// </summary>
+    // TODO ❓ (for R19's SEC review) — the <c>Community</c> flag is
+    // evaluated here without the resource's own component scope. ADR 0036 /
+    // 0102 refine the flag into a community-scoped shape: when the resource
+    // names a specific community (a non-empty <c>ComponentId</c> on the Post
+    // / Event / Project / Board / Todo), only that community's members see it
+    // (a different community's members, and the link viewer, are denied). The
+    // <c>Audience</c> type does not carry the component (it is on the
+    // resource — <c>Post.ComponentId</c> / <c>Event.ComponentId</c> / etc.),
+    // so this guard cannot distinguish "all communities" from "this specific
+    // community" from the audience alone. R17 treats <c>Community=true</c>
+    // as community-visible across all component scopes — the SEC review may
+    // tighten this to "the resource's own community" (requiring a per-type
+    // guard that reads the resource's <c>ComponentId</c> and checks
+    // community membership). Recorded here as held, not decided.
+    public static bool KioskLinkAudienceIsCommunity(Kumunita.Core.Authorization.Audience? aud)
+    {
+        if (aud is null) return true;            // public — the frozen Decide() branch 5
+        if (aud.Community) return true;          // the ADR 0036 / 0102 community-visible flag
+        if (aud.AllResidents) return true;       // the ADR 0041 all-residents flag
+        return false;                            // grant-restricted — denied for the link viewer
+    }
+
+    private async Task<bool> KioskLinkGroupIsNonPrivateAsync(string groupId)
+    {
+        // ADR 0010 — a private group's items are not community-visible.
+        var group = await groupService.GetGroupAsync(groupId).ConfigureAwait(false);
+        return group is not null && !group.IsPrivate;
     }
 
     private async Task<KioskResolvedItem> ResolveCalendarAsync(KioskEntry entry)
@@ -228,22 +316,35 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
             href + "&componentId=" + Uri.EscapeDataString(component.Id), null);
     }
 
-    private async Task<KioskResolvedItem> ResolveBoardAsync(KioskEntry entry, string id, string actorId, CancellationToken ct)
+    // The kioskLink parameter is the ADR 0302 D4 (R17) community-visible
+    // filter's mode flag: when true, the method applies the
+    // KioskLinkAudienceIsCommunity guard (and the draft / IsDeleted pins)
+    // after the resource is loaded. When false (the personal-kiosk path) the
+    // method behaves exactly as before — the guard is inert.
+
+    private async Task<KioskResolvedItem> ResolveBoardAsync(
+        KioskEntry entry, string id, string actorId, CancellationToken ct, bool kioskLink)
     {
         if (boards is null) return KioskResolvedItem.Hidden;
         var board = await boards.GetBoardAsync(id, actorId, ct).ConfigureAwait(false);
+        if (board.Board is null || board.Board.IsDeleted) return KioskResolvedItem.Hidden;
+        if (kioskLink && !KioskLinkAudienceIsCommunity(board.Board.Audience))
+            return KioskResolvedItem.Hidden;
         var list = entry.BoardView == KioskBoardView.List;
-        var boardId = board.Board?.Id ?? id;
+        var boardId = board.Board.Id;
         var href = $"/projects/boards/{Uri.EscapeDataString(boardId)}" + (list ? "?view=list" : string.Empty);
-        return new KioskResolvedItem(true, board.Board?.Title, href, BoardVersion(board, list));
+        return new KioskResolvedItem(true, board.Board.Title, href, BoardVersion(board, list));
     }
 
-    private async Task<KioskResolvedItem> ResolveTodoAsync(KioskEntry entry, string id, string actorId, CancellationToken ct)
+    private async Task<KioskResolvedItem> ResolveTodoAsync(
+        KioskEntry entry, string id, string actorId, CancellationToken ct, bool kioskLink)
     {
         if (todos is null) return KioskResolvedItem.Hidden;
         var detail = await todos.GetTodoAsync(id, actorId, ct).ConfigureAwait(false);
         var t = detail.Todo;
         if (t.IsDeleted) return KioskResolvedItem.Hidden;
+        if (kioskLink && !KioskLinkAudienceIsCommunity(t.Audience))
+            return KioskResolvedItem.Hidden;
         var v = new StringBuilder("T");
         Append(v, t.Title, t.Status, t.Body, Stamp(t.Modified), Stamp(t.DueAt), t.AssigneeId);
         foreach (var sub in detail.Subtasks)
@@ -254,17 +355,21 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         return new KioskResolvedItem(true, t.Title, $"/projects/todos/{Uri.EscapeDataString(t.Id)}", v.ToString());
     }
 
-    private async Task<KioskResolvedItem> ResolveProjectAsync(string id, string actorId, CancellationToken ct)
+    private async Task<KioskResolvedItem> ResolveProjectAsync(
+        string id, string actorId, CancellationToken ct, bool kioskLink)
     {
         if (projects is null) return KioskResolvedItem.Hidden;
         var p = await projects.GetProjectAsync(id, actorId, ct).ConfigureAwait(false);
         if (p.IsDeleted) return KioskResolvedItem.Hidden;
+        if (kioskLink && !KioskLinkAudienceIsCommunity(p.Audience))
+            return KioskResolvedItem.Hidden;
         var v = new StringBuilder("P");
         Append(v, p.Title, p.Status, p.Description, Stamp(p.Modified));
         return new KioskResolvedItem(true, p.Title, $"/projects/projects/{Uri.EscapeDataString(p.Id)}", v.ToString());
     }
 
-    private async Task<KioskResolvedItem> ResolveEventAsync(KioskEntry entry, string id, string actorId, CancellationToken ct)
+    private async Task<KioskResolvedItem> ResolveEventAsync(
+        KioskEntry entry, string id, string actorId, CancellationToken ct, bool kioskLink)
     {
         if (events is null) return KioskResolvedItem.Hidden;
 
@@ -282,6 +387,20 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
             href = $"/events/{Uri.EscapeDataString(id)}";
         }
         if (e is null || e.IsDeleted) return KioskResolvedItem.Hidden;
+        if (kioskLink)
+        {
+            // ADR 0302 D4 — the link viewer's draft gate (the owner passes
+            // the read seam's own draft gate, but a wall screen must not show
+            // an unpublished draft — the ADR 0037 author-only pin extended to
+            // the kiosk-link surface).
+            if (e.IsDraft) return KioskResolvedItem.Hidden;
+            // A community event's audience must be community-visible.
+            // A group event's IsPrivate flag is checked by the caller
+            // (ResolveAsync's KioskLinkGroupIsNonPrivateAsync guard).
+            if (string.IsNullOrWhiteSpace(e.GroupId) &&
+                !KioskLinkAudienceIsCommunity(e.Audience))
+                return KioskResolvedItem.Hidden;
+        }
 
         var v = new StringBuilder("E");
         Append(v, e.Title, e.Body, e.Location, Stamp(e.Start), Stamp(e.End), Stamp(e.Modified));
@@ -294,7 +413,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         return new KioskResolvedItem(true, e.Title, href, v.ToString());
     }
 
-    private async Task<KioskResolvedItem> ResolvePageAsync(string id, string actorId)
+    private async Task<KioskResolvedItem> ResolvePageAsync(string id, string actorId, bool kioskLink)
     {
         if (pages is null || authz is null) return KioskResolvedItem.Hidden;
 
@@ -307,11 +426,22 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         foreach (var p in tree) byId[p.Id] = p;
         if (!byId.TryGetValue(id, out var page) || page.IsDeleted)
             return KioskResolvedItem.Hidden;
-        if (page.IsDraft && !string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
-            return KioskResolvedItem.Hidden;
+        // A draft page is the author's only (the ADR 0037 author-only pin) —
+        // in kiosk-link mode the owner IS the author, so the draft is
+        // visible to the owner's personal kiosk but denied for the link
+        // viewer (a wall screen must not show an unpublished draft).
+        if (page.IsDraft)
+        {
+            if (kioskLink) return KioskResolvedItem.Hidden;
+            if (!string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
+                return KioskResolvedItem.Hidden;
+        }
 
         var decision = await authz.CanAsync(actorId, AccessAction.Read, new PageToAuditableResource(page)).ConfigureAwait(false);
         if (!decision.Allowed)
+            return KioskResolvedItem.Hidden;
+
+        if (kioskLink && !KioskLinkAudienceIsCommunity(page.Audience))
             return KioskResolvedItem.Hidden;
 
         var v = new StringBuilder("G");
@@ -320,11 +450,19 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
     }
 
     private async Task<KioskResolvedItem> ResolveAnnouncementAsync(
-        KioskEntry entry, string id, string actorId, IReadOnlySet<string> roles)
+        KioskEntry entry, string id, string actorId, IReadOnlySet<string> roles, bool kioskLink)
     {
         if (announcements is null) return KioskResolvedItem.Hidden;
         var a = await announcements.GetAsync(id, actorId, roles).ConfigureAwait(false);
         if (a is null) return KioskResolvedItem.Hidden;
+        // Announcements have no Audience — the flat two-way Scope split is
+        // the invariant (ADR 0017). A community-targeted row
+        // (CommunityId != null) is denied for the link viewer (the owner's
+        // community is not the community's). A draft is owner-only —
+        // denied for the link viewer (a wall screen must not show an
+        // unpublished draft).
+        if (kioskLink && (a.IsDraft || a.CommunityId is not null))
+            return KioskResolvedItem.Hidden;
 
         var v = new StringBuilder("A");
         Append(v, a.Title, a.Body, Stamp(a.Modified));
@@ -336,7 +474,7 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         return new KioskResolvedItem(true, a.Title, $"/announcements/{Uri.EscapeDataString(a.Id)}", v.ToString());
     }
 
-    private async Task<KioskResolvedItem> ResolvePostAsync(KioskEntry entry, string id, string actorId)
+    private async Task<KioskResolvedItem> ResolvePostAsync(KioskEntry entry, string id, string actorId, bool kioskLink)
     {
         if (posts is null) return KioskResolvedItem.Hidden;
         var detail = await posts.GetPostAsync(id, actorId).ConfigureAwait(false);
@@ -344,17 +482,36 @@ public sealed class KioskItemCatalog : IKioskItemCatalog
         // A group post is shown through the GroupPost type (its own route).
         if (post is null || post.DeletedAt is not null || !string.IsNullOrEmpty(post.GroupId))
             return KioskResolvedItem.Hidden;
+        if (kioskLink)
+        {
+            // A draft post is the author's only (the ADR 0037 author-only
+            // pin) — denied for the link viewer (a wall screen must not show
+            // an unpublished draft).
+            if (post.IsDraft) return KioskResolvedItem.Hidden;
+            // The audience must be community-visible (null = public,
+            // Community / AllResidents flag). A grant-restricted audience is
+            // denied for the link viewer.
+            if (!KioskLinkAudienceIsCommunity(post.Audience)) return KioskResolvedItem.Hidden;
+        }
         return new KioskResolvedItem(true, PostTitle(post),
             $"/posts/{Uri.EscapeDataString(post.Id)}", PostVersion(post, detail.Replies, entry.ShowComments));
     }
 
-    private async Task<KioskResolvedItem> ResolveGroupPostAsync(KioskEntry entry, string id, string actorId)
+    private async Task<KioskResolvedItem> ResolveGroupPostAsync(KioskEntry entry, string id, string actorId, bool kioskLink)
     {
         if (groupPosts is null || string.IsNullOrWhiteSpace(entry.GroupId)) return KioskResolvedItem.Hidden;
         var detail = await groupPosts.GetGroupPostAsync(entry.GroupId, id, actorId).ConfigureAwait(false);
         var post = detail.Post;
         if (post is null || post.DeletedAt is not null)
             return KioskResolvedItem.Hidden;
+        if (kioskLink)
+        {
+            // A draft group post is the author's only (the ADR 0037
+            // author-only pin) — denied for the link viewer (a wall screen
+            // must not show an unpublished draft). The group's IsPrivate
+            // flag is the caller's guard (ResolveAsync's KioskLinkGroupIsNonPrivateAsync).
+            if (post.IsDraft) return KioskResolvedItem.Hidden;
+        }
         return new KioskResolvedItem(true, PostTitle(post),
             $"/groups/{Uri.EscapeDataString(entry.GroupId)}/posts/{Uri.EscapeDataString(post.Id)}",
             PostVersion(post, detail.Replies, entry.ShowComments));
