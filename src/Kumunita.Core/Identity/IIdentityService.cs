@@ -486,13 +486,12 @@ public interface IIdentityService
     /// equals <paramref name="targetSubjectId"/>: the resident is deleting
     /// *their own* account (the Web self-serve surface
     /// <c>POST /account/delete</c> invokes this shape, after verifying the
-    /// resident's current password). **ADR 0142 D5 gate:** the self-serve
-    /// lane is reachable only by a <c>GlobalAdmin</c> — a non-GlobalAdmin
-    /// invoking this branch throws <c>UnauthorizedAccessException</c>
-    /// (the fail-closed pin, mirroring the admin-initiated branch). The
-    /// Web surface renders the ADR 0138 "surface-replaced-by-notice" shape
-    /// for a non-GlobalAdmin, so the resident sees the gate before
-    /// submitting. The audit row is <c>Via: Owner</c>.</item>
+    /// resident's current password). **ADR 0301 D1 (amends 0142 D5):** the
+    /// self-serve lane is open to <i>every</i> resident — the 0142 D5
+    /// GlobalAdmin gate is removed, so a non-GlobalAdmin may self-delete;
+    /// the only standing refusal that survives is the last-GlobalAdmin
+    /// lockout pin (0142 D3), re-checked inside the shared body
+    /// (<see cref="IdentityService"/>). The audit row is <c>Via: Owner</c>.</item>
     /// <item><b>Admin-initiated</b> — <paramref name="adminSubjectId"/>
     /// differs from <paramref name="targetSubjectId"/>: a GlobalAdmin is
     /// removing *another* resident (the Web admin surface
@@ -530,9 +529,13 @@ public interface IIdentityService
     /// Identity row is gone) — the lane is not a silent no-op.
     /// </para>
     /// </summary>
-    /// <exception cref="UnauthorizedAccessException">Either branch was
-    /// invoked by a non-<c>GlobalAdmin</c> (the self-serve lane's ADR 0142
-    /// D5 gate, or the admin-initiated branch's fail-closed pin).</exception>
+    /// <exception cref="UnauthorizedAccessException">The admin-initiated
+    /// branch was invoked by a non-<c>GlobalAdmin</c> (the
+    /// <see cref="BlockAsync"/> / <see cref="UnblockAsync"/> fail-closed
+    /// pin). The self-serve branch is open to every resident (ADR 0301 D1
+    /// amends 0142 D5 — the GlobalAdmin gate is removed); its surviving
+    /// refusal is the last-GlobalAdmin lockout pin (0142 D3), which throws
+    /// <see cref="InvalidOperationException"/>).</exception>
     /// <exception cref="InvalidOperationException">The target account does
     /// not exist, or the target is the last <c>GlobalAdmin</c> on the
     /// instance (the lockout pin — applies to <i>both</i> branches: a lone

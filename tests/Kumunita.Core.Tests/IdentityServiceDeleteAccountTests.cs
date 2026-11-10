@@ -19,10 +19,10 @@ namespace Kumunita.Core.Tests;
 /// </summary>
 /// <list type="bullet">
 /// <item><b>Self-deletion</b> (actor == target): the resident deletes their
-/// own account. ADR 0142 D5 gate — only a <c>GlobalAdmin</c> may self-delete
-/// (a non-GlobalAdmin's invocation throws
-/// <see cref="UnauthorizedAccessException"/> — the fail-closed pin). The audit
-/// row is <c>Via: Owner</c>.</item>
+/// own account. ADR 0301 D1 (amends 0142 D5) — the self-serve lane is open
+/// to <i>every</i> resident (the 0142 D5 GlobalAdmin gate is removed; the
+/// only surviving refusal is the last-GlobalAdmin lockout pin, 0142 D3). The
+/// audit row is <c>Via: Owner</c>.</item>
 /// <item><b>Admin-initiated</b> (actor ≠ target): a GlobalAdmin removes
 /// another resident. The GlobalAdmin gate applies (a non-GlobalAdmin's
 /// invocation throws <see cref="UnauthorizedAccessException"/>). The audit row
@@ -53,30 +53,51 @@ public sealed class IdentityServiceDeleteAccountTests(PostgresFixture fixture) :
     // ── Self-deletion (actor == target) ────────────────────────────────────
 
     [Fact]
-    public async Task DeleteAccountAsync_SelfDeletion_NonGlobalAdmin_ThrowsUnauthorized()
+    public async Task DeleteAccountAsync_SelfDeletion_NonGlobalAdmin_Successful_OpensToEveryResident()
     {
         var boot = await BootAsync();
-        // A plain resident (no GlobalAdmin role) attempting self-deletion —
-        // the ADR 0142 D5 gate refuses before any write.
+        // A plain resident (no GlobalAdmin role) self-deleting — ADR 0301 D1
+        // (amends 0142 D5) opens the self-serve lane to every resident, so
+        // this now succeeds (the IMPROVE-UX E7 dead-end is closed; the R12
+        // due-job runs exactly this branch). The target holds no GA role, so
+        // the 0142 D3 last-GlobalAdmin pin does not fire.
         var self = await SeedAccountAsync(boot, "self-nonadmin@examplium.com", globalAdmin: false);
+        await PlantAuditRowAsync(boot.Store, actorId: self, action: "post.read");
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => boot.Identity.DeleteAccountAsync(self, adminSubjectId: self));
+        await boot.Identity.DeleteAccountAsync(self, adminSubjectId: self);
 
-        // No write happened: no "account.delete" audit row, the account still
-        // exists, the profile row is intact (the fail-closed pin).
-        Assert.Empty(await AuditRows(boot.Store, action: "account.delete"));
-        Assert.NotNull(await boot.UserManager.FindByIdAsync(self));
-        Assert.NotNull(await ProfileAsync(boot.Store, self));
+        // The Identity account is gone (the password hash + roles deleted).
+        Assert.Null(await boot.UserManager.FindByIdAsync(self));
+
+        // The Profile row is deleted (the directory would list no one).
+        Assert.Null(await ProfileAsync(boot.Store, self));
+
+        // The target's pre-planted audit row is pseudonymized: the row
+        // *remains* (the trail is preserved) but the actor id is the
+        // tombstone.
+        var byAction = await AuditRows(boot.Store, action: "post.read");
+        Assert.Single(byAction);
+        Assert.Equal($"deleted:{self}", byAction[0].ActorId);
+
+        // Exactly one "account.delete" summary row — the self-serve branch
+        // is Via: Owner (the resident acted on their own account).
+        var deletes = await AuditRows(boot.Store, action: "account.delete");
+        Assert.Single(deletes);
+        Assert.Equal(AccessVia.Owner, deletes[0].Via);
+        Assert.Equal(self, deletes[0].ActorId);
+        Assert.Equal("account", deletes[0].TargetKind);
+        Assert.Equal(self, deletes[0].TargetId);
+        Assert.Equal(AccessOutcome.Allow, deletes[0].Outcome);
     }
 
     [Fact]
     public async Task DeleteAccountAsync_SelfDeletion_GA_Successful_DeletesAndPseudonymizes()
     {
         var boot = await BootAsync();
-        // A GlobalAdmin self-deleting (they hold the standing the D5 gate
-        // requires), plus a second GlobalAdmin (the last-GA guard is
-        // satisfied — the target is not the *last* GA).
+        // A GlobalAdmin self-deleting (ADR 0301 D1 opens the self-serve lane
+        // to every resident — a GA may self-delete too), plus a second
+        // GlobalAdmin (the 0142 D3 last-GA guard is satisfied — the target is
+        // not the *last* GA).
         var self = await SeedAccountAsync(boot, "self-ga@examplium.com", globalAdmin: true);
         await SeedAccountAsync(boot, "other-ga@examplium.com", globalAdmin: true);
 
