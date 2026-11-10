@@ -21,12 +21,18 @@ updated: 2026-11-10
 > X02 cold read) gets the honest before → after, not the intended one. This
 > note opens with **R15**, the ADR 0302 shared-kiosk-link Core seam
 > (the `KioskLink` doc + the `IKioskLinkService` create/revoke/validate
-> service + the P-1 gate count 82 → 83, the `// TODO ❓` open questions
-> for R19, and the R16 notes), then **R14**, the SEC review of the ADR 0301
-> grace period (R10–R13): the four review foci (audit rows, re-auth before
-> scheduling, the child rule, guard ordering + the scheduling-vs-execution
-> asymmetry) each with its verdict, the two ADR 0301 `// TODO ❓` open
-> questions resolved, and the Findings list (each filed with an owner).
+> service + the P-1 gate count 82 → 83), then **R17** (the community-visible
+> filter in `KioskItemCatalog`) and **R18** (the `/settings/kiosk`
+> create/revoke surface), then **R19**, the **SEC review** of the ADR 0302
+> lane (R15–R18): the R16 auth gap (the headline — a resident can mint a
+> token that works nowhere), the three red `SecGate` findings (one fixed —
+> the `KioskLink` eraser seam the ADR deferred to R19; the other two the
+> prompt mis-attributed to `KioskLink`, and are filed as pre-existing SEC-lane
+> drift), the code-check re-base of the four ADR-sanctioned kiosk edges,
+> the confirmed by-design calls (256-bit token, copy-once in `TempData`,
+> the revoke-mismatch `200`), and the open questions filed (the R16 auth,
+> the R17 `ComponentId` scope, expiry, max-links). Then **R14**, the SEC
+> review of the ADR 0301 grace period (R10–R13).
 > **Who is it for:** the next agent in this lane and the X02 cold read.
 > **When to read the rest:** before starting a unit, or when a DoD line
 > "looks done" and you want to know if it actually is.
@@ -127,6 +133,506 @@ tests, all in one `feat(ux):` commit (`8de9751a`). The personal kiosk
   claim) is a Web-side concern.
 - `LastUsedAt` is stamped on every successful validate — the R18 surface
   reads this field for the "last used" display.
+
+## R17 — kiosk-link community-visible filter (group-private → denied slide)
+
+**Scope:** ADR 0302 D4's "shows community-visible items only" (IMPROVE-UX
+R17 — the second kiosk unit). When the catalog resolves a slide **in
+kiosk-link mode** (the viewer's principal carries the `kiosk-link` role —
+the role R16 will mint; R17 adds the *filter* it will read), any item the
+whole community cannot see renders the existing `kiosk.slide_denied` shape
+instead of being offered. Personal-kiosk mode (the owner's full visibility)
+is **unchanged** — the filter is a no-op for a signed-in owner (ADR 0302 D5).
+
+**Outcome:** the filter + the `Roles.KioskLink` role constant + 14 tests, in
+one `feat(ux):` commit (`0a15fd02`). The personal kiosk and the R15 Core
+seam are untouched — R17 is purely additive to the catalog.
+
+**What landed**
+
+- **`Roles.KioskLink`** (`"kiosk-link"`) — the role value a kiosk-link
+  principal carries, defined in `ThinPrincipal.cs` (the R15 "no role on the
+  Core seam" rule kept — the role is a Web/Identity surface concern; R16 will
+  mint it). The catalog reads it to switch into kiosk-link mode.
+- **`KioskItemCatalog.ResolveAsync` kiosk-link branch** — a `kioskLink` flag
+  (`roles.Contains(Roles.KioskLink)`) threaded through each resolver. In
+  kiosk-link mode:
+  - **Group items** (a type that has no `Audience`) are denied when the
+    group is private (`KioskLinkGroupIsNonPrivateAsync` — a non-private
+    group's items are community-visible; a private group's are not).
+  - **`Audience`-bearing types** (Post / Board / Todo / Project / Page /
+    Event) are denied when the audience is *grant-restricted* — the pure
+    predicate `KioskLinkAudienceIsCommunity(aud)`: `null` (public) /
+    `Community` / `AllResidents` ⇒ visible; a user/group grant list without
+    a community flag ⇒ denied.
+  - **Announcements** are denied when a draft (`IsDraft`) or community-
+    targeted (`CommunityId != null`).
+  - **Drafts** of any type are denied (in kiosk-link mode the owner is not
+    the author, so a draft is not community-visible).
+- **Tests** — `KioskLinkCommunityFilterTests` (14): the pure
+  `KioskLinkAudienceIsCommunity` matrix (null / Community / AllResidents /
+  grant-restricted) + the per-type resolver denials (group-private → denied
+  slide, private group → denied, public group → visible, draft → denied,
+  community-targeted announcement → denied, etc.).
+
+**`// TODO ❓` left for R19's SEC review** (see the R19 Findings, F5): the
+`Community` flag is evaluated **without the resource's own `ComponentId`
+scope** — R17 treats `Community=true` as visible across all component scopes.
+ADR 0036 / 0102 refine the flag into a community-scoped shape; the stricter
+reading (narrow to the resource's own community) is a code change, not a
+review-note-only fix, so it is filed, not built.
+
+**Test results (before R19's touch):** `KioskLinkCommunityFilterTests` (14)
+**all green**; `KioskServiceTests` (6) **all green** (personal kiosk intact).
+
+## R18 — the `/settings/kiosk` shared-link surface (create / list / revoke)
+
+**Scope:** ADR 0302 D3/D4's Web surface (IMPROVE-UX R18 — the third kiosk
+unit). The signed-in resident's **create / list / revoke** on
+`/settings/kiosk`, built on the R15 Core seam (`IKioskLinkService`) and the
+R17 catalog. The raw token is **shown exactly once** at creation (a copy-once
+reveal), then gone — the store holds only the hash. **The R16 auth is not
+here** (the link authenticates nowhere yet — see R19 Focus 1). Personal-kiosk
+settings (`SettingsGet` / `SettingsPost` / the item picker) are **unchanged**.
+
+**Outcome:** the surface + `KioskLinkListReader` (the Web read seam) + the
+copy-once affordance + 10 `KioskLinkSettingsTests` + 14 localized keys
+(× en/de/fr/da), in one `feat(ux):` commit (`8531cd6d`). The R15 Core seam is
+**frozen** — R18 adds no method to it (the "Web layer owns the read"
+precedent; the `KioskController` stays off direct Marten, the C09 shape).
+
+**What landed**
+
+- **`IKioskLinkService` DI** — `Program.cs` registers
+  `IKioskLinkService → KioskLinkService` (R15's Core seam now reachable from
+  the Web).
+- **`POST /settings/kiosk/link`** (`LinkCreate`) — mints the link via
+  `CreateAsync(actorId, actorId)` (the personal playlist's `Id` = the owner's
+  subject id, ADR 0164). The **raw token** + the new row's metadata ride
+  `TempData` for the **single** redirect round-trip (never in the URL — the
+  token must not ride a referer / history entry), then are read + cleared by
+  `SettingsGet`, which hands it to the view for the copy-once reveal.
+- **`POST /settings/kiosk/link/revoke`** (`LinkRevoke`) — revokes via
+  `RevokeAsync(linkId, actorId)` (owner-scoped, idempotent — a missing /
+  already-revoked / another-owner's link is a no-op). Returns
+  `200 { revoked:false }` on a mismatch (a no-op, not a status-grade refusal —
+  see R19 Focus 5, the call R19 records).
+- **`GET /settings/kiosk`** (`SettingsGet`) — the owner's **active** links
+  (via `KioskLinkListReader`, `RevokedAt == null` only, newest first, **no**
+  token material) + the copy-once token reveal for the just-created one.
+- **`KioskLinkListReader`** (`IKioskLinkListReader` / `KioskLinkListReader`)
+  — the Web read seam the `KioskController` uses to stay off direct Marten
+  (the C09 shape; the `EscalationForwarder` `store.QuerySession()` idiom — the
+  session is disposed, the singleton store is not). Blank owner → `[]`.
+- **`KioskSettingsViewModel`** — `SharedLinks` (the active rows) +
+  `SharedLinkToken` (the one-shot reveal).
+- **View + TS** — the `Settings.cshtml` shared-link section (list + copy-once
+  reveal + revoke) + `kiosk-settings.ts`'s copy affordance (the
+  `/kiosk?link=<token>` URL is **assembled client-side**, the R16 middleware
+  is what will parse it — so the token never rides a server-rendered `href`).
+- **Localization** — 14 `kiosk.settings.*` keys × en/de/fr/da (de/fr/da
+  machine-written, flagged for the parked native review).
+- **`ux-baseline.json`** — `bare_status` re-based **704 → 708** (stated in the
+  file's `generated_from`): R18's `LinkCreate` / `LinkRevoke` owner guards
+  (`return Forbid()` / `BadRequest()`) + R17's +1 that shipped without a
+  re-base. The guards are belt-and-braces (the class-level `[Authorize]` +
+  the form's `linkId` make them unreachable in production); re-based rather
+  than deleted.
+
+**Test results (before R19's touch):** `KioskLinkSettingsTests` (10) **all
+green**; `KioskControllerTests` **all green**; `KioskLinkServiceTests` (8)
+**all green**.
+
+## R19 — SEC review of the ADR 0302 shared kiosk link (R15–R18)
+
+**Scope reviewed:** the ADR [0302](../../adr/0302-shared-kiosk-link.md)
+kiosk-link lane — R15 (`8de9751a`, the ADR + `KioskLink` doc +
+`IKioskLinkService`/`KioskLinkService`), **R16 (no commit — see Focus 1)**,
+R17 (`0a15fd02`, the community-visible filter) and R18 (`8531cd6d`, the
+`/settings/kiosk` surface). R19 is a **review**, not an implementation:
+R15–R18 are preserved, not rewritten.
+
+**Outcome (honest, and it diverges from the R19 prompt):** **one of the three
+red `SecGate` findings is a genuine ADR-0302 deferral — the `KioskLink`
+eraser seam — and R19 fixes it; the other two are pre-existing SEC-lane
+drift that the prompt mis-attributed to `KioskLink`, and R19 files them
+rather than fixing them in this unit.** The **R16 auth gap** (the headline)
+is recorded plainly: a resident can mint, list and revoke a kiosk token that
+**authenticates nowhere** — the link is not shippable to a resident until R16
+lands. The four ADR-sanctioned kiosk boundary edges are re-based under
+`adr: 0302`; the six non-kiosk code-check violations (R05 + four grown
+aggregate edges) are filed. No finding is left without an owner. R19 makes
+**two code fixes** (the `KioskLink` eraser seam + the one mis-typed SEC-READ
+marker) and **one baseline re-base** (the four kiosk edges); everything else
+is a decision or a filed finding.
+
+### Focus 1 — The R16 gap — **FILED (headline)**
+
+The ADR 0302 shared link is **built** (R15 Core seam, R17 filter, R18
+surface) but **authenticates nothing**. Verified at HEAD:
+
+- `Roles.KioskLink` (`"kiosk-link"`, `ThinPrincipal.cs:62`) is **defined**
+  (R17) and **read** (R17's `KioskItemCatalog` filter) but **never assigned** —
+  no code mints a principal carrying it.
+- **No `/kiosk?link=<token>` handler, no middleware, no `ValidateAsync`
+  caller** anywhere in `src/` — `IKioskLinkService.ValidateAsync` (the seam
+  R15 built specifically so R16's middleware could call it) has **zero**
+  callers. The `kiosk?link=` URL the R18 view/TS *assembles client-side* has
+  no server endpoint that accepts it.
+
+**R19 verdict: this is an accepted *held surface*, not a defect of R15–R18.**
+The create / list / revoke surface (R18) is **not shippable to a resident**
+until R16's auth lands — a resident who mints a token that works nowhere is a
+UX-and-SEC smell (it invites the "I shared my link" report with nothing
+behind it). **Filed (F1)** with the owner = the next IMPROVE-UX unit that
+implements R16 (the token→restricted-principal middleware on `/kiosk` +
+`/kiosk/slide`, the rate limit). The R18 surface should be **hidden or
+gated** (e.g. an `#if` feature flag or a "coming" state) until R16 ships —
+see F1.
+
+### Focus 2 — The three red `SecGate` tests — **one fixed, two filed (prompt mis-attribution)**
+
+R19 ran the three. The R19 prompt attributes all three to `KioskLink`;
+ground truth shows only one is.
+
+- **`EveryDeleteOrPseudonymizeType_IsHandledByAnEraser`** — red on **14**
+  unhandled `Delete` types. `KioskLink` is one, but so are `KioskPlaylist`
+  (the pre-existing ADR 0164 sibling) and 12 others (`AccessAudit`,
+  `EmailDeadLetter`, `InventoryCheckout`, `SuppressedAddress`, `Report`,
+  `ComponentMembership`, `GroupInvitation`, `GroupJoinRequest`,
+  `GroupMembership`, `GuardianLink`, `ModeratorAssignment`, `Profile`). This
+  is the **recorded IS24 SEC-lane drift** (the "gate is the pin, red is the
+  finding" state, `improve-sec-known-reds`).
+  **R19 fixes the one ADR 0302 explicitly deferred to it** — "the owner
+  account's eraser owns it — the R19 SEC review confirms the seam" — by
+  wiring `KioskLink` into `ResidentAccountRowsEraser` (a new block-14
+  `EraseKioskLinksAsync`, matched on `OwnerSubjectId`, mirroring the
+  `DeletionRequest` block-13 shape). After the fix, `KioskLink` is **gone**
+  from the unhandled list (14 → 13). The **other 13 are filed (F2)** with the
+  SEC lane — they are not ADR 0302's to close, and fixing them here would be
+  a scope slip into IS21–IS23 / IS31–IS32's recorded drift.
+- **`EveryResidentExportType_IsInUserScopeInventory`** — red on
+  `Announcement`, `AnnouncementTranslation`, `TagTranslation`. **`KioskLink`
+  is not in this failure** — it is `ExportScope.Never` and so is never
+  checked against the resident-export inventory. The R19 prompt's
+  "the type not in the export-scope inventory" **mis-attributes** this
+  finding. **Filed (F2)** with the SEC lane (the `Announcement*` /
+  `TagTranslation` export rows are the IS31/IS32 M2 drift the known-reds
+  memory records).
+- **`Every SEC-READ marker names a reason`** — red at one marker:
+  `ModerationService.cs:688` (R05's `ListMyReportsAsync`). **Not the kiosk
+  read path** — the kiosk code (`KioskLinkService`, `KioskLinkListReader`,
+  `KioskItemCatalog`) carries **no** `// SEC-READ:` marker at all (verified
+  by scan). The R19 prompt's "a `// SEC-READ:` on the kiosk-link read path
+  without the required reason" **mis-locates** this finding. The marker is a
+  real (if minor) gate miss — it lacked the required taxonomy word
+  (`owner-only` / `caller-gated` / `no disclosure` / `report-gated`).
+  **R19 fixes it minimally** by prepending `owner-only` (the reporter reads
+  their own report rows — the correct taxonomy word, the read already has a
+  reason after the em-dash). The test now passes.
+
+### Focus 3 — The red code-check ratchet — **four kiosk edges re-based, six non-kiosk filed**
+
+R19 ran `pwsh tools/code/code-check.ps1` (10 violations at HEAD, a known-red
+per `improve-sec-known-reds`). Each, per the ratchet doctrine (a raised
+number needs an `adr:` reason; a re-base is a *decision*, not a paper-over):
+
+**Fixed (re-based under `adr: 0302` in `tools/code/code-baseline.json`)** —
+the four ADR-sanctioned kiosk edges (the ADR 0302 Consequences + the R15–R18
+units *are* the reason; `Kiosk` is a legitimate bounded context, so these are
+not boundary *breaches* in the ADR 0006 sense — they are the sanctioned seams
+crossing contexts):
+
+- `Kiosk->Authorization:AccessAudit` (1 → **2 files**, `KioskService` + the
+  new `KioskLinkService` audit row) — raised, `adr: 0302`.
+- `Identity->Kiosk:KioskLink` (**2 files** — `ThinPrincipal.cs`'s
+  `Roles.KioskLink` const + R19's `ResidentAccountRowsEraser` eraser seam) —
+  added, `adr: 0302`. *(Note: the first of those two is a **name collision** —
+  `Roles.KioskLink` is the role-string const, not the `KioskLink` doc — the
+  gate counts by symbol token; both are ADR-sanctioned.)*
+- `Kiosk->Identity:IdentityService` (**1 file** — `KioskLinkService` uses
+  `IdentityService.Sha256Hex` for the hash-at-rest) — added, `adr: 0302`.
+- `Web->Kiosk:KioskLink` (**4 files** — `KioskLinkListReader`,
+  `KioskItemCatalog`, `KioskController`, `KioskSettingsViewModel`) — added,
+  `adr: 0302`.
+
+After the re-base the gate shows **6 violations, all non-kiosk** — filed
+(F3), not re-based under ADR 0302 (which would mis-attribute them):
+
+- `ListMyReportsAsync` **cc=17** (ceiling 15) — R05's "My reports" read
+  (the method the Focus 2 marker lives in). **Filed (F3)**: a code-shape
+  finding the IMPROVE-CODE lane owns (split the method / extract the target-
+  title read), not ADR 0302's to re-base.
+- `Moderation->Posts:PostService` (2 files) — R05's `ListMyReportsAsync`
+  read seam. **Filed (F3)** (same owner, same reason).
+- `Web->Authorization:Audience` (22 vs 21), `Web->ErrorReports:ErrorReport`
+  (4 vs 3), `Web->Identity:Roles` (40 vs 39), `Web->Identity:User` (82 vs 81)
+  — four **aggregate** file-count edges, each +1 over the base ref. None is
+  cleanly attributable to R15–R18 (verified: no kiosk Web file references
+  `ErrorReport`; `KioskItemCatalog.cs` — the only kiosk file that touches
+  `Roles`/`Audience`/`User` — was **already in the baseline** before R17).
+  **Filed (F3)** with the SEC lane / the unit that added each file (the
+  "drift found in a previous unit" the gate doctrine describes). Re-basing
+  them under `adr: 0302` would falsely claim ADR 0302 as their reason.
+
+**Gate state before → after (R19):** **10 violations → 6**; the four
+kiosk edges cleared, the six non-kiosk remain (filed, owners assigned). The
+`ImproveHarnessTests.CodeCheck_Gate_Passes` test is therefore **still red at
+R19's HEAD** on the six non-kiosk violations — an honest, filed state, not a
+silence.
+
+### Focus 4 — Token handling (ADR 0302 D1/D2) — **CONFIRMED**
+
+Verified the raw token appears **only** in the `CreateAsync` return + the one
+`TempData` round-trip, and **nowhere else**:
+
+- **At rest it is the SHA-256 hex digest** (`KioskLink.TokenHash`, via
+  `IdentityService.Sha256Hex`) — the raw token is never stored.
+- **Never in the URL** (the R18 reveal is a server-rendered read-only input +
+  the `data-kiosk-link-token` attribute; the `/kiosk?link=<token>` URL is
+  **assembled client-side** by `kiosk-settings.ts`, never a server `href` —
+  the token does not ride a referer or history entry the server writes).
+- **Never in an audit row** (`kiosk.link.create` / `kiosk.link.revoke` carry
+  only `TargetId` = the link's id, `Via: Owner`, `TargetKind "kiosk"` — PII-
+  and token-free) **or a log template** (no `kiosk.link.*` log line carries a
+  token placeholder).
+
+**TempData for a copy-once credential — DECIDED (acceptable at HEAD).** The
+ASP.NET Core `TempData` store (the `SessionState` provider by default here)
+is **transient** (one round-trip, then cleared — R18's `SettingsGet` reads +
+`TempData.Remove`s it), **server-side** (not in the URL, not in the browser
+history, not in a referer). A *persistent* store (a file / DB-backed
+`ITempDataProvider`) is **not** used in production, so the raw token does not
+survive on disk. This is the correct shape for a copy-once credential (the
+token is shown once and gone — the store holds only the hash). **No finding.**
+*(The test-harness `InMemoryTempDataProvider` retention is a test-only
+concern, not a production leak.)*
+
+### Focus 5 — Owner-scope pins — **CONFIRMED, one call recorded**
+
+- **Create** (actor = owner): `LinkCreate` passes `actorId` as both the
+  `playlistId` (the personal playlist's `Id` = the owner's subject id, ADR
+  0164) and the `ownerSubjectId`. A resident can only create a link over
+  their own playlist. **Pinned.**
+- **Validate** (hash + owner match): `ValidateAsync` matches
+  `TokenHash == hash && OwnerSubjectId == ownerSubjectId && RevokedAt == null`
+  — a valid hash for **another** owner's link is refused (R15 test
+  `ADR0302_Validate_AnotherOwnersLink_IsRefused`). **Pinned.**
+- **Revoke** (`RevokeAsync` no-ops on mismatch): a missing / already-revoked /
+  another-owner's link returns `false`, no audit row (R15 test
+  `ADR0302_Revoke_OwnerScoped_Idempotent_Audited`). **Pinned.**
+- **Revoke-mismatch status — DECIDED (acceptable at HEAD).** `LinkRevoke`
+  returns `200 { revoked:false }` on a mismatched / unknown link. It leaks
+  nothing (the owner-scope pin is enforced in the Core seam; a non-owner
+  cannot learn another owner's link id exists, because the id is a
+  server-generated `Guid` not enumerable, and the response is the same
+  `200 {revoked:false}` a self-`false` no-op would be). The prompt asks
+  whether a **404/403** is more correct: **R19 records `200 {revoked:false}`
+  as the better choice** — a 403 would disclose "the link exists but you
+  don't own it" (an oracle for a guesser probing another owner's link id); a
+  404 would disclose "the link does not exist" (equally an oracle). The
+  uniform `200 {revoked:false}` gives the least information. The owner UX
+  (the "revoked" flash) is already handled by the client for the happy path.
+  **No finding.**
+
+### Focus 6 — Audit rows — **CONFIRMED**
+
+Verified against R15's `KioskLinkService` + its tests:
+
+- Exactly **one** `kiosk.link.create` row (`Via: Owner`, `TargetKind "kiosk"`,
+  `TargetId` = the link's id, PII-free) on `CreateAsync`. **Pinned** (test
+  `ADR0302_Create_ReturnsRawTokenOnce_AndStoresRow`).
+- Exactly **one** `kiosk.link.revoke` row (same shape) on a successful
+  `RevokeAsync`; **zero** on a no-op (missing / revoked / another-owner's).
+  **Pinned** (test `ADR0302_Revoke_OwnerScoped_Idempotent_Audited`).
+- **Zero** on `ValidateAsync`; `LastUsedAt` stamped read-then-write (the ESC·9
+  "the read is not an access decision" floor — the owner-scope read decision
+  is R16's job, and every read the link authenticates is audited by the
+  item's own read lane under the owner, ADR 0302 D4). **Pinned** (test
+  `ADR0302_Validate_WritesNoAuditRow_StampedLastUsed`).
+
+### Focus 7 — Revoke terminality + idempotency — **CONFIRMED**
+
+- Revoke is **terminal** (no undo): `RevokedAt` set; the row drops out of
+  `KioskLinkListReader`'s active list (`RevokedAt == null` filter); the
+  `KioskLink` doc's state machine is `created (RevokedAt null) → revoked
+  (RevokedAt set)` with no forward edge. **Pinned.**
+- A second revoke is a **no-op returning `false`**, **no second audit row**
+  (the `stored.RevokedAt is not null` guard returns before the `Store` of the
+  audit row). **Pinned** (test `ADR0302_Revoke_OwnerScoped_Idempotent_Audited`
+  asserts exactly one audit row after two revoke calls).
+
+### Focus 8 — The Web read seam (`KioskLinkListReader`) — **CONFIRMED**
+
+- **Owner-scoped** (`OwnerSubjectId == ownerSubjectId`), **`RevokedAt == null`
+  only** (active links), **`OrderByDescending(CreatedAt)`** (newest first),
+  **blank owner → `[]`** (no throw). **Pinned.**
+- **No token material returned** — the `TokenHash` is on the `KioskLink` row
+  but the `KioskSettingsViewModel` / view only render `Id`, `CreatedAt`,
+  `LastUsedAt` (the revoke form posts `Id`; there is no "show the hash again"
+  and no raw-token re-read — the store holds only the hash, so a re-read
+  cannot recover the token). **Pinned.**
+- **C09 (controller off Marten)** — the read lives in the
+  `KioskLinkListReader` Web service (the `store.QuerySession()` idiom — the
+  session is disposed, the singleton store is not); the `KioskController`
+  never touches `IDocumentStore` directly for the shared-link list. **Pinned.**
+
+### ADR 0302 D6 open questions — **RESOLVED (one-line decisions, no ADR edit)**
+
+- **(a) Token length — CONFIRMED 256 bits.** `NewToken()` = `kskl_` +
+  **32 CSPRNG bytes** base64url (256 bits, the `EscalationTokenService`
+  `kesc_` shape). 256 bits is the standard high-entropy floor for a
+  brute-force-resistant credential (a 32-byte `RandomNumberGenerator` fill);
+  the `kskl_` prefix distinguishes the lane. **No change** (the number is not
+  frozen by the ADR; R19 confirms it, so it now stands).
+- **(b) Expiry — FILED (not decided in this unit).** ADR 0302 ships **no
+  expiry** (a link lives until revoked). Whether a long-lived shared
+  credential needs a max age is a **mechanism change** (an `ExpiresAt` field
+  + a validate-time check) beyond a one-line constant, so R19 **files it
+  (F5)** with the owner = a follow-up IMPROVE-UX unit / the SEC lane (decide
+  the policy: none / a fixed max age / an admin-set expiry), not built here.
+- **(c) Max links per playlist — FILED (not decided in this unit).** ADR 0302
+  ships **no ceiling**. A hard limit is a **mechanism change** (a create-time
+  count + refusal) beyond a one-line constant, so R19 **files it (F6)** with
+  the owner = a follow-up IMPROVE-UX unit (the R18 surface already lists +
+  revokes them, so a ceiling is additive on top; decide the policy: none /
+  N per playlist).
+
+### R18's four `// TODO ❓` — **RESOLVED**
+
+- **Revoke-mismatch status** — see Focus 5: **`200 {revoked:false}`
+  confirmed** (the least-information choice over 404/403).
+- **"Revoke all" skipped** — **intentional, confirmed.** R18 ships
+  per-link revoke (the owner revokes the specific link); a bulk "revoke all"
+  is a convenience, not a security control (the owner can revoke each link
+  individually, and the count is unbounded — see F6). **No finding.**
+- **Max-links ceiling** — see D6(c) above: **filed (F6)**.
+- **Token-in-`TempData`** — see Focus 4: **confirmed acceptable** (the
+  production `TempData` store is transient + server-side; the token does not
+  ride the URL / history / referer / disk).
+
+### Findings
+
+Each is **fixed** (with the fix in this commit) or **filed** with a named
+owner. Nothing is left without an owner.
+
+- **F1 — The R16 auth gap (the headline).**
+  *Where:* the entire R16 unit (the token→restricted-principal middleware on
+  `/kiosk` + `/kiosk/slide`, the rate limit) — **no commit exists**.
+  *What:* the kiosk link is created / listed / revoked (R15–R18) but
+  **authenticates nothing** (`ValidateAsync` has zero callers;
+  `Roles.KioskLink` is defined + read but never assigned; no `/kiosk?link=`
+  endpoint). A resident who mints a token that works nowhere is a UX-and-SEC
+  smell.
+  *R19 verdict:* **accepted held surface** (not a defect of R15–R18 — R16 was
+  never in scope of this unit). The R18 surface is **not shippable to a
+  resident** until R16 lands.
+  *Owner:* the next IMPROVE-UX unit that implements R16 (a scoped R16
+  follow-up). *Interim:* hide or gate the R18 `/settings/kiosk` shared-link
+  section (a feature flag or a "coming" state) until R16 ships, so a resident
+  cannot mint a token with nothing behind it. *(The R18 `ux-baseline.json`
+  re-base already records that the guards are belt-and-braces; the gate hides
+  the surface.)*
+
+- **F2 — Two red `SecGate` tests that are pre-existing SEC-lane drift, not
+  ADR 0302's.**
+  *Where:* (a) `EveryDeleteOrPseudonymizeType_IsHandledByAnEraser` — 13
+  unhandled `Delete` types beyond `KioskLink` (`KioskPlaylist` + 12 others).
+  (b) `EveryResidentExportType_IsInUserScopeInventory` — `Announcement`,
+  `AnnouncementTranslation`, `TagTranslation`.
+  *What:* the R19 prompt attributes both to `KioskLink`; ground truth shows
+  (a) is the recorded IS24 SEC-lane drift (14 types, `KioskLink` is 1 of 14)
+  and (b) does **not** involve `KioskLink` at all (it is `ExportScope.Never`,
+  never checked against the resident-export inventory). These are the IS21–
+  IS23 / IS31–IS32 M2 "gate is the pin, red is the finding" state the
+  `improve-sec-known-reds` memory records.
+  *R19 verdict:* **filed, not fixed in this unit** (fixing them here is a
+  scope slip into the SEC lane's recorded drift; R19 fixed only the one ADR
+  0302 explicitly deferred — the `KioskLink` eraser seam, Focus 2).
+  *Owner:* the SEC lane (IS21–IS23 / IS31–IS32 close — the 13 unhandled
+  `Delete` types + the 3 missing export rows).
+
+- **F3 — Six non-kiosk code-check violations (the ratchet red at R19's HEAD).**
+  *Where:* `ListMyReportsAsync` **cc=17** (ceiling 15) + `Moderation->Posts:
+  PostService` (both R05's "My reports" read seam); `Web->Authorization:
+  Audience` (22/21), `Web->ErrorReports:ErrorReport` (4/3), `Web->Identity:
+  Roles` (40/39), `Web->Identity:User` (82/81) (four aggregate file-count
+  edges, each +1 over the base ref, none cleanly attributable to R15–R18).
+  *What:* the gate is a known-red at HEAD (`improve-sec-known-reds`); the
+  six are R05's + other units' drift. R19 re-based the four ADR-sanctioned
+  kiosk edges (Focus 3) but **not** these — re-basing them under `adr: 0302`
+  would falsely claim ADR 0302 as their reason.
+  *R19 verdict:* **filed, not re-based in this unit.**
+  *Owner:* (cc=17 + `Moderation->Posts`) the IMPROVE-CODE lane (split
+  `ListMyReportsAsync` / extract the target-title read); (the four grown
+  edges) the SEC lane / the unit that added each file (the "drift found in a
+  previous unit" the gate doctrine describes).
+
+- **F4 — The R17 `ComponentId` scope (the stricter reading).**
+  *Where:* `KioskItemCatalog.KioskLinkAudienceIsCommunity` (`KioskItemCatalog.
+  cs:268` `// TODO ❓`) — the `Community` flag is evaluated **without the
+  resource's own `ComponentId` scope**.
+  *What:* R17 treats `Community=true` as visible across **all** component
+  scopes; ADR 0036 / 0102 refine the flag into a **community-scoped** shape
+  (a non-empty `ComponentId` on the Post / Event / Project / Board / Todo
+  means only that community's members see it). The `Audience` type does not
+  carry the component (it is on the resource), so the guard cannot distinguish
+  "all communities" from "this specific community" from the audience alone.
+  *R19 verdict:* **filed, not built in this unit** (the stricter reading is a
+  **code change** — a per-type guard that reads the resource's `ComponentId`
+  and checks community membership — not a review-note-only fix; R19's scope
+  rule bars building it here).
+  *Owner:* a follow-up IMPROVE-UX / SEC unit (the per-type `ComponentId`
+  guard; the SEC reading should narrow to the resource's own community).
+
+- **F5 — Expiry (ADR 0302 D6b).** See the D6 section: **filed** with the SEC
+  lane (a mechanism change — an `ExpiresAt` field + validate-time check —
+  decide the policy: none / a fixed max age / an admin-set expiry).
+
+- **F6 — Max links per playlist (ADR 0302 D6c).** See the D6 section:
+  **filed** with a follow-up IMPROVE-UX unit (a mechanism change — a
+  create-time count + refusal; the R18 surface already lists + revokes them,
+  so a ceiling is additive).
+
+### DoD line 8 — honest before → after (R19)
+
+- **Code changed in R19: 2 seams + 1 baseline.** (a) the `KioskLink` eraser
+  seam (new block-14 in `ResidentAccountRowsEraser` — the ADR 0302-deferred
+  finding, Focus 2); (b) the R05 `ListMyReportsAsync` SEC-READ marker
+  (prepended the `owner-only` taxonomy word — Focus 2); (c) the four
+  ADR-sanctioned kiosk edges re-based under `adr: 0302` in
+  `tools/code/code-baseline.json` (Focus 3). No other code changed; R15–R18
+  are preserved.
+- **`SecGate` before → after:** `EveryDeleteOrPseudonymizeType_IsHandledByAn-
+  Eraser` **14 → 13** (the `KioskLink` row fixed; the other 13 filed, F2);
+  `EveryResidentExportType_IsInUserScopeInventory` **unchanged** (3 missing
+  export rows, **not** `KioskLink` — filed, F2); `Every SEC-READ marker names
+  a reason` **red → green** (the R05 marker fixed, Focus 2).
+- **code-check gate before → after:** **10 → 6 violations**; the four
+  ADR-sanctioned kiosk edges cleared (re-based under `adr: 0302`), the six
+  non-kiosk remain (filed, F3). `ImproveHarnessTests.CodeCheck_Gate_Passes`
+  is **still red at R19's HEAD** on the six non-kiosk violations — an honest,
+  filed state, not a silence.
+- **Kiosk tests (before → after R19's fix):** `KioskLinkServiceTests` (8)
+  **all green** (unchanged); `KioskLinkCommunityFilterTests` (14) **all
+  green** (unchanged); `KioskLinkSettingsTests` (10) **all green** (unchanged);
+  `KioskControllerTests` **all green** (unchanged); Core deletion tests
+  (`DeleteAccountRowsTests` / `IdentityServiceDeleteAccountTests` /
+  `DataClassCoverageTests`, 24) **all green** (the new `KioskLink` eraser
+  block causes no regression); `dotnet build` **0 errors**.
+- **Findings filed (all with owners): 6** — F1 (MEDIUM, the R16 auth gap —
+  the headline; a resident can mint a token that works nowhere), F2
+  (MEDIUM, the two red `SecGate` tests that are pre-existing SEC-lane drift,
+  not ADR 0302's — the R19 prompt mis-attributed them), F3 (MEDIUM, the six
+  non-kiosk code-check violations — R05 + four grown aggregate edges), F4
+  (MEDIUM, the R17 `ComponentId` scope — the stricter reading is a code
+  change), F5 (LOW, expiry), F6 (LOW, max-links per playlist).
+- **Nothing held silently** — the R16 gap is stated plainly (Focus 1); the
+  two mis-attributed `SecGate` findings are named and filed (Focus 2, F2);
+  the six non-kiosk violations are named and filed (Focus 3, F3); the R17
+  `ComponentId` question is filed (F4). Every decision (256-bit token,
+  copy-once `TempData`, `200 {revoked:false}`) is recorded with its
+  reasoning.
 
 ## R14 — SEC review of the ADR 0301 grace period (R10–R13)
 

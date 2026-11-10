@@ -685,10 +685,10 @@ public partial class ModerationService : IModerationService
         string reporterId,
         CancellationToken ct = default)
     {
-        // SEC-READ: the reporter's own reports (a read, not a decision — the
-        // GetQueueAsync / GetDetailAsync precedent: no IAuthorizationService
-        // call, no AccessAudit row; the report is the reporter's own, the read
-        // is a list, not a scoped-read gate).
+        // SEC-READ: owner-only — the reporter's own reports (a read, not a
+        // decision — the GetQueueAsync / GetDetailAsync precedent: no
+        // IAuthorizationService call, no AccessAudit row; the report is the
+        // reporter's own, the read is a list, not a scoped-read gate).
         if (string.IsNullOrEmpty(reporterId))
             throw new ArgumentException("A reporter id is required.", nameof(reporterId));
         if (_posts is null)

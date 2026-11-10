@@ -1325,6 +1325,13 @@
     },
     {
       "from": "Identity",
+      "to": "Kiosk",
+      "symbol": "KioskLink",
+      "count": 2,
+      "adr": "0302"
+    },
+    {
+      "from": "Identity",
       "to": "Localization",
       "symbol": "LocaleSettings",
       "count": 1
@@ -1612,13 +1619,21 @@
       "from": "Kiosk",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 1
+      "count": 2,
+      "adr": "0302"
     },
     {
       "from": "Kiosk",
       "to": "Events",
       "symbol": "Event",
       "count": 1
+    },
+    {
+      "from": "Kiosk",
+      "to": "Identity",
+      "symbol": "IdentityService",
+      "count": 1,
+      "adr": "0302"
     },
     {
       "from": "Kiosk",
@@ -3079,6 +3094,13 @@
     {
       "from": "Web",
       "to": "Identity",
+      "symbol": "DeletionRequest",
+      "count": 1,
+      "adr": "0301"
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
       "symbol": "DisallowedEmailDomainException",
       "count": 2
     },
@@ -3191,6 +3213,13 @@
       "to": "Kiosk",
       "symbol": "KioskEntry",
       "count": 4
+    },
+    {
+      "from": "Web",
+      "to": "Kiosk",
+      "symbol": "KioskLink",
+      "count": 4,
+      "adr": "0302"
     },
     {
       "from": "Web",
@@ -3664,13 +3693,6 @@
       "to": "UserInfo",
       "symbol": "ProfileToAuditableResource",
       "count": 1
-    },
-    {
-      "from": "Web",
-      "to": "Identity",
-      "symbol": "DeletionRequest",
-      "count": 1,
-      "adr": "0301"
     }
   ],
   "controllers_marten_allowlist": [
