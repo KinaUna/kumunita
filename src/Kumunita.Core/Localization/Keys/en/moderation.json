@@ -1,6 +1,6 @@
 {
   "moderation.flash_choose_moderator": "Choose a moderator to assign.",
-  "moderation.flash_not_moderator": "That account is not a standing moderator on this report\u0027s component. (The form may be out of sync \u2014 refresh.)",
+  "moderation.flash_not_moderator": "That account is not an active moderator on this report's component. (The form may be out of sync \u2014 refresh.)",
   "moderation.flash_assigned": "Report assigned.",
   "moderation.flash_unlocked": "Report unlocked (C5 activated on the component).",
   "moderation.flash_resolved": "Report resolved.",

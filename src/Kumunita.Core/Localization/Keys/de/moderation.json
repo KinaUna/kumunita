@@ -1,6 +1,6 @@
 {
   "moderation.flash_choose_moderator": "W\u00E4hle einen Moderator zum Zuweisen.",
-  "moderation.flash_not_moderator": "Dieses Konto ist kein st\u00E4ndiger Moderator der Komponente dieser Meldung. (Das Formular ist m\u00F6glicherweise veraltet \u2013 bitte neu laden.)",
+  "moderation.flash_not_moderator": "Dieses Konto ist kein aktiver Moderator der Komponente dieser Meldung. (Das Formular ist m\u00f6glicherweise veraltet \u2013 bitte neu laden.)",
   "moderation.flash_assigned": "Meldung zugewiesen.",
   "moderation.flash_unlocked": "Meldung freigegeben (C5 auf der Komponente aktiviert).",
   "moderation.flash_resolved": "Meldung erledigt.",

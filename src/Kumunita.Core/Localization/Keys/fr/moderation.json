@@ -1,6 +1,6 @@
 {
   "moderation.flash_choose_moderator": "Choisissez un mod\u00E9rateur \u00E0 assigner.",
-  "moderation.flash_not_moderator": "Ce compte n\u2019est pas un mod\u00E9rateur permanent du composant de ce signalement. (Le formulaire est peut-\u00EAtre d\u00E9synchronis\u00E9 \u2014 actualisez.)",
+  "moderation.flash_not_moderator": "Ce compte n\u2019est pas un mod\u00e9rateur actif du composant de ce signalement. (Le formulaire est peut-\u00eatre d\u00e9synchronis\u00e9 \u2014 actualisez.)",
   "moderation.flash_assigned": "Signalement assign\u00E9.",
   "moderation.flash_unlocked": "Signalement d\u00E9verrouill\u00E9 (C5 activ\u00E9 sur le composant).",
   "moderation.flash_resolved": "Signalement r\u00E9solu.",

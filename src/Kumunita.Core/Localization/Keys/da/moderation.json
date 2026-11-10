@@ -1,6 +1,6 @@
 {
   "moderation.flash_choose_moderator": "V\u00E6lg en moderator, der skal tildeles.",
-  "moderation.flash_not_moderator": "Den konto er ikke fast moderator for denne anmeldelses komponent. (Formularen er muligvis for\u00E6ldet \u2014 opdater siden.)",
+  "moderation.flash_not_moderator": "Den konto er ikke en aktiv moderator for denne anmeldelses komponent. (Formularen er muligvis for\u00e6ldet \u2014 opdater siden.)",
   "moderation.flash_assigned": "Anmeldelse tildelt.",
   "moderation.flash_unlocked": "Anmeldelse l\u00E5st op (C5 aktiveret p\u00E5 komponenten).",
   "moderation.flash_resolved": "Anmeldelse afsluttet.",
