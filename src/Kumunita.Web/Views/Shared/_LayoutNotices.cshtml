@@ -1,7 +1,10 @@
 @using Kumunita.Web.Security
+@using Kumunita.Core.Identity
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IIdentityService Identity
+@inject Kumunita.Core.UserInfo.IUserInfoService UserInfo
 @* IMPROVE-CODE C11 — extracted from _Layout.cshtml (the .kmb-notices
    region: the flash toast, the pinned announcement, the guest notice,
    the onboarding banner, and the What's-new toast). The markup, the
@@ -38,22 +41,95 @@
 }
 <div class="kmb-notices" data-kmb-notices data-more-label="@_noticesMore">
 @await Html.PartialAsync("_PinnedAnnouncement")
-@* M19 F2 — the guest shell notice (the account.guest_welcome key).
-   Renders only when the Guest role is present, which is only minted by
-   KumunitaClaimsPrincipalFactory when the allowance window is live
-   (ValidFrom ≤ now < ValidUntil). An expired guest gets no Guest claim,
-   so the notice disappears automatically — no job, no extra DB read.
+@* M19 F2 + IMPROVE-UX R20 — the guest shell notice (the account.guest_welcome
+   key). Two states of a signed-in guest are handled, both resolved from the
+   GuestAccess document (the end date is NOT a claim — ADR 0120 D3):
+
+   (1) WINDOW LIVE — the Guest role is present (KumunitaClaimsPrincipalFactory
+       mints it only when Profile.IsGuest && ValidFrom ≤ now < ValidUntil).
+       The notice shows the existing text PLUS when the window ends (rendered
+       in the guest's own effective zone via the <kw-dt> TagHelper, ADR 0019/0020)
+       PLUS a "message the admins" affordance to GET /issues/new (the existing
+       resident feedback surface — the R08/R22 channel; a labelled link, not a
+       new form). A null/absent GuestAccess document degrades to the plain text
+       (the kw-l en floor, no crash).
+
+   (2) WINDOW LAPSED — the Guest role is ABSENT (no standing), so a role-based
+       gate can never see it. Detected via Profile.IsGuest == true AND the
+       window already past (now ≥ ValidUntil), read from the profile + the
+       GuestAccess doc — NOT the role. A friendly "your guest access has ended"
+       notice + the same "message the admins" affordance, so the guest is not
+       left on a bare shell (the E18 dead end).
+
    Use KumunitaPrincipal.HasRole (NOT ClaimsPrincipal.IsInRole): Kumunita's
    roles ride the custom "Kumunita.Role" claim type, not the BCL default,
-   so the built-in IsInRole would never match. The kw-l TagHelper resolves
-   the label in the viewer's language. *@
+   so the built-in IsInRole would never match. Both branches are cheap and
+   non-blocking: the profile + GuestAccess reads run only for a signed-in
+   guest (an ordinary resident / member / admin never pays for them). *@
 @if (User.Identity?.IsAuthenticated == true && KumunitaPrincipal.HasRole(User, "Guest"))
 {
+    // WINDOW LIVE (the Guest role is present ⇒ the window is live). The end
+    // date is the GuestAccess.ValidUntil document value, rendered in the
+    // guest's own effective zone/format by the <kw-dt> TagHelper (ADR 0019/0020
+    // — the same seam every other timestamp renders through). A null/absent
+    // document degrades to the existing text only (the kw-l en floor, no crash).
+    string? _subject = KumunitaPrincipal.SubjectId(User);
+    GuestAccess? _guest = _subject is null ? null : await Identity.GetGuestAccessAsync(_subject);
     <div class="container-fluid">
         <div class="kmb-notice alert alert-info py-2" role="status" data-kmb-notice="guest">
-            <kw-l key="account.guest_welcome">You are signed in as a guest. Your access is limited to the surfaces the admin has allowed, for the window they set.</kw-l>
+            <span>
+                <kw-l key="account.guest_welcome">You are signed in as a guest. Your access is limited to the surfaces the admin has allowed, for the window they set.</kw-l>
+            </span>
+            @if (_guest is not null)
+            {
+                <span class="ms-1">
+                    <kw-l key="account.guest_window_end">Your guest access ends on</kw-l>
+                    <span class="ms-1 fw-semibold"><kw-dt dt="@_guest.ValidUntil" format="d"></kw-dt></span>
+                </span>
+            }
+            @* The kw-l text IS the link's accessible name (no aria-label — the
+               visible localised label is the label; a hardcoded English
+               aria-label would override it and break the no-hardcoded-English
+               convention). *@
+            <span class="ms-2">
+                <a href="/issues/new" class="alert-link"><kw-l key="account.guest_reach_admins">Message the admins</kw-l></a>
+            </span>
         </div>
     </div>
+}
+else if (User.Identity?.IsAuthenticated == true
+         && !KumunitaPrincipal.HasRole(User, "Member")
+         && !KumunitaPrincipal.HasRole(User, "Moderator")
+         && !KumunitaPrincipal.HasRole(User, "GlobalAdmin"))
+{
+    // WINDOW LAPSED (the Guest role is absent ⇒ the window has passed). A guest
+    // NEVER gets Member (C-M19·2), and a Member / Moderator / GlobalAdmin is
+    // never a guest, so the three role checks above are a cheap claim-only
+    // short-circuit that keeps the profile + GuestAccess reads OFF the common
+    // resident / admin / moderator path (the E18 concern: one neighborhood, one
+    // or two guests — the read must not run for a Member / Moderator /
+    // GlobalAdmin). Only a signed-in guest whose window has ended
+    // (Profile.IsGuest true AND now ≥ ValidUntil) reaches the friendly lapsed
+    // notice below; a roleless unverified resident reads the profile once and
+    // falls through (IsGuest false → no notice).
+    string? _lapsedSubject = KumunitaPrincipal.SubjectId(User);
+    var _lapsedProfile = _lapsedSubject is null ? null : await UserInfo.GetProfileAsync(_lapsedSubject);
+    var _lapsedGuest = (_lapsedProfile?.IsGuest == true && _lapsedSubject is not null)
+        ? await Identity.GetGuestAccessAsync(_lapsedSubject)
+        : null;
+    @if (_lapsedProfile?.IsGuest == true && _lapsedGuest is not null && DateTimeOffset.UtcNow >= _lapsedGuest.ValidUntil)
+    {
+        <div class="container-fluid">
+            <div class="kmb-notice alert alert-warning py-2" role="status" data-kmb-notice="guest-lapsed">
+                <span>
+                    <kw-l key="account.guest_window_expired">Your guest access has ended. If you need more time, or have a question, the admins can help.</kw-l>
+                </span>
+                <span class="ms-2">
+                    <a href="/issues/new" class="alert-link"><kw-l key="account.guest_reach_admins">Message the admins</kw-l></a>
+                </span>
+            </div>
+        </div>
+    }
 }
 @* M22 (ADR 0132, D5) — the onboarding affordance: the dismissible home/nav
    banner (the _OnboardingBanner partial). Rendered by the partial only

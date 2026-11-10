@@ -1,5 +1,8 @@
 {
   "account.guest_welcome": "You are signed in as a guest. Your access is limited to the surfaces the admin has allowed, for the window they set.",
+  "account.guest_window_end": "Your guest access ends on",
+  "account.guest_reach_admins": "Message the admins",
+  "account.guest_window_expired": "Your guest access has ended. If you need more time, or have a question, the admins can help.",
   "account.time_limit.login_message": "You are outside your allowed hours. Please check back later.",
   "account.confirm_password": "Confirm password",
   "account.flash_password_changed": "Your password was changed. Sign in again with the new password.",

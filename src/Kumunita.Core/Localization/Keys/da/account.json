@@ -1,5 +1,8 @@
 {
   "account.guest_welcome": "Du er logget ind som g\u00E6st. Din adgang er begr\u00E6nset til de flader, administratoren har tilladt, for det vindue de har sat.",
+  "account.guest_window_end": "Din g\u00E6stetilgang slutter den",
+  "account.guest_reach_admins": "Kontakt administratoren",
+  "account.guest_window_expired": "Din g\u00E6stetilgang er udl\u00F8bt. Hvis du har brug for mere tid, eller du har sp\u00F8rgsm\u00E5l, kan administratoren hj\u00E6lpe dig.",
   "account.time_limit.login_message": "Du er uden for dine tilladte timer. Tjek venligst ind senere.",
   "account.confirm_password": "Bekr\u00E6ft adgangskode",
   "account.flash_password_changed": "Din adgangskode er \u00E6ndret. Log ind igen med den nye adgangskode.",

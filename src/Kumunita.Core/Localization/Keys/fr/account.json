@@ -1,5 +1,8 @@
 {
   "account.guest_welcome": "Vous \u00EAtes connect\u00E9 en tant qu\u0027invit\u00E9. Votre acc\u00E8s est limit\u00E9 aux surfaces que l\u0027administrateur a autoris\u00E9es, pour la fen\u00EAtre qu\u0027il a d\u00E9finie.",
+  "account.guest_window_end": "Votre acc\u00E8s en tant qu\u0027invit\u00E9 se termine le",
+  "account.guest_reach_admins": "Contacter l\u0027administration",
+  "account.guest_window_expired": "Votre acc\u00E8s en tant qu\u0027invit\u00E9 a expir\u00E9. Si vous avez besoin de plus de temps ou si vous avez des questions, l\u0027administration peut vous aider.",
   "account.time_limit.login_message": "Tu es en dehors de tes heures autoris\u00E9es. Merci de revenir plus tard.",
   "account.confirm_password": "Confirmer le mot de passe",
   "account.flash_password_changed": "Votre mot de passe a \u00E9t\u00E9 modifi\u00E9. Reconnectez-vous avec le nouveau mot de passe.",

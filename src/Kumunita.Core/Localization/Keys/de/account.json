@@ -1,5 +1,8 @@
 {
   "account.guest_welcome": "Du bist als Gast angemeldet. Dein Zugriff ist auf die Bereiche beschr\u00E4nkt, die die Verwaltung erlaubt hat, f\u00FCr das von ihr gesetzte Zeitfenster.",
+  "account.guest_window_end": "Dein Gastzugriff endet am",
+  "account.guest_reach_admins": "Die Verwaltung kontaktieren",
+  "account.guest_window_expired": "Dein Gastzugriff ist abgelaufen. Wenn du mehr Zeit brauchst oder Fragen hast, kann dir die Verwaltung helfen.",
   "account.time_limit.login_message": "Du bist au\u00DFerhalb deiner erlaubten Zeiten. Bitte melde dich sp\u00E4ter erneut an.",
   "account.confirm_password": "Passwort best\u00E4tigen",
   "account.flash_password_changed": "Dein Passwort wurde ge\u00E4ndert. Melde dich mit dem neuen Passwort erneut an.",
