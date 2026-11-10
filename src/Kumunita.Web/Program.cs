@@ -1031,6 +1031,22 @@ builder.UseWolverine(opts =>
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Notifications.NotificationService>();
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Usage.IStorageMetricsService>();
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.UserInfo.IUserInfoService>();
+    // ADR 0301 (IMPROVE-UX R12) — the DeletionDueTick handler injects two
+    // Core services (IDeletionScheduler for ListDueAsync / MarkExecutedAsync
+    // and IIdentityService for the DeleteAccountAsync lane). Both are
+    // transient direct interface→impl registrations (DependencyInjection.cs),
+    // but IIdentityService's constructor depends on IUserInfoService and
+    // IMailerStage — both opaque lambda factories already opted in above.
+    // Under ServiceLocationPolicy.NotAllowed the generated handler code
+    // cannot inline-construct IIdentityService without those transitive
+    // opt-ins, and even IDeletionScheduler's simple constructor crosses the
+    // opaque-land boundary via its IDocumentStore → IUserInfoService dep.
+    // Opting both in — the M33 IStorageMetricsService opt-in precedent
+    // (added when that handler's signature gained the param; without the
+    // opt-in the first dispatch throws InvalidServiceLocationException …
+    // NotAllowed and the envelopes go to the error queue).
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Identity.IIdentityService>();
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Identity.IDeletionScheduler>();
 });
 
 var app = builder.Build();
@@ -1373,6 +1389,14 @@ await bus.PublishAsync(new Kumunita.Core.Privacy.RetentionTick());
 // T4 cross-check never runs — the F15 UsagePurgeTick/MediaLifecycleTick seed
 // precedent, re-using F12's IAlertSink seam + F17's SuppressedAddress list).
 await bus.PublishAsync(new MailAlarmsTick());
+// ADR 0301 (IMPROVE-UX R12) — the scheduled-account-deletion due-job (the
+// DeletionDueHandler self-reschedules hourly after each run; this seed is the
+// first-boot scheduling. Without this line the handler never fires and a
+// resident's scheduled deletion is never executed — the M13 UsagePurgeTick /
+// F15 MediaLifecycleTick seed precedent). A no-op when no DeletionRequest row
+// is past its DueAt, so a double-schedule across two consecutive boots is
+// harmless (the idempotent-sweep shape).
+await bus.PublishAsync(new Kumunita.Core.Identity.DeletionDueTick());
 // M20 (ADR 0121) — the deferred-notification email flush tick (the
 // NotificationFlushHandler self-reschedules at the resolved admin cadence
 // QuietCheckMinutes after each run; this seed is the first-boot scheduling).
