@@ -1272,6 +1272,211 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         Assert.Empty(rows);
     }
 
+    // ── R07 — the ReportResolved emission (the E4 "the notification repeats
+    //       the reporter's own reason" fix) ──────────────────────────────
+    //
+    // IMPROVE-UX R07 (the R03/R04/R05/R06 close-out unit): the
+    // <c>ResolveReportAsync</c> lane's <see cref="NotificationKinds.ReportResolved"/>
+    // emission now carries the **outcome** (a localized sentence from
+    // <see cref="Report.Outcome"/> + the moderator's
+    // <see cref="Report.ResolutionNote"/> verbatim) as its body — not the
+    // reporter's own <see cref="Report.Reason"/> — and a
+    // <c>linkPath</c> that lands on the reporter's row on "My reports"
+    // (<c>/reports/mine#r-{id}</c>, the R06 row anchor
+    // <c>id="r-{ReportId}"</c>). These tests wire the
+    // <see cref="INotificationEmitter"/> as an NSubstitute seam (the
+    // <c>C03_NotificationEmitterContractTests</c> shape) and assert the
+    // emission's kind / recipient / linkPath / targetId / body. The kind,
+    // recipient, and idempotency-key pins are unchanged (the F10 re-emit
+    // idempotency anchor); the body + linkPath / targetId are the R07 ADDs.
+
+    /// <summary>
+    /// Compose the <see cref="ModerationService"/> over the real M1/M2
+    /// seams (the <see cref="Services"/> shape) **plus** an NSubstitute
+    /// <see cref="INotificationEmitter"/> seam (the R07 unit under test) and
+    /// a real <see cref="ITranslationProvider"/>-shaped substitute that
+    /// resolves each key to its <see cref="KnownTranslationKeys.EnValues"/>
+    /// floor (the ADR 0005 en-floor the provider guarantees, so the asserted
+    /// body is the exact <c>reports.body_*</c> English sentence). The
+    /// reporter's <see cref="Profile"/> is planted (the
+    /// <see cref="PlantProfile"/> shape) so
+    /// <see cref="IUserInfoService.GetProfileAsync"/> resolves their
+    /// <c>EmailLanguage</c> (null here — the en floor).
+    /// </summary>
+    private static async Task<(IDocumentStore store, ModerationService svc,
+        INotificationEmitter emitter)> ServicesWithNotifications(IDocumentStore store, string reporterId)
+    {
+        // (a) The translation seam — the ADR 0005 en-floor the provider
+        //     guarantees: every key resolves to its KnownTranslationKeys
+        //     en value (the closed registry the seeder materializes).
+        var translator = Substitute.For<ITranslationProvider>();
+        translator.GetAsync(Arg.Any<string>(), Arg.Any<string?>())
+            .Returns(ci =>
+            {
+                var key = (string)ci[0]!;
+                return Task.FromResult(
+                    KnownTranslationKeys.EnValues.TryGetValue(key, out var en) ? en : key);
+            });
+
+        // (b) The real M1/M2 trio (the Services(store) shape) + the emitter
+        //     substitute the R07 emission fires onto.
+        var (userInfo, authz, _) = Services(store);
+        var emitter = Substitute.For<INotificationEmitter>();
+        var svc = new ModerationService(
+            new ProfileSettingsService(store), authz, store,
+            notifications: emitter, userInfo: userInfo, translationProvider: translator);
+
+        // (c) Plant the reporter's Profile so GetProfileAsync resolves their
+        //     EmailLanguage (null here — the en floor; the R07 body asserts
+        //     the exact en sentence, not a language-specific one).
+        await PlantProfile(store, reporterId, "r07-reporter@example.com");
+        return (store, svc, emitter);
+    }
+
+    private static async Task PlantReportResolvedFixture(
+        IDocumentStore store, string prefix, string reporterId)
+    {
+        const string globalAdmin = "u-r07-admin";
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = $"{prefix}-assign", UserId = globalAdmin, ComponentId = ComponentId,
+            GrantedBy = $"{prefix}-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = $"{prefix}-post", ComponentId = ComponentId, AuthorId = $"{prefix}-author",
+            Body = $"body {prefix}", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, $"{prefix}-member"),
+        });
+        await Plant(store, new Report
+        {
+            Id = $"{prefix}-report", PostId = $"{prefix}-post", ReporterId = reporterId,
+            ComponentId = ComponentId, Reason = $"r07-reason-{prefix} (the reporter's own words)",
+            Status = "filed", At = DateTimeOffset.UtcNow,
+            Outcome = null, ResolutionNote = null, ResolvedAt = null, ResolvedBy = null,
+        });
+    }
+
+    [Theory]
+    [InlineData(ReportOutcome.NoAction)]
+    [InlineData(ReportOutcome.Hidden)]
+    [InlineData(ReportOutcome.Removed)]
+    [InlineData(ReportOutcome.Other)]
+    public async Task R07_ResolveReport_EmitsOutcomeBody_AndLinkPathToMyReportsRow(ReportOutcome outcome)
+    {
+        const string reporter = "u-r07-reporter";
+        var suffix = outcome.ToString().ToLowerInvariant();  // noaction / hidden / removed / other
+        var prefix = $"r07-{suffix}";
+        var reportId = $"{prefix}-report";                   // e.g. r07-noaction-report
+
+        var store = await BootStoreAsync();
+        var (_, svc, emitter) = await ServicesWithNotifications(store, reporter);
+
+        await PlantReportResolvedFixture(store, prefix, reporter);
+        const string globalAdmin = "u-r07-admin";
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(reportId, globalAdmin, session, outcome: outcome));
+
+        // (a) kind + recipient unchanged from the M6 F7 emission.
+        // (b) linkPath exactly /reports/mine#r-{reportId}; targetId == reportId.
+        // (c) body is the outcome sentence (reports.body_{suffix}) — NOT the
+        //     reporter's own reason (the E4 finding). No note → no suffix.
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: reporter,
+            kind: NotificationKinds.ReportResolved,
+            idempotencyKey: $"notification:report.resolved:{reportId}:filed",
+            body: Arg.Any<string?>(),
+            targetId: reportId,
+            linkPath: $"/reports/mine#r-{reportId}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        var call = emitter.ReceivedCalls()
+            .First(c => c.GetMethodInfo().Name == nameof(INotificationEmitter.EmitAsync));
+        var body = (string)call.GetArguments()[4]!;
+        Assert.Equal(
+            KnownTranslationKeys.EnValues[$"reports.body_{suffix}"],
+            body);
+        Assert.DoesNotContain("r07-reason", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task R07_ResolveReport_WithNote_BodyCarriesNoteVerbatim()
+    {
+        var store = await BootStoreAsync();
+        const string reporter = "u-r07-note-reporter";
+        var (_, svc, emitter) = await ServicesWithNotifications(store, reporter);
+
+        await PlantReportResolvedFixture(store, "r07-note", reporter);
+        const string globalAdmin = "u-r07-admin";
+        const string reportId = "r07-note-report";
+        const string note = "Moderator free-text note — verbatim, never translated (Umlaut ä, French é, Danish å).";
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(reportId, globalAdmin, session,
+                outcome: ReportOutcome.Other, resolutionNote: note));
+
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: reporter,
+            kind: NotificationKinds.ReportResolved,
+            idempotencyKey: Arg.Any<string>(),
+            body: Arg.Any<string?>(),
+            targetId: reportId,
+            linkPath: $"/reports/mine#r-{reportId}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        var call = emitter.ReceivedCalls()
+            .First(c => c.GetMethodInfo().Name == nameof(INotificationEmitter.EmitAsync));
+        var body = (string)call.GetArguments()[4]!;
+        // The outcome sentence + a space + the verbatim note (never translated).
+        Assert.StartsWith(KnownTranslationKeys.EnValues["reports.body_other"], body);
+        Assert.EndsWith(note, body);
+        Assert.Contains(note, body);
+    }
+
+    [Fact]
+    public async Task R07_ResolveReport_NoOutcome_BodyIsPlainResolvedSentence()
+    {
+        var store = await BootStoreAsync();
+        const string reporter = "u-r07-noout-reporter";
+        var (_, svc, emitter) = await ServicesWithNotifications(store, reporter);
+
+        await PlantReportResolvedFixture(store, "r07-noout", reporter);
+        const string globalAdmin = "u-r07-admin";
+        const string reportId = "r07-noout-report";
+
+        // The pre-R03 shape: no outcome, no note (the "resolved with no
+        // outcome recorded" state R05 reads) → the plain "resolved" sentence.
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(reportId, globalAdmin, session));
+
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: reporter,
+            kind: NotificationKinds.ReportResolved,
+            idempotencyKey: Arg.Any<string>(),
+            body: Arg.Any<string?>(),
+            targetId: reportId,
+            linkPath: $"/reports/mine#r-{reportId}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        var call = emitter.ReceivedCalls()
+            .First(c => c.GetMethodInfo().Name == nameof(INotificationEmitter.EmitAsync));
+        var body = (string)call.GetArguments()[4]!;
+        Assert.Equal(KnownTranslationKeys.EnValues["reports.body_resolved"], body);
+        Assert.DoesNotContain("r07-reason", body);   // the E4 pin: not the reporter's own reason
+    }
+
     // ── Shared helpers (mirror the PostServiceTests shape) ──────────────
 
     private async Task<IDocumentStore> BootStoreAsync()

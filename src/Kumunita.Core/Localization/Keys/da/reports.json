@@ -22,5 +22,10 @@
   "reports.outcome_removed": "Fjernet",
   "reports.outcome_other": "Andet",
   "reports.no_outcome": "Intet resultat registreret endnu",
-  "reports.target_unavailable": "(ikke længere tilgængelig)"
+  "reports.target_unavailable": "(ikke længere tilgængelig)",
+  "reports.body_resolved": "Din anmeldelse er løst.",
+  "reports.body_noaction": "Din anmeldelse er gennemgået, og der er ikke foretaget nogen handling.",
+  "reports.body_hidden": "Din anmeldelse er løst, og indholdet er skjult.",
+  "reports.body_removed": "Din anmeldelse er løst, og indholdet er fjernet.",
+  "reports.body_other": "Din anmeldelse er løst."
 }

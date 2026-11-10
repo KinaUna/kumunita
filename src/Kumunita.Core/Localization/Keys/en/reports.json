@@ -22,5 +22,10 @@
   "reports.outcome_removed": "Removed",
   "reports.outcome_other": "Other",
   "reports.no_outcome": "No outcome recorded yet",
-  "reports.target_unavailable": "(no longer available)"
+  "reports.target_unavailable": "(no longer available)",
+  "reports.body_resolved": "Your report has been resolved.",
+  "reports.body_noaction": "Your report was reviewed, and no action was taken.",
+  "reports.body_hidden": "Your report was resolved, and the content was hidden.",
+  "reports.body_removed": "Your report was resolved, and the content was removed.",
+  "reports.body_other": "Your report was resolved."
 }

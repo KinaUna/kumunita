@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -74,13 +75,22 @@ public partial class ModerationService : IModerationService
     // a post's visibility, so they are unaffected).
     private readonly Posts.PostService? _posts;
 
+    // IMPROVE-UX R07 — the translation seam (the ReportResolved body's
+    // localized outcome sentence; ADR 0005 the en-floor provider). Optional
+    // so the existing positional test-construction call sites keep compiling
+    // (CS1736, the _userInfo / _posts precedent); production wiring passes
+    // the DI-registered instance. When null (a test harness that omits it)
+    // the body degrades to the plain outcome word — never throws.
+    private readonly ITranslationProvider? _translationProvider;
+
     public ModerationService(
         IProfileSettingsService profileSettings,
         IAuthorizationService authz,
         IDocumentStore store,
         INotificationEmitter? notifications = null,
         IUserInfoService? userInfo = null,
-        Posts.PostService? posts = null)
+        Posts.PostService? posts = null,
+        ITranslationProvider? translationProvider = null)
     {
         _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _authz    = authz    ?? throw new ArgumentNullException(nameof(authz));
@@ -88,6 +98,7 @@ public partial class ModerationService : IModerationService
         _notifications = notifications;
         _userInfo = userInfo;
         _posts = posts;
+        _translationProvider = translationProvider;
     }
 
     private IUserInfoService UserInfo =>
@@ -132,6 +143,73 @@ public partial class ModerationService : IModerationService
                 $"The resolution note is {trimmed.Length} chars; the R03 cap is 500.",
                 nameof(note));
         return trimmed;
+    }
+
+    /// <summary>
+    /// IMPROVE-UX R07 — build the <c>ReportResolved</c> notification body
+    /// (the "the report-resolved notification is the reporter's own reason"
+    /// E4 fix): a localized outcome sentence (the <see cref="ReportOutcome"/>
+    /// closed four — the four <c>reports.body.*</c> keys; the pre-R03
+    /// <c>Outcome == null</c> shape falls back to the plain "resolved"
+    /// sentence, the <c>reports.body.resolved</c> key), with the
+    /// moderator's <see cref="Report.ResolutionNote"/> appended verbatim
+    /// when present (the free-text note is **never** translated).
+    /// Localizes to the *reporter's* <c>Profile.EmailLanguage</c> (the
+    /// <see cref="IUserInfoService"/> read seam; the
+    /// <c>EventReminderService.BuildLocalizedReminder</c> precedent).
+    /// Degrades gracefully: no <c>ITranslationProvider</c> or no
+    /// <c>IUserInfoService</c> → plain outcome word (or "Resolved"), never throws.
+    /// </summary>
+    private async Task<string> BuildReportResolvedBodyAsync(Report report)
+    {
+        // The closed-four outcome key (the R03 D1 vocabulary — the four
+        // `ReportOutcome` values each map to exactly one reports.body.*
+        // key); the pre-R03 null shape maps to reports.body.resolved.
+        var outcomeKey = report.Outcome switch
+        {
+            ReportOutcome.NoAction  => "reports.body_noaction",
+            ReportOutcome.Hidden    => "reports.body_hidden",
+            ReportOutcome.Removed   => "reports.body_removed",
+            ReportOutcome.Other     => "reports.body_other",
+            _                       => "reports.body_resolved"
+        };
+
+        string outcomeWord;
+        if (_translationProvider is null)
+        {
+            // No provider wired (a test harness that omits the seam):
+            // the plain English fallback — the outcome word the R06
+            // `reports.outcome_*` labels already carry (the en floor).
+            outcomeWord = KnownTranslationKeys.EnValues.TryGetValue(outcomeKey, out var en)
+                ? en
+                : (report.Outcome?.ToString() ?? "Resolved");
+        }
+        else
+        {
+            string? lang = null;
+            if (_userInfo is not null && !string.IsNullOrWhiteSpace(report.ReporterId))
+            {
+                try
+                {
+                    var profile = await _userInfo.GetProfileAsync(report.ReporterId).ConfigureAwait(false);
+                    lang = profile?.EmailLanguage;
+                }
+                catch
+                {
+                    // The read seam is best-effort here — the emission
+                    // itself must never be blocked by a profile lookup
+                    // failure (the reporter still gets the row).
+                }
+            }
+            outcomeWord = await _translationProvider.GetAsync(outcomeKey, lang).ConfigureAwait(false);
+        }
+
+        // The moderator's free-text note: appended verbatim (never
+        // translated), on a second sentence when present.
+        var note = report.ResolutionNote;
+        return string.IsNullOrWhiteSpace(note)
+            ? outcomeWord
+            : outcomeWord + " " + note;
     }
 
     /// <summary>

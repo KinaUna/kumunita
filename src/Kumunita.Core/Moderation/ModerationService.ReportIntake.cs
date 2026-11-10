@@ -759,12 +759,21 @@ public partial class ModerationService
             // the single SaveChangesAsync below (C3).
             if (_notifications is not null && !string.IsNullOrWhiteSpace(report.ReporterId))
             {
+                // IMPROVE-UX R07 — the body is the **outcome** (a localized
+                // sentence from report.Outcome + the moderator's note verbatim),
+                // not the reporter's own reason (the E4 "the notification
+                // repeats the reporter's own reason" finding this unit fixes);
+                // the linkPath lands on the reporter's row on "My reports"
+                // (the R06 row anchor id="r-{ReportId}").
+                var body = await BuildReportResolvedBodyAsync(report).ConfigureAwait(false);
                 await _notifications.EmitAsync(
                     session,
                     recipientId: report.ReporterId,
                     kind: NotificationKinds.ReportResolved,
                     idempotencyKey: $"notification:report.resolved:{report.Id}:filed",
-                    body: Truncate(report.Reason),
+                    body: body,
+                    targetId: report.Id,
+                    linkPath: $"/reports/mine#r-{report.Id}",
                     ct: default).ConfigureAwait(false);
             }
         }

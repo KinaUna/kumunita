@@ -22,5 +22,10 @@
   "reports.outcome_removed": "Supprimé",
   "reports.outcome_other": "Autre",
   "reports.no_outcome": "Aucun résultat consigné",
-  "reports.target_unavailable": "(non disponible)"
+  "reports.target_unavailable": "(non disponible)",
+  "reports.body_resolved": "Votre signalement a été résolu.",
+  "reports.body_noaction": "Votre signalement a été examiné, et aucune action n'a été menée.",
+  "reports.body_hidden": "Votre signalement a été résolu, et le contenu a été masqué.",
+  "reports.body_removed": "Votre signalement a été résolu, et le contenu a été supprimé.",
+  "reports.body_other": "Votre signalement a été résolu."
 }

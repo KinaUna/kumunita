@@ -22,5 +22,10 @@
   "reports.outcome_removed": "Entfernt",
   "reports.outcome_other": "Sonstiges",
   "reports.no_outcome": "Noch kein Ergebnis festgehalten",
-  "reports.target_unavailable": "(nicht mehr verfügbar)"
+  "reports.target_unavailable": "(nicht mehr verfügbar)",
+  "reports.body_resolved": "Deine Meldung wurde erledigt.",
+  "reports.body_noaction": "Deine Meldung wurde geprüft, und es wurde keine Handlung eingeleitet.",
+  "reports.body_hidden": "Deine Meldung wurde erledigt, und der Inhalt wurde ausgeblendet.",
+  "reports.body_removed": "Deine Meldung wurde erledigt, und der Inhalt wurde entfernt.",
+  "reports.body_other": "Deine Meldung wurde erledigt."
 }
