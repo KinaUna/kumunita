@@ -699,6 +699,16 @@ builder.Services.AddRateLimiter(opts =>
     // of stale sessions is fine; an automated revocation loop is not). The
     // same fixed-window-per-IP shape as the F8 upload policy above.
     AddWindow(opts, "sessions", limit: 10, window: TimeSpan.FromMinutes(15));
+
+    // ADR 0302 (IMPROVE-UX R16) — the shared kiosk link's token-presenting
+    // surface (GET /kiosk?link=<token> + its /kiosk/slide refresh): a leaked
+    // or brute-forced token is throttled per resolved client IP. The token is
+    // 256-bit (ADR 0302 D2) so online brute-force is infeasible — this bounds
+    // the flood on the validate path (the "rate-limited" line of the R16
+    // card). Attached to KioskController.Index/Slide via
+    // [EnableRateLimiting("kiosk-link")]; the tokenless personal-kiosk path
+    // also passes through but at this ceiling is harmless.
+    AddWindow(opts, "kiosk-link", limit: 30, window: TimeSpan.FromMinutes(15));
 });
 
 // ASP.NET Core Identity automatically wires a SecurityStampValidator into the
@@ -1164,6 +1174,22 @@ app.UseRouting();
 app.UseRateLimiter();
 
 app.UseAuthentication();
+
+// ADR 0302 (IMPROVE-UX R16) — the shared kiosk link's authentication seam:
+// on /kiosk + /kiosk/slide, a presented ?link=<token> (R18's carrier) is
+// validated through the Core IKioskLinkService (the hash-at-rest seam) and,
+// on a hit, a restricted owner principal is minted (Kumunita.Sub = owner,
+// kiosk-link role, read-only — the ClaimShaping admissible set, no new claim
+// type). On any other path the token is inert (the surface's own gate denies
+// it). Registered immediately after UseAuthentication and BEFORE
+// BlockedAccountMiddleware — the principal is a signed-in owner, so the
+// downstream block / time-limit gates apply to the minted owner (a blocked
+// owner's link stops working) while the session / stamp revocation gates pass
+// through on the token principal's absence of a kumunita.stamp / kumunita.sid
+// cookie item (their backward-compat shape). The rate-limit gate
+// ([EnableRateLimiting("kiosk-link")] on KioskController.Index/Slide) runs
+// before this (UseRateLimiter, above UseAuthentication).
+app.UseMiddleware<KioskLinkMiddleware>();
 
 app.UseMiddleware<BlockedAccountMiddleware>();
 

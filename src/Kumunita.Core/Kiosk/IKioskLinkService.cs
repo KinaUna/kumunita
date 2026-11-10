@@ -95,4 +95,43 @@ public interface IKioskLinkService
     /// <param name="ct">Cancellation.</param>
     Task<KioskLink?> ValidateAsync(
         string tokenHash, string ownerSubjectId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Validates a <b>presented raw token</b> for the wall-screen flow (ADR
+    /// 0302 D3, IMPROVE-UX R16) — the R16 middleware's only entry point.
+    /// <para>
+    /// **Trap A (hash in one place):** the Web host cannot hash the presented
+    /// token — <see cref="Kumunita.Core.Identity.IdentityService.Sha256Hex"/>
+    /// is <c>internal</c> to the Core assembly (no <c>InternalsVisibleTo</c> to
+    /// the Web host), and re-implementing the digest in the Web layer is a
+    /// divergence risk that breaks the "the hash is one fact" invariant the
+    /// <see cref="Kumunita.Core.ErrorReports.EscalationTokenService"/> keeps.
+    /// This overload hashes the raw token with that one existing hasher and
+    /// delegates to the hash-based <see cref="ValidateAsync"/>, so the digest
+    /// lives in exactly one place (this assembly).
+    /// </para>
+    /// <para>
+    /// **Owner-less by design (the <see cref="Kumunita.Core.ErrorReports
+    /// .EscalationTokenService.ValidateAsync(string, CancellationToken)"/>
+    /// precedent this ADR names as its template):** the wall screen has no
+    /// owner session — the owner is a *property of the link*, discovered by the
+    /// lookup, not a caller input. So this overload takes **only** the
+    /// presented token and returns the <see cref="KioskLink"/> row (which
+    /// carries <see cref="KioskLink.OwnerSubjectId"/> — the principal the R16
+    /// middleware mints) when the token matches a non-revoked row, else
+    /// <b><c>null</c></b>. A blank token is refused (the
+    /// <see cref="ValidateAsync"/> guard). No audit row is written (the M35·5
+    /// "the read is not an access decision" floor — the owner-scope read
+    /// decision is the R16 middleware's job, and every read the link
+    /// authenticates is audited by the item's own read lane under the owner).
+    /// </para>
+    /// </summary>
+    /// <param name="presentedToken">The raw token as presented by the viewer
+    /// (the R16 <c>?link=</c> query param) — hashed here, never compared raw.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The matching non-revoked <see cref="KioskLink"/> row, or
+    /// <c>null</c> (absent / revoked / blank — the caller renders the denied
+    /// shape).</returns>
+    Task<KioskLink?> ValidatePresentedAsync(
+        string presentedToken, CancellationToken ct = default);
 }

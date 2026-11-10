@@ -9,6 +9,7 @@ using Kumunita.Web.Security;
 using Kumunita.Web.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Kumunita.Web.Controllers;
 
@@ -97,6 +98,12 @@ public sealed class KioskController : Controller
     /// amendment), classified slide by slide; an empty or missing playlist
     /// renders the <c>kiosk.empty</c> message (M35-8).
     /// </summary>
+    // ADR 0302 (IMPROVE-UX R16) — the token-presenting surface (the
+    // ?link=<token> wall-screen URL) is throttled per client IP (the
+    // "kiosk-link" fixed window, Program.cs); a leaked / brute-forced token is
+    // bounded. The personal-kiosk path (signed in, no token) also passes
+    // through but at this ceiling is harmless.
+    [EnableRateLimiting("kiosk-link")]
     [HttpGet("/kiosk")]
     public async Task<IActionResult> Index(CancellationToken ct)
     {

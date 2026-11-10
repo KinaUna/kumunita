@@ -129,6 +129,52 @@ public sealed class KioskLinkService(IDocumentStore store) : IKioskLinkService
         return match;
     }
 
+    /// <inheritdoc />
+    public async Task<KioskLink?> ValidatePresentedAsync(
+        string presentedToken, CancellationToken ct = default)
+    {
+        // A blank presented token cannot match any stored hash (the ESC·5
+        // guard — and it keeps the blank case from opening a session).
+        if (string.IsNullOrWhiteSpace(presentedToken))
+        {
+            return null;
+        }
+
+        // Trap A — the hash lives in ONE place: the shared internal hasher
+        // (the IdentityService.Sha256Hex implementation — the sibling in
+        // EscalationTokenService hashes identically, pinned by the R15
+        // "the presented-token overload and the hash-based seam agree" test).
+        // The Web host cannot call it (internal, no InternalsVisibleTo), so
+        // the hashing is in this assembly; the presented token never enters a
+        // .Where(...) expression (the FindTokenAsync precomputed-constant
+        // pattern).
+        var tokenHash = Kumunita.Core.Identity.IdentityService.Sha256Hex(presentedToken);
+
+        // Owner-less by design (the EscalationTokenService.ValidateAsync(
+        // plaintext) precedent this ADR names as its template): the wall
+        // screen has no owner session — the owner is a property of the link,
+        // discovered by this lookup, not a caller input. So the lookup is on
+        // the hash alone (a 256-bit token is the owner-scope stand-in),
+        // restricted to non-revoked rows.
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var match = await session.Query<KioskLink>()
+            .Where(l => l.TokenHash == tokenHash && l.RevokedAt == null)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (match is null)
+        {
+            return null; // absent or revoked — no audit row (the ESC·5 floor)
+        }
+
+        // Stamp LastUsedAt on use (the ESC·9 read-then-write, no audit row —
+        // the M35·5 "the read is not an access decision" floor). The owner —
+        // match.OwnerSubjectId — is what the R16 middleware mints the
+        // restricted principal from (ADR 0302 D4: every read the link
+        // authenticates is audited under the owner).
+        match.LastUsedAt = DateTimeOffset.UtcNow;
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return match;
+    }
+
     // ── private helpers ────────────────────────────────────────────────────
 
     /// <summary>The one <c>AccessAudit</c> row shape the kiosk-link lane

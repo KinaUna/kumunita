@@ -105,10 +105,26 @@ digest is the only form a token is kept in at rest).
     revoked + the owner matches, else `null` (the caller renders the denied
     shape). Stamps `LastUsedAt` on a match (read-then-write, **no** audit
     row — the M35·5 / 0159 "the read is not an access decision" floor).
-    The **hash** (not the raw token) is the lookup key: the caller hashes
-    the presented token first (the `IdentityService.FindTokenAsync`
-    precomputed-constant pattern — the hash is a local constant, never
-    inside a `.Where(...)` expression).
+    The **hash** (not the raw token) is the lookup key (the
+    `IdentityService.FindTokenAsync` precomputed-constant pattern — the hash
+    is a local constant, never inside a `.Where(...)` expression).
+  - `ValidatePresentedAsync(presentedToken)` → the R16 seam: hashes the
+    presented token **inside Core** with the one shared
+    `IdentityService.Sha256Hex` digest and looks up the matching non-revoked
+    row, owner-less. **Trap A:** the Web host *cannot* hash the presented
+    token — `IdentityService.Sha256Hex` is `internal` to the Core assembly
+    (no `InternalsVisibleTo` to the Web host), and re-implementing the digest
+    in the Web layer would break the "the hash is one fact" invariant the
+    `EscalationTokenService` keeps; so the hashing lives in Core and the
+    Web middleware hands the raw token to this overload. **Owner-less by
+    design** (the `EscalationTokenService.ValidateAsync(plaintext)` precedent
+    this ADR names as its template): the wall screen has no owner session —
+    the owner is a *property of the link*, discovered by the lookup, not a
+    caller input — so the overload returns the `KioskLink` row (which carries
+    `OwnerSubjectId`, the principal the R16 middleware mints). Stamps
+    `LastUsedAt` on a match (no audit row); a blank / unknown / revoked token
+    is `null`. The R16 `KioskLinkMiddlewareTests` pin that the two paths
+    agree on the same token (the `KioskLinkServiceTests` R16 overload test).
 - **D4 — Invariants (what the R16–R18 units build against).** The link is
   **revocable** (revoke takes effect on the next validate), **read-only**
   (the link never confers a write standing — R16's restricted principal
@@ -124,18 +140,39 @@ digest is the only form a token is kept in at rest).
 - **D5 — What is NOT changed.** The **personal kiosk** (0164/0285 — signed
   in, the owner's full visibility, the existing per-entry options) is
   untouched (the plan's D4 "two modes"). The `KioskPlaylist` doc, the
-  `IKioskService` seam, the `KioskEntry` value object, the
-  `KioskController` surface and the `KioskItemCatalog` are all unchanged by
-  this ADR — R15 is the **Core seam + ADR only**; R16 (auth on `/kiosk` +
-  `/kiosk/slide`), R17 (the community-visible filter), R18 (the
-  `/settings/kiosk` surface) and R19 (the SEC review) are separate later
-  units.
+  `IKioskService` seam, the `KioskEntry` value object and the
+  `KioskItemCatalog` are all unchanged by this ADR — R15 is the **Core seam
+  + ADR only**; R16 (auth on `/kiosk` + `/kiosk/slide`), R17 (the
+  community-visible filter), R18 (the `/settings/kiosk` surface) and R19
+  (the SEC review) are separate later units. R16's only touch to the
+  `KioskController` surface is a `[EnableRateLimiting("kiosk-link")]`
+  attribute on `Index`/`Slide` (the "rate-limited" line of the R16 card) —
+  the actions' read/authorize behaviour is unchanged.
 - **D6 — Open questions (the R19 SEC review settles).** `// TODO ❓`
   (a) the token length (D2 proposes 256 bits); (b) an **expiry** (this ADR
   ships none — a link lives until revoked; whether a long-lived shared
   credential needs a max age is a SEC call); (c) the **max links per
   playlist** (this ADR ships no ceiling — the R18 surface can list and
   revoke them). Recorded here as held, not decided.
+- **D7 — R16's auth surface (the R16 SEC review settles — R19 reviewed
+  R15–R18, not R16's auth).** R16 lands the `KioskLinkMiddleware` (Web):
+  on `/kiosk` + `/kiosk/slide`, a presented `?link=<token>` (R18's carrier)
+  is validated through `ValidatePresentedAsync` and, on a hit, a restricted
+  owner principal is minted — `Kumunita.Sub` = the owner, `Kumunita.Verified`
+  = `false`, the single role value `Roles.KioskLink` (a role **value**, not a
+  claim **type** — the `ClaimShapingInvariantBTests` pin stays green), and
+  no `Member`/`Moderator`/`GlobalAdmin` (read-only). On any other path the
+  token is inert (the surface's own gate denies it). The principal is signed
+  in as the host cookie (`kumunita.auth`, the scheme real residents are minted
+  on) because `kiosk.ts`'s slide-refresh loop re-fetches `/kiosk/slide` on a
+  cookie-carrying, token-less fetch. `// TODO ❓` (for the R16 SEC review)
+  (i) an already-minted cookie is **not invalidated** by
+  `RevokeAsync(linkId)` — it lapses at the 14-day cookie span or on sign-out
+  / browser clear (the standing is read-only, so the blast radius is bounded;
+  a short cookie span or a per-request re-validate is a SEC call); (ii) the
+  token in the URL also lands in access logs (the residual note — the site's
+  `Referrer-Policy: no-referrer` already suppresses the `Referer` leak).
+  Both recorded here as held, not decided.
 
 ## Consequences
 

@@ -262,6 +262,58 @@ public sealed class KioskLinkServiceTests(PostgresFixture fixture) : IClassFixtu
         await store.DisposeAsync();
     }
 
+    // ── R16 — the presented-token overload and the hash-based seam agree ──
+    // Trap A: the hashing lives in ONE place (IdentityService.Sha256Hex,
+    // internal to Core). The R16 middleware hashes the presented token via
+    // ValidatePresentedAsync and must agree with a hash-based ValidateAsync
+    // lookup on the SAME token — a drift between the two would be a
+    // divergence risk the "the hash is one fact" invariant forbids (the
+    // EscalationTokenService precedent this ADR names as its template).
+
+    [Fact]
+    public async Task ADR0302_R16_PresentedOverload_AgreesWithHashBasedValidate()
+    {
+        var store = await BootStoreAsync();
+        var svc = new KioskLinkService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(Owner, Owner, ct);
+        var hash = TestSha256Hex(token);   // the test-local mirror of Sha256Hex
+
+        // The presented-token overload (owner-less — the wall-screen flow)
+        // returns the SAME row the hash-based seam returns for the OWNING
+        // scope (the two paths must not diverge — the one-fact invariant).
+        var presented = await svc.ValidatePresentedAsync(token, ct);
+        Assert.NotNull(presented);
+        Assert.Equal(row.Id, presented!.Id);
+        Assert.Equal(Owner, presented.OwnerSubjectId);
+        Assert.Equal(row.Id, (await svc.ValidateAsync(hash, Owner, ct))!.Id);
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ADR0302_R16_PresentedOverload_RefusesBlankRevokedAndUnknown()
+    {
+        var store = await BootStoreAsync();
+        var svc = new KioskLinkService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Blank / empty presented tokens refuse (the ESC·5 guard — no session,
+        // no store hit).
+        Assert.Null(await svc.ValidatePresentedAsync(string.Empty, ct));
+        Assert.Null(await svc.ValidatePresentedAsync("   ", ct));
+
+        // Unknown token refuses (no matching row).
+        Assert.Null(await svc.ValidatePresentedAsync("never-created-token", ct));
+
+        // Revoked token refuses (the revoked case, owner-less).
+        var (token, row) = await svc.CreateAsync(Owner, Owner, ct);
+        Assert.NotNull(await svc.ValidatePresentedAsync(token, ct));   // valid while live
+        Assert.True(await svc.RevokeAsync(row.Id, Owner, ct));
+        Assert.Null(await svc.ValidatePresentedAsync(token, ct));      // refused after revoke
+        await store.DisposeAsync();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh <c>mt</c> schema in a new scratch database — the
