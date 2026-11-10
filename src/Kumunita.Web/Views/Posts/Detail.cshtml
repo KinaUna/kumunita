@@ -112,7 +112,13 @@
                         </div>
                     }
                 }
-                @if (Model.Post.DeletedAt is null)
+                @* A01 (IMPROVE-UX, the E1/E2 leak fix) — the detail lane
+                   renders the full body only while the post is live
+                   (not soft-deleted, not moderator-hidden/removed). A
+                   soft-deleted or hidden post reaches the <c>else</c>
+                   branch below, which renders the author-facing
+                   placeholder (the ADR 0024 / A01 placeholder shape). *@
+                @if (Model.Post.DeletedAt is null && Model.Post.Status == Kumunita.Core.Posts.PostStatus.Active)
                 {
                     @* TD (ADR 0027) — every language variant is rendered
                        server-side; the chip row is the selector. The post's toggle
@@ -362,7 +368,7 @@
                         </div>
                     </div>
                 }
-                else
+                else if (Model.Post.DeletedAt is not null)
                 {
                     @* ADR 0024 — the post is soft-deleted: the record is kept
                        (replies below remain visible), but the body is
@@ -371,6 +377,28 @@
                     <div class="mb-3">
                         <div class="alert alert-secondary mb-2" role="alert">
                             <kw-l key="posts.deleted_placeholder">This post has been deleted by its author.</kw-l>
+                        </div>
+                        <span class="text-muted small">
+                            @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
+                        </span>
+                    </div>
+                }
+                else
+                {
+                    @* A01 (IMPROVE-UX, the E1/E2 leak fix) — the post is
+                       moderator-hidden or removed (PostStatus.Hidden /
+                       .Removed): the body is replaced by the "hidden by a
+                       moderator" placeholder. Only the author (who sees a
+                       placeholder, the ADR 0024 author-sees-its-own-deleted
+                       precedent) or a moderator (the report lane's hide/
+                       remove/unhide lever) can reach the detail view of a
+                       hidden post — any other reader got the fail-closed
+                       403 / status page (the "403 on denied, 404 leaks which
+                       ids are real" pin). No chip row / swap on a hidden
+                       post (the TD7 "no swap on a non-live post" shape). *@
+                    <div class="mb-3">
+                        <div class="alert alert-secondary mb-2" role="alert">
+                            <kw-l key="posts.moderator_hidden_placeholder">This post has been hidden by a moderator.</kw-l>
                         </div>
                         <span class="text-muted small">
                             @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>

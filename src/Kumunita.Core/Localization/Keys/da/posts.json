@@ -74,6 +74,7 @@
   "posts.delete": "Slet",
   "posts.reply_delete": "Slet",
   "posts.deleted_placeholder": "Dette indl\u00E6g er slettet af forfatteren.",
+  "posts.moderator_hidden_placeholder": "Dette indl\u00E6g er blevet skjult af en moderator.",
   "posts.reply_deleted_placeholder": "Dette svar er slettet af forfatteren.",
   "posts.translations_label": "Overs\u00E6ttelser",
   "posts.translations_none": "ingen endnu",

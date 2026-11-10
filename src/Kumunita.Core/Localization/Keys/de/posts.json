@@ -74,6 +74,7 @@
   "posts.delete": "L\u00F6schen",
   "posts.reply_delete": "L\u00F6schen",
   "posts.deleted_placeholder": "Dieser Beitrag wurde von dessen Autor:in gel\u00F6scht.",
+  "posts.moderator_hidden_placeholder": "Dieser Beitrag wurde von einer Moderationsperson ausgeblendet.",
   "posts.reply_deleted_placeholder": "Diese Antwort wurde von dessen Autor:in gel\u00F6scht.",
   "posts.translations_label": "\u00DCbersetzungen",
   "posts.translations_none": "noch keine",

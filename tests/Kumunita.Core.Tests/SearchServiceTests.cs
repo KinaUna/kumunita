@@ -1013,6 +1013,94 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
         Assert.Empty(await SearchAudit(store, "search:projects"));
     }
 
+    // ── A01 (IMPROVE-UX, the E1/E2 leak fix) — the search reads honour PostStatus ──
+    //
+    // A Hidden/Removed post is never a search hit — the candidate filter
+    // (Status == PostStatus.Active, the same single conjunct the feeds use)
+    // is in the query, so the match is applied over only the Active
+    // candidates. This is the search-lane half of the A01 "reads honour
+    // PostStatus" rule (the feeds + detail lanes are the other halves).
+
+    // ── A01·S1 — Search_Posts_ExcludesHiddenAndRemovedPosts ────────────────
+    //
+    // A Hidden post and a Removed post are absent from the community search
+    // hit set; the Active one is present. The actor is the author of all
+    // three (owner branch — the only lane that lets an actor see a post,
+    // invariant C1), so the audience is not the differentiator — the
+    // Status filter is.
+
+    [Fact]
+    public async Task A01_Search_Posts_ExcludesHiddenAndRemovedPosts()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-a01-search-actor";
+
+        await Plant(store, new Post
+        {
+            Id = "a01s-live", ComponentId = ComponentId, AuthorId = actor,
+            Title = "live picnic post", Body = "x", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(), Status = PostStatus.Active,
+        });
+        await Plant(store, new Post
+        {
+            Id = "a01s-hidden", ComponentId = ComponentId, AuthorId = actor,
+            Title = "hidden picnic post", Body = "x", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(), Status = PostStatus.Hidden,
+        });
+        await Plant(store, new Post
+        {
+            Id = "a01s-removed", ComponentId = ComponentId, AuthorId = actor,
+            Title = "removed picnic post", Body = "x", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(), Status = PostStatus.Removed,
+        });
+
+        var result = await svc.SearchAsync("picnic", SearchScope.Community, actor, TestContext.Current.CancellationToken);
+        var posts = result.Sections["posts"];
+
+        Assert.Contains("a01s-live", posts.Select(h => h.Id));
+        Assert.DoesNotContain("a01s-hidden", posts.Select(h => h.Id));
+        Assert.DoesNotContain("a01s-removed", posts.Select(h => h.Id));
+    }
+
+    // ── A01·S2 — Search_GroupScope_ExcludesHiddenGroupPosts ────────────────
+    //
+    // A Hidden group post is absent from the group-scope search hit set; the
+    // Active one is present. The actor is a member of the group (the
+    // group-lane membership decision lets them through — the Status filter
+    // is the differentiator, not membership). The group lane's search
+    // candidate query carries the same Status == PostStatus.Active conjunct.
+
+    [Fact]
+    public async Task A01_Search_GroupScope_ExcludesHiddenGroupPosts()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-a01-sg-actor";
+
+        await PlantMembership(store, GroupId, actor);
+        await Plant(store, new Post
+        {
+            Id = "a01sg-live", ComponentId = ComponentId, AuthorId = "u-a01-sg-author",
+            GroupId = GroupId, Title = "live group picnic", Body = "x",
+            Created = DateTimeOffset.UtcNow, Audience = new Audience(),
+            Status = PostStatus.Active,
+        });
+        await Plant(store, new Post
+        {
+            Id = "a01sg-hidden", ComponentId = ComponentId, AuthorId = "u-a01-sg-author",
+            GroupId = GroupId, Title = "hidden group picnic", Body = "x",
+            Created = DateTimeOffset.UtcNow, Audience = new Audience(),
+            Status = PostStatus.Hidden,
+        });
+
+        var result = await svc.SearchAsync("picnic", SearchScope.Groups, actor, TestContext.Current.CancellationToken);
+        var posts = result.Sections["posts"];
+
+        Assert.Contains("a01sg-live", posts.Select(h => h.Id));
+        Assert.DoesNotContain("a01sg-hidden", posts.Select(h => h.Id));
+    }
+
     // ── Boot / composition / seed helpers ────────────────────────────────────
 
     /// <summary>

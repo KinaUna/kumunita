@@ -1533,4 +1533,158 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
         var email = Assert.Single(boot.Staged);
         Assert.Equal($"notification:{Notifications.NotificationKinds.GroupPostMention}:{reply.Id}:ada", email.Key);
     }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // A01 (IMPROVE-UX, the E1/E2 leak fix) — the group-lane reads honour
+    // PostStatus. A Hidden/Removed group post is absent from the group feed
+    // (the candidate filter) and the detail lane serves it to its **author**
+    // only (the "hidden by a moderator" placeholder); any other member gets
+    // the same <c>Post = null</c> fail-closed shape as a membership Deny
+    // (the group lane's Web 404 — the "404 leaks which ids are real" pin).
+    // The group lane's membership decision has no <c>Moderator</c> branch
+    // (G·4: membership is the sole decision), so a moderator reaches a hidden
+    // group post through the report lane's independent
+    // <see cref="Kumunita.Core.Moderation.ModerationService"/>
+    // <c>LoadReportTargetResourceAsync</c> (<c>LoadAsync&lt;Post&gt;</c>) —
+    // not through this seam.
+    // ═════════════════════════════════════════════════════════════════════
+
+    // ── A01·G1 — HiddenGroupPost_ExcludedFromGroupFeed ─────────────────────
+    //
+    // A Hidden group post is absent from the group channel feed for the
+    // author (placeholder-only surface) and for any other member. The
+    // candidate filter (Status == PostStatus.Active) is the enforcement.
+
+    [Fact]
+    public async Task A01_G1_HiddenGroupPost_ExcludedFromGroupFeed()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string owner = "u-a01-g1-owner";
+        const string member = "u-a01-g1-member";
+
+        var group = await userInfo.CreateGroupAsync(owner, "A01 G1 family", null);
+        await userInfo.AddGroupMemberAsync(group.Id, member, addedBy: owner);
+        var g1 = GroupPost("a01-g1-post", group.Id, owner);
+        g1.Status = PostStatus.Hidden;
+        await Plant(store, g1);
+
+        // The author's feed — the hidden post is not in their working set.
+        var authorFeed = await svc.ListGroupFeedAsync(group.Id, owner, page: 1);
+        Assert.DoesNotContain(authorFeed.Visible, p => p.Id == "a01-g1-post");
+
+        // Another member's feed — the hidden post is not served either.
+        var memberFeed = await svc.ListGroupFeedAsync(group.Id, member, page: 1);
+        Assert.DoesNotContain(memberFeed.Visible, p => p.Id == "a01-g1-post");
+    }
+
+    // ── A01·G2 — RemovedGroupPost_ExcludedFromGroupFeed ────────────────────
+    //
+    // A Removed group post is absent from the group channel feed (the same
+    // single conjunct — Status == PostStatus.Active — covers both the
+    // Hidden and Removed lanes; no separate filter per status).
+
+    [Fact]
+    public async Task A01_G2_RemovedGroupPost_ExcludedFromGroupFeed()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string owner = "u-a01-g2-owner";
+
+        var group = await userInfo.CreateGroupAsync(owner, "A01 G2 family", null);
+        var g2 = GroupPost("a01-g2-post", group.Id, owner);
+        g2.Status = PostStatus.Removed;
+        await Plant(store, g2);
+
+        var feed = await svc.ListGroupFeedAsync(group.Id, owner, page: 1);
+        Assert.DoesNotContain(feed.Visible, p => p.Id == "a01-g2-post");
+    }
+
+    // ── A01·G3 — HiddenGroupPost_DetailAuthor_ReturnsPost ──────────────────
+    //
+    // The **author** of a Hidden group post reaches the detail lane and gets
+    // the post back (the Web view renders the "hidden by a moderator"
+    // placeholder — the ADR 0024 author-sees-its-own-deleted-post precedent,
+    // on the group lane). The post's Status is carried on the returned Post
+    // so the view can branch on it.
+
+    [Fact]
+    public async Task A01_G3_HiddenGroupPost_DetailAuthor_ReturnsPost()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a01-g3-author";
+
+        var group = await userInfo.CreateGroupAsync(author, "A01 G3 family", null);
+        var g3 = GroupPost("a01-g3-post", group.Id, author);
+        g3.Status = PostStatus.Hidden;
+        await Plant(store, g3);
+
+        var detail = await svc.GetGroupPostAsync(group.Id, "a01-g3-post", author);
+        Assert.NotNull(detail.Post);
+        Assert.Equal(PostStatus.Hidden, detail.Post.Status);
+        Assert.Equal("a01-g3-post", detail.Post.Id);
+    }
+
+    // ── A01·G4 — HiddenGroupPost_DetailOtherMember_PostIsNull ──────────────
+    //
+    // A **member** (not the author) reads a Hidden group post by direct URL:
+    // the detail lane returns <c>Post = null</c> — the same fail-closed
+    // shape as a membership Deny (the Web maps it to the 404 — the
+    // "404 leaks which ids are real" pin, the group lane's shape). The
+    // group lane's membership decision has no <c>Moderator</c> branch
+    // (G·4), so a member who is not the author gets the fail-closed shape
+    // regardless of their membership standing.
+
+    [Fact]
+    public async Task A01_G4_HiddenGroupPost_DetailOtherMember_PostIsNull()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a01-g4-author";
+        const string member = "u-a01-g4-member";
+
+        var group = await userInfo.CreateGroupAsync(author, "A01 G4 family", null);
+        await userInfo.AddGroupMemberAsync(group.Id, member, addedBy: author);
+        var g4 = GroupPost("a01-g4-post", group.Id, author);
+        g4.Status = PostStatus.Hidden;
+        await Plant(store, g4);
+
+        // The author sees it (placeholder case — A01·G3).
+        var authorDetail = await svc.GetGroupPostAsync(group.Id, "a01-g4-post", author);
+        Assert.NotNull(authorDetail.Post);
+
+        // The other member gets the fail-closed shape (the leak fix —
+        // before A01, a member could read a hidden group post by direct
+        // URL — the group lane's membership decision let them through).
+        var memberDetail = await svc.GetGroupPostAsync(group.Id, "a01-g4-post", member);
+        Assert.Null(memberDetail.Post);
+        Assert.Empty(memberDetail.Replies);
+    }
+
+    // ── A01·G5 — RemovedGroupPost_DetailOtherMember_PostIsNull ─────────────
+    //
+    // A **member** (not the author) reads a Removed group post by direct
+    // URL: the detail lane returns <c>Post = null</c> (the read branches
+    // are identical for the Hidden and Removed lanes — only the write
+    // lanes differ, Hidden being reversible and Removed not). The author
+    // still sees the placeholder.
+
+    [Fact]
+    public async Task A01_G5_RemovedGroupPost_DetailOtherMember_PostIsNull()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a01-g5-author";
+        const string member = "u-a01-g5-member";
+
+        var group = await userInfo.CreateGroupAsync(author, "A01 G5 family", null);
+        await userInfo.AddGroupMemberAsync(group.Id, member, addedBy: author);
+        var g5 = GroupPost("a01-g5-post", group.Id, author);
+        g5.Status = PostStatus.Removed;
+        await Plant(store, g5);
+
+        Assert.NotNull((await svc.GetGroupPostAsync(group.Id, "a01-g5-post", author)).Post);
+        Assert.Null((await svc.GetGroupPostAsync(group.Id, "a01-g5-post", member)).Post);
+    }
 }

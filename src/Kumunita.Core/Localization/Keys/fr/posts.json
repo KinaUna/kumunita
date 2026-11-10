@@ -74,6 +74,7 @@
   "posts.delete": "Supprimer",
   "posts.reply_delete": "Supprimer",
   "posts.deleted_placeholder": "Cette publication a \u00E9t\u00E9 supprim\u00E9e par son auteur.",
+  "posts.moderator_hidden_placeholder": "Cette publication a \u00E9t\u00E9 masqu\u00E9e par un mod\u00E9rateur.",
   "posts.reply_deleted_placeholder": "Cette r\u00E9ponse a \u00E9t\u00E9 supprim\u00E9e par son auteur.",
   "posts.translations_label": "Traductions",
   "posts.translations_none": "pas encore",

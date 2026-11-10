@@ -2052,4 +2052,323 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         var notifs = await MentionEmitters.AllNotifications(boot.Store);
         Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
     }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // A01 (IMPROVE-UX, the E1/E2 leak fix) — the reads honour PostStatus.
+    // The feeds + search exclude Hidden/Removed posts (the candidate filter);
+    // the detail lane serves a non-Active post to its author (placeholder)
+    // and to a standing moderator / break-glass (the report lane's lever) but
+    // returns `Post = null` to any other reader (the Web 403 / R01·R02 status
+    // page — the "403 on denied, 404 leaks which ids are real" pin). This is
+    // the "filter the feed, forget the URL" fix: the feed is clean *and* the
+    // direct /posts/{id} link no longer serves a hidden post to a stranger.
+    // ═════════════════════════════════════════════════════════════════════
+
+    // ── A01·1 — Hidden_ExcludedFromFeed_ForAuthorAndStranger ────────────────
+    //
+    // A post a moderator has Hidden (Status = PostStatus.Hidden) is absent
+    // from the community feed — for the author *and* for another resident.
+    // The feed's candidate filter (Status == PostStatus.Active) is the
+    // enforcement; the author does not see their own hidden post in the
+    // feed (the ADR 0024 author-sees-it-in-the-detail-only precedent —
+    // "kept but hidden from the author's working surfaces").
+
+    [Fact]
+    public async Task A01_Hidden_ExcludedFromFeed_ForAuthorAndStranger()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a01-feed-author";
+        const string stranger = "u-a01-feed-stranger";
+        const string postId = "a01-feed-post";
+
+        // The post is community-scoped so both the author and a stranger
+        // would normally see it (audience allow — not the audience Deny).
+        var communityAudience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]);
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 feed", Created = DateTimeOffset.UtcNow,
+            Audience = communityAudience, Status = PostStatus.Hidden,
+        });
+
+        // The author's own feed — a hidden post is not in their working set.
+        var authorFeed = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.DoesNotContain(authorFeed.Visible, p => p.Id == postId);
+
+        // The stranger's feed — the hidden post is not served to them either
+        // (the leak fix — the direct URL is the author/mod-only surface, not
+        // the feed or a stranger's detail view).
+        var strangerFeed = await svc.ListFeedAsync(ComponentId, stranger, page: 1);
+        Assert.DoesNotContain(strangerFeed.Visible, p => p.Id == postId);
+    }
+
+    // ── A01·2 — Removed_ExcludedFromFeed (the .Removed lane) ───────────────
+    //
+    // A post a moderator has Removed (Status = PostStatus.Removed) is absent
+    // from the community feed for everyone. The candidate filter is the same
+    // single conjunct (Status == PostStatus.Active) — the Hidden and Removed
+    // lanes share it (no separate filter per status).
+
+    [Fact]
+    public async Task A01_Removed_ExcludedFromFeed_ForEveryone()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a01-rm-author";
+        const string stranger = "u-a01-rm-stranger";
+        const string postId = "a01-rm-post";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 removed", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+            Status = PostStatus.Removed,
+        });
+
+        Assert.DoesNotContain(
+            (await svc.ListFeedAsync(ComponentId, author, page: 1)).Visible,
+            p => p.Id == postId);
+        Assert.DoesNotContain(
+            (await svc.ListFeedAsync(ComponentId, stranger, page: 1)).Visible,
+            p => p.Id == postId);
+    }
+
+    // ── A01·3 — Hidden_DetailAuthor_ReturnsPost (the placeholder case) ─────
+    //
+    // The **author** of a Hidden post reaches the detail lane and gets the
+    // post back (the Web view renders the "hidden by a moderator"
+    // placeholder, the ADR 0024 author-sees-its-own-deleted-post precedent).
+    // The post's Status is carried on the returned Post so the view can
+    // branch on it.
+
+    [Fact]
+    public async Task A01_Hidden_DetailAuthor_ReturnsPost()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a01-det-author";
+        const string postId = "a01-det-post";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 detail", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+            Status = PostStatus.Hidden,
+        });
+
+        var detail = await svc.GetPostAsync(postId, author);
+        Assert.NotNull(detail.Post);
+        Assert.Equal(PostStatus.Hidden, detail.Post.Status);
+        Assert.Equal(postId, detail.Post.Id);
+    }
+
+    // ── A01·4 — Hidden_DetailOtherReader_PostIsNull (the leak fix) ─────────
+    //
+    // A **stranger** (not the author, no moderator standing, no break-glass)
+    // reads a Hidden post by direct URL: the detail lane returns
+    // <c>Post = null</c> — the same fail-closed shape as a Deny (the Web
+    // maps it to the 403 / R01·R02 status page; a 404 would leak which ids
+    // are real, the repo's "403 on denied, 404 leaks which ids are real"
+    // pin). This is the direct-URL leak fix (E1/E2): before A01 the feed
+    // was clean but /posts/{id} still served a hidden post to any
+    // signed-in resident with a standing that matches the audience (or the
+    // post's audience was Community-scoped, which is the common case).
+
+    [Fact]
+    public async Task A01_Hidden_DetailOtherReader_PostIsNull()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a01-det-author";
+        const string stranger = "u-a01-det-stranger";
+        const string postId = "a01-det-post";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 detail", Created = DateTimeOffset.UtcNow,
+            // Community-scoped audience — any community member (the
+            // stranger) would normally be allowed the post's Read decision
+            // (the "audience branch" allow). The A01 Status branch on top
+            // of the decision is what refuses the hidden post.
+            Audience = new Audience { Community = true },
+            Status = PostStatus.Hidden,
+        });
+
+        // The author's component membership — the stranger is a member too
+        // (both are in the community, the audience's Community flag is the
+        // allow). We only need to plant a ComponentMembership for the
+        // actor's standing read (the audience decision's communityIds).
+        await userInfo.SetCommunityMembershipAsync(ComponentId, author, actorId: "u-a01-det-admin");
+        await userInfo.SetCommunityMembershipAsync(ComponentId, stranger, actorId: "u-a01-det-admin");
+
+        // The author sees their hidden post (placeholder case — A01·3).
+        var authorDetail = await svc.GetPostAsync(postId, author);
+        Assert.NotNull(authorDetail.Post);
+
+        // The stranger gets the fail-closed shape (the leak fix — before
+        // A01, the stranger's community membership let them see the hidden
+        // post by direct URL).
+        var strangerDetail = await svc.GetPostAsync(postId, stranger);
+        Assert.Null(strangerDetail.Post);
+        Assert.Empty(strangerDetail.Replies);
+    }
+
+    // ── A01·5 — Hidden_DetailStandingModerator_ReturnsPost ─────────────────
+    //
+    // A **standing moderator** (a <c>ModeratorAssignment</c> on the post's
+    // component, the M3b F3/F4 write-lane standing) reaches the detail lane
+    // of a Hidden post and gets the post back — the report lane's
+    // hide/remove/unhide lever reads the target through this seam (the
+    // decision's <c>Via</c> is <see cref="AccessVia.Moderator"/>, the
+    // A01 branch's privileged check). The moderator is **not** the author
+    // and **not** in the audience — the only lane that allows is the
+    // moderator branch (the decision's Via tag is the signal).
+
+    [Fact]
+    public async Task A01_Hidden_DetailStandingModerator_ReturnsPost()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a01-m-mod-author";
+        const string moderator = "u-a01-m-mod-moderator";
+        const string postId = "a01-m-mod-post";
+
+        // The component's ModeratorAccess flag is ON + a standing moderator
+        // assignment — the same setup M3b·9's HidePostAsync test uses.
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a01-m-mod-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-a01-m-mod-admin", At = DateTimeOffset.UtcNow
+        });
+
+        // The post's audience grants only `author` — the moderator is NOT in
+        // it, so the only lane that lets the moderator Read it is the
+        // moderator branch (Via = Moderator, the A01 privileged check).
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 mod detail", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+            Status = PostStatus.Hidden,
+        });
+
+        // The author's component membership (the standing read's
+        // communityIds — the moderator branch short-circuits before the
+        // audience branch, so the moderator does not need to be in the
+        // audience or a member).
+        var (userInfo, _, _) = Services(store);
+        await userInfo.SetCommunityMembershipAsync(ComponentId, author, actorId: "u-a01-m-mod-admin");
+
+        // The author sees it (placeholder case — A01·3).
+        var authorDetail = await svc.GetPostAsync(postId, author);
+        Assert.NotNull(authorDetail.Post);
+
+        // The standing moderator sees it too (the report lane's lever —
+        // the A01 privileged check via decision.Via == Moderator).
+        var moderatorDetail = await svc.GetPostAsync(postId, moderator);
+        Assert.NotNull(moderatorDetail.Post);
+        Assert.Equal(PostStatus.Hidden, moderatorDetail.Post.Status);
+    }
+
+    // ── A01·6 — Removed_DetailOtherReader_PostIsNull (the .Removed lane) ──
+    //
+    // A **stranger** reads a Removed post by direct URL: the detail lane
+    // returns <c>Post = null</c> (the same fail-closed shape as a Hidden
+    // post — the read branches are identical for the two non-Active
+    // statuses; only the write lanes differ, Hidden being reversible and
+    // Removed not). The author still sees the placeholder.
+
+    [Fact]
+    public async Task A01_Removed_DetailOtherReader_PostIsNull()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a01-rm-author";
+        const string stranger = "u-a01-rm-stranger";
+        const string postId = "a01-rm-post";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 removed detail", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience { Community = true },
+            Status = PostStatus.Removed,
+        });
+        await userInfo.SetCommunityMembershipAsync(ComponentId, author, actorId: "u-a01-rm-admin");
+        await userInfo.SetCommunityMembershipAsync(ComponentId, stranger, actorId: "u-a01-rm-admin");
+
+        Assert.NotNull((await svc.GetPostAsync(postId, author)).Post);
+        Assert.Null((await svc.GetPostAsync(postId, stranger)).Post);
+    }
+
+    // ── A01·7 — Hidden_ThenFeed_ExcludesPost_ButDetailStillReturnsIt_Author ─
+    //
+    // The ADR 0024 two-halves shape, for the A01 Status lane: the feed
+    // hides a hidden post, but the **author's** detail lane still returns it
+    // (the placeholder shape). Mirrors the M3b write lane (HidePostAsync is
+    // the Moderate-gated write; A01's read branch is the read-side half).
+
+    [Fact]
+    public async Task A01_Hidden_ThenFeed_ExcludesPost_ButDetailStillReturnsIt_Author()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a01-feed-author";
+        const string moderator = "u-a01-feed-moderator";
+        const string postId = "a01-feed-post";
+
+        // The component's ModeratorAccess flag ON + a standing moderator
+        // assignment — the M3b F3 write-lane setup (the HidePostAsync lane
+        // requires a standing moderator, not the post's author).
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a01-feed-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-a01-feed-admin", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a01-live", ComponentId = ComponentId, AuthorId = author,
+            Body = "live", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience { Community = true },
+        });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "to-be-hidden", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience { Community = true },
+        });
+        await userInfo.SetCommunityMembershipAsync(ComponentId, author, actorId: "u-a01-feed-admin");
+
+        var before = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.Equal(2, before.Visible.Count(p => p.Id is "a01-live" or "a01-feed-post"));
+
+        // The M3b write lane (a standing moderator runs it — the author has
+        // no Moderate standing, so the write-lane decision denies and the
+        // status would not flip; the write lane is the lane's own concern,
+        // A01's read branch reads the status back).
+        await RunInSession(store, async s =>
+            await svc.HidePostAsync(postId, moderator, s));
+
+        var after = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.DoesNotContain(after.Visible, p => p.Id == postId);
+        Assert.Contains(after.Visible, p => p.Id == "a01-live");
+
+        // … but the author's detail lane still returns it (the placeholder).
+        var detail = await svc.GetPostAsync(postId, author);
+        Assert.NotNull(detail.Post);
+        Assert.Equal(PostStatus.Hidden, detail.Post.Status);
+    }
 }

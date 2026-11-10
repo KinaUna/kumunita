@@ -79,6 +79,7 @@
   "posts.delete": "Delete",
   "posts.reply_delete": "Delete",
   "posts.deleted_placeholder": "This post has been deleted by its author.",
+  "posts.moderator_hidden_placeholder": "This post has been hidden by a moderator.",
   "posts.reply_deleted_placeholder": "This reply has been deleted by its author.",
   "posts.translations_label": "Translations",
   "posts.translations_none": "none yet",

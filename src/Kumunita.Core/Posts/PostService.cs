@@ -229,7 +229,7 @@ public partial class PostService
         await using var session = _store.QuerySession();
         IQueryable<Post> q = session
             .Query<Post>()
-            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft);
+            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active);
 
         var candidates = await OrderByPostSort(q, sort)
             .Skip((page - 1) * ps)
@@ -248,7 +248,7 @@ public partial class PostService
         // page's window is non-empty here, so the component has candidates).
         int candidateCount = await session
             .Query<Post>()
-            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft)
+            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active)
             .CountAsync()
             .ConfigureAwait(false);
 
@@ -310,7 +310,7 @@ public partial class PostService
         await using var session = _store.QuerySession();
         IQueryable<Post> q = session
             .Query<Post>()
-            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft);
+            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active);
 
         var candidates = await OrderByPostSort(q, sort)
             .Skip((page - 1) * ps)
@@ -328,7 +328,7 @@ public partial class PostService
         // post-filter), one CountAsync over the same filtered query.
         int candidateCount = await session
             .Query<Post>()
-            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft)
+            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active)
             .CountAsync()
             .ConfigureAwait(false);
 
@@ -398,6 +398,30 @@ public partial class PostService
             // C-M3·1 / F10 — a Deny short-circuits at the parent: replies not
             // evaluated, not loaded for rendering, no reply row at all.
             return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+        // A01 (IMPROVE-UX, the E1/E2 leak fix) — the reads honour
+        // <see cref="PostStatus"/>. A <see cref="PostStatus.Hidden"/> /
+        // <see cref="PostStatus.Removed"/> post is no longer served to an
+        // ordinary reader who reaches it by a direct <c>/posts/{id}</c> URL:
+        // the **author** (the "owner branch" — they see the "hidden by a
+        // moderator" placeholder, the ADR 0024 author-sees-its-own-deleted-post
+        // precedent) and a **moderator** (the report lane's hide/remove/unhide
+        // lever) / break-glass still see it; any other reader gets the same
+        // <c>Post = null</c> fail-closed shape as a Deny (the Web 403 / R01·R02
+        // status page — the repo's "403 on denied, 404 leaks which ids are real"
+        // pin). The feeds + search already exclude non-Active (the candidate
+        // filter above); this is the detail-lane half of the same rule. The
+        // method's existing return-null contract (not a
+        // <see cref="KeyNotFoundException"/>) is preserved: the ~25 call sites
+        // that check <c>Post is null</c> already map to the fail-closed shape,
+        // and a hidden post must not leak *which* id was real (a 404 would).
+        if (post.Status != PostStatus.Active)
+        {
+            var privileged = string.Equals(post.AuthorId, actorId, StringComparison.Ordinal)
+                || decision.Via is AccessVia.Moderator or AccessVia.BreakGlass;
+            if (!privileged)
+                return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+        }
 
         // C-M3·1 — the reply list is returned **as-is** under the parent's single
         // decision: no second authorization evaluation, no per-reply audit row.

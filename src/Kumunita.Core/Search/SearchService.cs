@@ -306,7 +306,7 @@ public sealed class SearchService : ISearchService
     private async Task<List<SearchHit>> CommunityPostsAsync(IDocumentSession session, string q, string? actorId, IReadOnlyDictionary<string, string> tagNames, CancellationToken ct)
     {
         var candidates = await session.Query<Post>()
-            .Where(p => p.GroupId == string.Empty && p.DeletedAt == null && !p.IsDraft)
+            .Where(p => p.GroupId == string.Empty && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active)
             .OrderByDescending(p => p.Created)
             .ToListAsync(ct);
 
@@ -431,7 +431,7 @@ public sealed class SearchService : ISearchService
         foreach (var groupId in groups)
         {
             var candidates = await session.Query<Post>()
-                .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft)
+                .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active)
                 .ToListAsync(ct);
             var matched = candidates.Where(p => MatchsWithTags(p.Title, p.Body, q, p.TagIds, tagNames)).ToList();
             if (matched.Count == 0) continue;
