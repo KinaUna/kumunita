@@ -57,7 +57,8 @@ public sealed class AdminSignupController(
         var model = new SignupAdminViewModel
         {
             IsOpen = await identity.IsSignupOpenAsync(),
-            NotifyAdmins = await identity.IsNotifyAdminsOnSignupAsync()
+            NotifyAdmins = await identity.IsNotifyAdminsOnSignupAsync(),
+            ResidentInvite = await identity.GetResidentInviteSettingAsync()
         };
 
         return View(model);
@@ -101,6 +102,38 @@ public sealed class AdminSignupController(
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>
+    /// <c>POST /admin/signup/resident-invite</c> (IMPROVE-UX A11, ADR 0304
+    /// amended) — sets the 3-state resident-invite mode
+    /// (<see cref="Kumunita.Core.Identity.ResidentInviteSetting.Off"/> /
+    /// <c>On</c> / <c>OnWithApproval</c>). Delegates to
+    /// <see cref="IIdentityService.SetResidentInviteSettingAsync"/> (the
+    /// single audited write lane — exactly one <c>AccessAudit</c> row,
+    /// <c>Via = Admin</c>, action <c>signup.set-resident-invite</c>,
+    /// <c>TargetKind</c> "signup" — the singleton-toggle shape). An
+    /// independent setting from the open / invitation-only gate and the
+    /// notify-admins gate (three distinct admin-settled instance values, each
+    /// with its own audited write lane — the ADR 0019 / ADR 0020
+    /// singleton-toggle shape).
+    /// </summary>
+    [HttpPost("resident-invite")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveResidentInvite(Kumunita.Core.Identity.ResidentInviteSetting residentInvite)
+    {
+        var actor = ActorId(User) ?? string.Empty;
+        await identity.SetResidentInviteSettingAsync(residentInvite, actor);
+        // The flash names the mode (the enum value — the same token the view's
+        // radio group binds on, so the admin reads back exactly what they
+        // selected: Off / On / OnWithApproval, the ADR 0304 §Amendments A11
+        // 3-state set). The localized option label in the view is the friendly
+        // spelling; the flash is the confirmation.
+        TempData["info"] = await this.FlashAsync(
+            "admin.flash_resident_invite_saved",
+            "Resident invite mode is now {0}.",
+            residentInvite.ToString());
+        return RedirectToAction(nameof(Index));
+    }
+
     // ── View model (public nested type so the Razor view can bind to it) ──
 
     public sealed class SignupAdminViewModel
@@ -109,5 +142,9 @@ public sealed class AdminSignupController(
 
         /// <summary>ADR 0077 — the notify-admins gate (the <c>true</c> floor).</summary>
         public bool NotifyAdmins { get; init; } = true;
+
+        /// <summary>IMPROVE-UX A11 — the 3-state resident-invite mode
+        /// (the <c>Off</c> floor, ADR 0304 §Amendments A11).</summary>
+        public Kumunita.Core.Identity.ResidentInviteSetting ResidentInvite { get; init; } = Kumunita.Core.Identity.ResidentInviteSetting.Off;
     }
 }

@@ -104,6 +104,23 @@ public partial class IdentityService
     public async Task SetNotifyAdminsOnSignupAsync(bool notify, string adminSubjectId)
         => await _gates.SetNotifyAdminsOnSignupAsync(notify, adminSubjectId);
 
+    // ── Resident-invite mode (ADR 0304, amended 2026-11-11 for IMPROVE-UX A11) ──
+    // The 3-state resident-invite posture (the EventRsvpMode 3-state shape,
+    // the NotifyAdminsOnSignup / IsSignupOpen singleton-toggle lane). A11
+    // settles the setting + the rule; A12's resident "Invite a neighbour"
+    // surface will consume the posture via IInvitationService
+    // .GetResidentInvitePostureAsync (the A12 seam reads MayInvite /
+    // RequiresApproval before calling CreateAsync / InviteAsync). The
+    // C08 thin-forwarder shape — IdentityService delegates to the
+    // IdentityPlatformGateService (the C3-03 / ADR 0293 part-vs-whole
+    // surface).
+
+    public async Task<ResidentInviteSetting> GetResidentInviteSettingAsync()
+        => await _gates.GetResidentInviteSettingAsync();
+
+    public async Task SetResidentInviteSettingAsync(ResidentInviteSetting mode, string adminSubjectId)
+        => await _gates.SetResidentInviteSettingAsync(mode, adminSubjectId);
+
     // ── M19 guest standing (ADR 0120, D2 — the single audited write lane) ──
 
     /// <inheritdoc />

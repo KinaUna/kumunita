@@ -141,3 +141,115 @@ public enum EmailInvitationStatus
     /// value).</summary>
     Expired
 }
+
+/// <summary>
+/// The **resident-invite mode** (ADR 0304, amended 2026-11-11 for IMPROVE-UX
+/// A11): the admin-settled posture for whether *residents* may invite
+/// neighbours (the A12 "Invite a neighbour" surface). A 3-state code-owned
+/// closed set (the <see cref="Kumunita.Core.UserInfo.EventRsvpMode"/>
+/// 3-state posture shape, the <see cref="EmailInvitationStatus"/> enum
+/// convention — **not** a stored string). Stored on
+/// <see cref="Kumunita.Core.Localization.LocaleSettings.ResidentInviteSetting"/>
+/// (the <see cref="IsSignupOpen"/> / <see cref="NotifyAdminsOnSignup"/>
+/// singleton field shape, ADR 0004 §B.1 additive).
+/// <para>
+/// **The floor is <see cref="Off"/>**: a fresh instance ships with resident
+/// self-invite *off* — resident invite is opt-in, set by a GlobalAdmin
+/// (the ADR 0304 D4 "works while closed" posture; the deliberate
+/// <b>inverse</b> of the codebase <c>true</c>-floor convention, like
+/// <c>MessagingEnabled</c>). A missing singleton or an unset value both
+/// yield <c>Off</c> (the read floor, resolved in
+/// <see cref="IIdentityService.GetResidentInviteSettingAsync"/>).
+/// </para>
+/// </summary>
+public enum ResidentInviteSetting
+{
+    /// <summary>
+    /// The **floor** — resident self-invite is **off**: no resident may
+    /// create an invitation (the A12 "Invite a neighbour" surface is
+    /// hidden and its seam refuses). A fresh instance ships in this state
+    /// (the ADR 0304 §Amendments A11 rule — resident invite is opt-in, set
+    /// by a GlobalAdmin). The admin invitation surface
+    /// (<c>/admin/invitations</c>, A09) is unaffected — GlobalAdmins
+    /// always invite.
+    /// </summary>
+    Off,
+
+    /// <summary>
+    /// Resident self-invite is **on, immediate**: a resident's created
+    /// invitations are immediately usable (the <see cref
+    /// "IInvitationService.CreateAsync"/> / <see cref
+    /// "IInvitationService.InviteAsync"/> lane runs without a gate). The
+    /// single-use / expiring / revocable invariants (ADR 0304 D4) still
+    /// apply — the mode controls *who may create*, not *what a row can
+    /// do*.
+    /// </summary>
+    On,
+
+    /// <summary>
+    /// Resident self-invite is **on, with admin approval**: a resident's
+    /// created invitations are gated behind the admin approval queue A12
+    /// ships (the ADR 0304 D6 c "approval state" — the row state
+    /// <c>PendingApproval</c> + the admin-approve lane land with A12;
+    /// A11 settles the *mode* + the *rule*). A11's rule returns
+    /// <see cref="ResidentInvitePosture.RequiresApproval"/> = <c>true</c>
+    /// for this state (the A12 surface reads the flag and enforces it).
+    /// </summary>
+    OnWithApproval
+}
+
+/// <summary>
+/// The **resident invite posture** (ADR 0304, amended 2026-11-11 for
+/// IMPROVE-UX A11): the testable decision the
+/// <see cref="IInvitationService.GetResidentInvitePostureAsync"/> seam
+/// returns for a resident — what A12's "Invite a neighbour" surface reads
+/// before calling <see cref="IInvitationService.CreateAsync"/> /
+/// <see cref="IInvitationService.InviteAsync"/>.
+/// <para>
+/// **Pure, testable, setting-driven (A11):**
+/// <list type="bullet">
+/// <item><see cref="ResidentInviteSetting.Off"/> →
+/// <c>MayInvite = false</c> (the A12 surface refuses).</item>
+/// <item><see cref="ResidentInviteSetting.On"/> →
+/// <c>MayInvite = true, RequiresApproval = false</c> (the A12 surface
+/// proceeds directly).</item>
+/// <item><see cref="ResidentInviteSetting.OnWithApproval"/> →
+/// <c>MayInvite = true, RequiresApproval = true</c> (the A12 surface
+/// proceeds but the row is gated behind the admin approval queue).</item>
+/// </list>
+/// The rule is a **read** — zero audit rows (the
+/// <see cref="IIdentityService.IsSignupOpenAsync"/> /
+/// <see cref="IInvitationService.ValidateAsync"/> "the read is not an
+/// access decision" floor — the *write* decision is the A12
+/// <c>CreateAsync</c> lane's job).
+/// </para>
+/// <para>
+/// <b>// TODO ❓</b> the ADR 0304 D6 b open question — **who may invite
+/// and how many per period** — is **flagged, not built** here: A11 ships
+/// the *setting-driven* rule; the who-may-invite + rate-limit refinement
+/// is A12's (or a follow-on), and the proposed 5-per-30-days ceiling from
+/// D6 b stands. A11's rule does **not** reject on rate; A12 (or a
+/// follow-on) will settle it.
+/// </para>
+/// </summary>
+public readonly record struct ResidentInvitePosture(
+    bool MayInvite,
+    bool RequiresApproval)
+{
+    /// <summary>The <see cref="ResidentInviteSetting.Off"/> posture —
+    /// the resident may not create an invitation (the A12 surface
+    /// refuses, the ADR 0304 §Amendments A11 floor).</summary>
+    public static readonly ResidentInvitePosture Refused = new(false, false);
+
+    /// <summary>The <see cref="ResidentInviteSetting.On"/> posture — the
+    /// resident may create an invitation, immediately usable (the A12
+    /// surface proceeds directly).</summary>
+    public static readonly ResidentInvitePosture Allow = new(true, false);
+
+    /// <summary>The <see cref="ResidentInviteSetting.OnWithApproval"/>
+    /// posture — the resident may create an invitation, but the row is
+    /// gated behind the admin approval queue (the A12 surface proceeds
+    /// but the row lands in <c>PendingApproval</c> until an admin
+    /// approves, ADR 0304 D6 c).</summary>
+    public static readonly ResidentInvitePosture AllowWithApproval = new(true, true);
+}

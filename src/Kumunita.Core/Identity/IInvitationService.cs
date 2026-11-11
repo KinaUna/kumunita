@@ -312,4 +312,49 @@ public interface IInvitationService
         string email, string inviterSubjectId, string inviterDisplayName,
         DateTimeOffset expiresAt, string? inviteLinkOverride = null,
         CancellationToken ct = default);
+
+    // ── IMPROVE-UX A11 — the resident-invite posture rule ──────────────────
+
+    /// <summary>
+    /// The **resident-invite posture** (ADR 0304, amended 2026-11-11 for
+    /// IMPROVE-UX A11): the testable decision the A12 "Invite a neighbour"
+    /// surface reads before calling <see cref="CreateAsync"/> /
+    /// <see cref="InviteAsync"/>. Consults the instance
+    /// <see cref="ResidentInviteSetting"/> (the
+    /// <see cref="IIdentityService.GetResidentInviteSettingAsync"/> read
+    /// seam, the <c>Off</c> floor) and returns the posture for a resident:
+    /// <list type="bullet">
+    /// <item><see cref="ResidentInviteSetting.Off"/> →
+    /// <see cref="ResidentInvitePosture.Refused"/> (<c>MayInvite = false</c>).</item>
+    /// <item><see cref="ResidentInviteSetting.On"/> →
+    /// <see cref="ResidentInvitePosture.Allow"/> (<c>MayInvite = true,
+    /// RequiresApproval = false</c>).</item>
+    /// <item><see cref="ResidentInviteSetting.OnWithApproval"/> →
+    /// <see cref="ResidentInvitePosture.AllowWithApproval"/>
+    /// (<c>MayInvite = true, RequiresApproval = true</c>).</item>
+    /// </list>
+    /// A **read** — zero audit rows (the <see cref="IIdentityService
+    /// .IsSignupOpenAsync"/> / <see cref="ValidateAsync"/> "the read is not
+    /// an access decision" floor — the *write* decision is the A12
+    /// <c>CreateAsync</c> lane's job).
+    /// <para>
+    /// <b>// TODO ❓</b> the ADR 0304 D6 b open question — **who may invite
+    /// and how many per period** — is **flagged, not built** here: A11
+    /// ships the *setting-driven* rule; the who-may-invite + rate-limit
+    /// refinement is A12's (or a follow-on), and the proposed
+    /// 5-per-30-days ceiling from D6 b stands. A11's rule does **not**
+    /// reject on rate; A12 (or a follow-on) will settle it.
+    /// </para>
+    /// </summary>
+    /// <param name="residentSubjectId">The resident whose posture is being
+    /// decided (the audit principal — a GlobalAdmin is always allowed to
+    /// invite via the admin surface, so this seam is the *resident*
+    /// posture only).</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The <see cref="ResidentInvitePosture"/> for the resident
+    /// (the A12 surface reads <c>MayInvite</c> / <c>RequiresApproval</c>
+    /// before calling <see cref="CreateAsync"/> / <see cref
+    /// "InviteAsync"/>).</returns>
+    Task<ResidentInvitePosture> GetResidentInvitePostureAsync(
+        string residentSubjectId, CancellationToken ct = default);
 }

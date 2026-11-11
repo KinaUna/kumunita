@@ -490,6 +490,46 @@ public sealed class InvitationService(
         return (subject, body);
     }
 
+    // ── IMPROVE-UX A11 — the resident-invite posture rule ──────────────────
+    // The testable decision the A12 "Invite a neighbour" surface reads before
+    // calling CreateAsync / InviteAsync. A11 ships the *setting-driven* rule;
+    // A12 ships the resident surface + the admin approval queue (the row
+    // state + the approve lane, ADR 0304 D6 c). The who-may-invite + rate
+    // ceiling (ADR 0304 D6 b) is flagged, not built — see the interface
+    // seam's doc for the // TODO ❓.
+
+    /// <inheritdoc />
+    public async Task<ResidentInvitePosture> GetResidentInvitePostureAsync(
+        string residentSubjectId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(residentSubjectId);
+
+        // ADR 0304 (A11) — the rule is a pure, testable, setting-driven
+        // decision. The setting is read through IIdentityService
+        // .GetResidentInviteSettingAsync (the `Off` floor, the
+        // IsSignupOpenAsync plain-read shape). Zero audit rows (the
+        // M35·5 / 0159 "the read is not an access decision" floor — the
+        // write decision is A12's CreateAsync lane's job).
+        var setting = await identity.GetResidentInviteSettingAsync().ConfigureAwait(false);
+
+        // // TODO ❓ the ADR 0304 D6 b open question — who may invite and
+        // how many per period — is flagged, not built: A11 ships the
+        // setting-driven rule; A12 (or a follow-on) will add the rate
+        // ceiling (the proposed 5-per-30-days). The rule does not reject
+        // on rate yet (the A11 prompt: "the rule does not reject on rate
+        // yet").
+        return setting switch
+        {
+            ResidentInviteSetting.Off            => ResidentInvitePosture.Refused,
+            ResidentInviteSetting.On             => ResidentInvitePosture.Allow,
+            ResidentInviteSetting.OnWithApproval => ResidentInvitePosture.AllowWithApproval,
+            // Defensive: a future enum value floors to the most-restrictive
+            // posture (the `Off` floor shape — an unknown state never
+            // widens the resident's standing).
+            _                                    => ResidentInvitePosture.Refused,
+        };
+    }
+
     /// <summary>The one <c>AccessAudit</c> row shape the invitation lane
     /// writes (the <see cref="KioskLinkService"/> <c>kiosk.link.create</c>
     /// field mapping — the KioskLink "the read is not an access decision"

@@ -71,4 +71,16 @@ public interface IIdentityPlatformGateService
     /// <summary>The ADR 0077 admin-notify write (the admin-settled singleton
     /// toggle + the admin audit row).</summary>
     Task SetNotifyAdminsOnSignupAsync(bool notify, string adminSubjectId);
+
+    // ── Resident-invite mode (ADR 0304, amended 2026-11-11 for IMPROVE-UX A11) ──
+
+    /// <summary>The ADR 0304 (A11) resident-invite mode read (the <c>Off</c>
+    /// floor — a fresh instance ships with resident self-invite off; the
+    /// opt-in posture a GlobalAdmin sets). A read (no audit row).</summary>
+    Task<ResidentInviteSetting> GetResidentInviteSettingAsync();
+
+    /// <summary>The ADR 0304 (A11) resident-invite mode write (the
+    /// admin-settled singleton toggle + the admin audit row
+    /// <c>signup.set-resident-invite</c>, <c>TargetKind</c> "signup").</summary>
+    Task SetResidentInviteSettingAsync(ResidentInviteSetting mode, string adminSubjectId);
 }

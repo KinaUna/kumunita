@@ -459,7 +459,41 @@ public interface IIdentityService
     /// may call this; the Web's <c>AdminSignupController</c> enforces the gate.
     /// </summary>
     Task SetNotifyAdminsOnSignupAsync(bool notify, string adminSubjectId);
+    // ── Resident-invite mode (ADR 0304, amended 2026-11-11 for IMPROVE-UX A11) ──
 
+    /// <summary>
+    /// The **resident-invite mode** (ADR 0304, amended 2026-11-11 for
+    /// IMPROVE-UX A11): the admin-settled posture for whether *residents* may
+    /// invite neighbours (the A12 "Invite a neighbour" surface). A 3-state
+    /// <see cref="ResidentInviteSetting"/> (the
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode"/> 3-state posture shape
+    /// — a code-owned closed set, not a stored string). A read (no audit
+    /// row); the <c>Off</c> floor — a missing singleton or an unset value both
+    /// yield <c>Off</c>, so a fresh instance ships with resident self-invite
+    /// **off** (the opt-in posture a GlobalAdmin sets — the ADR 0304
+    /// §Amendments A11 rule, the deliberate inverse of the codebase
+    /// <c>true</c>-floor convention, like
+    /// <see cref="IsSignupOpenAsync"/>'s <c>false</c> floor).
+    /// </summary>
+    Task<ResidentInviteSetting> GetResidentInviteSettingAsync();
+
+    /// <summary>
+    /// Set the resident-invite mode (ADR 0304, amended 2026-11-11 for
+    /// IMPROVE-UX A11): a GlobalAdmin flips the instance-wide posture —
+    /// <see cref="ResidentInviteSetting.Off"/> (the floor; a fresh instance
+    /// ships here) disables the A12 "Invite a neighbour" surface,
+    /// <see cref="ResidentInviteSetting.On"/> enables it (immediately
+    /// usable), and <see cref="ResidentInviteSetting.OnWithApproval"/>
+    /// enables it with the admin approval queue (A12 ships the row state
+    /// + the approve lane — ADR 0304 D6 c). Writes the
+    /// <see cref="Kumunita.Core.Localization.LocaleSettings
+    /// .ResidentInviteSetting"/> singleton and appends exactly one
+    /// <c>AccessAudit</c> row (<c>via: Admin</c>, action
+    /// <c>"signup.set-resident-invite"</c>, target "signup") in the same
+    /// session (C3 — no silent, unaudited access). Only a GlobalAdmin may
+    /// call this; the Web's <c>AdminSignupController</c> enforces the gate.
+    /// </summary>
+    Task SetResidentInviteSettingAsync(ResidentInviteSetting mode, string adminSubjectId);
     // ── M19 guest standing (ADR 0120, D2 — the single audited write lane) ────
 
     /// <summary>

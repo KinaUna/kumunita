@@ -139,6 +139,33 @@ public sealed class LocaleSettings
     public bool MessagingEnabled { get; set; } = false;
 
     /// <summary>
+    /// The **resident-invite mode** (ADR 0304, amended 2026-11-11 for IMPROVE-UX
+    /// A11): the admin-settled posture for whether *residents* may invite
+    /// neighbours (the A12 "Invite a neighbour" surface). A 3-state
+    /// <see cref="Kumunita.Core.Identity.ResidentInviteSetting"/> (the
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode"/> 3-state posture
+    /// shape — a code-owned closed set, not a stored string):
+    /// <see cref="Kumunita.Core.Identity.ResidentInviteSetting.Off"/>
+    /// (the floor — a fresh instance ships with resident self-invite *off*;
+    /// the opt-in posture a GlobalAdmin sets),
+    /// <see cref="Kumunita.Core.Identity.ResidentInviteSetting.On"/>
+    /// (the resident's created invitations are immediately usable), and
+    /// <see cref="Kumunita.Core.Identity.ResidentInviteSetting.OnWithApproval"/>
+    /// (the resident's created invitations are gated behind the admin
+    /// approval queue A12 ships). An *additive* field on the singleton (ADR
+    /// 0004 §B.1), the same shape as <see cref="IsSignupOpen"/> / <see
+    /// cref="NotifyAdminsOnSignup"/> / <see cref="MessagingEnabled"/>.
+    /// Defaults to <c>Off</c> — the deliberate <b>inverse</b> of the
+    /// codebase <c>true</c>-floor convention (like <see
+    /// cref="MessagingEnabled"/>): a missing settings row reads as
+    /// <b>off</b> (the <c>Off</c> floor, ADR 0304 §Amendments). The read
+    /// floor (missing row → <c>Off</c>) is resolved in the Core read seam
+    /// (<see cref="Kumunita.Core.Identity.IIdentityService
+    /// .GetResidentInviteSettingAsync"/>), not here.
+    /// </summary>
+    public Kumunita.Core.Identity.ResidentInviteSetting ResidentInviteSetting { get; set; } = Kumunita.Core.Identity.ResidentInviteSetting.Off;
+
+    /// <summary>
     /// M20 (ADR 0121, D6) — how often the §6.4 notification-flush job re-checks
     /// the held (deferred) notification emails, in **minutes**. An *additive*
     /// field on the singleton (ADR 0004 §B.1), the same shape as
