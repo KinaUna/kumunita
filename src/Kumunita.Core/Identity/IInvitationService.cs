@@ -29,12 +29,18 @@ namespace Kumunita.Core.Identity;
 /// <para>
 /// **Pure Core — no Web coupling (ADR 0304 D3):** A08's <c>?invite=</c>
 /// sign-up wiring, A09's <c>/admin/invitations</c> surface, and A12's
-/// resident "Invite a neighbour" all call this seam; the Web host
-/// precomputes the token hash with the one shared
-/// <c>IdentityService.Sha256Hex</c> digest (the
-/// <c>FindTokenAsync</c> local-constant pattern) and hands it to
-/// <see cref="ValidateAsync"/> / <see cref="AcceptAsync"/> — the digest is
-/// never inside a <c>.Where(...)</c> expression.
+/// resident "Invite a neighbour" all call this seam. The hash-based seams
+/// (<see cref="ValidateAsync"/> / <see cref="AcceptAsync"/>) take a
+/// precomputed digest (the <c>IdentityService.FindTokenAsync</c>
+/// local-constant pattern — the digest is never inside a
+/// <c>.Where(...)</c> expression); the **presented-token** overloads
+/// (<see cref="ValidatePresentedAsync"/> / <see cref
+/// "AcceptPresentedAsync"/>, IMPROVE-UX A08) accept the raw token and hash
+/// it in **this** assembly with the one shared <c>IdentityService
+/// .Sha256Hex</c> digest, then delegate to the hash-based seams (the ADR
+/// 0302 <c>KioskLinkService.ValidatePresentedAsync</c> **Trap A** shape —
+/// the Web host cannot hash, <c>Sha256Hex</c> is <c>internal</c>, so the
+/// digest lives in exactly one place).
 /// </para>
 /// </summary>
 public interface IInvitationService
@@ -147,5 +153,83 @@ public interface IInvitationService
     /// value).</returns>
     Task<ThinPrincipal> AcceptAsync(
         string tokenHash, string email, string displayName, string password,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Validates a <b>presented raw token</b> for the sign-up gate (ADR 0304
+    /// D3, IMPROVE-UX A08) — the A08 <c>?invite=</c> gate's read seam.
+    /// <para>
+    /// **Trap A (hash in one place):** the Web host cannot hash the presented
+    /// token — <see cref="IdentityService.Sha256Hex"/> is <c>internal</c> to
+    /// the Core assembly (no <c>InternalsVisibleTo</c> to the Web host), and
+    /// re-implementing the digest in the Web layer is a divergence risk that
+    /// breaks the "the hash is one fact" invariant the
+    /// <see cref="Kumunita.Core.Kiosk.KioskLinkService"/> / <see cref
+    /// "Kumunita.Core.ErrorReports.EscalationTokenService"/> keep. This
+    /// overload hashes the raw token with that one existing hasher and
+    /// delegates to the hash-based <see cref="ValidateAsync"/>, so the digest
+    /// lives in exactly one place (this assembly).
+    /// </para>
+    /// <para>
+    /// **Owner-less by design** (the invitation has no owner session at the
+    /// gate): the token is the credential, discovered by the lookup — so this
+    /// overload takes **only** the presented token and returns the
+    /// <see cref="Invitation"/> row (which carries
+    /// <see cref="Invitation.Email"/> — the address the A08 gate prefills
+    /// and must-match-pins) when the token is a live <see cref
+    /// "EmailInvitationStatus.Pending"/> row, else <b><c>null</c></b> (the
+    /// caller renders the closed shape). A blank token is refused (the
+    /// <see cref="ValidateAsync"/> guard). No audit row is written (the M35·5
+    /// "the read is not an access decision" floor — the access decision is
+    /// A08's sign-up gate's job).
+    /// </para>
+    /// </summary>
+    /// <param name="presentedToken">The raw token as presented by the viewer
+    /// (the A08 <c>?invite=</c> query param / hidden form field) — hashed
+    /// here, never compared raw.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The matching live <see cref="Invitation"/> row, or
+    /// <c>null</c> (absent / accepted / revoked / past-expiry / blank — the
+    /// caller renders the closed shape).</returns>
+    Task<Invitation?> ValidatePresentedAsync(
+        string presentedToken, CancellationToken ct = default);
+
+    /// <summary>
+    /// Accepts a <b>presented raw token</b> for the sign-up write path (ADR
+    /// 0304 D3, IMPROVE-UX A08) — the A08 <c>?invite=</c> POST's write seam.
+    /// <para>
+    /// **Trap A (hash in one place):** the Web host cannot hash the presented
+    /// token — <see cref="IdentityService.Sha256Hex"/> is <c>internal</c> to
+    /// the Core assembly (no <c>InternalsVisibleTo</c> to the Web host). This
+    /// overload hashes the raw token with that one existing hasher and
+    /// delegates to the hash-based <see cref="AcceptAsync"/>, so the digest
+    /// lives in exactly one place (this assembly).
+    /// </para>
+    /// <para>
+    /// **Contract:** identical to <see cref="AcceptAsync"/> (the token is
+    /// verified, the signing-up email must match
+    /// <see cref="Invitation.Email"/>, the
+    /// <see cref="IIdentityService.RegisterAsync"/> lane runs, the row is
+    /// marked <see cref="EmailInvitationStatus.Accepted"/>, one
+    /// <c>invitation.accept</c> audit row is written, the
+    /// <see cref="ThinPrincipal"/> is returned). A blank token is refused
+    /// (the <see cref="ValidatePresentedAsync"/> guard).
+    /// </para>
+    /// </summary>
+    /// <param name="presentedToken">The raw token as presented by the viewer
+    /// (the A08 <c>?invite=</c> hidden form field) — hashed here, never
+    /// compared raw.</param>
+    /// <param name="email">The signing-up email (must match
+    /// <see cref="Invitation.Email"/>).</param>
+    /// <param name="displayName">The new account's display name (passed to
+    /// <see cref="IIdentityService.RegisterAsync"/>).</param>
+    /// <param name="password">The new account's password (passed to
+    /// <see cref="IIdentityService.RegisterAsync"/>).</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The <see cref="ThinPrincipal"/> for the newly created
+    /// account (the <see cref="IIdentityService.RegisterAsync"/> return
+    /// value).</returns>
+    Task<ThinPrincipal> AcceptPresentedAsync(
+        string presentedToken, string email, string displayName, string password,
         CancellationToken ct = default);
 }

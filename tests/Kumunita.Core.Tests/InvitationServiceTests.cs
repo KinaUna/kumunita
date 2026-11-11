@@ -277,6 +277,137 @@ public sealed class InvitationServiceTests(PostgresFixture fixture) : IClassFixt
         await store.DisposeAsync();
     }
 
+    // ── A08 — the presented-token overloads and the hash-based seams agree ──
+    // Trap A (ADR 0304 D3, IMPROVE-UX A08): the hashing lives in ONE place
+    // (IdentityService.Sha256Hex, internal to Core). The A08 sign-up gate
+    // hashes the presented token via ValidatePresentedAsync / AcceptPresentedAsync
+    // and must agree with a hash-based ValidateAsync / AcceptAsync lookup on the
+    // SAME token — a drift between the two would be a divergence risk the "the
+    // hash is one fact" invariant forbids (the KioskLinkService R16 /
+    // EscalationTokenService precedent this ADR names as its template).
+
+    [Fact]
+    public async Task ADR0304_A08_PresentedOverload_AgreesWithHashBasedValidate()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+        var hash = TestSha256Hex(token);   // the test-local mirror of Sha256Hex
+
+        // The presented-token overload (owner-less — the sign-up gate has no
+        // owner session) returns the SAME row the hash-based seam returns for
+        // the same token (the two paths must not diverge — the one-fact
+        // invariant).
+        var presented = await svc.ValidatePresentedAsync(token, ct);
+        Assert.NotNull(presented);
+        Assert.Equal(row.Id, presented!.Id);
+        Assert.Equal(row.Id, (await svc.ValidateAsync(hash, ct))!.Id);
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ADR0304_A08_PresentedOverload_RefusesBlankRevokedExpiredAndUnknown()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Blank / empty presented tokens refuse (the ESC·5 guard — no session,
+        // no store hit).
+        Assert.Null(await svc.ValidatePresentedAsync(string.Empty, ct));
+        Assert.Null(await svc.ValidatePresentedAsync("   ", ct));
+
+        // Unknown token refuses (no matching row).
+        Assert.Null(await svc.ValidatePresentedAsync("kinv_never-created", ct));
+
+        // Revoked token refuses (the revoked case, owner-less).
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+        Assert.NotNull(await svc.ValidatePresentedAsync(token, ct));   // valid while live
+        Assert.True(await svc.RevokeAsync(row.Id, Inviter, ct));
+        Assert.Null(await svc.ValidatePresentedAsync(token, ct));      // refused after revoke
+
+        // Expired token refuses (the virtual-Expired state, ADR 0304 D1/D6).
+        var (expired, _) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddHours(-1), ct);
+        Assert.Null(await svc.ValidatePresentedAsync(expired, ct));
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ADR0304_A08_PresentedAccept_MatchingEmail_RunsTheLane()
+    {
+        var (svc, store, identity) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+
+        // The IIdentityService.RegisterAsync stub returns a sentinel principal
+        // (the test does not need a real account).
+        identity.RegisterAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
+        .Returns(callInfo => Task.FromResult(
+            new ThinPrincipal(
+                SubjectId: "new-account-a08",
+                ExternalId: null,
+                IsVerifiedResident: false,
+                Roles: ThinPrincipal.NoRoles)));
+
+        // The presented-token write seam (the A08 POST's entry point) runs the
+        // RegisterAsync lane + marks the row Accepted (the same contract as the
+        // hash-based AcceptAsync — the one-fact invariant).
+        var principal = await svc.AcceptPresentedAsync(
+            token, InvitedEmail, "Invitee Name", "Sup3rSecret!", ct);
+        Assert.Equal("new-account-a08", principal!.SubjectId);
+
+        // The row is now Accepted (the single-use pin, ADR 0304 D4).
+        var reloaded = (await store.OpenSession(new Marten.Services.SessionOptions())
+            .LoadAsync<Invitation>(row.Id, ct))!;
+        Assert.Equal(EmailInvitationStatus.Accepted, reloaded.Status);
+        await identity.Received(1).RegisterAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ADR0304_A08_PresentedAccept_MismatchedEmail_IsRefused()
+    {
+        var (svc, store, identity) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, _) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+
+        // A different email than the one on the invitation is refused (the
+        // ADR 0304 D4 single-address pin — the token is only good for the
+        // invited address). The RegisterAsync lane is NOT reached.
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.AcceptPresentedAsync(
+                token, OtherEmail, "Other Name", "Sup3rSecret!", ct));
+        await identity.DidNotReceive()
+            .RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ADR0304_A08_PresentedAccept_BlankToken_IsRefused()
+    {
+        var (svc, store, identity) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        // A blank token refuses before any hash/lookup (the ESC·5 guard — the
+        // same refusal shape as the hash-based AcceptAsync's invalid-token case).
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.AcceptPresentedAsync(string.Empty, InvitedEmail, "N", "P", ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.AcceptPresentedAsync("   ", InvitedEmail, "N", "P", ct));
+        await identity.DidNotReceive()
+            .RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        await store.DisposeAsync();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh <c>mt</c> schema in a new scratch database — the

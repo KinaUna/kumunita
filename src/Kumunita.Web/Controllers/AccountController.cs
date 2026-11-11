@@ -49,7 +49,18 @@ public sealed class AccountController(
     // that construct this controller with the four original args keep compiling;
     // DI always supplies the live scheduler in the app, and the R13 Delete
     // tests pass an NSubstitute explicitly.
-    IDeletionScheduler? scheduler = null) : Controller
+    IDeletionScheduler? scheduler = null,
+    // ADR 0304 (IMPROVE-UX A08) — the email invitation seam (A07's Core
+    // service, DI-registered in the Identity module): the `?invite=` gate
+    // opens the self-service surface while the ADR 0050 gate is closed and
+    // runs the AcceptPresentedAsync write (RegisterAsync + the Accepted mark
+    // + the invitation.accept audit row). OPTIONAL (the `IDeletionScheduler?`
+    // harness idiom) so the existing direct-construction harnesses keep
+    // compiling; DI always supplies it, and the A08 tests pass an
+    // NSubstitute. When null AND a token is presented, the gate decides
+    // (fail-closed — no account is created on an unresolvable seam; the
+    // SignupClosed floor holds, which is the ADR 0050 invariant).
+    IInvitationService? invitationService = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
@@ -595,20 +606,42 @@ public sealed class AccountController(
 
     [AllowAnonymous]
     [HttpGet]
-    public async Task<IActionResult> Signup()
+    public async Task<IActionResult> Signup([FromQuery] string? invite = null)
     {
         if (User.Identity?.IsAuthenticated == true)
             return Redirect("/");   // ADR 0238 — already signed in: Home, not the new-resident profile step
 
-        // ADR 0050 — the sign-up gate (the admin-settled instance value, the
-        // `false` floor — a fresh instance ships invitation-only). Closed → the
-        // invitation-only notice instead of the form;
-        // the gate is authoritative (an authenticated admin still creates accounts
-        // through the Guardian / admin lanes, not this self-service surface).
-        if (!await identity.IsSignupOpenAsync())
-            return View("SignupClosed", new SignupClosedViewModel());
-
         var model = new SignupViewModel();
+
+        // ADR 0304 (IMPROVE-UX A08) — resolve the presented invitation token
+        // (the `?invite=` query param) via the Core presented-token seam (Trap A:
+        // the hashing lives in one place, in Core — the Web host cannot hash).
+        // A live token prefills the invited email (Invitation.Email) and marks
+        // InvitationActive — the form then renders EVEN WHEN the ADR 0050 gate is
+        // closed (the ADR 0304 D4 "works while sign-up is closed" invariant).
+        // The token is a credential (ADR 0304 D2) — carried into the POST via a
+        // hidden field (model.InviteToken), never a visible form control.
+        var token = NormalizeToken(invite);
+        if (token is not null && invitationService is not null)
+        {
+            var invitation = await invitationService.ValidatePresentedAsync(token);
+            if (invitation is not null)
+            {
+                model.InvitationActive = true;
+                model.Email         = invitation.Email;   // prefill the invited address
+                model.InviteToken   = token;               // the hidden field's value
+            }
+        }
+
+        // ADR 0050 — the sign-up gate (the admin-settled instance value, the
+        // `false` floor — a fresh instance ships invitation-only). Closed + no
+        // valid token → the invitation-only notice instead of the form. The gate
+        // is authoritative (an authenticated admin still creates accounts through
+        // the Guardian / admin lanes, not this self-service surface); a valid
+        // invitation is the ADR 0304 exception that opens the surface — the gate
+        // is not bypassed.
+        if (!await identity.IsSignupOpenAsync() && !model.InvitationActive)
+            return View("SignupClosed", new SignupClosedViewModel());
 
         // F9 (AUTH-15, U3) — surface the flag + site key to the view (pin §4b): the
         // challenge widget + the hidden BotChallengeToken input render ONLY when the
@@ -637,11 +670,25 @@ public sealed class AccountController(
     [EnableRateLimiting("signup")]
     public async Task<IActionResult> Signup(SignupViewModel model)
     {
+        // ADR 0304 (IMPROVE-UX A08) — resolve the presented invitation token
+        // (the hidden `InviteToken` form field, echoed from the GET's
+        // `?invite=` query param) via the Core presented-token seam. The token
+        // is a credential (ADR 0304 D2) — never compared raw here; the hashing
+        // + email-match pin live in Core (Trap A). A live token lets the
+        // write path through EVEN WHEN the ADR 0050 gate is closed (the
+        // ADR 0304 D4 "works while sign-up is closed" invariant).
+        var token = NormalizeToken(model.InviteToken);
+        Invitation? invitation = null;
+        if (token is not null && invitationService is not null)
+            invitation = await invitationService.ValidatePresentedAsync(token);
+
         // ADR 0050 — the gate is authoritative on the write path too (the GET hides
         // the form, but the POST is the actual account-creation surface): a closed
-        // gate denies the self-service write. A resident who is *invited* is added
-        // by an administrator, not through this endpoint.
-        if (!await identity.IsSignupOpenAsync())
+        // gate denies the self-service write — UNLESS a live invitation is
+        // presented (the ADR 0304 exception that opens the surface; the gate is
+        // not bypassed, the invitation IS the exception). Closed + no live token
+        // (absent / invalid / expired / revoked) → the ADR 0050 floor holds.
+        if (!await identity.IsSignupOpenAsync() && invitation is null)
             return View("SignupClosed", new SignupClosedViewModel());
 
         if (!ModelState.IsValid)
@@ -673,6 +720,66 @@ public sealed class AccountController(
             return View(model);
         }
 
+        // ADR 0304 (IMPROVE-UX A08) — a live invitation (regardless of the gate
+        // state) takes the invitation write seam: the single-address pin + the
+        // RegisterAsync lane + the Accepted mark + the invitation.accept audit
+        // row, in one Core lane (A07's AcceptAsync contract — the
+        // AcceptPresentedAsync overload delegates to it, Trap A). The invited
+        // person lands on the same "check your inbox" flash as the open-gate path.
+        if (invitation is not null && token is not null)
+        {
+            // ADR 0304 D4 (IMPROVE-UX A08) — the single-address pin: the signing-up
+            // email must match the invitation's (the token is only good for the
+            // invited address). A07's AcceptAsync enforces this in Core (step 2,
+            // before the RegisterAsync lane); the Web surface checks it FIRST so a
+            // mismatch re-renders with a friendly notice + the invited email
+            // refilled (the EmailDomainDisallowed / BotChallengeFailed
+            // re-render-with-flag precedent), instead of surfacing a raw exception.
+            // The Core check remains the source of truth (this is a UX shortcut,
+            // not a security gate).
+            if (!string.Equals(
+                    model.Email.Trim().ToLowerInvariant(), invitation.Email,
+                    StringComparison.Ordinal))
+            {
+                model.InvitationActive = true;   // the token is still live — only the email was wrong
+                model.InvitationMismatch = true;
+                model.Email = invitation.Email;   // refill the invited address for the retry
+                ModelState.AddModelError(string.Empty, await this.FlashAsync(
+                    "account.signup_invite_email_mismatch",
+                    "This invitation is for a different email address. Please sign up with the invited address."));
+                return View(model);
+            }
+
+            try
+            {
+                await invitationService!.AcceptPresentedAsync(
+                    token, model.Email, model.DisplayName, model.Password);
+            }
+            catch (DisallowedEmailDomainException ex)
+            {
+                // F9 (AUTH-15) — the disposable-email blocklist rejection (caught
+                // BEFORE the InvalidOperationException catch — pin §3b).
+                model.EmailDomainDisallowed = true;
+                ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.domain_not_accepted", "The email domain '{0}' is not accepted for new accounts.", ex.Domain));
+                return View(model);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // A07's AcceptAsync refusal (the row is no longer Pending — e.g. a
+                // second accept, a revoked/expired token) or a RegisterAsync failure
+                // (e.g. the invited email already has an account). Friendly
+                // re-render, not a crash (the EmailAlreadyExists precedent).
+                if (ex.Message.StartsWith("An account with email", StringComparison.OrdinalIgnoreCase))
+                    model.EmailAlreadyExists = true;
+                ModelState.AddModelError(string.Empty, ex.Message);
+                return View(model);
+            }
+
+            TempData["info"] = await this.FlashAsync("account.flash_created", "Account created. Check your inbox for the verification link.");
+            return RedirectToAction(nameof(Login));
+        }
+
+        // ── open-gate path (no live invitation) ─────────────────────────────
         try
         {
             // RegisterAsync: creates the unverified account, bootstraps the Profile
@@ -701,6 +808,16 @@ public sealed class AccountController(
         TempData["info"] = await this.FlashAsync("account.flash_created", "Account created. Check your inbox for the verification link.");
         return RedirectToAction(nameof(Login));
     }
+
+    /// <summary>
+    /// The A08 (IMPROVE-UX A08) token normalizer: trims a presented
+    /// <c>?invite=</c> / hidden-field value and returns <c>null</c> for a blank
+    /// one (the ESC·5 guard — the seam then refuses it and opens no session).
+    /// The raw value is passed through unchanged otherwise (the hashing is Core's
+    /// job — Trap A).
+    /// </summary>
+    private static string? NormalizeToken(string? presented) =>
+        string.IsNullOrWhiteSpace(presented) ? null : presented.Trim();
 
     // ── Resend confirmation email (an unactivated account already exists for the email) ──
 

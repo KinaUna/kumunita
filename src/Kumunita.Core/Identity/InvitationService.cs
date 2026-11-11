@@ -207,6 +207,53 @@ public sealed class InvitationService(IDocumentStore store, IIdentityService ide
         return principal;
     }
 
+    /// <inheritdoc />
+    public Task<Invitation?> ValidatePresentedAsync(
+        string presentedToken, CancellationToken ct = default)
+    {
+        // A blank presented token cannot match any stored hash (the ESC·5
+        // guard — and it keeps the blank case from opening a session).
+        if (string.IsNullOrWhiteSpace(presentedToken))
+        {
+            return Task.FromResult<Invitation?>(null);
+        }
+
+        // Trap A (ADR 0304 D3, IMPROVE-UX A08) — the hash lives in ONE place:
+        // the shared internal hasher (the IdentityService.Sha256Hex
+        // implementation — the sibling in KioskLinkService hashes identically,
+        // pinned by the A08 "the presented-token overload and the hash-based
+        // seam agree" test). The Web host cannot call it (internal, no
+        // InternalsVisibleTo), so the hashing is in this assembly; the
+        // presented token never enters a .Where(...) expression (the
+        // FindTokenAsync precomputed-constant pattern).
+        var tokenHash = IdentityService.Sha256Hex(presentedToken);
+        return ValidateAsync(tokenHash, ct);
+    }
+
+    /// <inheritdoc />
+    public Task<ThinPrincipal> AcceptPresentedAsync(
+        string presentedToken, string email, string displayName, string password,
+        CancellationToken ct = default)
+    {
+        // A blank presented token cannot match any stored hash (the ESC·5
+        // guard — refuse before hashing, the ValidatePresentedAsync shape).
+        if (string.IsNullOrWhiteSpace(presentedToken))
+        {
+            throw new InvalidOperationException(
+                "The invitation token is invalid, expired, or already used.");
+        }
+
+        // Trap A (ADR 0304 D3, IMPROVE-UX A08) — the hash lives in ONE place
+        // (the IdentityService.Sha256Hex shared hasher — the Web host cannot
+        // call it, internal, no InternalsVisibleTo); the presented token never
+        // enters a .Where(...) expression. Delegate to the hash-based seam so
+        // the contract (email match, RegisterAsync, the Accepted mark, the one
+        // invitation.accept audit row, the ThinPrincipal return) is shared
+        // verbatim — the two paths must not diverge (the one-fact invariant).
+        var tokenHash = IdentityService.Sha256Hex(presentedToken);
+        return AcceptAsync(tokenHash, email, displayName, password, ct);
+    }
+
     // ── private helpers ────────────────────────────────────────────────────
 
     /// <summary>The one <c>AccessAudit</c> row shape the invitation lane
