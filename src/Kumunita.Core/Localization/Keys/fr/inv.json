@@ -24,5 +24,6 @@
   "inv.detail.checkIn": "Restituer",
   "inv.edit.title": "Modifier l\u0027article",
   "inv.edit.submit": "Enregistrer les modifications",
-  "inv.item.delete_confirm": "Supprimer cet article ? Cela ne peut pas \u00EAtre annul\u00E9."
+  "inv.item.delete_confirm": "Supprimer cet article ? Cela ne peut pas \u00EAtre annul\u00E9.",
+  "inv.list.empty_title": "Aucun article pour l\u0027instant."
 }

@@ -48,5 +48,7 @@
   "documents.folder_flash_created": "Ordner erstellt.",
   "documents.folder_flash_renamed": "Ordner umbenannt.",
   "documents.folder_flash_moved": "Ordner verschoben.",
-  "documents.folder_flash_deleted": "Ordner gel\u00F6scht."
+  "documents.folder_flash_deleted": "Ordner gel\u00F6scht.",
+  "documents.empty_title": "Noch keine Dokumente.",
+  "documents.deleted_empty_title": "Keine gel\u00F6schten Dokumente."
 }

@@ -106,7 +106,16 @@
         <div class="airy-ann-list">
             @if (Model.Items.Count == 0)
             {
-                <div class="p-4 text-muted"><kw-l key="inv.list.empty">No items yet.</kw-l></div>
+                @* R32 (IMPROVE-UX) — the house .kmb-empty idiom (title + body +
+                   one next action); the body is the existing inv.list.empty
+                   sentence and the action reuses the page's New-item button. *@
+                <div class="kmb-empty">
+                    <p class="kmb-empty-title"><kw-l key="inv.list.empty_title">No items yet.</kw-l></p>
+                    <p class="kmb-empty-body">
+                        <kw-l key="inv.list.empty">No items yet.</kw-l>
+                    </p>
+                    <a class="btn btn-primary" href="/inventory/new"><kw-l key="inv.create.title">New item</kw-l></a>
+                </div>
             }
             @foreach (var row in Model.Items)
             {

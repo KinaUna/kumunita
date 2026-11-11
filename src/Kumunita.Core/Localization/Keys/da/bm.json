@@ -21,5 +21,6 @@
   "bm.folder.rename": "Omd\u00F8b mappe",
   "bm.folder.delete": "Slet mappe",
   "bm.folder.empty": "Ingen bogm\u00E6rker i denne mappe endnu.",
-  "bm.bookmark.move": "Flyt"
+  "bm.bookmark.move": "Flyt",
+  "bm.list.empty_title": "Ingen bogm\u00E6rker endnu."
 }

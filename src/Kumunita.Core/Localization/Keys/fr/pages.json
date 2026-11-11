@@ -47,5 +47,6 @@
   "pages.form.submit_create": "Cr\u00E9er la page",
   "pages.form.submit_save": "Enregistrer les modifications",
   "pages.reset_confirm": "R\u00E9initialiser cette page au texte seed\u00E9 ? Toutes les modifications que tu as apport\u00E9es au corps (anglais) et \u00E0 ses traductions allemandes / fran\u00E7aises / danoises seront \u00E9cras\u00E9es par la baseline seed\u00E9e. Le reste de la page (public, parent, etc.) n\u0027est pas touch\u00E9.",
-  "pages.delete_confirm": "Supprimer cette page ?"
+  "pages.delete_confirm": "Supprimer cette page ?",
+  "pages.none_title": "Aucune page pour l\u0027instant."
 }

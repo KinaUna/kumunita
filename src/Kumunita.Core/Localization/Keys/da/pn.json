@@ -38,5 +38,6 @@
   "pn.folder.new": "Ny mappe",
   "pn.folder.rename": "Omd\u00F8b mappe",
   "pn.folder.delete": "Slet mappe",
-  "pn.folder.empty": "Ingen noter i denne mappe endnu."
+  "pn.folder.empty": "Ingen noter i denne mappe endnu.",
+  "pn.list.empty_title": "Ingen noter endnu."
 }

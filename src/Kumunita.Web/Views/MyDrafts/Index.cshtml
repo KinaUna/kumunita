@@ -16,8 +16,18 @@
 
         @if (!any)
         {
-            <div class="alert alert-light border">
-                <kw-l key="my_drafts.empty">You have no drafts.</kw-l>
+            @* R32 (IMPROVE-UX) — the house .kmb-empty idiom (title + body + one
+               next action). The body is the existing my_drafts.empty sentence.
+               This page has no New button (drafts are saved from the post /
+               announcement / event composers elsewhere), so the one action is
+               the community feed — the natural "start something to draft"
+               destination (the R29 Directory/Index precedent). *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="my_drafts.empty_title">No drafts yet.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="my_drafts.empty">You have no drafts.</kw-l>
+                </p>
+                <a class="btn btn-outline-secondary" href="/community"><kw-l key="about.cta_feed">See the feed</kw-l></a>
             </div>
         }
 

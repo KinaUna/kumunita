@@ -47,5 +47,6 @@
   "pages.form.submit_create": "Create page",
   "pages.form.submit_save": "Save changes",
   "pages.reset_confirm": "Reset this page to the seeded text? Any edits you made to the body (English) and to its German / French / Danish translations will be overwritten with the seeded baseline. The rest of the page (audience, parent, etc.) is untouched.",
-  "pages.delete_confirm": "Delete this page?"
+  "pages.delete_confirm": "Delete this page?",
+  "pages.none_title": "No pages yet."
 }

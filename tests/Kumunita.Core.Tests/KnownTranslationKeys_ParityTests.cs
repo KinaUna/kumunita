@@ -287,18 +287,22 @@ public class KnownTranslationKeys_ParityTests
     // a non-empty value. The M17 parity-test precedent (the about.* /
     // footer.platform.* closed-set shape re-used).
 
-    [Fact(DisplayName = "M37: the 40 pn.* keys (ADR 0167 §kw-l) are registered in all four languages with non-empty values")]
+    [Fact(DisplayName = "M37: the 41 pn.* keys (ADR 0167 §kw-l) are registered in all four languages with non-empty values")]
     public void KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages()
     {
-        // The ADR 0167 §kw-l closed contract — exactly 40 keys (the original
+        // The ADR 0167 §kw-l closed contract — exactly 41 keys (the original
         // 24 + 5 announcement/modal extension + 1 page-level inventory + 10
         // page-level kinds — the 2026-10-25 page-level notes lane, ADR 0167
-        // amendment: one note per named platform page).
+        // amendment: one note per named platform page — + IMPROVE-UX R32's
+        // pn.list.empty_title, the empty-state title line).
         var pnKeys = new[]
         {
             "pn.nav",
             "pn.list.title",
             "pn.list.empty",
+            // IMPROVE-UX R32 (2026-11-11) — the Notes empty-state title (the
+            // house .kmb-empty idiom's title line) joins the closed set.
+            "pn.list.empty_title",
             "pn.list.degraded",
             "pn.list.kind.post",
             "pn.list.kind.grouppost",
@@ -343,8 +347,9 @@ public class KnownTranslationKeys_ParityTests
             "pn.folder.empty",
         };
 
-        Assert.True(pnKeys.Length == 40,
-            "the pn.* closed set must be exactly 40 keys");
+        // IMPROVE-UX R32 (2026-11-11) — the closed set is 40 -> 41 (pn.list.empty_title).
+        Assert.True(pnKeys.Length == 41,
+            "the pn.* closed set must be exactly 41 keys");
         Assert.True(new HashSet<string>(pnKeys).Count == pnKeys.Length,
             "the pn.* closed set must have no duplicate names");
 
@@ -366,12 +371,13 @@ public class KnownTranslationKeys_ParityTests
             }
         }
 
-        // The list is closed: every pn.* key in the registry is one of the 40
+        // The list is closed: every pn.* key in the registry is one of the 41
         // contract keys (no drift in either direction — the parity pin).
+        // IMPROVE-UX R32 (2026-11-11) — 40 -> 41 (pn.list.empty_title joined).
         var registryPnKeys =
             KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("pn.")).ToList();
-        Assert.True(registryPnKeys.Count == 40,
-            "the registry's pn.* key set is not the closed 40-key §kw-l set");
+        Assert.True(registryPnKeys.Count == 41,
+            "the registry's pn.* key set is not the closed 41-key §kw-l set");
         Assert.Equal(pnKeys.OrderBy(k => k).ToList(),
             registryPnKeys.OrderBy(k => k).ToList());
     }

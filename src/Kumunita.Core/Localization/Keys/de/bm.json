@@ -21,5 +21,6 @@
   "bm.folder.rename": "Ordner umbenennen",
   "bm.folder.delete": "Ordner l\u00F6schen",
   "bm.folder.empty": "Noch keine Lesezeichen in diesem Ordner.",
-  "bm.bookmark.move": "Verschieben"
+  "bm.bookmark.move": "Verschieben",
+  "bm.list.empty_title": "Noch keine Lesezeichen."
 }

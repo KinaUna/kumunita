@@ -47,5 +47,6 @@
   "pages.form.submit_create": "Opret side",
   "pages.form.submit_save": "Gem \u00E6ndringer",
   "pages.reset_confirm": "Nulstil denne side til seedteksten? Alle \u00E6ndringer, du har foretaget i teksten (engelsk) og i dens tyske / franske / danske overs\u00E6ttelser, bliver overskrevet af seed-baseline\u0027en. Resten af siden (publikum, for\u00E6lder, etc.) er uber\u00F8rt.",
-  "pages.delete_confirm": "Slet denne side?"
+  "pages.delete_confirm": "Slet denne side?",
+  "pages.none_title": "Ingen sider endnu."
 }

@@ -96,8 +96,15 @@
             }
             @if (Model.Visible.Count == 0)
             {
-                <div class="p-4 text-muted">
-                    <kw-l key="documents.empty">No documents are visible to you yet.</kw-l>
+                @* R32 (IMPROVE-UX) — the house .kmb-empty idiom (title + body +
+                   one next action); the body is the existing documents.empty
+                   sentence and the action reuses the page's Upload button. *@
+                <div class="kmb-empty">
+                    <p class="kmb-empty-title"><kw-l key="documents.empty_title">No documents yet.</kw-l></p>
+                    <p class="kmb-empty-body">
+                        <kw-l key="documents.empty">No documents are visible to you yet.</kw-l>
+                    </p>
+                    <a class="btn btn-primary" href="/documents/new"><kw-l key="documents.upload">Upload a document</kw-l></a>
                 </div>
             }
             @foreach (var d in Model.Visible)

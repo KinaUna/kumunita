@@ -119,6 +119,10 @@ public sealed class BookmarksControllerTests
         "bm.folder.delete",
         "bm.folder.empty",
         "bm.bookmark.move",
+        // IMPROVE-UX R32 (2026-11-11) — the Bookmarks empty-state title
+        // (the house .kmb-empty idiom's title line) joins the closed set;
+        // the set is 23 -> 24 keys.
+        "bm.list.empty_title",
     ];
 
     // ── 1 — F3_OwnerList_Loads_Their_Rows_And_NoAuditRow_Commits ─────────
@@ -386,7 +390,9 @@ public sealed class BookmarksControllerTests
             .Where(k => k.StartsWith("bm.", StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
         Assert.Equal(BmKeys.ToHashSet(StringComparer.Ordinal), actualBmKeys);
-        Assert.Equal(23, actualBmKeys.Count);
+        // IMPROVE-UX R32 (2026-11-11) — the set is now 24 keys (bm.list.empty_title
+        // joined; the 2026-10-16 inventory / directory kind labels remain).
+        Assert.Equal(24, actualBmKeys.Count);
 
         // (3) All four registries (en / de / fr / da) carry the same closed
         // set (the §kw-l parity pin — the U04 / U05 units consume the full

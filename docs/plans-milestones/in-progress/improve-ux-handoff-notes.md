@@ -1201,3 +1201,97 @@ labels (body + action) reuse existing keys. JSON edits are additions-only
     `Community/Manage`, `Community/Translations`.
 - **31 remaining NONE leads** — out of scope for the whole lane until a later
   batch.
+
+## R32 — empty states batch 4 (the 8 counted content views) — **SHIPPED**
+
+**Scope:** the *fourth* empty-states batch named in the plan. Drive the 9
+named R32 content views to the house `.kmb-empty` idiom (a short title + a
+body + **one next action**), per the `Groups/Index.cshtml:144` reference
+(R29/R30/R31 are the closest precedent). Of the 9, **8 are counted** by the
+measure (all PLAIN); `Page/_PageTreeItem` is a `_`-prefixed partial the
+measure excludes (verified with the script's own constants before editing —
+the R29 prompt's per-view labels were partly wrong, so each view was
+re-classified: 8 PLAIN + 1 EXCLUDED, exactly as the prompt's table predicted).
+
+**Outcome:** all 8 counted views carry a `.kmb-empty` block (verified per-view);
+the `empty_plain` floor re-based **18 → 10** in `tools/ux/ux-baseline.json`
+(house-format note appended, seam clean, parses as valid JSON; `empty_none`
+**stays 31** — all 8 counted views were PLAIN, 0 NONE, so it was not
+re-based). `ux-measure.py --check` green, `dotnet build` 0 errors, the C02
+four-language key-parity test green (15/15), and the two closed-set key pins
+re-baselined to admit the new `bm.*` / `pn.*` title keys
+(`BookmarksControllerTests.BmKeys_AreTheClosedTwentyThreeKeySet` 23 → 24;
+`KnownTranslationKeys_ParityTests.KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages`
+40 → 41). 7 new title keys added (en/de/fr/da; de/fr/da machine-written,
+flagged for the parked native review); every body + action label reuses an
+existing key.
+
+### What landed (per-view before → after)
+
+**8 COUNTED views (PLAIN → `.kmb-empty`; these moved `empty_plain` 18 → 10):**
+
+- `Document/Index` — title `documents.empty_title` (new), body
+  `documents.empty`, action Upload a document (`/documents/new`,
+  `documents.upload`).
+- `Document/Deleted` — title `documents.deleted_empty_title` (new), body
+  `documents.deleted_empty`, action back to Documents (`/documents`,
+  `documents.title` — the view's own back link).
+- `Page/Index` — title `pages.none_title` (new), body `pages.none` (the long
+  plain-text sentence, unchanged), action New page (`/pages/new`,
+  `pages.new_button`) — rendered **only when signed in** (the button is
+  sign-in-gated on the page).
+- `Inventory/List` — title `inv.list.empty_title` (new, shared with
+  `Inventory/Detail`), body `inv.list.empty`, action New item
+  (`/inventory/new`, `inv.create.title`).
+- `Inventory/Detail` (the "Usage history" sub-section) — title
+  `inv.list.empty_title` (shared), body `inv.list.empty`, action **back to
+  Inventory** (`/inventory`, `inv.nav`). **Caution resolved (option a):**
+  history is append-only via check-in/check-out — there is **no "create a
+  history entry" action**, so the one next action is the back-to-inventory
+  link, *not* a misleading "new history" button. The body text
+  `inv.list.empty` ("No items yet.") is pre-existing and was **not reworded**
+  (R32 swaps the container, not the words); it reads slightly generically
+  here — recorded as a known compromise, not a new string.
+- `Bookmarks/Index` — title `bm.list.empty_title` (new), body
+  `bm.list.empty`, action New folder (`/bookmarks/folders/new`,
+  `bm.folder.new`).
+- `MyDrafts/Index` — title `my_drafts.empty_title` (new), body
+  `my_drafts.empty`, action See the feed (`/community`, `about.cta_feed`).
+  **Caution resolved:** the page has **no New button** (drafts are saved from
+  the post / announcement / event composers elsewhere), so the one next action
+  is the community feed — the R29 `Directory/Index` precedent; **no dead
+  "new draft" route was added**.
+- `Notes/Index` — title `pn.list.empty_title` (new), body `pn.list.empty`,
+  action New folder (`/notes/folders/new`, `pn.folder.new`).
+
+**1 EXCLUDED partial (the measure does not count it; a justified survivor):**
+
+- `Page/_PageTreeItem` — a collapsible per-node tree item (leaf vs. branch);
+  it has **no list-level empty branch of its own** (a leaf with no children
+  renders a plain row; a branch with children renders the `<details>` group —
+  there is no "empty list" state to make friendly). Recorded as a **justified
+  survivor** (the R31 `_BoardCard` / `_TodoDisplay` precedent) rather than
+  forced into a misleading block; the parent `Page/Index` already carries the
+  list-level friendly empty state for the zero-pages case.
+
+### New translation keys (7, en/de/fr/da; de/fr/da machine-written, flagged
+for the parked native review)
+
+`documents.empty_title`, `documents.deleted_empty_title` (→ `documents.json` ×
+4 languages); `pages.none_title` (→ `pages.json` × 4); `inv.list.empty_title`
+(→ `inv.json` × 4); `bm.list.empty_title` (→ `bm.json` × 4);
+`my_drafts.empty_title` (→ `my_drafts.json` × 4); `pn.list.empty_title` (→
+`pn.json` × 4). All other labels (body + action) reuse existing keys. JSON
+edits are additions-only (28 lines, no existing key churn; fr/da/de kept the
+local `\uXXXX` / `\u0027` escape style; every file still parses with
+`json.load`).
+
+### Parked follow-up (NOT started — R33's scope, do not open a new lane)
+
+- **10 remaining PLAIN leads** in the details/groups/guardian views named by
+  R33: `Announcement/Detail`, `Event/Detail`, `Posts/Detail`, `Groups/Detail`,
+  `Groups/_GroupMembers`, `Groups/_GroupPostReplies`, `Guardian/Detail`,
+  `Guardian/Index`, `Guardian/_GuardianEventAttendance`, `Kiosk/Index`,
+  `Locale/Index`, `Community/Manage`, `Community/Translations`.
+- **31 remaining NONE leads** — out of scope for the whole lane until a later
+  batch.

@@ -48,5 +48,7 @@
   "documents.folder_flash_created": "Folder created.",
   "documents.folder_flash_renamed": "Folder renamed.",
   "documents.folder_flash_moved": "Folder moved.",
-  "documents.folder_flash_deleted": "Folder deleted."
+  "documents.folder_flash_deleted": "Folder deleted.",
+  "documents.empty_title": "No documents yet.",
+  "documents.deleted_empty_title": "No deleted documents."
 }

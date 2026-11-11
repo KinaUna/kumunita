@@ -126,7 +126,19 @@
             <h2><kw-l key="inv.detail.history">Usage history</kw-l></h2>
             @if (Model.History.Count == 0)
             {
-                <div class="p-3 text-muted"><kw-l key="inv.list.empty">No items yet.</kw-l></div>
+                @* R32 (IMPROVE-UX) — the house .kmb-empty idiom. The body is the
+                   existing inv.list.empty sentence (shared with Inventory/List —
+                   see the handoff note for why). The action is a BACK link to the
+                   inventory list — there is no "create a history entry" action
+                   (history is append-only via check-in/check-out), so no "new
+                   history" affordance is offered. *@
+                <div class="kmb-empty">
+                    <p class="kmb-empty-title"><kw-l key="inv.list.empty_title">No items yet.</kw-l></p>
+                    <p class="kmb-empty-body">
+                        <kw-l key="inv.list.empty">No items yet.</kw-l>
+                    </p>
+                    <a class="btn btn-outline-secondary" href="/inventory"><kw-l key="inv.nav">Inventory</kw-l></a>
+                </div>
             }
             else
             {

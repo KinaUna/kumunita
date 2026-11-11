@@ -47,5 +47,6 @@
   "pages.form.submit_create": "Seite erstellen",
   "pages.form.submit_save": "\u00C4nderungen speichern",
   "pages.reset_confirm": "Diese Seite auf den Seed-Text zur\u00FCcksetzen? Alle \u00C4nderungen, die du am Text (Englisch) und an seinen deutschen / franz\u00F6sischen / d\u00E4nischen \u00DCbersetzungen vorgenommen hast, werden durch die Seed-Baseline \u00FCberschrieben. Der Rest der Seite (Zielgruppe, Elternteil, etc.) bleibt unber\u00FChrt.",
-  "pages.delete_confirm": "Diese Seite l\u00F6schen?"
+  "pages.delete_confirm": "Diese Seite l\u00F6schen?",
+  "pages.none_title": "Noch keine Seiten."
 }

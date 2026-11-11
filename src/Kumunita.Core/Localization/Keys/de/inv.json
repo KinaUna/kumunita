@@ -24,5 +24,6 @@
   "inv.detail.checkIn": "Zur\u00FCckgeben",
   "inv.edit.title": "Gegenstand bearbeiten",
   "inv.edit.submit": "\u00C4nderungen speichern",
-  "inv.item.delete_confirm": "Dieses Element l\u00F6schen? Das kann nicht r\u00FCckg\u00E4ngig gemacht werden."
+  "inv.item.delete_confirm": "Dieses Element l\u00F6schen? Das kann nicht r\u00FCckg\u00E4ngig gemacht werden.",
+  "inv.list.empty_title": "Noch keine Elemente."
 }

@@ -21,5 +21,6 @@
   "bm.folder.rename": "Rename folder",
   "bm.folder.delete": "Delete folder",
   "bm.folder.empty": "No bookmarks in this folder yet.",
-  "bm.bookmark.move": "Move"
+  "bm.bookmark.move": "Move",
+  "bm.list.empty_title": "No bookmarks yet."
 }

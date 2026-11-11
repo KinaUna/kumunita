@@ -88,7 +88,16 @@
 
         @if (Model.Groups.Count == 0)
         {
-            <div class="p-4 text-muted"><kw-l key="bm.list.empty">No bookmarks yet.</kw-l></div>
+            @* R32 (IMPROVE-UX) — the house .kmb-empty idiom (title + body +
+               one next action); the body is the existing bm.list.empty
+               sentence and the action reuses the page's New-folder button. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="bm.list.empty_title">No bookmarks yet.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="bm.list.empty">No bookmarks yet.</kw-l>
+                </p>
+                <a class="btn btn-primary" href="/bookmarks/folders/new"><kw-l key="bm.folder.new">New folder</kw-l></a>
+            </div>
         }
         else
         {
