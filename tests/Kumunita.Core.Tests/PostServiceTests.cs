@@ -1021,6 +1021,161 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
                                    && a.Outcome == AccessOutcome.Deny);
     }
 
+    // ── IMPROVE-UX A03 — UnhidePostAsync (the reversible lever) ─────────
+    //
+    // Same Moderate-gated write-lane shape as M3b·9 / M3b·11 (the F3 / F4
+    // pins) but the domain write is the inverse of HidePostAsync: a
+    // hidden post flips back to PostStatus.Active. The F4 "Removed" hard
+    // lane is irreversible by design — UnhidePostAsync does not undo a
+    // Removed post (the reversible lever only reverses Hidden).
+
+    // ── A03·1 — UnhidePostAsync_Moderator_WritesStatusActive_ViaTagIsAdmin ─
+    //
+    // A03 — a caller with a standing moderator in this component flips
+    // a hidden post back to PostStatus.Active. The M1-seam's audit
+    // record (Action = AccessAction.Moderate.Id, TargetId = the post
+    // id, Outcome = Allow) is the canonical write audit — same shape as
+    // the M3b·9 hide-lane audit (A03 is the inverse, not a new lane).
+
+    [Fact]
+    public async Task UnhidePostAsync_Moderator_WritesStatusActive_ViaTagIsAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string moderator = "u-a03-m-svc-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a03-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-a03-m-svc-admin", At = DateTimeOffset.UtcNow
+        });
+        // Plant the post in its hidden state (the A03 pin: a post that
+        // was hidden by a prior HidePostAsync call — the A03 Unhide is
+        // the inverse of that write).
+        await Plant(store, new Post
+        {
+            Id = "a03-post", ComponentId = ComponentId, AuthorId = "u-a03-m-svc-author",
+            Body = "body a03", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a03-m-svc-member"),
+            Status = PostStatus.Hidden,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.UnhidePostAsync("a03-post", moderator, session));
+
+        // The post's Status flipped back to PostStatus.Active (the A03
+        // "hidden → active round trip" pin).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a03-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Active, post!.Status);
+
+        // The canonical write record from the M1-frozen seam: the audit
+        // row for Action = AccessAction.Moderate.Id, TargetId = the
+        // post id, ActorId = the acting caller, Outcome = Allow (the
+        // M3b·9 hide-lane shape — A03 is the inverse of that write).
+        var rows = await PostAudits(store, actor: moderator);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "a03-post"
+                                   && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── A03·2 — UnhidePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState ─
+    //
+    // A03, SoD — a caller without a standing moderator in this
+    // component is denied (the M1-seam's Deny branch does not fire the
+    // domain write): the post's Status is NOT updated (it remains
+    // PostStatus.Hidden — the A03 pin: the unhide is denied, not a
+    // "do nothing" no-op), and the Deny audit row is committed. C3 — no
+    // partial write; the audit row is the only trace.
+
+    [Fact]
+    public async Task UnhidePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string caller = "u-a03-m-svc-callernon";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new Post
+        {
+            Id = "a03-denied-post", ComponentId = ComponentId, AuthorId = "u-a03-m-svc-author",
+            Body = "body a03 denied", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a03-m-svc-member"),
+            Status = PostStatus.Hidden,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.UnhidePostAsync("a03-denied-post", caller, session));
+
+        // The post's Status must remain PostStatus.Hidden (no partial
+        // write — the lane's "if (decision.Allowed)" gate did not fire).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a03-denied-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Hidden, post!.Status);
+
+        // The Deny audit row for the write attempt is committed.
+        var rows = await PostAudits(store, actor: caller);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "a03-denied-post"
+                                   && a.Outcome == AccessOutcome.Deny);
+    }
+
+    // ── A03·3 — UnhidePostAsync_AfterHide_HiddenToActive (round-trip pin) ─
+    //
+    // The A03 DoD "hidden → active round trip" pin: HidePostAsync
+    // (M3b·9) then UnhidePostAsync (A03) in sequence — the post ends
+    // at PostStatus.Active. Both audit rows commit (one Allow for
+    // hide, one Allow for unhide). The round trip is the "reversible
+    // lever" the moderation-loop close requires — the A03 DoD line.
+
+    [Fact]
+    public async Task UnhidePostAsync_AfterHide_HiddenToActive()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string moderator = "u-a03-rt-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a03-rt-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-a03-rt-admin", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a03-rt-post", ComponentId = ComponentId, AuthorId = "u-a03-rt-author",
+            Body = "body a03 rt", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a03-rt-member"),
+            Status = PostStatus.Active,
+        });
+
+        // Step 1 — the M3b·9 hide lane (Active → Hidden).
+        await RunInSession(store, async session =>
+            await svc.HidePostAsync("a03-rt-post", moderator, session));
+        await using (var mid = store.QuerySession())
+        {
+            var p = await mid.LoadAsync<Post>("a03-rt-post", TestContext.Current.CancellationToken);
+            Assert.Equal(PostStatus.Hidden, p!.Status);
+        }
+
+        // Step 2 — the A03 unhide lane (Hidden → Active).
+        await RunInSession(store, async session =>
+            await svc.UnhidePostAsync("a03-rt-post", moderator, session));
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a03-rt-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Active, post!.Status);
+
+        // Both Allow audit rows committed (the hide + the unhide).
+        var rows = await PostAudits(store, actor: moderator);
+        Assert.Equal(2, rows.Count(a => a.Action == AccessAction.Moderate.Id
+                                        && a.TargetId == "a03-rt-post"
+                                        && a.Outcome == AccessOutcome.Allow));
+    }
+
     // ── M3b·13 — PostStatus_EnumHasExactlyThreeLiterals_ActiveHiddenRemoved ─
     //
     // Shape test for §2.2.1's pin: the PostStatus enum literal set is

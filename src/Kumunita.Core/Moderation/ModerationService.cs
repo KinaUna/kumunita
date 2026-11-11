@@ -378,6 +378,55 @@ public partial class ModerationService : IModerationService
     }
 
     /// <summary>
+    /// The committed <c>Unhide</c> lane (IMPROVE-UX A03 — the reversible
+    /// lever; the <see cref="ResolveReportAsync"/> precedent's
+    /// committed-overload shape: opens its own
+    /// <see cref="Marten.IDocumentSession"/> (the C3
+    /// same-transaction lane), loads the <see cref="Report"/> row for
+    /// the <c>PostId</c>, delegates to the Posts context's
+    /// <c>PostService.UnhidePostAsync</c> (the
+    /// <see cref="Kumunita.Core.Authorization.AccessAction.Moderate"/>
+    /// -gated write lane — the <c>HidePostAsync</c> inverse), one
+    /// <c>SaveChangesAsync</c>). The <see cref="KeyNotFoundException"/>
+    /// the report read throws (an absent report) is the controller's 404
+    /// pin (the non-leaky shape — the <c>ResolveReportAsync</c> precedent).
+    /// </summary>
+    public async Task UnhidePostAsync(
+        string reportId,
+        string actorId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(reportId)) throw new ArgumentException("A report id is required.", nameof(reportId));
+        if (string.IsNullOrEmpty(actorId))  throw new ArgumentException("A moderating actor is required.", nameof(actorId));
+        if (_posts is null)
+            throw new InvalidOperationException(
+                "The posts write seam (Posts.PostService) is not wired — the " +
+                "ModerationService UnhidePostAsync seam (IMPROVE-UX A03) requires it.");
+
+        await using var session = _store.LightweightSession();
+
+        // The report read runs first: the report's KeyNotFoundException is
+        // the controller's 404 pin (non-leaky, the ResolveReportAsync
+        // precedent); the PostId is resolved here so the Posts seam does not
+        // have to re-derive it (the C-M3b·4 "no fabricated component" shape
+        // — the report is the source of the target's identity, not the
+        // caller).
+        var report = await session.LoadAsync<Report>(reportId).ConfigureAwait(false);
+        if (report is null)
+            throw new KeyNotFoundException($"Report '{reportId}' was not found.");
+
+        // Delegate to the Posts context's UnhidePostAsync (the
+        // HidePostAsync inverse — the Moderate-gated write lane, the same
+        // C3 same-transaction shape as HidePostAsync / RemovePostAsync).
+        // PostService.UnhidePostAsync commits in this session (the C3
+        // same-transaction lane, ADR 0006-E) — the audit row + the
+        // post.Status write commit atomically. The session is disposed
+        // by the await using (a second SaveChangesAsync here would be a
+        // no-op at best, a second round-trip at worst).
+        await _posts.UnhidePostAsync(report.PostId, actorId, session).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// The standing-moderator read for the <c>Assign</c> web-side
     /// defense-in-depth (IMPROVE-CODE C09 — the controller's previous
     /// <c>AnyAsync</c> read moved behind this service, ADR 0006 §D): a
@@ -662,6 +711,7 @@ public partial class ModerationService : IModerationService
             ComponentName    = report.ComponentId is not null ? componentNames.GetValueOrDefault(report.ComponentId) : null,
             Reason           = report.Reason,
             Status           = statusKey,
+            Outcome          = report.Outcome,   // IMPROVE-UX A03 — the R03 resolution outcome (the Web layer's Unhide-form predicate)
             At               = report.At,
             ReporterName     = reporter?.DisplayName,
             PostTitle        = postTitle,

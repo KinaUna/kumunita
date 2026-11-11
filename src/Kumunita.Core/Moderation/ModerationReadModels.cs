@@ -107,6 +107,16 @@ public sealed class ModerationDetailReadModel
     public string? ComponentName { get; init; }
     public string? Reason { get; init; }
     public required string Status { get; init; }
+    // IMPROVE-UX A03 — the report's resolution outcome (the R03 shape: the
+    // <see cref="Kumunita.Core.Posts.Report"/> doc's
+    // <see cref="Kumunita.Core.Posts.Report.Outcome"/> field, <c>null</c>
+    // until the <c>ResolveReportAsync</c> lane writes it). The Web layer
+    // uses this to decide whether to render the A03 "Unhide" form block
+    // (shown only when the report is <c>resolved</c> AND the outcome was
+    // <see cref="Kumunita.Core.Posts.ReportOutcome.Hidden"/> — the
+    // reversible lever; a <c>Removed</c> outcome is the F4 hard lane and
+    // is irreversible by design).
+    public Kumunita.Core.Posts.ReportOutcome? Outcome { get; init; }
     public required DateTimeOffset At { get; init; }
     public string? ReporterName { get; init; }
     public string? PostTitle { get; init; }

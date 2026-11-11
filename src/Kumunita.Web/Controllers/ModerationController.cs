@@ -285,6 +285,7 @@ public sealed class ModerationController(
             PostBody        = detail.PostBody,
             ComponentName   = detail.ComponentName,
             PostAuthorName  = detail.PostAuthorName,
+            Outcome         = detail.Outcome,   // IMPROVE-UX A03 — the R03 resolution outcome (the view's Unhide-form predicate)
             ReplyId         = detail.ReplyId,
             ReplyBody       = detail.ReplyBody,
             ReplyAuthorName = detail.ReplyAuthorName,
@@ -523,5 +524,70 @@ public sealed class ModerationController(
             return NotFound();
         }
         return Redirect("/moderation");
+    }
+
+    // ── /moderation/{id}/unhide — POST (GlobalAdmin-only — A03) ─────────
+    // The A03 reversible lever (the inverse of the ResolvePost outcome-
+    // execution lane's "Hidden" outcome): a moderator who hid a post via
+    // the ResolveReportAsync outcome-execution lane can reverse the
+    // decision from the resolved report page without a fresh report.
+    // Gate shape mirrors ResolvePost — the action-level
+    // [Authorize(Roles = GlobalAdmin)] (the class-level [Authorize] is
+    // signed-in only, so a standing-moderator may read the detail but
+    // not post to this lane — the C-M3b·4 SoD display-level projection),
+    // and the Core's CanAsync(Moderate) decision gate lives inside
+    // ModerationService.UnhidePostAsync (which delegates to
+    // Posts.PostService.UnhidePostAsync — the HidePostAsync inverse,
+    // the C3 same-transaction shape; a denied call writes only the audit
+    // row, no partial state, the ADR 0006-C "audit-row always written"
+    // pin). The controller stays single-facade (the C09 shape) — it
+    // injects IModerationService, not PostService (the group-post surface
+    // uses its own controller for the same reason).
+
+    /// <summary>
+    /// The "unhide the post" submit (IMPROVE-UX A03 — the reversible
+    /// lever; the <see cref="Kumunita.Core.Posts.PostService"/>
+    /// <c>UnhidePostAsync</c> is the <c>HidePostAsync</c> inverse).
+    /// Delegates to the <see cref="IModerationService.UnhidePostAsync"/>
+    /// seam (the committed-overload shape — opens its own
+    /// <see cref="Marten.IDocumentSession"/>, loads the
+    /// <see cref="Kumunita.Core.Posts.Report"/> row for the
+    /// <c>PostId</c>, delegates to the Posts context's
+    /// <c>UnhidePostAsync</c> in that session). Same gate shape as
+    /// <see cref="ResolvePost"/> (the SoD <c>[Authorize(Roles =
+    /// GlobalAdmin)]</c> action-level attribute + the Core's
+    /// <c>CanAsync(Moderate)</c> inside the Posts context's
+    /// <c>UnhidePostAsync</c> — the two independent gates). A
+    /// <c>Removed</c> post is the F4 hard lane and is **not** reversed
+    /// by this action (the <c>UnhidePostAsync</c> writes
+    /// <see cref="Kumunita.Core.Posts.PostStatus.Active"/> unconditionally
+    /// when the decision is allowed, so the Web layer's
+    /// <c>Status == "resolved" && Outcome == Hidden</c> form predicate is
+    /// the display-level guard — a <c>Removed</c> post has
+    /// <c>Outcome == Removed</c> and the form is not rendered).
+    /// </summary>
+    [HttpPost("{id}/unhide")]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = Roles.GlobalAdmin)]
+    public async Task<IActionResult> Unhide([FromRoute] string id)
+    {
+        if (string.IsNullOrEmpty(id)) return NotFound();
+        var admin = SubjectId(User) ?? string.Empty;
+
+        try
+        {
+            // IMPROVE-UX A03 — the committed lane (the Core's own session;
+            // the Posts context's CanAsync(Moderate) decision inside
+            // PostService.UnhidePostAsync is the C3 same-transaction gate,
+            // the HidePostAsync inverse, ADR 0006 §D "route + authz +
+            // shape").
+            await moderation.UnhidePostAsync(reportId: id, actorId: admin).ConfigureAwait(false);
+            TempData["info"] = await this.FlashAsync("moderation.flash_unhidden", "Post unhidden.");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        return Redirect($"/moderation/{id}");
     }
 }

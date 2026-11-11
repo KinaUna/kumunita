@@ -46,6 +46,14 @@ public sealed class ModerationResolveViewModel
     public string? ComponentId { get; set; }
     public string? Reason { get; set; }
     public string? Status { get; set; }        // one of: filed / assigned / unlocked / resolved (or null pre-U4)
+    // IMPROVE-UX A03 — the report's resolution outcome (the R03 shape; the
+    // Web layer's "Unhide" form predicate: shown only when the report is
+    // <c>resolved</c> AND the outcome was <see
+    // cref="Kumunita.Core.Posts.ReportOutcome.Hidden"/> — the reversible
+    // lever; a <c>Removed</c> outcome is the F4 hard lane, irreversible by
+    // design; a <c>NoAction</c> / <c>Other</c> outcome has nothing to
+    // reverse).
+    public Kumunita.Core.Posts.ReportOutcome? Outcome { get; set; }
     public DateTimeOffset At { get; set; }
     public string? ReporterName { get; set; }   // IUserInfoService.GetProfileAsync read (a read, not a decision)
 

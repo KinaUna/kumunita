@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated": "2026-11-10",
-  "generated_from": "IMPROVE-UX X01 baseline on development; re-based 2026-11-10 for IMPROVE-UX R18 (ADR 0302) — bare_status 704 -> 708: R18's LinkCreate/LinkRevoke owner guards (+3 return Forbid/BadRequest) + R17's +1 that shipped without a re-base. The guards are belt-and-braces (the class-level [Authorize] + the form's linkId make them unreachable in production); re-basing rather than deleting them.",
+  "generated": "2026-11-11",
+  "generated_from": "IMPROVE-UX X01 baseline on development; re-based 2026-11-10 for IMPROVE-UX R18 (ADR 0302) — bare_status 704 -> 708: R18's LinkCreate/LinkRevoke owner guards (+3 return Forbid/BadRequest) + R17's +1 that shipped without a re-base. The guards are belt-and-braces (the class-level [Authorize] + the form's linkId make them unreachable in production); re-basing rather than deleting them. Re-based 2026-11-11 for IMPROVE-UX A03 — bare_status 708 -> 710: the new Unhide Web action (ModerationController) carries the same two belt-and-braces `return NotFound()` guards as the existing ResolvePost / Unlock / Assign actions (empty-id + catch-404), the C-M3b·4 SoD write-lane shape — the A03 reversible lever mirrors the A02 outcome-execution lane's non-leaky 404 pin by construction.",
   "counts": {
-    "bare_status": 708,
+    "bare_status": 710,
     "a11y": 95,
     "empty_plain": 37,
     "empty_none": 33,

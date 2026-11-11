@@ -247,6 +247,36 @@
     </div>
 }
 
+@* ── The A03 "Unhide" form block (the reversible lever) ─────────────
+   Shown only when the report is <c>resolved</c> AND the moderator's
+   chosen outcome was <c>Hidden</c> (the R03 shape — the
+   <c>ModerationResolveViewModel.Outcome</c> field). The "Hidden"
+   outcome's execution was <c>HidePostAsync</c> (the reversible F3 lane);
+   the "Unhide" button is its inverse (the A03 <c>UnhidePostAsync</c>
+   seam). A <c>Removed</c> outcome is the F4 hard lane — irreversible
+   by design (the moderator's free-text note is the record; the only
+   way back is a fresh post or a DB restore). A <c>NoAction</c> /
+   <c>Other</c> outcome has nothing to reverse. The display-level
+   predicate (<c>Model.Outcome == Hidden</c>) is the guard — the
+   <c>UnhidePostAsync</c> seam's <c>CanAsync(Moderate)</c> decision
+   gate is the real authorization (C-M3b·4 SoD shape, ADR 0006-C
+   "audit-row always written"). *@
+@if (Model.Status == "resolved" && Model.Outcome == Kumunita.Core.Posts.ReportOutcome.Hidden)
+{
+    <div class="card mb-4">
+        <div class="card-header"><kw-l key="moderation.unhide_header">Unhide the post</kw-l></div>
+        <div class="card-body">
+            <p class="text-muted">
+                <kw-l key="moderation.unhide_desc">This restores the post to the feed — it was hidden by a moderator when the report was resolved. The action is written to the audit log.</kw-l></p>
+            <form method="post" action="/moderation/@Model.ReportId/unhide">
+                @Html.AntiForgeryToken()
+                <button class="btn btn-secondary" type="submit"><kw-l key="moderation.unhide_submit">Unhide</kw-l></button>
+                <a href="/moderation" class="btn btn-link ms-2"><kw-l key="moderation.cancel">Cancel</kw-l></a>
+            </form>
+        </div>
+    </div>
+}
+
 <div>
     <a href="/moderation" class="btn btn-link"><kw-l key="moderation.back_to_queue">← Back to queue</kw-l></a>
 </div>

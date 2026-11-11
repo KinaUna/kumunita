@@ -230,6 +230,31 @@ public interface IModerationService
         CancellationToken ct = default);
 
     /// <summary>
+    /// The committed <c>Unhide</c> lane (IMPROVE-UX A03 — the reversible
+    /// lever that completes the moderation loop: a moderator who hid a post
+    /// via the <c>ResolvePost</c> outcome-execution lane can reverse the
+    /// decision from the resolved report page without a fresh report).
+    /// Opens its own <see cref="Marten.IDocumentSession"/>, loads the
+    /// <see cref="Kumunita.Core.Posts.Report"/> row for the report's
+    /// <c>PostId</c>, and delegates to the Posts context's
+    /// <c>PostService.UnhidePostAsync</c> (the <c>HidePostAsync</c> inverse
+    /// — the <see cref="Kumunita.Core.Authorization.AccessAction.Moderate"/>
+    /// -gated write lane, the same-transaction C3 shape as
+    /// <see cref="ResolveReportAsync"/>) — one <c>SaveChangesAsync</c>.
+    /// Throws <see cref="KeyNotFoundException"/> when the report or the
+    /// target post is absent (the controller maps to 404). The Posts
+    /// context's <c>UnhidePostAsync</c> throws its own
+    /// <see cref="KeyNotFoundException"/> when the post id is missing;
+    /// the seam's report read runs first, so the report's
+    /// <see cref="KeyNotFoundException"/> is the controller's 404 pin
+    /// (the non-leaky shape, the <c>ResolveReportAsync</c> precedent).
+    /// </summary>
+    Task UnhidePostAsync(
+        string reportId,
+        string actorId,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// The resident-facing <c>POST /posts/{postId}/report</c> intake lane
     /// (IMPROVE-CODE-2 C2-03 — added to the seam so the Web crossing of the
     /// <c>Posts</c> / <c>ReportTargets</c> controllers codes against the
