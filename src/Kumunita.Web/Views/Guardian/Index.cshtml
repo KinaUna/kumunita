@@ -97,8 +97,8 @@
                                 <form method="post" action="@Url.Action("Accept", "Guardian", new { childId = req.ChildId })">
                                     @Html.AntiForgeryToken()
                                     <div class="form-check">
-                                        <input name="GuardianConsent" type="checkbox" value="true" class="form-check-input" required />
-                                        <label class="form-check-label"><kw-l key="guardian.accept.consent.checkbox">I consent to the processing of this child's data under these terms.</kw-l></label>
+                                        <input id="accept-consent" name="GuardianConsent" type="checkbox" value="true" class="form-check-input" required />
+                                        <label class="form-check-label" for="accept-consent"><kw-l key="guardian.accept.consent.checkbox">I consent to the processing of this child's data under these terms.</kw-l></label>
                                     </div>
                                     <button type="submit" class="btn btn-primary mt-2"><kw-l key="guardian.accept">Accept &amp; agree to the terms</kw-l></button>
                                 </form>

@@ -509,8 +509,8 @@
                 @Html.AntiForgeryToken()
                 <div asp-validation-summary="All" class="text-danger mb-2"></div>
                 <div class="mb-2 form-check">
-                    <input name="Confirmed" type="checkbox" class="form-check-input" />
-                    <label class="form-check-label"><kw-l key="guardian.delete_child_confirm_checkbox">I understand the child account will be permanently deleted.</kw-l></label>
+                    <input id="delete-child-confirmed" name="Confirmed" type="checkbox" class="form-check-input" />
+                    <label class="form-check-label" for="delete-child-confirmed"><kw-l key="guardian.delete_child_confirm_checkbox">I understand the child account will be permanently deleted.</kw-l></label>
                 </div>
                 <button type="submit" class="btn btn-danger"><kw-l key="guardian.delete_child_submit">Delete account</kw-l></button>
             </form>
