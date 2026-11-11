@@ -659,7 +659,199 @@ public sealed class InvitationServiceTests(PostgresFixture fixture) : IClassFixt
         await store.DisposeAsync();
     }
 
+    // ── A10 — the inviter-acceptance nudge (IMPROVE-UX A10) ──────────────
+    // IMPROVE-UX A10: AcceptAsync step 4 emits one best-effort
+    // invitation.accepted notification to the inviter (the A07/A08
+    // acceptance moment). The card's "Done when" pins (verbatim):
+    // (a) acceptance emits one invitation.accepted notify to the inviter
+    //     (Kind, RecipientId, body carries the display name);
+    // (b) the notify is best-effort — a failing/unwired emitter does not
+    //     throw and the invitation.accept audit row + Accepted mark still
+    //     commit (the D5 posture pin);
+    // (c) idempotency — a duplicate emission of the same (invitation,
+    //     inviter) is a no-op (the stable-key pin);
+    // (d) the A08 presented-token path (AcceptPresentedAsync) emits the
+    //     SAME single notify (the two paths must not diverge).
+
+    [Fact]
+    public async Task A10_Accept_EmitsOneInvitationAcceptedNotifyToInviter()
+    {
+        var (svc, store, _, emitter) = await BootA10Async();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+        var hash = TestSha256Hex(token);
+
+        // BootA10Async has already stubbed IIdentityService.RegisterAsync to
+        // return a sentinel principal (the A07/A08 shape — the test does not
+        // need a real account).
+        var principal = await svc.AcceptAsync(
+            hash, InvitedEmail, "Invitee Name", "Sup3rSecret!", ct);
+        Assert.Equal("new-account-a10", principal!.SubjectId);
+
+        // The row is Accepted (the existing pin holds).
+        var reloaded = (await store.OpenSession(new Marten.Services.SessionOptions())
+            .LoadAsync<Invitation>(row.Id, ct))!;
+        Assert.Equal(EmailInvitationStatus.Accepted, reloaded.Status);
+
+        // One emission, to the INVITER, the right kind, the display name
+        // in the body, the stable idempotency key, the A09 /admin/invitations
+        // linkPath (// TODO ❓ the resident invite surface when A11/A12 land).
+        var emit = Assert.Single(emitter.Emitted);
+        Assert.Equal(Inviter, emit.RecipientId);
+        Assert.Equal(Kumunita.Core.Notifications.NotificationKinds.InvitationAccepted, emit.Kind);
+        Assert.Contains("Invitee Name", emit.Body);
+        Assert.Equal(
+            $"notification:{Kumunita.Core.Notifications.NotificationKinds.InvitationAccepted}:{row.Id}",
+            emit.IdempotencyKey);
+        Assert.Equal("/admin/invitations", emit.LinkPath);
+
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A10_Accept_BestEffort_FailingEmitterDoesNotThrow_AndAuditCommits()
+    {
+        var (svc, store, _, emitter) = await BootA10Async(throwingEmitter: true);
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+        var hash = TestSha256Hex(token);
+
+        // A throwing emitter must NOT propagate — the D5 posture (the
+        // EmitAccountNotificationAsync pin).
+        var ex = await RecordExceptionAsync(async () =>
+        {
+            var principal = await svc.AcceptAsync(
+                hash, InvitedEmail, "Invitee Name", "Sup3rSecret!", ct);
+            Assert.NotNull(principal);
+        });
+        Assert.Null(ex);   // no throw — the best-effort contract
+
+        // The durable record is intact: the row is Accepted + the
+        // invitation.accept audit row is present.
+        var reloaded = (await store.OpenSession(new Marten.Services.SessionOptions())
+            .LoadAsync<Invitation>(row.Id, ct))!;
+        Assert.Equal(EmailInvitationStatus.Accepted, reloaded.Status);
+        Assert.Equal("new-account-a10", reloaded.AcceptedSubjectId);
+        var audits = await AllAudits(store);
+        Assert.Contains(audits, a => a.Action == "invitation.accept");
+        // The emitter was attempted (the throw is swallowed, not skipped).
+        Assert.True(emitter.AttemptCount >= 1);
+
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A10_Accept_IdempotencyKey_IsStablePerInvitation()
+    {
+        var (svc, store, _, emitter) = await BootA10Async();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+        var hash = TestSha256Hex(token);
+
+        await svc.AcceptAsync(
+            hash, InvitedEmail, "Invitee Name", "Sup3rSecret!", ct);
+
+        // The stable key is content-derived (the F10 shape) — the invitation
+        // id is the discriminator, so a re-emission of the same
+        // (invitation, inviter) would be a no-op (the single-use pin makes
+        // a true re-accept impossible, but the key shape is content-derived
+        // regardless — a different invitation id is a different key).
+        var emit = Assert.Single(emitter.Emitted);
+        Assert.Equal(
+            $"notification:{Kumunita.Core.Notifications.NotificationKinds.InvitationAccepted}:{row.Id}",
+            emit.IdempotencyKey);
+        // The key carries the invitation id (the per-invitation discriminator).
+        Assert.Contains(row.Id, emit.IdempotencyKey);
+
+        // A DIFFERENT invitation would produce a DIFFERENT key (the shape
+        // pin): the invitation id is the discriminator, so two distinct
+        // invitations can never collide on the same key.
+        var otherInvitationId = Guid.NewGuid().ToString("N");
+        Assert.NotEqual(emit.IdempotencyKey,
+            $"notification:{Kumunita.Core.Notifications.NotificationKinds.InvitationAccepted}:{otherInvitationId}");
+
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A10_Accept_PresentedTokenPath_EmitsSameSingleNotify()
+    {
+        var (svc, store, _, emitter) = await BootA10Async();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+
+        // The presented-token seam (the A08 path) funnels into AcceptAsync —
+        // it must emit the SAME single notify (the one-fact invariant: the
+        // two paths must not diverge).
+        await svc.AcceptPresentedAsync(
+            token, InvitedEmail, "Invitee Name", "Sup3rSecret!", ct);
+
+        var emit = Assert.Single(emitter.Emitted);
+        Assert.Equal(Inviter, emit.RecipientId);
+        Assert.Equal(Kumunita.Core.Notifications.NotificationKinds.InvitationAccepted, emit.Kind);
+        Assert.Contains("Invitee Name", emit.Body);
+        Assert.Equal(
+            $"notification:{Kumunita.Core.Notifications.NotificationKinds.InvitationAccepted}:{row.Id}",
+            emit.IdempotencyKey);
+
+        await store.DisposeAsync();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
+
+    /// <summary>A10 — boot the A07 harness + a fake
+    /// <see cref="Kumunita.Core.Notifications.INotificationEmitter"/>
+    /// (the recorded emissions are the assertion target; an optional
+    /// throwing flag exercises the best-effort D5 pin).</summary>
+    private async Task<(InvitationService Svc, IDocumentStore Store, IIdentityService Identity, EmitterFake Emitter)> BootA10Async(bool throwingEmitter = false)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (svc, store, identity) = await BootAsync();
+
+        // The IIdentityService.RegisterAsync stub returns a sentinel principal
+        // (the A07/A08 shape — the test does not need a real account).
+        identity.RegisterAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
+        .Returns(callInfo => Task.FromResult(
+            new ThinPrincipal(
+                SubjectId: "new-account-a10",
+                ExternalId: null,
+                IsVerifiedResident: false,
+                Roles: ThinPrincipal.NoRoles)));
+
+        var emitter = new EmitterFake(throwingEmitter);
+        svc = new InvitationService(
+            store, identity,
+            null,       // mailer
+            null,       // baseUrlReader
+            null,       // translationProvider
+            null,       // communityOptions
+            emitter);   // notifications (A10)
+        return (svc, store, identity, emitter);
+    }
+
+    /// <summary>Captures any exception an async delegate throws (null when
+    /// none) — the best-effort pin's assertion shape.</summary>
+    private static async Task<Exception?> RecordExceptionAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex;
+        }
+    }
 
     /// <summary>Boot a fresh <c>mt</c> schema in a new scratch database — the
     /// doc types these pins read: <see cref="Invitation"/> +
@@ -798,4 +990,58 @@ internal sealed class FakeProvider(
         IReadOnlyCollection<string> keys, IReadOnlyCollection<string>? candidates) =>
         Task.FromResult<IReadOnlyDictionary<string, string>>(
             keys.ToDictionary(k => k, k => _values.GetValueOrDefault(k) ?? k));
+}
+
+/// <summary>
+/// A10 test fake — the <see cref="Kumunita.Core.Notifications.INotificationEmitter"/>
+/// the <see cref="InvitationService.AcceptAsync"/> A10 lane emits into.
+/// Records the emissions (the A10 pins: the recipient, the kind, the body,
+/// the idempotency key, the linkPath). An optional <c>throwing</c> flag
+/// exercises the best-effort D5 pin (the emitter throws; the accept lane
+/// must swallow it and still commit).
+/// </summary>
+internal sealed class EmitterFake(bool throwing = false)
+    : Kumunita.Core.Notifications.INotificationEmitter
+{
+    public List<Emission> Emitted { get; } = new();
+    public int AttemptCount { get; private set; }
+
+    private void Record(string recipientId, string kind, string idempotencyKey, string? body, string? linkPath)
+    {
+        AttemptCount++;   // the attempt was made (the D5 pin asserts this)
+        if (throwing)
+            throw new InvalidOperationException("test-throw: the emitter seam is down");
+        Emitted.Add(new Emission(recipientId, kind, idempotencyKey, body, linkPath));
+    }
+
+    public Task<Kumunita.Core.Notifications.Notification?> EmitAsync(
+        Marten.IDocumentSession session,
+        string recipientId,
+        string kind,
+        string idempotencyKey,
+        string? body,
+        CancellationToken ct = default)
+    {
+        Record(recipientId, kind, idempotencyKey, body, linkPath: null);
+        return Task.FromResult<Kumunita.Core.Notifications.Notification?>(null);
+    }
+
+    public Task<Kumunita.Core.Notifications.Notification?> EmitAsync(
+        Marten.IDocumentSession session,
+        string recipientId,
+        string kind,
+        string idempotencyKey,
+        string? body,
+        string? targetId = null,
+        string? linkPath = null,
+        string? acceptPath = null,
+        string? declinePath = null,
+        CancellationToken ct = default)
+    {
+        Record(recipientId, kind, idempotencyKey, body, linkPath);
+        return Task.FromResult<Kumunita.Core.Notifications.Notification?>(null);
+    }
+
+    public sealed record Emission(
+        string RecipientId, string Kind, string IdempotencyKey, string? Body, string? LinkPath);
 }

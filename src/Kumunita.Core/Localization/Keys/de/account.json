@@ -10,7 +10,7 @@
   "account.flash_created": "Konto erstellt. Pr\u00FCfe deinen Posteingang auf den Best\u00E4tigungslink.",
   "account.delete_confirm_dialog": "Dein Konto endg\u00FCltig l\u00F6schen? Das kann nicht r\u00FCckg\u00E4ngig gemacht werden.",
   "account.signup_closed_title": "Die Registrierung ist geschlossen",
-  "account.signup_closed_body": "Die Registrierung ist auf dieser Instanz derzeit nur per Einladung m\u00f6glich. Um ein Konto zu erhalten, bitte um einen Einladungs-Link bei einer:r Administrator:in \u2014 oder bei Nachbar:innen, die einladen d\u00fcrfen \u2014 und folge dann diesem Link, um dich anzumelden.",
+  "account.signup_closed_body": "Die Registrierung ist auf dieser Instanz derzeit nur per Einladung m\u00f6glich. Um ein Konto zu erhalten, bitte eine:n Administrator:in um einen Einladungs-Link und folge dann diesem Link, um dich anzumelden.",
   "account.signup_invite_email_hint": "Das ist die E-Mail-Adresse, mit der du eingeladen wurdest.",
   "account.signup_invite_email_mismatch": "Diese Einladung ist f\u00fcr eine andere E-Mail-Adresse. Bitte melde dich mit der eingeladenen Adresse an.",
   "account.login_title": "Anmelden",

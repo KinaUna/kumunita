@@ -10,7 +10,7 @@
   "account.flash_created": "Account created. Check your inbox for the verification link.",
   "account.delete_confirm_dialog": "Delete your account permanently? This cannot be undone.",
   "account.signup_closed_title": "Sign-up is closed",
-  "account.signup_closed_body": "Sign-up is currently invitation-only on this instance. To get an account, ask an administrator \u2014 or a neighbour who can invite \u2014 to send you an invitation link, then follow that link to sign up.",
+  "account.signup_closed_body": "Sign-up is currently invitation-only on this instance. To get an account, ask an administrator to send you an invitation link, then follow that link to sign up.",
   "account.signup_invite_email_hint": "This is the email address you were invited with.",
   "account.signup_invite_email_mismatch": "This invitation is for a different email address. Please sign up with the invited address.",
   "account.login_title": "Sign in",

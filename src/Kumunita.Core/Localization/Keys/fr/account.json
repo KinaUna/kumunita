@@ -10,7 +10,7 @@
   "account.flash_created": "Compte cr\u00E9\u00E9. Consultez votre bo\u00EEte de r\u00E9ception pour le lien de v\u00E9rification.",
   "account.delete_confirm_dialog": "Supprimer d\u00E9finitivement votre compte ? Cette action est irr\u00E9versible.",
   "account.signup_closed_title": "L\u0027inscription est ferm\u00E9e",
-  "account.signup_closed_body": "L'inscription est actuellement r\u00e9serv\u00e9e aux invitations sur cette instance. Pour obtenir un compte, demande un lien d'invitation \u00e0 une personne administratrice \u2014 ou \u00e0 un\u00b7e voisin\u00b7e pouvant inviter \u2014 puis suis ce lien pour t'inscrire.",
+  "account.signup_closed_body": "L'inscription est actuellement r\u00E9serv\u00E9e aux invitations sur cette instance. Pour obtenir un compte, demande un lien d'invitation \u00E0 une personne administratrice puis suis ce lien pour t'inscrire.",
   "account.signup_invite_email_hint": "Ceci est l'adresse e-mail avec laquelle tu as \u00e9t\u00e9 invit\u00e9\u00b7e.",
   "account.signup_invite_email_mismatch": "Cette invitation est destin\u00e9e \u00e0 une autre adresse e-mail. Inscris-toi avec l'adresse invit\u00e9e.",
   "account.login_title": "Se connecter",

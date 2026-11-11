@@ -87,6 +87,38 @@ public static class NotificationKinds
     /// </summary>
     public const string IssueResolved = "issue.resolved";
 
+    /// <summary>
+    /// IMPROVE-UX A10 (ADR 0304) — an invitation's <see
+    /// cref="Kumunita.Core.Identity.IInvitationService
+    /// .AcceptAsync"/> lane completed (the invited person accepted the
+    /// invitation link and their account was created). The recipient is the
+    /// <b>inviter</b> (<see cref="Kumunita.Core.Identity.Invitation
+    /// .InviterSubjectId"/>), not the accepted person. Resident-facing
+    /// (the inviter is a resident — an admin in A09's admin-invite case, or
+    /// a neighbour once A11/A12 ship the resident self-invite lane), so it is
+    /// NOT gated by the instance <c>NotifyAdminsOnSignup</c> flag (unlike
+    /// <see cref="AccountSignup"/>) and it is NOT a re-emit of the
+    /// admin-lane <c>account.signup</c> row (that already fires on
+    /// <see cref="Kumunita.Core.Identity.IIdentityService.RegisterAsync"/>,
+    /// which <see cref="Kumunita.Core.Identity.InvitationService
+    /// .AcceptAsync"/> runs in step 3 — an inviter who is also a
+    /// GlobalAdmin gets two distinct rows, two distinct kinds, two distinct
+    /// meanings). Best-effort (the <see cref="Kumunita.Core.Identity
+    /// .IdentityService"/> <c>EmitAccountNotificationAsync</c> D5 posture —
+    /// a missing emitter / an emit error is swallowed + logged; the
+    /// <c>invitation.accept</c> audit row is the durable record). Emitter:
+    /// <see cref="Kumunita.Core.Identity.InvitationService.AcceptAsync"/>
+    /// step 4 (the <see cref="Kumunita.Core.Identity.InvitationService
+    /// .AcceptPresentedAsync"/> path funnels into it, so one emission point
+    /// covers both the hash-based and the presented-token seams). One row
+    /// per (invitation, inviter) — the stable idempotency key
+    /// <c>notification:invitation.accepted:{invitationId}</c>
+    /// (the <c>EmitAccountNotificationAsync</c> F10 shape — a re-accept of
+    /// the same invitation is impossible anyway, the single-use pin, but
+    /// the key is content-derived regardless).
+    /// </summary>
+    public const string InvitationAccepted = "invitation.accepted";
+
     /// <summary>A to-do was assigned to the resident (person-only; wired, U04).</summary>
     public const string TodoAssign = "todo.assign";
 
@@ -385,7 +417,7 @@ public static class NotificationKinds
         PostReply, PostMention, GroupPost, GroupAdded, GroupInvite,
         EventRsvp, EventReminder,
         ReportFiled, ReportAssigned, ReportResolved, ReportQueued,
-        IssueResolved, TodoAssign,
+        IssueResolved, InvitationAccepted, TodoAssign,
         // The two admin-lane kinds (account.signup / account.verified, ADR
         // 0077) are appended last — they are a separate lane (the recipient is a
         // GlobalAdmin, not the resident whose inbox the resident-facing kinds

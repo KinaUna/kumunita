@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Notifications;
 using Marten;
 
 namespace Kumunita.Core.Identity;
@@ -58,7 +59,15 @@ public sealed class InvitationService(
     IMailerStage? mailer = null,
     IInstanceBaseUrlReader? baseUrlReader = null,
     Kumunita.Core.Localization.ITranslationProvider? translationProvider = null,
-    Microsoft.Extensions.Options.IOptions<Kumunita.Core.CommunityOptions>? communityOptions = null) : IInvitationService
+    Microsoft.Extensions.Options.IOptions<Kumunita.Core.CommunityOptions>? communityOptions = null,
+    // IMPROVE-UX A10 — the inviter-acceptance nudge (AcceptAsync step 4).
+    // Optional (default null) so the A07/A08 test harness
+    // (`new InvitationService(store, identity)`) and the A09 BootA09Async
+    // positional call (six args) keep compiling: a null emitter skips the
+    // notify lane entirely (the best-effort degrade path — the
+    // EmitAccountNotificationAsync D5 posture). DI always supplies the live
+    // INotificationEmitter.
+    Kumunita.Core.Notifications.INotificationEmitter? notifications = null) : IInvitationService
 {
     /// <inheritdoc />
     public async Task<(string Token, Invitation Invitation)> CreateAsync(
@@ -218,6 +227,43 @@ public sealed class InvitationService(
         stored.AcceptedSubjectId = principal.SubjectId;
         session.Store(stored);
         session.Store(AuditRow(now, invitation.InviterSubjectId, "invitation.accept", invitation.Id));
+
+        // IMPROVE-UX A10 (ADR 0304) — the inviter hears back: a best-effort
+        // notification to the inviter that their invitee accepted and an
+        // account was created. Staged into the SAME committed session
+        // (the IdentityService.EmitAccountNotificationAsync D5 posture —
+        // the notify row is part of this write). **Not** a re-emit of
+        // account.signup (that already fires on IIdentityService.RegisterAsync,
+        // step 3 — re-emitting it here would double-notify the GlobalAdmin
+        // set). Best-effort: a null emitter or an emit error is swallowed —
+        // the account creation (step 3) + the invitation.accept audit row
+        // (above) are the durable record; the inbox row is the nudge.
+        // // TODO ❓ linkPath: /admin/invitations (A09's surface) for now;
+        // // the resident self-invite surface when A11/A12 ship. Flag for
+        // // SEC review: an inviter who is also a GlobalAdmin gets two
+        // // distinct rows (invitation.accepted + account.signup) — two
+        // // distinct kinds, two distinct meanings; I believe that is
+        // // acceptable, but confirm in the SEC lane.
+        if (notifications is not null)
+        {
+            try
+            {
+                await notifications.EmitAsync(
+                    session,
+                    recipientId: invitation.InviterSubjectId,
+                    kind: NotificationKinds.InvitationAccepted,
+                    idempotencyKey: $"notification:{NotificationKinds.InvitationAccepted}:{invitation.Id}",
+                    body: displayName,
+                    linkPath: "/admin/invitations",
+                    ct: ct).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Best-effort (D5): the domain write + audit row are durable;
+                // a notify-lane failure must not fail the accept.
+            }
+        }
+
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return principal;
     }

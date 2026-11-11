@@ -9,13 +9,15 @@
         <h1><kw-l key="account.signup_closed_title">Sign-up is closed</kw-l></h1>
 
         @* ADR 0304 (IMPROVE-UX A08) — honest closed-page text (E9): the real
-           path is an invitation link (an admin, or a neighbour when the
-           resident-invite setting is on), not a promise that an admin will
-           manually add the account. The ?invite= token from that link is what
+           path is an invitation link from an administrator, not a promise
+           that an admin will manually add the account. (IMPROVE-UX A10 — the
+           "or a neighbour who can invite" clause is dropped: the resident
+           self-invite setting is A11/A12, not shipped, so the page must only
+           promise what exists.) The ?invite= token from that link is what
            opens the sign-up surface (the ADR 0304 D4 "works while closed"
            invariant). *@
         <p class="text-muted">
-            <kw-l key="account.signup_closed_body">Sign-up is currently invitation-only on this instance. To get an account, ask an administrator — or a neighbour who can invite — to send you an invitation link, then follow that link to sign up.</kw-l>
+            <kw-l key="account.signup_closed_body">Sign-up is currently invitation-only on this instance. To get an account, ask an administrator to send you an invitation link, then follow that link to sign up.</kw-l>
         </p>
 
         <p class="mt-3">
