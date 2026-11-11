@@ -126,18 +126,27 @@
 
         @if (Model.Profiles.Count == 0)
         {
-            @* Two distinct empty shapes: no residents on the platform at all
-               (directory.empty) vs. residents exist but the viewer's search or
-               verified toggle narrowed them to zero (directory.no_results). *@
-            <div class="alert alert-info">
+            @* R30 (IMPROVE-UX) — the house .kmb-empty idiom (title + body +
+               one next action). Two body shapes preserved: no residents on the
+               platform at all (directory.empty) vs. residents exist but the
+               viewer's search or verified toggle narrowed them to zero
+               (directory.no_results). The action is the feed — no "add
+               resident" action exists (sign-up is invitation-only). *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="directory.empty_title">No residents yet.</kw-l></p>
                 @if (Model.HasAnyResidents)
                 {
-                    <kw-l key="directory.no_results">No residents match your search.</kw-l>
+                    <p class="kmb-empty-body">
+                        <kw-l key="directory.no_results">No residents match your search.</kw-l>
+                    </p>
                 }
                 else
                 {
-                    <kw-l key="directory.empty">No residents on this neighborhood yet.</kw-l>
+                    <p class="kmb-empty-body">
+                        <kw-l key="directory.empty">No residents on this neighborhood yet.</kw-l>
+                    </p>
                 }
+                <a class="btn btn-outline-secondary" href="/community"><kw-l key="about.cta_feed">See the feed</kw-l></a>
             </div>
         }
         else

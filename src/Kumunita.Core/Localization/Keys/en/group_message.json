@@ -7,6 +7,7 @@
   "group_message.add_members": "Add people",
   "group_message.add_members.placeholder": "Choose residents to add",
   "group_message.thread.empty": "No messages yet \u2014 start the conversation.",
+  "group_message.thread.empty_title": "No group messages yet.",
   "group_message.compose.placeholder": "Write a message to the group\u2026",
   "group_message.compose.send": "Send",
   "group_message.unread": "unread",

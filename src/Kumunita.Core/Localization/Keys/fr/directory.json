@@ -2,6 +2,7 @@
   "directory.title": "Annuaire",
   "directory.lead": "Tout le monde dans le quartier \u2014 chaque habitant sur la plateforme.",
   "directory.empty": "Pas encore d\u0027habitants dans ce quartier.",
+  "directory.empty_title": "Pas encore d\u0027habitants.",
   "directory.no_results": "Aucun habitant ne correspond \u00E0 votre recherche.",
   "directory.search": "Rechercher",
   "directory.verified_only": "V\u00E9rifi\u00E9s uniquement",

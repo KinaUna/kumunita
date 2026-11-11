@@ -3,6 +3,7 @@
   "message.title": "Messages",
   "message.new": "Nouvelle conversation",
   "message.thread.empty": "Pas encore de messages \u2014 dites bonjour.",
+  "message.thread.empty_title": "Pas encore de messages.",
   "message.compose.placeholder": "\u00C9crire un message\u2026",
   "message.compose.send": "Envoyer",
   "message.unread": "non lu",

@@ -2,6 +2,7 @@
   "directory.title": "Kontaktliste",
   "directory.lead": "Alle i nabolaget \u2014 alle beboere p\u00E5 platformen.",
   "directory.empty": "Ingen beboere i dette nabolag endnu.",
+  "directory.empty_title": "Ingen beboere endnu.",
   "directory.no_results": "Ingen beboere matcher dit s\u00F8gning.",
   "directory.search": "S\u00F8g",
   "directory.verified_only": "Kun verificerede",

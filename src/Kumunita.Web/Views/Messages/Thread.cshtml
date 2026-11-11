@@ -71,8 +71,12 @@
         @* ── The thread (chronological — latest last, the view's rendering) ── *@
         @if (Model.Messages.Count == 0)
         {
-            <div class="alert alert-secondary" role="status">
-                <kw-l key="message.thread.empty">No messages yet — say hello.</kw-l>
+            @* R30 (IMPROVE-UX) — the house .kmb-empty idiom (title + body +
+               one next action): back to your messages. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="message.thread.empty_title">No messages yet.</kw-l></p>
+                <p class="kmb-empty-body"><kw-l key="message.thread.empty">No messages yet — say hello.</kw-l></p>
+                <a class="btn btn-outline-secondary" href="/messages"><kw-l key="message.nav">Messages</kw-l></a>
             </div>
         }
         else

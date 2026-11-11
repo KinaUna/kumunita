@@ -3,6 +3,7 @@
   "message.title": "Messages",
   "message.new": "New conversation",
   "message.thread.empty": "No messages yet \u2014 say hello.",
+  "message.thread.empty_title": "No messages yet.",
   "message.compose.placeholder": "Write a message\u2026",
   "message.compose.send": "Send",
   "message.unread": "unread",

@@ -1030,3 +1030,82 @@ reuse existing keys (`posts.write`, `blog.new_page`, `about.cta_feed`,
   messages, projects, content, details/groups/guardian) — the R30–R33 batches.
 - **31 remaining NONE leads** — out of scope for the whole lane until a later
   batch.
+
+## R30 — empty states batch 2 (the 8 named people/messages views) — **SHIPPED**
+
+**Scope:** the *second* empty-states batch named in the plan. Drive the 8
+named R30 people/messages views to the house `.kmb-empty` idiom (a short title
++ a body + **one next action**), per the `Groups/Index.cshtml:144` reference
+(the R29 handoff note is the closest precedent).
+
+**Outcome:** all 8 views carry a `.kmb-empty` block (verified per-view); the
+`empty_plain` floor re-based **30 → 22** in `tools/ux/ux-baseline.json`
+(house-format note appended, seam clean, `empty_none` **stays 31** — none of
+the 8 was a NONE lead, so it was not re-based). `ux-measure.py --check` green,
+`dotnet build` 0 errors, the C02 four-language key-parity test green
+(15/15). 5 new title keys added (en/de/fr/da; de/fr/da machine-written,
+flagged for the parked native review); the next-action labels all reuse
+existing keys.
+
+### What landed (per-view before → after, all 8 PLAIN → `.kmb-empty`)
+
+- `Directory/Index` — title `directory.empty_title`, body `directory.no_results`
+  / `directory.empty` (per `HasAnyResidents`, both shapes preserved), action See
+  the feed (`/community`). No "add resident" action exists (sign-up is
+  invitation-only), so the feed is the honest next action.
+- `Directory/Detail` — the **interests & skills sub-section** (a read-only
+  sub-section, not a main list): title `profile.detail.tags.empty_title`, body
+  `profile.detail.tags.empty`, action Back to the directory (`/directory`,
+  reusing the view's own `directory.detail_back` back-link key). The rest of
+  the profile card is untouched.
+- `FindPeople/Bio` — title `profile.find.empty_title`, body `profile.find.empty`,
+  action Browse the directory (`/directory`, `directory.title`).
+- `FindPeople/Tag` — title `profile.find.empty_title`, body `profile.find.empty`,
+  action Browse the directory (`/directory`, `directory.title`).
+- `Messages/Index` — title `message.thread.empty_title`, body
+  `message.thread.empty`, action Find people (`/people`, `profile.find.title`).
+  The inner New-conversation picker (`Candidates` branch) is untouched.
+- `Messages/Thread` — title `message.thread.empty_title`, body
+  `message.thread.empty`, action Messages (`/messages`, `message.nav`).
+- `GroupMessages/Index` — title `group_message.thread.empty_title`, body
+  `group_message.thread.empty`, action Browse groups (`/groups`, `groups.title`).
+  The inner New-group picker (`Candidates` branch) is untouched.
+- `GroupMessages/Thread` — title `group_message.thread.empty_title`, body
+  `group_message.thread.empty`, action Group messages (`/group-messages`,
+  `group_message.nav`).
+
+### The `Directory/Detail` caution (recorded, not forced)
+
+The prompt flagged `Directory/Detail`'s empty state as the tags *sub-section*
+("No tags set"), not a main list — and allowed either a sensible "back to the
+directory" action **or** a justified-survivor record (the R28 precedent). I
+took the first path: the three-element idiom is a slight poor fit for a
+read-only sub-section, but the action reuses the view's *own* existing
+navigation (`directory.detail_back` → `/directory`), so it is not misleading.
+The profile card is otherwise untouched.
+
+### New translation keys (5, en/de/fr/da; de/fr/da machine-written)
+
+`directory.empty_title`, `profile.detail.tags.empty_title`,
+`profile.find.empty_title`, `message.thread.empty_title`,
+`group_message.thread.empty_title`. All other labels (body + action) reuse
+existing keys. JSON edits are additions-only (20 lines, no existing key churn;
+fr/da/de kept the local `\uXXXX` / `\u0027` escape style).
+
+### Parked follow-up (NOT started — R31–R33's scope, do not open a new lane)
+
+- **22 remaining PLAIN leads** in the non-people/messages views named by R31–R33:
+  - R31 (projects): `Boards/BoardIndex`, `Boards/_BoardLanes`,
+    `Boards/_BoardList`, `Projects/ProjectsIndex`, `Projects/ProjectDetail`,
+    `Todos/TodosIndex`, `Todos/_TodoComments`, `Todos/_TodoDisplay`,
+    `Shared/_BoardCard`.
+  - R32 (content): `Document/Index`, `Document/Deleted`, `Page/Index`,
+    `Page/_PageTreeItem`, `Inventory/List`, `Inventory/Detail`,
+    `Bookmarks/Index`, `MyDrafts/Index`, `Notes/Index`.
+  - R33 (details/groups/guardian): `Announcement/Detail`, `Event/Detail`,
+    `Posts/Detail`, `Groups/Detail`, `Groups/_GroupMembers`,
+    `Groups/_GroupPostReplies`, `Guardian/Detail`, `Guardian/Index`,
+    `Guardian/_GuardianEventAttendance`, `Kiosk/Index`, `Locale/Index`,
+    `Community/Manage`, `Community/Translations`.
+- **31 remaining NONE leads** — out of scope for the whole lane until a later
+  batch.

@@ -7,6 +7,7 @@
   "group_message.add_members": "Tilf\u00F8j personer",
   "group_message.add_members.placeholder": "V\u00E6lg beboere, der skal tilf\u00F8jes",
   "group_message.thread.empty": "Ingen beskeder endnu \u2014 start samtalen.",
+  "group_message.thread.empty_title": "Ingen gruppebeskeder endnu.",
   "group_message.compose.placeholder": "Skriv en besked til gruppen\u2026",
   "group_message.compose.send": "Send",
   "group_message.unread": "ul\u00E6st",
