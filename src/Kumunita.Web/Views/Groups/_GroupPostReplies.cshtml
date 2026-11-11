@@ -96,10 +96,10 @@ else
                                             <form method="post" action="@($"/groups/{Model.Model.GroupId}/posts/{Model.PostId}/replies/{r.Id}/translations/update")">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                                <label class="form-label small">
+                                                <label class="form-label small" for="@($"reply-t-edit-body-{r.Id}-{existing.LanguageCode}")">
                                                     <kw-l key="posts.translation_body_label">Body</kw-l>
                                                 </label>
-                                                <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
+                                                <textarea class="form-control form-control-sm mb-2" id="@($"reply-t-edit-body-{r.Id}-{existing.LanguageCode}")" name="body" rows="3" required>@existing.Body</textarea>
                                                 <button type="submit" class="btn btn-sm btn-primary">
                                                     <kw-l key="posts.translation_save">Save translation</kw-l>
                                                 </button>
@@ -207,7 +207,13 @@ else
                                                 <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
                                                 <partial name="_RichEditorToggle" />
                                             </div>
-                                            <textarea class="form-control mb-2" name="body" rows="3"
+                                            @* IMPROVE-UX R24 (WCAG 4.1.2) — the reply-edit body has no visible
+                                               label (unlike the composer, ADR 0016 reply lane); add one, reusing
+                                               posts.reply_label (en/de/fr/da). *@
+                                            <label class="form-label" for="@($"reply-t-edit-body-{r.Id}")">
+                                                <kw-l key="posts.reply_label">Reply</kw-l>
+                                            </label>
+                                            <textarea class="form-control mb-2" id="@($"reply-t-edit-body-{r.Id}")" name="body" rows="3"
                                                       required placeholder="…" data-rich-editor>@r.Body</textarea>
                                             <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
                                         </div>
