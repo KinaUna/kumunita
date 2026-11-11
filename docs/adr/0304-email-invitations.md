@@ -196,3 +196,69 @@ mirrors.
   first; A08 (the `?invite=` sign-up wiring), A09 (the `/admin/invitations`
   surface), A10 (the acceptance notify), A11 (the resident-invite setting)
   and A12 (the resident "Invite a neighbour") build on it.
+## Amendments
+
+**2026-11-11 (IMPROVE-UX A11) — the resident-invite mode is settled (resolves D6 c, partially).**
+A11 ships the **3-state resident-invite setting** + a **testable rule** that
+reads it and returns a resident's invite posture — A12's resident
+"Invite a neighbour" surface will consume both.
+
+- **The enum (Core).** `ResidentInviteSetting` (a code-owned closed set,
+  the `EventRsvpMode` / `EmailInvitationStatus` shape — **not** a stored
+  string) with three states: `Off` (the **floor** — a fresh instance
+  ships with resident self-invite *off*; resident invite is opt-in, set
+  by a GlobalAdmin), `On` (the resident's created invitations are
+  immediately usable), and `OnWithApproval` (the resident's created
+  invitations are gated behind the admin approval queue A12 ships —
+  the D6 c "approval state" is what this mode enables).
+- **Storage.** `LocaleSettings.ResidentInviteSetting` (the
+  `NotifyAdminsOnSignup` / `IsSignupOpen` singleton field shape — the
+  `SetSignupOpenAsync` / `SetNotifyAdminsOnSignupAsync`
+  singleton-toggle lane, the same `LocaleSettings` doc the other
+  instance gates read/write). The read floor is `Off` — a missing
+  singleton or an unset value both yield `Off`.
+- **The seam (Core).** `IIdentityService.GetResidentInviteSettingAsync()`
+  → the enum (the `Off` floor), and
+  `IIdentityService.SetResidentInviteSettingAsync(ResidentInviteSetting
+  mode, string adminSubjectId)` → the singleton write + **exactly one**
+  `AccessAudit` row (`Via = Admin`, action `signup.set-resident-invite`,
+  `TargetKind = "signup"`, `TargetId = "signup"` — the
+  `signup.set-open` / `signup.set-notify` singleton shape). The
+  `IIdentityPlatformGateService` surface (C3-03, ADR 0293) carries the
+  two methods; `IdentityService` keeps the thin forwarder (the C08
+  test-compat facade shape, the existing 12-gate surface).
+- **The rule (Core, on `IInvitationService`).**
+  `GetResidentInvitePostureAsync(residentSubjectId, ct)` → a `ResidentInvitePosture`
+  (a `record (bool MayInvite, bool RequiresApproval)`) — the testable
+  decision that A12's resident "Invite a neighbour" surface will call
+  **before** `CreateAsync` / `InviteAsync`. `Off` →
+  `MayInvite = false`; `On` → `MayInvite = true, RequiresApproval =
+  false`; `OnWithApproval` → `MayInvite = true, RequiresApproval = true`.
+  A **read** — zero audit rows (the `IsSignupOpenAsync` / `ValidateAsync`
+  "the read is not an access decision" floor — the *write* decision is
+  A12's `CreateAsync` lane's job). The rule does **not** change any of
+  the D3 seams (`CreateAsync` / `RevokeAsync` / `ValidateAsync` /
+  `AcceptAsync` / `ListAsync` / `InviteAsync` + the A08 presented-token
+  overloads + the A10 inviter-acceptance notify).
+- **D6 c (the approval state) — clarified.** This ADR still ships only
+  the `Pending` / `Accepted` / `Revoked` / `Expired` state machine.
+  A11 settles the **mode** (`OnWithApproval`) and the **rule** (the
+  `RequiresApproval` flag on `ResidentInvitePosture`) — A12's approval
+  queue will add the `PendingApproval` row state (and the admin-approve
+  lane) when it ships. A11's rule is the *gate*; A12's row state is the
+  *ledger*.
+- **D6 b (the rate ceiling) — remains open.** A11 ships the
+  setting-driven rule; the `// TODO ❓` who-may-invite + how-many-per-
+  period refinement is **flagged, not built** (a `// TODO ❓` comment at
+  the rule's seam, the A10 precedent). A12 (or a follow-on) will settle
+  it; the proposed 5-per-30-days ceiling from D6 b stands.
+- **Web surface.** `AdminSignupController` gains a
+  `SaveResidentInvite(mode)` POST (mirroring `SaveNotify`), the
+  `SignupAdminViewModel` carries the 3-state setting, and
+  `Views/AdminSignup/Index.cshtml` renders a 3-option radio group. The
+  `[Authorize(Roles = Roles.GlobalAdmin)]` gate and the
+  `IsSignupOpenAsync` / `SetSignupOpenAsync` / `IsNotifyAdminsOnSignupAsync`
+  / `SetNotifyAdminsOnSignupAsync` seams are **unchanged** (the ADR 0050
+  signup-gate surface is intact). The 3 option labels + the flash
+  strings land in the 4-language `admin.*` key surface (C02 parity, the
+  de/fr/da machine-written + flagged-for-parked-native-review shape).
