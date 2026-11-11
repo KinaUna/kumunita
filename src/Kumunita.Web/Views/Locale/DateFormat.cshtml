@@ -94,6 +94,7 @@
                 </select>
                 @if (!df.CurrentIsPreset)
                 {
+                    <label class="visually-hidden" for="customFormat"><kw-l key="settings.dateformat_label">Your date &amp; time format</kw-l></label>
                     <input type="text" class="form-control mt-2" name="customFormat" id="customFormat"
                            value="@df.SelectedFormat" placeholder="yyyy-MM-dd HH:mm" />
                     <div class="form-text small"><kw-l key="settings.dateformat_custom_hint">A .NET custom datetime format string (e.g. yyyy-MM-dd HH:mm). Leave blank to use a preset.</kw-l></div>

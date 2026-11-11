@@ -143,6 +143,7 @@
             <form method="post" action="@Url.Action("AddMember", "Community", new { componentId = Model.ComponentId })">
                 @Html.AntiForgeryToken()
                 <div class="input-group">
+                    <label class="visually-hidden" for="addUser"><kw-l key="community.manage_add_member">Add a member</kw-l></label>
                     <select class="form-select" id="addUser" name="UserId" required>
                         <option value="" disabled selected><kw-l key="community.manage_pick_resident">Pick a resident to add…</kw-l></option>
                         @foreach (var c in Model.Candidates)

@@ -100,17 +100,19 @@
                                       action="@($"/community/translations/{Model.ComponentId}/update")">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="languageCode" value="@t.LanguageCode" />
-                                    <label class="form-label small">
+                                    <label class="form-label small" for="ct-name-@t.LanguageCode">
                                         <kw-l key="community.translation_name_label">Name</kw-l>
                                         <span class="text-muted">(<kw-l key="community.translation_optional">optional</kw-l>)</span>
                                     </label>
                                     <input class="form-control form-control-sm mb-2" name="name"
+                                           id="ct-name-@t.LanguageCode"
                                            value="@t.Name" />
-                                    <label class="form-label small">
+                                    <label class="form-label small" for="ct-desc-@t.LanguageCode">
                                         <kw-l key="community.translation_desc_label">Description</kw-l>
                                         <span class="text-muted">(<kw-l key="community.translation_optional">optional</kw-l>)</span>
                                     </label>
                                     <textarea class="form-control form-control-sm mb-2"
+                                              id="ct-desc-@t.LanguageCode"
                                               name="description" rows="3" placeholder="…">@t.Description</textarea>
                                     <div class="form-text mb-2">
                                         <kw-l key="community.translation_min_one">At least one of name or description is required.</kw-l>

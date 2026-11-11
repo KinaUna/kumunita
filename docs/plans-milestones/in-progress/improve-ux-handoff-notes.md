@@ -13,7 +13,7 @@ related:
   - docs/adr/0028-guardian-controls-account-scope-supervision.md
   - docs/adr/0143-guardian-delete-child.md
 lane: improve-ux
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 > **Abstract:** the running handoff log for the **IMPROVE-UX** lane — each
@@ -907,3 +907,60 @@ change in R14.
   English message), F4 (LOW, forward-compat child-rule re-check).
 - **Nothing held silently** — every observation is in the Findings list
   above with a named owner.
+## R28 — a11y batch 5 (the 10 named resident views) — **SHIPPED**
+
+**Scope:** the *last* a11y batch named in the plan. Drive the a11y leads in
+the 10 named R28 views to 0 by giving each unlabeled control a programmatic
+label (WCAG 4.1.2), and record the 2 dynamic shared partials as justified
+survivors. The 7 residual resident views (20 leads) and 9 admin views (27
+leads) are **out of scope** and parked below.
+
+**Outcome:** the 6 fix-target views driven to 0; the 3 already-clean
+read-only views confirmed 0; the 2 dynamic partials recorded as justified
+survivors; the `a11y` floor re-based **56 → 49** in
+`tools/ux/ux-baseline.json` (house-format note appended, seam clean, `--check`
+green, `dotnet build` 0 errors). No new translation strings; no `aria-label`
+dodges; no `on*`/`<script>` (SEC gate).
+
+### What landed (per-view before → after)
+
+- `Community/Manage` 1 → 0: the `addUser` select (label-less) gains a
+  `visually-hidden` `<label for="addUser">` reusing `community.manage_add_member`.
+- `Community/Translations` 2 → 0: the edit-form `name`/`description` inputs
+  (inside the `@foreach` over translations) gain a **per-row suffixed**
+  `id` (`ct-name-@LanguageCode` / `ct-desc-@LanguageCode`) plus the matching
+  `for` on their existing label. A static `id="name"` would be a **duplicate
+  across the loop rows** — the R27 `GuardianConsent` trap avoided.
+- `Locale/DateFormat` 1 → 0: the `customFormat` input (label-less) gains a
+  `visually-hidden` `<label for="customFormat">` reusing `settings.dateformat_label`.
+- `Languages/Translations` 1 → 0: the `bundle` file input (no `id`, no label)
+  gains `id="bundle"` + a `visually-hidden` `<label for="bundle">` reusing
+  `translations.bulk.import`.
+- `Account/Portability/Index` 1 → 0: the `archive` file input (label-less)
+  gains a `visually-hidden` `<label for="archive">` reusing `myportability.import`.
+- `Account/Portability/ResolveReview` 1 → 0: the `archive` file input
+  (label-less) gains a `visually-hidden` `<label for="archive">` reusing
+  `myportability.resolve.archive_label`.
+- **Justified survivors (not edited):** `Shared/_GrantPickers` and
+  `Shared/_NoteButton` build `id` **and** `for` via **Razor string
+  concatenation**, so the static literal `id`/`for` heuristic cannot credit
+  them even though they are correctly associated at runtime. Recorded in the
+  baseline `generated_from` (the R21 `jargon` "each survivor justified"
+  precedent); no `aria-label` added (a real `for`/`id` pair already exists at
+  runtime — a second accessible name would be redundant).
+- **Read-only, confirmed 0:** `Notes/NoteRemoveTag`, `SecuritySettings/Mfa`,
+  `Shared/_AccountNav`.
+
+### Parked follow-up (NOT started — do not open a new lane until the a11y lane resumes)
+
+- **7 residual resident views (20 leads)** — all Shape A (`asp-for` inputs
+  with `asp-for` labels): `Account/Login` (5), `Account/Signup` (4),
+  `Groups/Create` (3), `Guardian/AddChild` (3), `Account/Delete` (2),
+  `Account/Verify` (2), `Account/ResendVerification` (1).
+- **9 admin/operator views (27 leads):** `AdminSite/Index` (12),
+  `AdminSetup/Setup` (4), `Admin/Communities` (3), `Admin/Audit` (2),
+  `AdminSurfaceLabels/Index` (2), `Admin/Accounts` (1), `Admin/Index` (1),
+  `AdminDateFormat/Index` (1), `AdminPortability/Index` (1).
+
+These 47 leads (20 + 27) are the remaining `a11y` floor above the 2 justified
+survivors.
