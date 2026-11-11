@@ -43,6 +43,7 @@
   "posts.audience_restrict_hint": "Disse valg er skjult, mens \u0022Alle i dette f\u00E6llesskab\u0022 er t\u00E6ndt \u2014 indl\u00E6gget er synligt for alle i f\u00E6llesskabet. Sl\u00E5 det fra for at begr\u00E6nse adgang med valgene her.",
   "posts.audience_only_picks": "Det, du v\u00E6lger her, bliver indl\u00E6ggets modtagerkreds \u2014 der tilf\u00F8jes intet ovenfor eller nedenfor denne formular. Et tomt valg (med \u0022Alle i dette f\u00E6llesskab\u0022 slukket) betyder, at kun du kan se indl\u00E6gget.",
   "posts.empty_can_post": "Ingen indl\u00E6g her endnu. Skriv det f\u00F8rste \u2014 det vises kun for den modtagerkreds, du v\u00E6lger i editoren under overskriften.",
+  "posts.empty_title": "Ingen indl\u00E6g her endnu.",
   "posts.empty": "Ingen indl\u00E6g her endnu.",
   "posts.reply_count_none": "Ingen svar endnu",
   "posts.reply_count_one": "{0} svar",

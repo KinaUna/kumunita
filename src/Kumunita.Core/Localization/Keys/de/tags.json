@@ -5,9 +5,11 @@
   "tags.flash_translation_saved": "\u00DCbersetzung gespeichert.",
   "tags.list.heading": "Tags",
   "tags.list.lede": "Themen, mit denen eure Beitr\u00E4ge und Blogseiten verschlagwortet sind \u2014 klicke auf eines, um zu sehen, was dazu geschrieben wurde.",
+  "tags.list.empty_title": "Noch keine Tags.",
   "tags.list.empty": "Noch keine Tags \u2014 sie erscheinen hier, sobald eine:r Anwohner:in einem Beitrag oder einer Blogseite ein Tag zuweist.",
   "tags.bytag.heading": "Beitr\u00E4ge und Seiten \u00FCber",
   "tags.bytag.posts_heading": "Beitr\u00E4ge",
   "tags.bytag.pages_heading": "Blogseiten",
+  "tags.bytag.empty_title": "Nichts unter diesem Tag.",
   "tags.bytag.empty": "Keine lesbaren Beitr\u00E4ge oder Blogseiten tragen dieses Tag."
 }

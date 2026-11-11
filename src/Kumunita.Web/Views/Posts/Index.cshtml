@@ -213,15 +213,24 @@
         <div>
         @if (Model.Items.Count == 0)
         {
-            <div class="alert alert-info">
+            @* R29 (IMPROVE-UX) — the house .kmb-empty idiom (title + body +
+               one next action); the body is the existing posts.empty(_can_post)
+               sentence and the action reuses the page's Write-a-post button. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="posts.empty_title">No posts here yet.</kw-l></p>
                 @if (Model.CanPost)
                 {
-                    <text><kw-l key="posts.empty_can_post">No posts yet here. Write the first one — it will be visible only to
-                    the audience you choose in the composer below the title.</kw-l></text>
+                    <p class="kmb-empty-body">
+                        <kw-l key="posts.empty_can_post">No posts yet here. Write the first one — it will be visible only to the audience you choose in the composer below the title.</kw-l>
+                    </p>
+                    <a class="btn btn-primary" href="@Url.Action("New","Posts")"><kw-l key="posts.write">Write a post</kw-l></a>
                 }
                 else
                 {
-                    <text><kw-l key="posts.empty">No posts here yet.</kw-l></text>
+                    <p class="kmb-empty-body">
+                        <kw-l key="posts.empty">No posts here yet.</kw-l>
+                    </p>
+                    <a class="btn btn-outline-secondary" href="/community"><kw-l key="about.cta_feed">See the feed</kw-l></a>
                 }
             </div>
         }

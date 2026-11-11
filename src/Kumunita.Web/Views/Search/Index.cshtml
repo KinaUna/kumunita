@@ -67,8 +67,14 @@
         }
         else if (!hasHits)
         {
-            <div class="p-4 text-muted">
-                <kw-l key="search.no-results">No results for</kw-l> <code>@Model.Q</code>.
+            @* R29 (IMPROVE-UX) — the house .kmb-empty idiom; no "create"
+               action exists for search, so the next action is the feed. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="search.empty_title">No results.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="search.no-results">No results for</kw-l> <code>@Model.Q</code>.
+                </p>
+                <a class="btn btn-outline-secondary" href="/community"><kw-l key="about.cta_feed">See the feed</kw-l></a>
             </div>
         }
         else

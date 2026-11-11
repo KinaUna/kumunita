@@ -315,7 +315,15 @@
 
             @if (feed.IsEmpty)
             {
-                <p class="text-secondary"><kw-l key="home.feed_empty">Nothing posted yet — be the first to start the conversation in the feed.</kw-l></p>
+                @* R29 (IMPROVE-UX) — the house .kmb-empty idiom; this card is
+                   a preview of the feed, so the next action is the feed. *@
+                <div class="kmb-empty">
+                    <p class="kmb-empty-title"><kw-l key="home.feed_empty_title">Nothing posted yet.</kw-l></p>
+                    <p class="kmb-empty-body">
+                        <kw-l key="home.feed_empty">Nothing posted yet — be the first to start the conversation in the feed.</kw-l>
+                    </p>
+                    <a class="btn btn-outline-secondary" href="/community"><kw-l key="about.cta_feed">See the feed</kw-l></a>
+                </div>
             }
             else
             {

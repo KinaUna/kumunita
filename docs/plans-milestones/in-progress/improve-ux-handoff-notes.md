@@ -964,3 +964,69 @@ dodges; no `on*`/`<script>` (SEC gate).
 
 These 47 leads (20 + 27) are the remaining `a11y` floor above the 2 justified
 survivors.
+
+## R29 — empty states batch 1 (the 8 named feed views) — **SHIPPED**
+
+**Scope:** the *first* empty-states batch named in the plan. Drive the 8
+named R29 feed views to the house `.kmb-empty` idiom (a short title + a body
++ **one next action**), per the `Groups/Index.cshtml:144` reference.
+
+**Outcome:** all 8 views carry a `.kmb-empty` block (verified); the
+`empty_plain` floor re-based **36 → 30** and the `empty_none` floor re-based
+**33 → 31** in `tools/ux/ux-baseline.json` (house-format note appended, seam
+clean, `--check` green, `dotnet build` 0 errors, the C02 four-language key
+parity test green). 10 new translation keys added (en/de/fr/da; de/fr/da
+machine-written, flagged for the parked native review); the next-action labels
+reuse existing keys (`posts.write`, `blog.new_page`, `about.cta_feed`,
+`notifications.preferences`, `notifications.inbox`).
+
+### What landed (per-view before → after)
+
+- **6 PLAIN views (bare `.alert-info` / bare text → `.kmb-empty`)** — these
+  leave the PLAIN bucket (the 36 → 30 drop):
+  - `Posts/Index` — title `posts.empty_title`, body `posts.empty_can_post` /
+    `posts.empty` (per `CanPost`), action Write a post (`/posts/new`) or See
+    the feed.
+  - `Blog/Feed` — title `blog.empty_title`, body `blog.empty_own` /
+    `blog.empty_other` (per `IsOwner`), action New blog page (`/pages/new`) or
+    See the feed.
+  - `Search/Index` (the no-results branch) — title `search.empty_title`, body
+    `search.no-results`, action See the feed.
+  - `Tag/ByTag` — title `tags.bytag.empty_title`, body `tags.bytag.empty`,
+    action See the feed (this view carries no create button).
+  - `Tag/Index` — title `tags.list.empty_title`, body `tags.list.empty`,
+    action See the feed (tags are born when a resident tags a post/page).
+  - `Notifications/Index` — title `notifications.empty_title`, body
+    `notifications.empty`, action Preferences.
+- **2 NONE views (no empty state at all → `.kmb-empty`)** — these leave the
+  NONE bucket (the 33 → 31 drop):
+  - `Home/Index` — the `home.feed_empty` card preview: title
+    `home.feed_empty_title`, body `home.feed_empty`, action See the feed.
+  - `Notifications/Subscriptions` — the `@foreach` is now guarded by a new
+    `@if (Model.Rows.Count > 0) { … }`; the empty branch uses title
+    `notifications.subscriptions.title`, body `notifications.subscriptions.empty`,
+    action Notifications (the inbox).
+
+### Note on the prompt's counts (recorded honestly — DoD line 8)
+
+- The prompt stated `empty_plain` is **37** at HEAD and drops **37 → 30**.
+  Measured at HEAD it is **36** (the committed `empty_plain` floor was a stale
+  37), so the true drop is **36 → 30**.
+- The prompt stated `Home/Index` and `Notifications/Subscriptions` are
+  "structurally empty, not counted" and said **not** to re-base `empty_none`.
+  Both are in fact `empty_none` leads (list markup, no empty-check, no
+  `.kmb-empty`), so giving them a `.kmb-empty` block drops `empty_none`
+  **33 → 31**. Both floors re-based to the measured values (the check is a
+  ceiling — it fails only when a count *exceeds* the floor, so the lower,
+  measured values are the honest floors).
+- The prompt expected "only the body keys, if any." 10 keys were added — a
+  short `*_title` on every view (7) plus the `notifications.subscriptions.empty`
+  body (1) plus the 2 `*_title` reuses (`posts.empty_title`,
+  `home.feed_empty_title`) — all in en/de/fr/da.
+
+### Parked follow-up (NOT started — R30–R33's scope, do not open a new lane)
+
+- **30 remaining PLAIN leads** in the non-feed views named by R30–R33 (people/
+  messages, projects, content, details/groups/guardian) — the R30–R33 batches.
+- **31 remaining NONE leads** — out of scope for the whole lane until a later
+  batch.

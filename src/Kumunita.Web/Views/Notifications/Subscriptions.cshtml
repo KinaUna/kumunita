@@ -28,6 +28,8 @@
                    switch binds <c>enabled</c> (a checked box posts "true";
                    an unchecked checkbox posts nothing → the form-bound bool
                    defaults to false). *@
+                @if (Model.Rows.Count > 0)
+                {
                 @foreach (var group in Model.Rows.GroupBy(r => r.Kind, StringComparer.Ordinal))
                 {
                     var sectionKey = group.Key;
@@ -50,6 +52,20 @@
                                 </div>
                             </form>
                         }
+                    </div>
+                }
+                }
+                else
+                {
+                    @* R29 (IMPROVE-UX) — the house .kmb-empty idiom; the next
+                       action is the inbox (targets appear here as they join
+                       your community). *@
+                    <div class="kmb-empty">
+                        <p class="kmb-empty-title"><kw-l key="notifications.subscriptions.title">Notification subscriptions</kw-l></p>
+                        <p class="kmb-empty-body">
+                            <kw-l key="notifications.subscriptions.empty">You are not yet subscribed to any community, group, or page.</kw-l>
+                        </p>
+                        <a class="btn btn-outline-secondary" href="/notifications"><kw-l key="notifications.inbox">Notifications</kw-l></a>
                     </div>
                 }
             </div>

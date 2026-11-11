@@ -2,6 +2,7 @@
   "search.nav": "Search",
   "search.title": "Search",
   "search.placeholder": "Search posts, events, pages, announcements, projects, boards, to-dos, inventory, documents and people\u2026",
+  "search.empty_title": "No results.",
   "search.no-results": "No results for",
   "search.section.posts": "Posts",
   "search.section.events": "Events",

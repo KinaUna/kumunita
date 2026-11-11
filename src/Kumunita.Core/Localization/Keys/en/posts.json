@@ -43,6 +43,7 @@
   "posts.audience_restrict_hint": "These picks are hidden while \u201CEveryone in this community\u201D is on \u2014 the post is visible to everyone in the community. Turn that off to narrow who can see it with the picks here.",
   "posts.audience_only_picks": "Whatever you pick here becomes the post\u0027s audience \u2014 nothing above or below this form is added to it. An empty pick (with \u201CEveryone in this community\u201D off) means only you can see the post.",
   "posts.empty_can_post": "No posts yet here. Write the first one \u2014 it will be visible only to the audience you choose in the composer below the title.",
+  "posts.empty_title": "No posts here yet.",
   "posts.empty": "No posts here yet.",
   "posts.reply_count_none": "No replies yet",
   "posts.reply_count_one": "{0} reply",

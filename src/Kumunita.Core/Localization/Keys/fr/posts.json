@@ -43,6 +43,7 @@
   "posts.audience_restrict_hint": "Ces s\u00E9lections sont masqu\u00E9es tant que \u00AB Tout le monde dans cette communaut\u00E9 \u00BB est actif \u2014 la publication est visible par toute la communaut\u00E9. D\u00E9sactive-le pour restreindre l\u0027acc\u00E8s avec les s\u00E9lections ci-dessous.",
   "posts.audience_only_picks": "Ce que tu s\u00E9lectionnes ici devient l\u0027audience de la publication \u2014 rien au-dessus ou en dessous de ce formulaire n\u0027y est ajout\u00E9. Une s\u00E9lection vide (avec \u00AB Tout le monde dans cette communaut\u00E9 \u00BB d\u00E9sactiv\u00E9) signifie que seul tu peux voir la publication.",
   "posts.empty_can_post": "Pas encore de publications ici. \u00C9cris la premi\u00E8re \u2014 elle sera visible uniquement par l\u0027audience que tu choisis dans le composeur sous le titre.",
+  "posts.empty_title": "Pas encore de publications ici.",
   "posts.empty": "Pas encore de publications ici.",
   "posts.reply_count_none": "Aucune r\u00E9ponse pour l\u0027instant",
   "posts.reply_count_one": "{0} r\u00E9ponse",

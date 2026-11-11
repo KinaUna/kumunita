@@ -43,6 +43,7 @@
   "posts.audience_restrict_hint": "Diese Auswahl ist ausgeblendet, solange \u201EAlle in dieser Gemeinschaft\u201C an ist \u2014 der Beitrag ist f\u00FCr alle in der Gemeinschaft sichtbar. Schalte sie ab, um mit den Auswahl hier zu bestimmen, wer ihn sehen kann.",
   "posts.audience_only_picks": "Was du hier w\u00E4hlst, wird das Publikum des Beitrags \u2014 es wird nichts dar\u00FCber oder darunter hinzugef\u00FCgt. Eine leere Auswahl (mit \u201EAlle in dieser Gemeinschaft\u201C aus) bedeutet, dass nur du den Beitrag sehen kannst.",
   "posts.empty_can_post": "Noch keine Beitr\u00E4ge hier. Schreibe den ersten \u2014 er ist nur f\u00FCr das Publikum sichtbar, das du im Editor unterhalb der \u00DCberschrift w\u00E4hlst.",
+  "posts.empty_title": "Noch keine Beitr\u00E4ge hier.",
   "posts.empty": "Noch keine Beitr\u00E4ge hier.",
   "posts.reply_count_none": "Noch keine Antworten",
   "posts.reply_count_one": "{0} Antwort",
