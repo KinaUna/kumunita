@@ -732,50 +732,87 @@ public partial class ModerationService
                 report.ResolvedBy    = globalAdminId;
             }
 
-            // IMPROVE-UX A02 — the outcome-execution lane (the D6 "the outcome
-            // picker performs the action" promise; plan-improve-ux.md A02). The
-            // resolve form (R04) records the outcome on the Report row above;
-            // A02 makes that record **change something visible**: it re-derives
-            // the same action on the target post from the recorded outcome and
-            // runs it in the **caller's session** (the same `session` — the C3
-            // same-transaction lane, ADR 0006-C), so the resolve + the hide/remove
+            // IMPROVE-UX A02 + A04 — the outcome-execution lane (the D6 "the
+            // outcome picker performs the action" promise; plan-improve-ux.md
+            // A02 / A04). The resolve form (R04) records the outcome on the
+            // Report row above; A02 makes that record **change something
+            // visible** for **post targets**: it re-derives the same action
+            // on the target post from the recorded outcome and runs it in the
+            // **caller's session** (the same `session` — the C3 same-
+            // transaction lane, ADR 0006-C), so the resolve + the hide/remove
             // commit atomically with this lane's AccessAudit row (the A01 read
-            // branch is what makes the post actually disappear from feed/detail —
-            // A02 only writes the PostStatus; the reads were already A01's).
-            // **Post targets only** (the plan card's scope, the A02 trap): the
-            // guard requires a non-empty `Report.PostId` — the original M3b /
-            // ADR 0023 post + reply shapes carry their id there, but the new
-            // ADR 0173 lanes (event / project / board / todo) set
-            // `PostId = string.Empty` and carry their id in `TargetId` (the
-            // `FileReportTargetAsync` lane), so a non-post target records the
-            // outcome + note and executes **nothing** (that per-target-kind
-            // execution is A04's scope). `HidePostAsync` / `RemovePostAsync`
-            // each run their own `Moderate` decision + write their own
-            // `Action = Moderate` audit row (the M3b write-lane rows,
-            // `TargetId = the post id`) — **additional** rows in this same
-            // transaction, never a change to this lane's own `report.resolve`
-            // row (the R03 pin is intact). `NoAction` / `Other` are no-action /
-            // the explanation) — no execution. `_posts` is the optional R05
-            // seam (nullable, the CS1736 precedent); the same method's R07
-            // emitter guards its optional seam the same way
-            // (`_notifications is not null && …`), so A02 degrades gracefully
-            // when it is absent (the pre-A02 R03 tests wire `_posts` as null
-            // and resolve with Hidden/Removed — they stay green because the
-            // outcome is still recorded, just not executed). Production DI
-            // always wires the PostService, so the degrade is a test-only
-            // shape, never a production path.
+            // branch is what makes the post actually disappear from feed/detail
+            // — A02 only writes the PostStatus; the reads were already A01's).
+            // A04 extends the same lane to **grouppost targets** (the closest
+            // copy — a `Post` doc with `GroupId` set, the ADR 0013 shape):
+            // the `FileReportTargetAsync` lane sets `PostId = string.Empty`
+            // and the target's id in `TargetId` (the ADR 0173 new-lane shape),
+            // so A04 adds a `grouppost` branch that uses `TargetId`.
+            //
+            // **Target-kind-aware guard** (A02 post/reply + A04 grouppost):
+            //   • post / reply  — `Report.PostId` is non-empty (the original
+            //     M3b / ADR 0023 shape) → use `PostId`.
+            //   • grouppost    — `Report.TargetKind == "grouppost"` and
+            //     `Report.TargetId` is non-empty (the ADR 0173 new-lane shape)
+            //     → use `TargetId`.
+            //   • event / project / board / todo — remain **records-only**
+            //     (A04's "the rest listed as follow-ups"):
+            //       - event   — no `PostStatus` field; a different doc shape
+            //                   (likely a `Visibility` flag, not a `PostStatus`
+            //                   flip) — filed, not built.
+            //       - project — same shape as event (a `Project` doc, not a
+            //                   `Post`).
+            //       - board   — a `KanbanBoard` doc; no `PostStatus` field.
+            //       - todo    — a `TodoItem` doc; no `PostStatus` field.
+            //
+            // `HidePostAsync` / `RemovePostAsync` each run their own
+            // `Moderate` decision + write their own `Action = Moderate` audit
+            // row (the M3b write-lane rows, `TargetId = the post id`) —
+            // **additional** rows in this same transaction, never a change to
+            // this lane's own `report.resolve` row (the R03 pin is intact).
+            // `NoAction` / `Other` are no-action / the explanation — no
+            // execution. `_posts` is the optional R05 seam (nullable, the
+            // CS1736 precedent); the same method's R07 emitter guards its
+            // optional seam the same way (`_notifications is not null && …`),
+            // so A02 degrades gracefully when it is absent (the pre-A02 R03
+            // tests wire `_posts` as null and resolve with Hidden/Removed —
+            // they stay green because the outcome is still recorded, just not
+            // executed). Production DI always wires the PostService, so the
+            // degrade is a test-only shape, never a production path.
+            //
+            // // TODO ❓ (A04 — group-scope moderation gate): a group post's
+            // `Post.ComponentId` is `string.Empty` (ADR 0013 G·2 lane
+            // exclusivity) and its `Audience` is empty (G·8). The
+            // `AuthorizationService.Decide` function has **no** group-scope
+            // moderation branch: branch 2 (Moderation) keys on
+            // `ComponentId` (which is empty → no match), and there is no
+            // `GlobalAdmin` branch (the role is enforced at the Web layer,
+            // not in the Core's `Decide`). A regular GlobalAdmin resolving a
+            // grouppost report with `Hidden` is **denied** at the Core's
+            // `CanAsync(Moderate)` gate — the report is not resolved, the
+            // group post is not hidden. Only a break-glass `AdminOverride`
+            // row (branch 3) or the author (branch 1, owner) passes. The
+            // standing-moderator shape (Option B, ADR 0003 SoD) is a
+            // follow-up: the `ModeratorAssignment` row would need to be read
+            // on the group's scope, not the community's. Filed, not built.
+            string? executionTargetId = null;
+            if (!string.IsNullOrEmpty(report.PostId))
+                executionTargetId = report.PostId;                                  // A02 post / reply shape
+            else if (report.TargetKind == "grouppost" && !string.IsNullOrEmpty(report.TargetId))
+                executionTargetId = report.TargetId;                                // A04 grouppost shape
+
             if (outcome is (ReportOutcome.Hidden or ReportOutcome.Removed)
                 && _posts is not null
-                && !string.IsNullOrEmpty(report.PostId))
+                && executionTargetId is not null)
             {
                 if (outcome == ReportOutcome.Hidden)
                 {
-                    await _posts.HidePostAsync(report.PostId, globalAdminId, session)
+                    await _posts.HidePostAsync(executionTargetId, globalAdminId, session)
                         .ConfigureAwait(false);
                 }
                 else // outcome == ReportOutcome.Removed
                 {
-                    await _posts.RemovePostAsync(report.PostId, globalAdminId, session)
+                    await _posts.RemovePostAsync(executionTargetId, globalAdminId, session)
                         .ConfigureAwait(false);
                 }
             }

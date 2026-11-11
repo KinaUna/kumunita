@@ -8,6 +8,7 @@ using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Marten;
 using NSubstitute;
+using Npgsql;
 using Xunit;
 
 namespace Kumunita.Core.Tests;
@@ -1509,6 +1510,264 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
                                        && a.Outcome == AccessOutcome.Allow);
     }
 
+    // ═════════════════════════════════════════════════════════════════════
+    // IMPROVE-UX A04 — grouppost-target outcome-execution (the A02 guard
+    // flipped for the "closest copy" — a `Post` doc with `GroupId` set, the
+    // ADR 0013 shape). A02 recorded the outcome on the Report row but
+    // executed **nothing** for grouppost targets (the `PostId` guard blocked
+    // it; the target's id lives in `TargetId`, not `PostId`). A04 adds the
+    // `grouppost` branch in the execution block: when
+    // `Report.TargetKind == "grouppost"` and `Report.TargetId` is non-empty,
+    // the same `HidePostAsync` / `RemovePostAsync` write lanes run on that
+    // id. The post / reply shape (the `PostId` branch) is unchanged; the
+    // `event` / `project` / `board` / `todo` shapes remain records-only (the
+    // plan card's "the rest listed as follow-ups" line).
+    //
+    // **Gate reality (the `// TODO ❓` documented in the execution block):**
+    // a group post's `Post.ComponentId` is `string.Empty` (ADR 0013 G·2 lane
+    // exclusivity) and its `Audience` is empty (G·8). The
+    // `AuthorizationService.Decide` function has no group-scope moderation
+    // branch and no `GlobalAdmin` branch (the role is Web-layer-only, not in
+    // Core's `Decide`). A regular GlobalAdmin resolving a grouppost report
+    // is **denied** at the Core's `CanAsync(Moderate)` gate. Only a break-
+    // glass `AdminOverride` row (branch 3) or the author (branch 1) passes.
+    // These tests seed the break-glass row to prove the execution block works
+    // when the gate passes; the `// TODO ❓` documents the design gap for
+    // the standing-moderator shape (Option B, ADR 0003 SoD) as a follow-up.
+    // ═════════════════════════════════════════════════════════════════════
+
+    // ── A04-1 — ResolveReportAsync_OutcomeHidden_GroupPostTarget_FlipsGroupPostHidden ─
+    //
+    // A04 DoD pin ("one more kind hideable"): resolving a **grouppost-
+    // targeted** report (`Report.PostId = string.Empty`,
+    // `Report.TargetKind = "grouppost"`, `Report.TargetId = the group post
+    // id`) with `ReportOutcome.Hidden` executes `HidePostAsync` on the
+    // **group post's id** (via the A04 `grouppost` branch in the execution
+    // block), so the group post's `Post.Status` flips to `PostStatus.Hidden`.
+    // The break-glass `AdminOverride` row is seeded so the Core's
+    // `CanAsync(Moderate)` gate passes (the A04 `// TODO ❓` — a regular
+    // GlobalAdmin is denied; only break-glass or the author passes for a
+    // `ComponentId = string.Empty` / empty-audience resource). The `report.
+    // resolve` audit row is also committed (the lane's own row, the R03 pin
+    // unchanged).
+
+    [Fact]
+    public async Task A04_ResolveReport_OutcomeHidden_GroupPostTarget_FlipsGroupPostHidden()
+    {
+        var (store, conn) = await BootStoreAsyncWithConn();
+        var (userInfo, _, svc) = ServicesWithPosts(store);
+        const string admin = "u-a04-1-admin";
+        const string author = "u-a04-1-author";
+        var now = DateTimeOffset.UtcNow;
+
+        // Break-glass row (the Core-layer equivalent of the Web GlobalAdmin
+        // role — the A04 `// TODO ❓` documents that a regular GlobalAdmin
+        // is denied at the Core gate for a ComponentId=string.Empty resource;
+        // only break-glass or the author passes).
+        await SeedAdminOverrideAsync(conn, admin, "tok-a04-1",
+            grantedAt: now.AddHours(-2), expiresAt: now.AddHours(+2),
+            consumedAt: now.AddHours(-1));
+
+        // The group post (ADR 0013 G·2/G·8 shape: ComponentId=empty,
+        // GroupId set, Audience non-null empty).
+        var group = await userInfo.CreateGroupAsync(author, "A04 test group", null);
+        await Plant(store, new Post
+        {
+            Id = "a04-1-gp", GroupId = group.Id, ComponentId = string.Empty,
+            AuthorId = author,
+            Body = "body a04-1", Created = DateTimeOffset.UtcNow,
+            Audience = new Authorization.Audience(),   // G·8 — non-null empty
+            Status = PostStatus.Active,
+        });
+        // The grouppost-targeted report (ADR 0173 new-lane shape:
+        // PostId = string.Empty, TargetKind = "grouppost", TargetId = post id).
+        await Plant(store, new Report
+        {
+            Id = "a04-1-report", PostId = string.Empty,
+            ReporterId = "u-a04-1-reporter",
+            Reason = "a04-1-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+            TargetKind = "grouppost", TargetId = "a04-1-gp",
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "a04-1-report", admin, session,
+                outcome: ReportOutcome.Hidden,
+                resolutionNote: "hidden per group policy"));
+
+        // The outcome is recorded on the Report row (the R03 shape, intact).
+        await using var s1 = store.QuerySession();
+        var report = await s1.LoadAsync<Report>("a04-1-report", TestContext.Current.CancellationToken);
+        Assert.NotNull(report);
+        Assert.Equal("resolved", report!.Status);
+        Assert.Equal(ReportOutcome.Hidden, report.Outcome);
+        Assert.Equal(string.Empty, report.PostId);        // the ADR 0173 new-lane shape
+        Assert.Equal("grouppost", report.TargetKind);
+        Assert.Equal("a04-1-gp", report.TargetId);
+
+        // **A04 DoD pin**: the group post actually flips to Hidden.
+        await using var s2 = store.QuerySession();
+        var gp = await s2.LoadAsync<Post>("a04-1-gp", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Hidden, gp!.Status);
+
+        // The M3b write-lane audit row (Action = "moderate", TargetId = the
+        // group post id, Outcome = Allow) — an **additional** row in the same
+        // transaction (the A02 same-transaction pin, extended to A04).
+        var postRows = await PostAudits(store, actor: admin);
+        Assert.Contains(postRows, a => a.Action == AccessAction.Moderate.Id
+                                       && a.TargetId == "a04-1-gp"
+                                       && a.Outcome == AccessOutcome.Allow);
+
+        // The lane's own resolve row (the R03 pin — unchanged shape).
+        var reportRows = await ReportAudits(store, actor: admin);
+        var resolveRow = Assert.Single(reportRows, a => a.Action == "report.resolve");
+        Assert.Equal("a04-1-report", resolveRow.TargetId);
+        Assert.Equal(AccessOutcome.Allow, resolveRow.Outcome);
+    }
+
+    // ── A04-3 — ResolveReportAsync_OutcomeRemoved_GroupPostTarget_FlipsGroupPostRemoved ─
+    //
+    // A04 (the `Removed` symmetry, the F4 hard lane): resolving a
+    // **grouppost-targeted** report with `ReportOutcome.Removed` executes
+    // `RemovePostAsync` on the group post's id, so the group post's
+    // `Post.Status` flips to `PostStatus.Removed` (the A04 "hideable" pin's
+    // `Removed` sibling; the F4 hard lane is the same shape — irreversible
+    // by design, the A03 `UnhidePostAsync` does not undo `Removed`).
+
+    [Fact]
+    public async Task A04_ResolveReport_OutcomeRemoved_GroupPostTarget_FlipsGroupPostRemoved()
+    {
+        var (store, conn) = await BootStoreAsyncWithConn();
+        var (userInfo, _, svc) = ServicesWithPosts(store);
+        const string admin = "u-a04-3-admin";
+        const string author = "u-a04-3-author";
+        var now = DateTimeOffset.UtcNow;
+
+        await SeedAdminOverrideAsync(conn, admin, "tok-a04-3",
+            grantedAt: now.AddHours(-2), expiresAt: now.AddHours(+2),
+            consumedAt: now.AddHours(-1));
+
+        var group = await userInfo.CreateGroupAsync(author, "A04-3 test group", null);
+        await Plant(store, new Post
+        {
+            Id = "a04-3-gp", GroupId = group.Id, ComponentId = string.Empty,
+            AuthorId = author,
+            Body = "body a04-3", Created = DateTimeOffset.UtcNow,
+            Audience = new Authorization.Audience(),
+            Status = PostStatus.Active,
+        });
+        await Plant(store, new Report
+        {
+            Id = "a04-3-report", PostId = string.Empty,
+            ReporterId = "u-a04-3-reporter",
+            Reason = "a04-3-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+            TargetKind = "grouppost", TargetId = "a04-3-gp",
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "a04-3-report", admin, session,
+                outcome: ReportOutcome.Removed,
+                resolutionNote: "removed — content policy"));
+
+        await using var s1 = store.QuerySession();
+        var report = await s1.LoadAsync<Report>("a04-3-report", TestContext.Current.CancellationToken);
+        Assert.Equal(ReportOutcome.Removed, report!.Outcome);
+
+        // **A04 hard-lane pin**: the group post flips to Removed.
+        await using var s2 = store.QuerySession();
+        var gp = await s2.LoadAsync<Post>("a04-3-gp", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Removed, gp!.Status);
+
+        var postRows = await PostAudits(store, actor: admin);
+        Assert.Contains(postRows, a => a.Action == AccessAction.Moderate.Id
+                                       && a.TargetId == "a04-3-gp"
+                                       && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── A04-2 — ResolveReportAsync_OutcomeHidden_EventTarget_StillRecordsOnly ─
+    //
+    // A04 (the "the rest listed as follow-ups" regression pin): an
+    // **event-targeted** report with `ReportOutcome.Hidden` still records
+    // the outcome on the Report row but executes **nothing** (the `event`
+    // branch is **not** in A04's execution block — only `grouppost` was
+    // added). The A02 `A02_…_EventTarget_RecordsOutcomeOnly` test already
+    // pins this; A04-2 re-pins it here to confirm A04 did not accidentally
+    // extend execution to `event` (the guard is `TargetKind == "grouppost"`,
+    // not "any non-post target"). A decoy post must stay `Active` (the
+    // A02 trap shape, unchanged).
+
+    [Fact]
+    public async Task A04_ResolveReport_OutcomeHidden_EventTarget_StillRecordsOnly()
+    {
+        var (store, _) = await BootStoreAsyncWithConn();
+        var (_, _, svc) = ServicesWithPosts(store);
+        const string admin = "u-a04-2-admin";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a04-2-assign", UserId = admin, ComponentId = ComponentId,
+            GrantedBy = "u-a04-2-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Kumunita.Core.Events.Event
+        {
+            Id = "a04-2-event", ComponentId = ComponentId, AuthorId = "u-a04-2-author",
+            Title = "event a04-2", Body = "body a04-2",
+            Start = DateTimeOffset.UtcNow, End = DateTimeOffset.UtcNow.AddHours(1),
+            Created = DateTimeOffset.UtcNow,
+        });
+        // A DECOY post — must stay Active (proves the A04 guard is on
+        // TargetKind == "grouppost", not "any non-post target").
+        await Plant(store, new Post
+        {
+            Id = "a04-2-decoy", ComponentId = ComponentId, AuthorId = "u-a04-2-decoy-author",
+            Body = "decoy a04-2", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a04-2-decoy-member"),
+            Status = PostStatus.Active,
+        });
+        // Event-target report: PostId = string.Empty, TargetKind = "event".
+        await Plant(store, new Report
+        {
+            Id = "a04-2-report", PostId = string.Empty,
+            ReporterId = "u-a04-2-reporter",
+            ComponentId = ComponentId, Reason = "a04-2-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+            TargetKind = "event", TargetId = "a04-2-event",
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "a04-2-report", admin, session,
+                outcome: ReportOutcome.Hidden,
+                resolutionNote: "event — hide is a follow-up (A04 'the rest listed as follow-ups')"));
+
+        // The outcome is recorded…
+        await using var s1 = store.QuerySession();
+        var report = await s1.LoadAsync<Report>("a04-2-report", TestContext.Current.CancellationToken);
+        Assert.Equal(ReportOutcome.Hidden, report!.Outcome);
+        Assert.Equal("resolved", report.Status);
+        Assert.Equal(string.Empty, report.PostId);
+
+        // …but the decoy post is untouched (still Active) — the A04 guard
+        // is on TargetKind == "grouppost", not "any non-post target".
+        await using var s2 = store.QuerySession();
+        var decoy = await s2.LoadAsync<Post>("a04-2-decoy", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Active, decoy!.Status);
+
+        // No write-lane (moderate) row for the decoy post.
+        var postRows = await PostAudits(store, actor: admin);
+        Assert.DoesNotContain(postRows, a => a.TargetId == "a04-2-decoy");
+
+        // The resolve row is still written (the lane's own row).
+        var reportRows = await ReportAudits(store, actor: admin);
+        Assert.Contains(reportRows, a => a.Action == "report.resolve"
+                                         && a.Outcome == AccessOutcome.Allow);
+    }
+
     // ── R05-1 — ListMyReportsAsync_ReturnsReportersRows_WithResolutionShape ─
     //
     // IMPROVE-UX R05 (the D1 "My reports" read shape; the R05 DoD a pin): the
@@ -1856,6 +2115,17 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
 
     private async Task<IDocumentStore> BootStoreAsync()
     {
+        var (store, _) = await BootStoreAsyncWithConn();
+        return store;
+    }
+
+    /// <summary>
+    /// <see cref="BootStoreAsync"/> + the raw connection string (needed by the
+    /// A04 tests to seed a break-glass <c>AdminOverride</c> row via the raw-SQL
+    /// path — the <c>GroupPostServiceTests.SeedAdminOverrideAsync</c> shape).
+    /// </summary>
+    private async Task<(IDocumentStore store, string conn)> BootStoreAsyncWithConn()
+    {
         var conn = await fixture.NewDatabaseAsync(TestContext.Current.CancellationToken);
         var store = DocumentStore.For(opts =>
         {
@@ -1868,7 +2138,47 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
-        return store;
+        return (store, conn);
+    }
+
+    /// <summary>
+    /// Seed a consumed/unexpired <c>AdminOverride</c> row (the
+    /// <c>AuthorizationServiceTests.SeedAdminOverrideAsync</c> / <c>GroupPost-
+    /// ServiceTests.SeedAdminOverrideAsync</c> precedent — the hand-rolled
+    /// <c>mt</c> table, operator-written via psql; the test mirrors that path
+    /// with a raw Npgsql insert). Needed by the A04 tests to pass the Core's
+    /// <c>CanAsync(Moderate)</c> gate for a <c>ComponentId = string.Empty</c>
+    /// resource (a group post) where a regular GlobalAdmin is denied.
+    /// </summary>
+    private static async Task SeedAdminOverrideAsync(
+        string connString, string userId, string token,
+        DateTimeOffset grantedAt, DateTimeOffset expiresAt,
+        DateTimeOffset consumedAt)
+    {
+        await using var conn = new NpgsqlConnection(connString);
+        await conn.OpenAsync(TestContext.Current.CancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText =
+            "INSERT INTO \"mt\".\"AdminOverride\" " +
+            "  (\"id\", \"userId\", \"token\", \"grantedAt\", \"expiresAt\", \"consumedAt\") " +
+            "VALUES (@id, @userId, @token, @grantedAt, @expiresAt, @consumedAt)";
+
+        static void Add(NpgsqlCommand cmd, string name, object value)
+        {
+            var p = cmd.CreateParameter();
+            p.ParameterName = name;
+            p.Value = value;
+            cmd.Parameters.Add(p);
+        }
+
+        Add(cmd, "@id", Guid.NewGuid().ToString("N"));
+        Add(cmd, "@userId", userId);
+        Add(cmd, "@token", token);
+        Add(cmd, "@grantedAt", grantedAt);
+        Add(cmd, "@expiresAt", expiresAt);
+        Add(cmd, "@consumedAt", consumedAt);
+
+        await cmd.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     /// <summary>
