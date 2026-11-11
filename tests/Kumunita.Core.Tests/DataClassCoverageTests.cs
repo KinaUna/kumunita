@@ -83,13 +83,14 @@ public class DataClassCoverageTests
     {
         HashSet<Type> registered = BuildRegisteredTypes();
 
-        // Sanity: the registered set must be exactly 83 (the design doc's
+        // Sanity: the registered set must be exactly 84 (the design doc's
         // count, +1 for ADR 0301 / IMPROVE-UX R11's DeletionRequest, +1 for
-        // ADR 0302 / IMPROVE-UX R15's KioskLink).
-        if (registered.Count != 83)
+        // ADR 0302 / IMPROVE-UX R15's KioskLink, +1 for ADR 0304 /
+        // IMPROVE-UX A07's Invitation).
+        if (registered.Count != 84)
         {
             throw new Xunit.Sdk.XunitException(
-                $"Expected 83 registered doc types; got {registered.Count}. " +
+                $"Expected 84 registered doc types; got {registered.Count}. " +
                 $"Types: {string.Join(", ", registered.Select(t => t.Name).OrderBy(n => n))}");
         }
 

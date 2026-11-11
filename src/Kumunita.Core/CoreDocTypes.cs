@@ -113,6 +113,15 @@ public static class CoreDocTypes
         // Looked up by (TokenHash, OwnerSubjectId) in ValidateAsync — a plain
         // query, no index needed (the link count per instance is small).
         opts.Schema.For<Kiosk.KioskLink>();
+        // ADR 0304 (IMPROVE-UX A07) — the email invitation (the single-use,
+        // expiring, revocable credential that opens sign-up while the gate is
+        // closed). One row per invitation; the conventional string Id (the
+        // KioskLink / IdentityToken / EscalationToken credential shape).
+        // TokenHash is the SHA-256 digest only — the raw token is never stored
+        // (ADR 0304 D2, the F2 / 0159 / ADR 0302 D2 hash-at-rest rule).
+        // Looked up by TokenHash in ValidateAsync / AcceptAsync — a plain
+        // query, no index needed (the invitation count per instance is small).
+        opts.Schema.For<Identity.Invitation>();
 
         // Outbox (plan M1 step 6/7): the staged email row the domain write commits with
         // (IMailerStage / OutboxEmailStager, invariant C3) and the domain dead-letter
