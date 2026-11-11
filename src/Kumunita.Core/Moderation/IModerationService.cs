@@ -49,6 +49,42 @@ public interface IModerationService
         CancellationToken ct = default);
 
     /// <summary>
+    /// The moderation queue's <b>open-report count</b> (IMPROVE-UX A06 — the
+    /// account-nav badge's read seam): the number of reports in the actor's
+    /// scoped queue whose <c>Status</c> is <c>"filed"</c>, <c>"assigned"</c>,
+    /// or <c>"unlocked"</c> (a <c>"resolved"</c> report is done — not open).
+    /// <para>
+    /// The <b>same scoped query</b> <see cref="GetQueueAsync"/> uses
+    /// (GlobalAdmin → every report; standing-moderator → reports on their
+    /// <see cref="ModeratorAssignment"/> components with
+    /// <c>Component.ModeratorAccess</c> ON; a plain resident → no reports —
+    /// the C-M3b·4 SoD display-level projection). The badge's count is
+    /// <b>provably equal</b> to
+    /// <c>GetQueueAsync(...).Rows.Where(r =&gt; r.Status is
+    /// "filed" or "assigned" or "unlocked").Count()</c> for the same actor
+    /// in the same window — a test pins this (A06-1).
+    /// </para>
+    /// <para>
+    /// A <b>read lane</b>, not a decision lane (the
+    /// <see cref="GetQueueAsync"/> / <see cref="GetDetailAsync"/> shape):
+    /// no <see cref="IAuthorizationService.CanAsync"/> call, no
+    /// <c>AccessAudit</c> row. The lean count query (two narrow
+    /// <c>Marten</c> reads — the <c>ModeratorAssignment</c> +
+    /// <c>Component.ModeratorAccess</c> reads, then a <c>Report</c> count
+    /// scoped to the result) replaces the full per-row resolution
+    /// <see cref="GetQueueAsync"/> does (the reporter / reply / target
+    /// names + the component name), so the nav badge on every
+    /// authenticated request does not pay the queue page's DB cost
+    /// (the A06 "the badge does not double the queue's DB load" pin).
+    /// </para>
+    /// </summary>
+    Task<int> CountOpenReportsAsync(
+        string actorId,
+        bool isGlobalAdmin,
+        bool isStanding,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// The <c>GET /moderation/{id}</c> detail (the controller's
     /// <c>Resolve</c> body minus the shape mapping): the report + its
     /// resolved target (post, or event / project / board / todo /

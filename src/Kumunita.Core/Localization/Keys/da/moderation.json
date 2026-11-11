@@ -47,5 +47,6 @@
   "moderation.resolve_outcome_removed": "Fjern indlægget",
   "moderation.resolve_outcome_other": "Andet (se note)",
   "moderation.resolve_note_label": "Note til rapportøren (valgfri)",
-  "moderation.resolve_note_placeholder": "Hvad skete der, i et eller to sætninger"
+  "moderation.resolve_note_placeholder": "Hvad skete der, i et eller to sætninger",
+  "moderation.empty_body": "Når en beboer indgiver en rapport om indhold i et fællesskab, du modererer, vises den her."
 }

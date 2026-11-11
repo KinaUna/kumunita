@@ -49,5 +49,6 @@
   "moderation.resolve_outcome_removed": "Remove the post",
   "moderation.resolve_outcome_other": "Other (see note)",
   "moderation.resolve_note_label": "Note to the reporter (optional)",
-  "moderation.resolve_note_placeholder": "What happened, in one or two sentences"
+  "moderation.resolve_note_placeholder": "What happened, in one or two sentences",
+  "moderation.empty_body": "When a resident files a report on content in a community you moderate, it will appear here."
 }

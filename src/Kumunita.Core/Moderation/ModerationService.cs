@@ -621,6 +621,78 @@ public partial class ModerationService : IModerationService
         };
     }
 
+    /// <summary>
+    /// The scoped-component-id set for <paramref name="actorId"/> when they
+    /// are a standing-moderator (the <see cref="GetQueueAsync"/> scoped-read
+    /// filter, extracted verbatim): the intersection of the actor's
+    /// <see cref="ModeratorAssignment"/> component ids and the set of
+    /// components whose <see cref="Kumunita.Core.UserInfo.Component.ModeratorAccess"/>
+    /// flag is ON (the U6 handoff's flag-ON gate). An empty set when the
+    /// actor has no <see cref="ModeratorAssignment"/> row on any
+    /// <c>ModeratorAccess</c>-ON component — the badge's count is then 0.
+    /// </summary>
+    private async Task<HashSet<string>> ScopedComponentIdsAsync(
+        string actorId,
+        IDocumentSession session)
+    {
+        var myComponents = (await _profileSettings
+            .GetAssignmentsAsync(actorId).ConfigureAwait(false))
+            .Where(a => a.ComponentId is not null)
+            .Select(a => a.ComponentId)
+            .ToHashSet();
+        var components = (await session.Query<Kumunita.Core.UserInfo.Component>()
+            .ToListAsync().ConfigureAwait(false)).ToDictionary(c => c.Id);
+        var scoped = new HashSet<string>();
+        foreach (var componentName in components.Keys)
+        {
+            if (!myComponents.Contains(componentName))
+                continue;
+            if (components[componentName].ModeratorAccess == true)
+                scoped.Add(componentName);
+        }
+        return scoped;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountOpenReportsAsync(
+        string actorId,
+        bool isGlobalAdmin,
+        bool isStanding,
+        CancellationToken ct = default)
+    {
+        // SEC-READ: report-gated (ADR 0003) — the badge self-filters the same
+        // way the queue does (C-M3b·4 SoD): a standing-moderator sees only
+        // reports on their assigned components with ModeratorAccess ON; a
+        // plain resident sees none; a GlobalAdmin sees all.
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+        if (!isGlobalAdmin && isStanding)
+        {
+            var scopedComponentIds = await ScopedComponentIdsAsync(actorId, session).ConfigureAwait(false);
+            if (scopedComponentIds.Count == 0)
+                return 0;
+            return await session.Query<Report>()
+                .CountAsync(r => (r.Status == "filed" || r.Status == "assigned"
+                                 || r.Status == "unlocked" || r.Status == null)
+                    && r.ComponentId != null
+                    && scopedComponentIds.Contains(r.ComponentId))
+                .ConfigureAwait(false);
+        }
+
+        if (!isGlobalAdmin)
+        {
+            // A plain resident (Member, no standing-moderator row) sees NO
+            // reports (the C-M3b·4 SoD pin projects at the display level on
+            // the read lanes) — the badge's count is 0 by construction.
+            return 0;
+        }
+
+        return await session.Query<Report>()
+            .CountAsync(r => r.Status == "filed" || r.Status == "assigned"
+                || r.Status == "unlocked" || r.Status == null)
+            .ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public async Task<ModerationDetailReadModel> GetDetailAsync(
         string reportId,

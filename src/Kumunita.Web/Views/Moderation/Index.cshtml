@@ -15,8 +15,13 @@
 
 @if (Model.TotalCount == 0)
 {
-    <div class="alert alert-secondary">
-        <kw-l key="moderation.empty">No reports yet. The queue is empty.</kw-l>
+    @* IMPROVE-UX A06 — the queue's friendly empty state (the R29–R33 batch's
+       .kmb-empty shape, the ADR 0177 reference; Moderation/Index was the last
+       plain empty state — the R33 "Moderation/Index is A06's" pin). The
+       queue is a passive inbox: the resident files, the moderator acts. *@
+    <div class="kmb-empty">
+        <p class="kmb-empty-title"><kw-l key="moderation.empty">No reports yet. The queue is empty.</kw-l></p>
+        <p class="kmb-empty-body"><kw-l key="moderation.empty_body">When a resident files a report on content in a community you moderate, it will appear here.</kw-l></p>
     </div>
 }
 else

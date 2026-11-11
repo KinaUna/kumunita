@@ -266,6 +266,108 @@ public sealed class ModerationControllerTests
             ct:             Arg.Any<CancellationToken>());
     }
 
+    // ── A06 — the moderation nav badge render (view-source pin) ────────────
+
+    /// <summary>
+    /// IMPROVE-UX A06 (the E3 "new reports reach no moderator" finding's
+    /// visible loop-closer, the badge half): the <c>_AccountNav</c> partial
+    /// carries the moderation nav badge's count span
+    /// (<c>class="kmb-nav-badge"</c>) on the Moderation menu item — rendered
+    /// <b>only when</b> <c>navModerationOpenCount &gt; 0</c> (the A06
+    /// "0 hides" pin — a 0-badge is a noise path, the <c>@if</c> guard
+    /// keeps it out). The count comes from
+    /// <c>IModerationService.CountOpenReportsAsync</c> (the Core read seam —
+    /// ADR 0006-D holds: the cache is Web-layer, the seam stays pure),
+    /// read through the instance-level <c>IMemoryCache</c> keyed by
+    /// (actorId, isGlobalAdmin, isStanding) with a 60 s sliding window
+    /// (the A06 "cached ≤60 s" pin — the badge does not double the queue's
+    /// DB load). Both Moderation menu items (the GlobalAdmin branch at
+    /// the <c>/admin/error-reports</c> sibling + the standing-moderator
+    /// branch) carry the same badge span — the scope is by construction
+    /// (a plain resident sees neither row, so no extra guard is needed).
+    /// The queue's friendly empty state is a separate view pin
+    /// (<see cref="A06_Moderation_Index_EmptyState_KmbEmptyShape"/>) — the
+    /// R29–R33 batch's last plain empty state (the R33 "Moderation/Index
+    /// is A06's" pin).
+    /// </summary>
+    [Fact]
+    public void A06_AccountNav_ModerationBadge_GuardedOnCountGreaterThanZero()
+    {
+        var nav = ReadViewSource("Shared", "_AccountNav.cshtml");
+
+        // The badge span is on the Moderation menu item (both branches —
+        // the GlobalAdmin branch and the standing-moderator branch carry
+        // the same href + the same badge shape).
+        Assert.Contains("href=\"/moderation\"", nav, StringComparison.Ordinal);
+        Assert.Contains("kmb-nav-badge", nav, StringComparison.Ordinal);
+        Assert.Contains("data-nav-badge=\"moderation\"", nav, StringComparison.Ordinal);
+
+        // The A06 "0 hides" pin: the badge span is wrapped in an
+        // @if (navModerationOpenCount > 0) guard — a 0-badge is a noise
+        // path. The guard is present before the span (the Razor conditional
+        // wraps the span, not the other way round).
+        Assert.Contains(
+            "navModerationOpenCount > 0",
+            nav, StringComparison.Ordinal);
+
+        // The count comes from the Core read seam
+        // (IModerationService.CountOpenReportsAsync — the A06 count-seam
+        // shape, the same scoped query the queue uses) read through the
+        // Web-layer IMemoryCache (the 60 s sliding window — the A06
+        // "cached ≤60 s" pin).
+        Assert.Contains(
+            "Moderation.CountOpenReportsAsync",
+            nav, StringComparison.Ordinal);
+        Assert.Contains(
+            "TimeSpan.FromSeconds(60)",
+            nav, StringComparison.Ordinal);
+        Assert.Contains(
+            "SlidingExpiration",
+            nav, StringComparison.Ordinal);
+
+        // The cache key is scoped per (actorId, isGlobalAdmin, isStanding)
+        // — the A06 "per (actor, standing)" pin.
+        Assert.Contains(
+            "moderation.open-badge:",
+            nav, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// IMPROVE-UX A06 (the queue's friendly empty state — the A06 DoD's
+    /// second half, the R33 "Moderation/Index is A06's" pin):
+    /// <c>Views/Moderation/Index.cshtml</c>'s
+    /// <c>@if (Model.TotalCount == 0)</c> branch renders the
+    /// <c>.kmb-empty</c> shape (the R29–R33 batch's reference, the ADR 0177
+    /// shape) — a <c>kmb-empty-title</c> wrapping the existing
+    /// <c>moderation.empty</c> key + a <c>kmb-empty-body</c> wrapping the
+    /// new <c>moderation.empty_body</c> key (the one new translation key ×
+    /// en/de/fr/da, the parity pin). The bare
+    /// <c>alert alert-secondary</c> it previously rendered is gone (the
+    /// <c>ux-measure.py</c> <c>empty_plain</c> count drops by 1).
+    /// </summary>
+    [Fact]
+    public void A06_Moderation_Index_EmptyState_KmbEmptyShape()
+    {
+        var view = ReadViewSource("Moderation", "Index.cshtml");
+
+        // The .kmb-empty shape (the ADR 0177 reference — the R29–R33
+        // batch's friendly empty state).
+        Assert.Contains("kmb-empty", view, StringComparison.Ordinal);
+        Assert.Contains("kmb-empty-title", view, StringComparison.Ordinal);
+        Assert.Contains("kmb-empty-body", view, StringComparison.Ordinal);
+
+        // The existing moderation.empty title key (reused, not new) + the
+        // new moderation.empty_body key (the one new translation key).
+        Assert.Contains("moderation.empty", view, StringComparison.Ordinal);
+        Assert.Contains("moderation.empty_body", view, StringComparison.Ordinal);
+
+        // The bare alert-secondary it previously rendered is gone (the
+        // ux-measure.py empty_plain count drops by 1 — the R33 pin).
+        Assert.DoesNotContain(
+            "alert alert-secondary",
+            view, StringComparison.Ordinal);
+    }
+
     // ── Harness ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -298,6 +400,24 @@ public sealed class ModerationControllerTests
 
         controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
         return controller;
+    }
+
+    /// <summary>
+    /// Reads a view's source by walking up from the test's working
+    /// directory to the repo root (the <c>Kumunita.slnx</c> file) — the
+    /// same pattern <see cref="GroupMessagesControllerTests.ReadViewSource"/>
+    /// / <see cref="MessagesControllerTests.ReadViewSource"/> use for their
+    /// <c>_AccountNav.cshtml</c> pin.
+    /// </summary>
+    private static string ReadViewSource(string dir, string file)
+    {
+        var dirInfo = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (dirInfo is not null && !File.Exists(Path.Combine(dirInfo.FullName, "Kumunita.slnx")))
+            dirInfo = dirInfo.Parent;
+        Assert.NotNull(dirInfo);
+        var path = Path.Combine(dirInfo!.FullName, "src", "Kumunita.Web", "Views", dir, file);
+        Assert.True(File.Exists(path), $"view {path} not found");
+        return File.ReadAllText(path);
     }
 
     /// <summary>

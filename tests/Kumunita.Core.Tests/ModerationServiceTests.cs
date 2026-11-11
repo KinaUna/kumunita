@@ -2492,6 +2492,192 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
             $"report.queued body carries target content: {b}"));
     }
 
+    // ── A06 — the moderation nav badge's open-report count ────────────────────
+    //
+    // IMPROVE-UX A06 (the E3 "new reports reach no moderator" finding's
+    // visible loop-closer, the badge half — A05 shipped the routing):
+    // ModerationService.CountOpenReportsAsync is a read seam (the
+    // GetQueueAsync / GetDetailAsync shape — no CanAsync, no AccessAudit row)
+    // that returns the actor's scoped open-report count, where "open" is
+    // Status ∈ {filed, assigned, unlocked} (a resolved report is done). The
+    // scoped query is the SAME one GetQueueAsync uses (the C-M3b·4 SoD shape:
+    // GlobalAdmin → every report; standing-moderator → their components with
+    // ModeratorAccess ON; plain resident → no reports) — a test pins this
+    // (A06-1). The nav badge's 60 s cache is Web-layer (ADR 0006-D holds:
+    // the Core seam is pure, the IMemoryCache lives in Kumunita.Web).
+
+    [Fact]
+    public async Task A06_CountOpenReports_GlobalAdmin_SameScopedQueryAsQueue()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+
+        const string moderator = "a06-1-mod";
+        const string reporter = "a06-1-reporter";
+
+        // Component A — the moderator's scoped component (ModeratorAccess ON,
+        // the U6 handoff's flag-ON gate). Component B — a different component
+        // the moderator has no standing on (out of scope for the standing
+        // call, in scope for the GlobalAdmin call).
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a06-1-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "a06-1-root", At = DateTimeOffset.UtcNow
+        });
+        const string compB = "a06-1-comp-b";
+        await Plant(store, new Component { Id = compB, Name = "Social", Enabled = true,
+                                           ModeratorAccess = true });
+
+        await Plant(store, new Post
+        {
+            Id = "a06-1-post", ComponentId = ComponentId, AuthorId = "a06-1-author",
+            Body = "body a06-1", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+
+        // Three reports: one filed on Component A (in scope), one resolved on
+        // Component A (out of scope — not open), one filed on Component B
+        // (out of scope for the standing call, in scope for the GlobalAdmin
+        // call).
+        await Plant(store, new Report
+        {
+            Id = "a06-1-r-filed-a", PostId = "a06-1-post", ReporterId = reporter,
+            ComponentId = ComponentId, Reason = "flagged", Status = "filed",
+            At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Report
+        {
+            Id = "a06-1-r-resolved-a", PostId = "a06-1-post", ReporterId = reporter,
+            ComponentId = ComponentId, Reason = "flagged", Status = "resolved",
+            At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Report
+        {
+            Id = "a06-1-r-filed-b", PostId = "a06-1-post", ReporterId = reporter,
+            ComponentId = compB, Reason = "flagged", Status = "filed",
+            At = DateTimeOffset.UtcNow
+        });
+
+        // The standing-moderator call: in-scope (Component A) open reports
+        // only — the filed A report. The resolved A report is not open; the
+        // filed B report is out of scope (the moderator has no
+        // ModeratorAssignment on Component B).
+        var standingCount = await svc.CountOpenReportsAsync(
+            moderator, isGlobalAdmin: false, isStanding: true, TestContext.Current.CancellationToken);
+        Assert.Equal(1, standingCount);
+
+        // The GlobalAdmin call: every open report (both filed reports — A
+        // and B; the resolved A report still excluded — not open). This is
+        // the "same scoped query as the queue" pin: the GlobalAdmin's
+        // GetQueueAsync would return all three rows, and its open count is
+        // Rows.Count - ByStatus["resolved"] = 2.
+        var globalAdminCount = await svc.CountOpenReportsAsync(
+            moderator, isGlobalAdmin: true, isStanding: true, TestContext.Current.CancellationToken);
+        Assert.Equal(2, globalAdminCount);
+
+        // The pin — the count is provably equal to the queue's open count
+        // (the A06 "the badge count is provably equal to the queue's open
+        // count for the same actor in the same window" invariant): for the
+        // GlobalAdmin, GetQueueAsync returns all three rows and its
+        // ByStatus["resolved"] is 1, so its open count is
+        // Rows.Count - ByStatus["resolved"] = 2 — the same as
+        // CountOpenReportsAsync. (The ServicesWithPosts composition is
+        // used here — the queue read seam resolves display names via
+        // IUserInfoService, which the plain Services trio omits; the
+        // scoped query itself is unchanged.)
+        // Compose the moderation service with the IUserInfoService read seam
+        // wired (the GetQueueAsync display-name resolution requires it — the
+        // A06 pin is about the scoped query, not the display work, so a real
+        // UserInfoService over the same live store is the honest shape).
+        var userInfo = new UserInfoService(store);
+        var authz = new AuthorizationService(store, userInfo);
+        var profileSettings = new ProfileSettingsService(store);
+        var svc2 = new ModerationService(profileSettings, authz, store, userInfo: userInfo);
+        var queue = await svc2.GetQueueAsync(moderator, isGlobalAdmin: true, isStanding: true, TestContext.Current.CancellationToken);
+        Assert.Equal(3, queue.Rows.Count);
+        Assert.Equal(1, queue.ByStatus.GetValueOrDefault("resolved", 0));
+        Assert.Equal(
+            queue.Rows.Count - queue.ByStatus.GetValueOrDefault("resolved", 0),
+            globalAdminCount);
+    }
+
+    [Fact]
+    public async Task A06_CountOpenReports_PlainResident_Zero()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+
+        const string resident = "a06-2-resident";
+        const string reporter = "a06-2-reporter";
+
+        // A filed report on a component the resident has no standing on —
+        // the C-M3b·4 SoD display-level projection (a plain resident sees
+        // no reports, the badge's count is 0 by construction).
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new Post
+        {
+            Id = "a06-2-post", ComponentId = ComponentId, AuthorId = "a06-2-author",
+            Body = "body a06-2", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+        await Plant(store, new Report
+        {
+            Id = "a06-2-r-filed", PostId = "a06-2-post", ReporterId = reporter,
+            ComponentId = ComponentId, Reason = "flagged", Status = "filed",
+            At = DateTimeOffset.UtcNow
+        });
+
+        var count = await svc.CountOpenReportsAsync(
+            resident, isGlobalAdmin: false, isStanding: false, TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task A06_CountOpenReports_ResolvedReport_NotOpen()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+
+        const string moderator = "a06-3-mod";
+        const string reporter = "a06-3-reporter";
+
+        // One filed + one resolved report on the same component the
+        // moderator is standing on — the resolved one is not "open" (the
+        // A06 "a resolved report is done" pin).
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a06-3-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "a06-3-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a06-3-post", ComponentId = ComponentId, AuthorId = "a06-3-author",
+            Body = "body a06-3", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+        await Plant(store, new Report
+        {
+            Id = "a06-3-r-filed", PostId = "a06-3-post", ReporterId = reporter,
+            ComponentId = ComponentId, Reason = "flagged", Status = "filed",
+            At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Report
+        {
+            Id = "a06-3-r-resolved", PostId = "a06-3-post", ReporterId = reporter,
+            ComponentId = ComponentId, Reason = "flagged", Status = "resolved",
+            At = DateTimeOffset.UtcNow
+        });
+
+        var count = await svc.CountOpenReportsAsync(
+            moderator, isGlobalAdmin: false, isStanding: true, TestContext.Current.CancellationToken);
+        Assert.Equal(1, count);
+    }
+
     // ── Shared helpers (mirror the PostServiceTests shape) ──────────────
 
     private async Task<IDocumentStore> BootStoreAsync()

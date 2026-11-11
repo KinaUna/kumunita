@@ -1513,6 +1513,25 @@ body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
   margin-right: 0.4rem;
   vertical-align: -0.15em;
 }
+/* IMPROVE-UX A06 — the moderation queue's open-report count on the nav's
+   Moderation menu item (the .kmb-nav-icon / .kmb-empty naming shape). A small
+   pill, right after the icon, only when the count is > 0 (the A06 "0 hides"
+   pin — a 0-badge is a noise path; the @if guard in _AccountNav keeps it out). */
+.dropdown-item .kmb-nav-badge,
+.nav-link .kmb-nav-badge {
+  display: inline-block;
+  min-width: 1.25rem;
+  margin: 0 0.5rem 0 0.15rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--kmb-radius-pill, 999px);
+  background: var(--bs-secondary-bg, #6c757d);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  vertical-align: -0.2em;
+}
 /* ADR 0283 — the same icon + label shape inside button-group switches
    (Upcoming/Past, Day/Week/Month, the Translations mode toggle). */
 .btn .kmb-nav-icon {

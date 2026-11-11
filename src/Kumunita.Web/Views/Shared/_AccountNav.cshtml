@@ -1,6 +1,7 @@
 @using Kumunita.Core.Localization
 @using Kumunita.Core.Identity
 @using Kumunita.Core.UserInfo
+@using Kumunita.Core.Moderation
 @using Kumunita.Web.Security
 @inject ILocalizationService Localization
 @inject ITranslationProvider Translation
@@ -8,6 +9,9 @@
 @inject IIdentityService Identity
 @inject IUserInfoService UserInfo
 @inject Kumunita.Core.Messaging.IMessagingService Messaging
+@inject IModerationService Moderation
+@inject Microsoft.Extensions.Caching.Memory.IMemoryCache MemoryCache
+@using Microsoft.Extensions.Caching.Memory
 @{
     var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var _navBellAria = Translation is null ? "Notifications" : await Translation.GetAsync("notifications.bell", _aL);
@@ -38,6 +42,47 @@
     // avatar set) avatar.js hides the <img> and shows the monogram sibling).
     // A read of the signed-in resident's own row — never another resident's.
     string? navAvatarSubject = isAuthenticated ? KumunitaPrincipal.SubjectId(User) : null;
+    // IMPROVE-UX A06 — the moderation queue's open-report count for the nav
+    // badge (the account-nav Moderation menu item's count pill, shown only
+    // when > 0). The scoped count (the same scoped query the /moderation queue
+    // uses — IModerationService.CountOpenReportsAsync, the C-M3b·4 SoD shape:
+    // GlobalAdmin → every open report; standing-moderator → their scoped
+    // components with ModeratorAccess ON; a plain resident → 0, the badge is
+    // unreachably scoped by construction — the plain-resident nav has no
+    // Moderation row at all). Cached in the instance-level IMemoryCache keyed
+    // by (actorId, isGlobalAdmin, isStanding) with a 60 s sliding window so the
+    // nav's per-request render does not pay the queue's DB cost (the A06
+    // "the badge does not double the queue's DB load" pin). A failure (the
+    // seam throws, e.g. the store is unavailable) degrades to 0 — the badge is
+    // display-only, never a hard dependency on the nav render.
+    int navModerationOpenCount = 0;
+    if (isAuthenticated && navAvatarSubject is not null
+        && (isGlobalAdmin || KumunitaPrincipal.IsModerator(User)))
+    {
+        var badgeCacheKey = $"moderation.open-badge:{navAvatarSubject}:{isGlobalAdmin}:{KumunitaPrincipal.IsModerator(User)}";
+        if (!MemoryCache.TryGetValue(badgeCacheKey, out object? badgeObj)
+            || badgeObj is null)
+        {
+            badgeObj = 0;
+            try
+            {
+                badgeObj = await Moderation.CountOpenReportsAsync(
+                    navAvatarSubject,
+                    isGlobalAdmin,
+                    KumunitaPrincipal.IsModerator(User));
+            }
+            catch
+            {
+                badgeObj = 0;   // the badge is display-only — never block the nav
+            }
+            MemoryCache.Set(badgeCacheKey, badgeObj,
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+                {
+                    SlidingExpiration = TimeSpan.FromSeconds(60),   // the A06 ≤60 s pin
+                });
+        }
+        if (badgeObj is int i) navModerationOpenCount = i;
+    }
     string navAvatarInitial = string.Empty;
     // The dropdown toggle's label: the resident's display name, falling back to
     // their email when no name is set. Capped at 15 characters so the navbar
@@ -222,7 +267,7 @@
                         <a class="dropdown-item text-dark" href="/admin/error-reports"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-error-reports"/></svg><kw-l key="nav.error_reports">Error reports</kw-l></a>
                     </li>
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg><kw-l key="nav.moderation">Moderation</kw-l></a>
+                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg>@if (navModerationOpenCount > 0) { <span class="kmb-nav-badge" data-nav-badge="moderation">@navModerationOpenCount</span> }<kw-l key="nav.moderation">Moderation</kw-l></a>
                     </li>
                 }
                 else if (KumunitaPrincipal.IsModerator(User))
@@ -235,7 +280,7 @@
                        the /moderation queue — scoped to their assigned components
                        at the read lane; no error-report surface. *@
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg><kw-l key="nav.moderation">Moderation</kw-l></a>
+                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg>@if (navModerationOpenCount > 0) { <span class="kmb-nav-badge" data-nav-badge="moderation">@navModerationOpenCount</span> }<kw-l key="nav.moderation">Moderation</kw-l></a>
                     </li>
                 }
                 @* ADR 0021 — the Translator's home: the language catalog + translation editors.

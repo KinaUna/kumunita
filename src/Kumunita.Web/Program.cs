@@ -531,6 +531,11 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<Kumunita.Web.Services.IEscalationForwarder, Kumunita.Web.Services.EscalationForwarder>();
 // ADR 0175 — the cached platform-default palette read by _Layout.
 builder.Services.AddSingleton<Kumunita.Web.Services.PlatformPaletteProvider>();
+// IMPROVE-UX A06 — the moderation nav badge's count cache (the 60 s sliding
+// window per (actor, standing) the _AccountNav partial reads; the Web layer
+// owns the cache — ADR 0006-D holds: the Core IModerationService.CountOpenReportsAsync
+// seam stays pure, HTTP-free).
+builder.Services.AddMemoryCache();
 // ADR 0285 — the kiosk playlist editor's item picker (composes the M8 search
 // surfaces + the component list; no access logic of its own).
 builder.Services.AddScoped<Kumunita.Web.Services.IKioskItemCatalog, Kumunita.Web.Services.KioskItemCatalog>();

@@ -47,5 +47,6 @@
   "moderation.resolve_outcome_removed": "Supprimer la publication",
   "moderation.resolve_outcome_other": "Autre (voir note)",
   "moderation.resolve_note_label": "Note \u00E0 l\u2019attention du signaleur (facultative)",
-  "moderation.resolve_note_placeholder": "Ce qui s\u2019est pass\u00E9, en une ou deux phrases"
+  "moderation.resolve_note_placeholder": "Ce qui s\u2019est pass\u00E9, en une ou deux phrases",
+  "moderation.empty_body": "Lorsqu'un r\u00E9sident signale un contenu dans une communaut\u00E9 que vous mod\u00E9rez, il appara\u00EEtra ici."
 }

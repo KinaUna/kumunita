@@ -49,5 +49,6 @@
   "moderation.resolve_outcome_removed": "Beitrag entfernen",
   "moderation.resolve_outcome_other": "Sonstiges (siehe Hinweis)",
   "moderation.resolve_note_label": "Hinweis an die Meldung (optional)",
-  "moderation.resolve_note_placeholder": "Was ist passiert, in einem oder zwei Sätzen"
+  "moderation.resolve_note_placeholder": "Was ist passiert, in einem oder zwei Sätzen",
+  "moderation.empty_body": "Wenn ein Bewohner einen Bericht zu Inhalten in einer Community erstattet, die du moderierst, erscheint er hier."
 }
