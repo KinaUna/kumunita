@@ -272,7 +272,12 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // 31 → 32 (IMPROVE-UX R08, ADR 0300 — issue.resolved joins the
         // closed set: the resolved platform-issue loop closes for the
         // signed-in filer).
-        Assert.Equal(32, vm.AllKinds.Count);
+        // 32 → 33 (IMPROVE-UX A05, ADR 0303 — report.queued joins the
+        // closed set: the filed report is routed to the component's standing
+        // moderators + the GlobalAdmins, the admin-lane kind the "new reports
+        // reach the moderators" loop closes for; its settings-toggle label
+        // is notifications.preference.report.queued.label).
+        Assert.Equal(33, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

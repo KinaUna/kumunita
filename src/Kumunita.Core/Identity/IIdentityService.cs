@@ -419,6 +419,35 @@ public interface IIdentityService
     Task<bool> IsNotifyAdminsOnSignupAsync();
 
     /// <summary>
+    /// ADR 0303 (IMPROVE-UX A05) — the **GlobalAdmin enumeration** read
+    /// seam: the <c>SubjectId</c> of every account holding the
+    /// <see cref="Roles.GlobalAdmin"/> role (the
+    /// <see cref="Microsoft.AspNetCore.Identity.UserManager{TUser}.GetUsersInRoleAsync"/>
+    /// shape, the <c>IdentityService.EmitAccountNotificationAsync</c>
+    /// precedent, ADR 0077). A **read** (no audit row — the
+    /// <see cref="IsSignupOpenAsync"/> plain-read shape). <c>userId</c>
+    /// projection only — **no PII** (no email, no display name); the
+    /// recipient is addressed by <c>SubjectId</c> in the notification
+    /// emitter, which is the ADR 0077 admin-fan-out shape.
+    /// <para>
+    /// The <b>Identity</b> concern (role enumeration lives with the module
+    /// that owns the role source of truth — the ADR 0006-E *compatible
+    /// ADD*: a new method on the owning module's public surface, named
+    /// here). It is the seam the <c>Moderation</c> bounded context
+    /// (<see cref="Kumunita.Core.Moderation.ModerationService"/>'s three
+    /// report-filing lanes, A05) resolves the **GlobalAdmin fallback
+    /// recipient set** through, so a filed report reaches a GlobalAdmin
+    /// when a component has no standing moderator (the A05 / E3 loop
+    /// closer — the standing-moderator half is the
+    /// <see cref="Kumunita.Core.Moderation.ModerationService
+    /// .GetStandingModeratorsAsync"/> seam, this the GlobalAdmin half).
+    /// <c>IUserInfoService</c> is deliberately untouched (ADR 0006 frozen
+    /// profile/community seam; role enumeration is not a profile concern).
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<string>> ListGlobalAdminsAsync();
+
+    /// <summary>
     /// Set whether the account lane notifies the GlobalAdmins on sign-up and
     /// verification (ADR 0077): a GlobalAdmin flips the instance-wide gate —
     /// <c>true</c> enables the <c>account.signup</c> / <c>account.verified</c>

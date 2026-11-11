@@ -27,7 +27,16 @@ public static class ModerationModule
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetService<Core.Notifications.INotificationEmitter>(),
             sp.GetService<Core.UserInfo.IUserInfoService>(),
-            sp.GetRequiredService<Core.Posts.PostService>()));
+            sp.GetRequiredService<Core.Posts.PostService>(),
+            // IMPROVE-UX A05 (ADR 0303) — the GlobalAdmin enumeration read
+            // seam (IIdentityService.ListGlobalAdminsAsync). The Identity
+            // context is always composed before moderation at the Core
+            // composition root, so GetRequiredService is the correct shape
+            // (the IIdentityService is a required seam, unlike the optional
+            // INotificationEmitter / IUserInfoService / PostService seams).
+            // Named argument (translationProvider has a default — it is not
+            // resolved here; the body degrades to the en floor, never throws).
+            identity: sp.GetRequiredService<Core.Identity.IIdentityService>()));
         return services;
     }
 }

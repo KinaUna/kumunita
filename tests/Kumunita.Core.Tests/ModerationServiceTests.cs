@@ -2111,6 +2111,387 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         Assert.DoesNotContain("r07-reason", body);   // the E4 pin: not the reporter's own reason
     }
 
+    // ── A05 — the report.queued routing emission (the E3 "new reports reach
+    //       no moderator" loop closer) ────────────────────────────────────────
+    //
+    // IMPROVE-UX A05 (ADR 0303): a *filed* report is routed to the component's
+    // standing moderators ∪ the GlobalAdmins (deduped), with **no target
+    // content in the body** (the 2026-09-25 disclosure-fix shape) and a
+    // linkPath of /moderation/{reportId} (the scoped-read route — the
+    // receiving moderator's Read decision on open still applies). These tests
+    // wire the INotificationEmitter as an NSubstitute seam (the R07 shape)
+    // **and** the IIdentityService.ListGlobalAdminsAsync seam (the ADR 0303
+    // GlobalAdmin-fan-out) — both optional on the ModerationService ctor,
+    // wired here so the full recipient set resolves. The report.filed-to-
+    // author emission (the 2026-09-25 shape) is asserted **unchanged** — the
+    // author still gets report.filed, never report.queued.
+    //
+    /// <summary>
+    /// Compose the M3b trio **plus** the NSubstitute
+    /// <see cref="INotificationEmitter"/> (the A05 emission seam) **and** the
+    /// <see cref="IIdentityService"/> (the ADR 0303
+    /// <see cref="IIdentityService.ListGlobalAdminsAsync"/> GlobalAdmin
+    /// fan-out). The standing-moderator half resolves from the live store's
+    /// <see cref="ModeratorAssignment"/> rows (the same-transaction read); the
+    /// GlobalAdmin half resolves from the <paramref name="globalAdminIds"/>
+    /// the substitute returns.
+    /// </summary>
+    private static (IDocumentStore store, ModerationService svc, INotificationEmitter emitter)
+        ServicesWithRouting(IDocumentStore store, IReadOnlyList<string> globalAdminIds)
+    {
+        var (userInfo, authz, _) = Services(store);
+        var emitter = Substitute.For<INotificationEmitter>();
+        var identity = Substitute.For<IIdentityService>();
+        identity.ListGlobalAdminsAsync()
+            .Returns(Task.FromResult<IReadOnlyList<string>>(globalAdminIds.ToList()));
+        var svc = new ModerationService(
+            new ProfileSettingsService(store), authz, store,
+            notifications: emitter, userInfo: userInfo, identity: identity);
+        return (store, svc, emitter);
+    }
+
+    /// <summary>The id of the report filed against a post (the post-lane's
+    /// internal Guid, read back from the live store for the linkPath /
+    /// idempotency-key pins).</summary>
+    private static async Task<string> ReportIdForPostAsync(IDocumentStore store, string postId)
+    {
+        await using var q = store.QuerySession();
+        var r = await q.Query<Report>()
+            .Where(x => x.PostId == postId)
+            .SingleAsync(TestContext.Current.CancellationToken);
+        return r.Id;
+    }
+
+    /// <summary>The id of the report filed against a new-lane target
+    /// (ADR 0173 — <see cref="Report.TargetId"/> carries the target's id; the
+    /// post-lane's <see cref="Report.PostId"/> is empty), read back from the
+    /// live store for the linkPath / idempotency-key pins.</summary>
+    private static async Task<string> ReportIdForTargetAsync(IDocumentStore store, string targetId)
+    {
+        await using var q = store.QuerySession();
+        var r = await q.Query<Report>()
+            .Where(x => x.TargetId == targetId)
+            .SingleAsync(TestContext.Current.CancellationToken);
+        return r.Id;
+    }
+
+    // ── A05-1 — filed report routes to standing moderator ∪ GlobalAdmin
+    //       (deduped), author still gets report.filed ──────────────────────────
+
+    [Fact]
+    public async Task A05_FileReport_Queued_StandingModeratorAndGlobalAdmin_InboxRows()
+    {
+        var store = await BootStoreAsync();
+        // The standing moderator "a05-1-mod" is ALSO a GlobalAdmin (dedupe
+        // pin: one row, not two); "a05-1-admin" is a GlobalAdmin only.
+        var (_, svc, emitter) = ServicesWithRouting(
+            store, new[] { "a05-1-mod", "a05-1-admin" });
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a05-1-assign", UserId = "a05-1-mod", ComponentId = ComponentId,
+            GrantedBy = "a05-1-root", At = DateTimeOffset.UtcNow
+        });
+        const string reporter = "a05-1-reporter";
+        const string author = "a05-1-author";
+        await Plant(store, new Post
+        {
+            Id = "a05-1-post", ComponentId = ComponentId, AuthorId = author,
+            Body = "body a05-1", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+
+        await RunInSession(store, async session =>
+            await svc.FileReportAsync("a05-1-post", reporter, "a05-1-reason", session));
+
+        var reportId = await ReportIdForPostAsync(store, "a05-1-post");
+        var link = $"/moderation/{reportId}";
+
+        // The standing moderator (who is also a GlobalAdmin) gets ONE row.
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: "a05-1-mod",
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{reportId}:a05-1-mod",
+            body: (string?)null,
+            targetId: reportId,
+            linkPath: link,
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        // The GlobalAdmin-only recipient gets one row.
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: "a05-1-admin",
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{reportId}:a05-1-admin",
+            body: (string?)null,
+            targetId: reportId,
+            linkPath: link,
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        // The reporter is NOT routed a nudge about their own filing.
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: reporter,
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{reportId}:{reporter}",
+            body: (string?)null,
+            targetId: reportId,
+            linkPath: link,
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        // The author's report.filed emission is UNCHANGED (one, not queued).
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: author,
+            kind: NotificationKinds.ReportFiled,
+            idempotencyKey: $"notification:report.filed:{reportId}",
+            body: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: author,
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{reportId}:{author}",
+            body: (string?)null,
+            targetId: reportId,
+            linkPath: link,
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+    }
+
+    // ── A05-2 — self-report: the reporter (their own standing moderator)
+    //       gets no queued row; the GlobalAdmin still does ─────────────────────
+
+    [Fact]
+    public async Task A05_FileReport_Queued_SelfReport_NoQueuedRowForReporter()
+    {
+        var store = await BootStoreAsync();
+        // The reporter IS the standing moderator (degenerate); a GlobalAdmin
+        // is the fallback.
+        var (_, svc, emitter) = ServicesWithRouting(
+            store, new[] { "a05-2-admin" });
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a05-2-assign", UserId = "a05-2-reporter", ComponentId = ComponentId,
+            GrantedBy = "a05-2-root", At = DateTimeOffset.UtcNow
+        });
+        const string reporter = "a05-2-reporter";
+        const string author = "a05-2-author";
+        await Plant(store, new Post
+        {
+            Id = "a05-2-post", ComponentId = ComponentId, AuthorId = author,
+            Body = "body a05-2", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+
+        await RunInSession(store, async session =>
+            await svc.FileReportAsync("a05-2-post", reporter, "a05-2-reason", session));
+
+        var reportId = await ReportIdForPostAsync(store, "a05-2-post");
+
+        // The reporter (their own standing moderator) is skipped (self-report
+        // guard, mirrored from the report.filed-to-author lane). All string
+        // args are literals (the A05-3 consistent-matchers shape — mixing a
+        // matcher with string literals raises NSubstitute's
+        // AmbiguousArgumentsException).
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: reporter,
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{reportId}:{reporter}",
+            body: (string?)null,
+            targetId: reportId,
+            linkPath: $"/moderation/{reportId}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        // The GlobalAdmin fallback still gets the row (the A05 / E3 loop
+        // closer — the standing half is empty for the reporter, the
+        // GlobalAdmin half is not).
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: "a05-2-admin",
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{reportId}:a05-2-admin",
+            body: (string?)null,
+            targetId: reportId,
+            linkPath: $"/moderation/{reportId}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+    }
+
+    // ── A05-3 — the new-lane shape (FileReportTargetAsync): component set →
+    //       standing moderators; component null → only the GlobalAdmins ────────
+
+    [Fact]
+    public async Task A05_FileReportTarget_Queued_NewLaneShape_RoutesToo()
+    {
+        var store = await BootStoreAsync();
+        var (_, svc, emitter) = ServicesWithRouting(
+            store, new[] { "a05-3-admin" });
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a05-3-assign", UserId = "a05-3-mod", ComponentId = ComponentId,
+            GrantedBy = "a05-3-root", At = DateTimeOffset.UtcNow
+        });
+        const string reporter = "a05-3-reporter";
+        const string author = "a05-3-author";
+
+        // Filing 1 — a group post INSIDE a component (componentId set): the
+        // standing moderators + the GlobalAdmins both get a row.
+        await svc.FileReportTargetAsync(
+            "grouppost", "a05-3-gp-1", ComponentId, author, reporter, "a05-3-reason-1");
+        // Filing 2 — a group post OUTSIDE a component (componentId null): the
+        // C-M3b·4 "no fabricated component" shape — only the GlobalAdmins
+        // reach it (no standing set for a null component).
+        await svc.FileReportTargetAsync(
+            "grouppost", "a05-3-gp-2", null, author, reporter, "a05-3-reason-2");
+
+        var r1 = await ReportIdForTargetAsync(store, "a05-3-gp-1");
+        var r2 = await ReportIdForTargetAsync(store, "a05-3-gp-2");
+
+        // The standing moderator gets a row for filing 1 only (filing 2 has
+        // no component → no standing set).
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: "a05-3-mod",
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{r1}:a05-3-mod",
+            body: (string?)null,
+            targetId: r1,
+            linkPath: $"/moderation/{r1}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+        await emitter.DidNotReceive().EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: "a05-3-mod",
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{r2}:a05-3-mod",
+            body: (string?)null,
+            targetId: r2,
+            linkPath: $"/moderation/{r2}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        // The GlobalAdmin gets a row for BOTH filings (the fallback recipient
+        // set — the E3 loop closer for component-less targets).
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: "a05-3-admin",
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{r1}:a05-3-admin",
+            body: (string?)null,
+            targetId: r1,
+            linkPath: $"/moderation/{r1}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: "a05-3-admin",
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{r2}:a05-3-admin",
+            body: (string?)null,
+            targetId: r2,
+            linkPath: $"/moderation/{r2}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        // The author's report.filed emission is UNCHANGED (one per filing).
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: author,
+            kind: NotificationKinds.ReportFiled,
+            idempotencyKey: $"notification:report.filed:{r1}",
+            body: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: author,
+            kind: NotificationKinds.ReportFiled,
+            idempotencyKey: $"notification:report.filed:{r2}",
+            body: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+    }
+
+    // ── A05-4 — the report.queued body carries NO target content (the A05
+    //       "no content in body" pin) ─────────────────────────────────────────
+
+    [Fact]
+    public async Task A05_FileReport_Queued_BodyHasNoContent()
+    {
+        var store = await BootStoreAsync();
+        var (_, svc, emitter) = ServicesWithRouting(store, new[] { "a05-4-admin" });
+
+        const string reason = "a05-4-secret-reason (the reporter's free-text, never forwarded)";
+        const string postBody = "a05-4-secret-post-body";
+        const string reporter = "a05-4-reporter";
+        const string author = "a05-4-author";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a05-4-assign", UserId = "a05-4-admin", ComponentId = ComponentId,
+            GrantedBy = "a05-4-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a05-4-post", ComponentId = ComponentId, AuthorId = author,
+            Body = postBody, Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+
+        await RunInSession(store, async session =>
+            await svc.FileReportAsync("a05-4-post", reporter, reason, session));
+
+        var reportId = await ReportIdForPostAsync(store, "a05-4-post");
+
+        // The queued emission's body is null — the localized
+        // notification.report.queued.subject is the row's text. No title, no
+        // body, no reporter's reason (the 2026-09-25 disclosure-fix shape).
+        await emitter.Received(1).EmitAsync(
+            Arg.Any<IDocumentSession>(),
+            recipientId: "a05-4-admin",
+            kind: NotificationKinds.ReportQueued,
+            idempotencyKey: $"notification:report.queued:{reportId}:a05-4-admin",
+            body: (string?)null,
+            targetId: reportId,
+            linkPath: $"/moderation/{reportId}",
+            acceptPath: (string?)null,
+            declinePath: (string?)null,
+            ct: Arg.Any<CancellationToken>());
+
+        // The pin: none of the report.queued emissions carry the reason or
+        // the post body in their body argument (body is null — the strongest
+        // form of the "no content" guarantee).
+        var queuedBodies = emitter.ReceivedCalls()
+            .Where(c => (string?)c.GetArguments()[2] == NotificationKinds.ReportQueued)
+            .Select(c => (string?)c.GetArguments()[4])
+            .ToList();
+        Assert.All(queuedBodies, b => Assert.True(b is null || (
+            !b.Contains(reason, StringComparison.Ordinal) &&
+            !b.Contains(postBody, StringComparison.Ordinal)),
+            $"report.queued body carries target content: {b}"));
+    }
+
     // ── Shared helpers (mirror the PostServiceTests shape) ──────────────
 
     private async Task<IDocumentStore> BootStoreAsync()

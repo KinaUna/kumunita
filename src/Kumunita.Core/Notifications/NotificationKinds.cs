@@ -53,6 +53,28 @@ public static class NotificationKinds
     public const string ReportResolved = "report.resolved";
 
     /// <summary>
+    /// IMPROVE-UX A05 (ADR 0303) — a report was <b>filed</b> and routed to
+    /// the component's standing moderators + the <c>GlobalAdmin</c>s (an
+    /// <b>admin-lane</b> kind — the recipients are the standing moderators /
+    /// GlobalAdmins, not the reporter; the ADR 0077 <c>account.signup</c> /
+    /// <c>account.verified</c> admin-lane precedent, which also trail the
+    /// resident-facing kinds in <see cref="Known"/>). One row per recipient
+    /// (the standing moderators ∪ the GlobalAdmins, deduped), **no target
+    /// content in the body** (the 2026-09-25 disclosure-fix shape — the
+    /// localized template alone is the signal; the reporter's free-text
+    /// reason is never forwarded), <c>linkPath = /moderation/{reportId}</c>
+    /// (the scoped-read route — the receiving moderator's <c>Read</c>
+    /// decision on open still applies; A05 routes a nudge, it does not grant
+    /// standing). Emitter: the three
+    /// <see cref="Kumunita.Core.Moderation.ModerationService"/> filing lanes
+    /// (the per-recipient idempotency key
+    /// <c>notification:report.queued:{reportId}:{recipientId}</c>, the ADR
+    /// 0077 admin-fan-out shape — one row per recipient, a re-filing of the
+    /// same report does not re-emit).
+    /// </summary>
+    public const string ReportQueued = "report.queued";
+
+    /// <summary>
     /// IMPROVE-UX R08 (ADR 0300) — a platform-issue report
     /// (<see cref="ErrorReports.ErrorReport"/>) filed by a signed-in resident
     /// was resolved. The recipient is the filer
@@ -362,7 +384,17 @@ public static class NotificationKinds
     [
         PostReply, PostMention, GroupPost, GroupAdded, GroupInvite,
         EventRsvp, EventReminder,
-        ReportFiled, ReportAssigned, ReportResolved, IssueResolved, TodoAssign,
+        ReportFiled, ReportAssigned, ReportResolved, ReportQueued,
+        IssueResolved, TodoAssign,
+        // The two admin-lane kinds (account.signup / account.verified, ADR
+        // 0077) are appended last — they are a separate lane (the recipient is a
+        // GlobalAdmin, not the resident whose inbox the resident-facing kinds
+        // serve), so they trail the resident-facing kinds. ReportQueued
+        // (ADR 0303) is also an admin-lane kind (its recipients are the standing
+        // moderators / GlobalAdmins, not the reporter) but it sits with the
+        // report cluster (report.filed / report.assigned / report.resolved) it
+        // belongs to semantically — the report cluster is the moderator-facing
+        // loop A05 closes, distinct from the signup-lane pair.
         AccountSignup, AccountVerified,
         Announcement, CommunityPost, PageChild, MessageNew,
         // M36 (ADR 0165, M36·3) — the six sibling mention kinds (the reserved

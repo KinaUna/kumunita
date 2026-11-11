@@ -83,6 +83,21 @@ public partial class ModerationService : IModerationService
     // the body degrades to the plain outcome word — never throws.
     private readonly ITranslationProvider? _translationProvider;
 
+    // IMPROVE-UX A05 (ADR 0303) — the GlobalAdmin enumeration read seam (the
+    // report.queued routing's GlobalAdmin fallback recipient set: when a
+    // component has no standing moderator, the filed report still reaches the
+    // GlobalAdmins). ADR 0006-E *compatible ADD* on the Identity module
+    // (IIdentityService.ListGlobalAdminsAsync) — role enumeration is an
+    // Identity concern, not a frozen profile/community seam, so
+    // IUserInfoService is untouched. Optional (CS1736, the _userInfo / _posts
+    // / _translationProvider precedent) so the existing positional test
+    // call sites keep compiling; production wiring (the DI factory) passes
+    // the DI-registered instance. When null (a test harness that omits it)
+    // the GlobalAdmin half of the recipient set is empty — the standing-
+    // moderator half still routes (the A05 "never ship only the standing
+    // half silently" pin is enforced by a test, not by this degrade).
+    private readonly Kumunita.Core.Identity.IIdentityService? _identity;
+
     public ModerationService(
         IProfileSettingsService profileSettings,
         IAuthorizationService authz,
@@ -90,7 +105,12 @@ public partial class ModerationService : IModerationService
         INotificationEmitter? notifications = null,
         IUserInfoService? userInfo = null,
         Posts.PostService? posts = null,
-        ITranslationProvider? translationProvider = null)
+        ITranslationProvider? translationProvider = null,
+        // IMPROVE-UX A05 (ADR 0303) — the GlobalAdmin enumeration read seam
+        // (the report.queued routing's fallback recipient set). Optional
+        // (CS1736) — a test harness that omits it routes the standing
+        // moderators only (the GlobalAdmin half is empty).
+        Kumunita.Core.Identity.IIdentityService? identity = null)
     {
         _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _authz    = authz    ?? throw new ArgumentNullException(nameof(authz));
@@ -99,6 +119,7 @@ public partial class ModerationService : IModerationService
         _userInfo = userInfo;
         _posts = posts;
         _translationProvider = translationProvider;
+        _identity = identity;
     }
 
     private IUserInfoService UserInfo =>

@@ -122,6 +122,25 @@ public partial class IdentityService(
         return new ThinPrincipal(user.Id ?? subjectId, user.ExternalId, verified, roles);
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> ListGlobalAdminsAsync()
+    {
+        // ADR 0303 (IMPROVE-UX A05) — the GlobalAdmin enumeration read seam.
+        // The GetUsersInRoleAsync shape (the EmitAccountNotificationAsync
+        // precedent, ADR 0077), userId projection only (no PII), null-safe
+        // (an account with no Id is skipped — the ADR 0077 fan-out guard).
+        var admins = await userManager
+            .GetUsersInRoleAsync(Roles.GlobalAdmin).ConfigureAwait(false);
+        var ids = new List<string>(admins.Count);
+        foreach (var a in admins)
+        {
+            var id = a?.Id ?? string.Empty;
+            if (id.Length > 0)
+                ids.Add(id);
+        }
+        return ids;
+    }
+
     // ── Signup + verification (the one designed handoff: the verification
     //    email, single-send; the only outward-seam exit) ─────────────────────
 
