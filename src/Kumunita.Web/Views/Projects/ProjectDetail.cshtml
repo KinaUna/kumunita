@@ -342,18 +342,18 @@
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="mb-3">
-                                                        <label class="form-label">
+                                                        <label class="form-label" for="@($"proj-trans-edit-title-{existing.LanguageCode}")">
                                                             @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
                                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                                         </label>
-                                                        <input class="form-control" type="text" name="title" value="@existing.Title" />
+                                                        <input class="form-control" type="text" id="@($"proj-trans-edit-title-{existing.LanguageCode}")" name="title" value="@existing.Title" />
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">
+                                                        <label class="form-label" for="@($"proj-trans-edit-body-{existing.LanguageCode}")">
                                                             <kw-l key="posts.translation_body_label">Body</kw-l>
                                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                                         </label>
-                                                        <textarea class="form-control" name="body" rows="4" placeholder="…">@existing.Body</textarea>
+                                                        <textarea class="form-control" id="@($"proj-trans-edit-body-{existing.LanguageCode}")" name="body" rows="4" placeholder="…">@existing.Body</textarea>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer">
@@ -387,14 +387,14 @@
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="mb-3">
-                                                        <label class="form-label">
+                                                        <label class="form-label" for="@($"proj-trans-add-title-{lang.Code}")">
                                                             @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
                                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                                         </label>
-                                                        <input class="form-control" type="text" name="title" value="@Model.Title" />
+                                                        <input class="form-control" type="text" id="@($"proj-trans-add-title-{lang.Code}")" name="title" value="@Model.Title" />
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">
+                                                        <label class="form-label" for="@($"proj-trans-add-body-{lang.Code}")">
                                                             <kw-l key="posts.translation_body_label">Body</kw-l>
                                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                                         </label>
@@ -407,7 +407,7 @@
                                                                 <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
                                                                 <partial name="_RichEditorToggle" />
                                                             </div>
-                                                            <textarea class="form-control" name="body" rows="4" placeholder="…" data-rich-editor></textarea>
+                                                            <textarea class="form-control" id="@($"proj-trans-add-body-{lang.Code}")" name="body" rows="4" placeholder="…" data-rich-editor></textarea>
                                                             <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
                                                         </div>
                                                     </div>
