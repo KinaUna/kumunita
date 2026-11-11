@@ -40,7 +40,7 @@
                 <div class="card-body">
                     <h2 class="kmb-form-section-title"><kw-l key="events.section_details">Details</kw-l></h2>
                     <div class="kmb-form-field">
-                        <div class="form-label" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></div>
+                        <label class="form-label" for="title" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></label>
                         <input class="form-control" type="text" id="title" name="Title"
                                maxlength="120" required value="@Model.Title" />
                         <div class="text-muted small mt-1"><kw-l key="events.title_hint">A short headline for the event.</kw-l></div>
@@ -167,8 +167,8 @@
                                     </div>
                                 </div>
                                 <div class="col-sm-3">
-                                    <span class="text-muted small"><kw-l key="events.recurrence.count">occurrences</kw-l></span>
-                                    <input class="form-control" type="number" min="2" name="EndsAfterCount"
+                                    <label class="text-muted small" for="ends-after-count"><kw-l key="events.recurrence.count">occurrences</kw-l></label>
+                                    <input class="form-control" type="number" min="2" id="ends-after-count" name="EndsAfterCount"
                                            value="@Model.EndsAfterCount" />
                                 </div>
                                 <div class="col-sm-3">
@@ -179,8 +179,8 @@
                                     </div>
                                 </div>
                                 <div class="col-sm-3">
-                                    <span class="text-muted small"><kw-l key="events.recurrence.until">until</kw-l></span>
-                                    <input class="form-control" type="date" name="EndsOnDate"
+                                    <label class="text-muted small" for="ends-on-date"><kw-l key="events.recurrence.until">until</kw-l></label>
+                                    <input class="form-control" type="date" id="ends-on-date" name="EndsOnDate"
                                            value="@(Model.EndsOnDate?.ToString("yyyy-MM-dd"))" />
                                 </div>
                             </div>
