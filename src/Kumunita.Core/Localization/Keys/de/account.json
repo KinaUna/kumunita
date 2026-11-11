@@ -92,5 +92,15 @@
   "account.signup_resend_prompt": "Keine Best\u00E4tigungs-E-Mail erhalten?",
   "account.signup_resend_link": "Best\u00E4tigungs-E-Mail erneut senden",
   "account.verify_confirm_lede": "Best\u00E4tige, dass es dein Konto ist und du dich anmelden m\u00F6chtest.",
-  "account.verify_confirm_submit": "Best\u00E4tigen \u0026 anmelden"
+  "account.verify_confirm_submit": "Best\u00E4tigen \u0026 anmelden",
+  "account.invite_title": "Nachbarin/ein Nachbar einladen",
+  "account.invite_lede": "Lade eine Nachbarin/einen Nachbar ein, der/dem die Plattform beitreten kann. Die Einladung ist ein einmaliger Link, der die Anmeldung f\u00FCr diese Adresse \u00F6ffnet (auch w\u00E4hrend die Anmeldung geschlossen ist) und nach 7 Tagen abl\u00E4uft. Die Einladung wird per E-Mail mit dem Link gesendet.",
+  "account.invite_email_label": "E-Mail-Adresse",
+  "account.invite_email_hint": "Die E-Mail-Adresse der Nachbarin/des Nachbarn. Jede/r erh\u00E4lt einen einmaligen Anmeldelink per E-Mail.",
+  "account.invite_button": "Einladen",
+  "account.invite_success": "Einladung an {0} gesendet.",
+  "account.invite_pending_approval": "Deine Einladung f\u00FCr {0} wartet auf Genehmigung. Eine/r GlobalAdmin pr\u00FCft sie.",
+  "account.invite_off": "Einladungen durch Bewohner:innen sind f\u00FCr diese Gemeinschaft nicht aktiviert. Bitte kontaktiere eine/n GlobalAdmin.",
+  "account.invite_invalid_email": "Keine g\u00FCltige E-Mail-Adresse.",
+  "account.invite_already_invited": "{0} hat bereits eine aktive Einladung."
 }

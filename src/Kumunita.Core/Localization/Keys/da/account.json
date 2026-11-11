@@ -92,5 +92,15 @@
   "account.signup_resend_prompt": "Fik du ikke bekr\u00E6ftelsesmailen?",
   "account.signup_resend_link": "Send bekr\u00E6ftelsesmailen igen",
   "account.verify_confirm_lede": "Bekr\u00E6ft, at det er din konto, og at du er klar til at logge ind.",
-  "account.verify_confirm_submit": "Bekr\u00E6ft \u0026 log ind"
+  "account.verify_confirm_submit": "Bekr\u00E6ft \u0026 log ind",
+  "account.invite_title": "Inviter en nabo",
+  "account.invite_lede": "Inviter en nabo til at deltage i f\u00E6llesskabet. Invitationen er et engangsl\u00E6nk, der \u00E5bner tilmelding for denne adresse (selv n\u00E5r tilmeldingen er l\u00E5st) og udl\u00F8ber efter 7 dage. Invitationen sendes som en e-mail med l\u00E6nket.",
+  "account.invite_email_label": "E-mailadresse",
+  "account.invite_email_hint": "Naboen\u2019s e-mailadresse. Hver f\u00E5r et engangsl\u00E6nk til tilmelding via e-mail.",
+  "account.invite_button": "Inviter",
+  "account.invite_success": "Invitation sendt til {0}.",
+  "account.invite_pending_approval": "Din invitation til {0} afventer godkendelse. En GlobalAdmin vil gennemg\u00E5 den.",
+  "account.invite_off": "Borgerinvitationer er ikke aktiveret for dette f\u00E6llesskab. Venligst kontakt en GlobalAdmin.",
+  "account.invite_invalid_email": "Ikke en gyldig e-mailadresse.",
+  "account.invite_already_invited": "{0} har allerede en aktiv invitation."
 }

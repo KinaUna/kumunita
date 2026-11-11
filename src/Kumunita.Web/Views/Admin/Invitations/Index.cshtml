@@ -35,6 +35,73 @@
     </div>
 
     <div class="col-lg-7">
+        @* IMPROVE-UX A12 (ADR 0304 D6 c) — the approval queue: the
+           PendingApproval rows across all inviters (the A12 card: "a new
+           section on this surface (the PendingApproval rows + the
+           admin-approve button) — the A09 view is already built; A12
+           extends it, does not re-wire it"). The section is visible when
+           the A11 setting is OnWithApproval (the resident surface can
+           create PendingApproval rows) and hidden when Off (no resident
+           invitations can exist) or On (the resident's invitations land
+           Pending directly — the A09 list surface is unchanged). *@
+        @if (Model.ApprovalQueueVisible)
+        {
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="h5"><kw-l key="admin.invitations_approval_title">Resident invitations pending approval</kw-l></h2>
+                    <p class="text-muted">
+                        <kw-l key="admin.invitations_approval_lede">Residents have invited neighbours. Approve each invitation before it becomes usable.</kw-l>
+                    </p>
+                    @if (Model.PendingApprovalItems.Count == 0)
+                    {
+                        @* ADR 0177 / R29–R33 — friendly empty state (.kmb-empty + one next action). *@
+                        <div class="kmb-empty">
+                            <p class="kmb-empty-title"><kw-l key="admin.invitations_approval_empty">No resident invitations are pending approval.</kw-l></p>
+                            <p class="kmb-empty-body">
+                                <kw-l key="admin.invitations_approval_empty_hint">When a resident invites a neighbour (in "On with admin approval" mode), the invitation appears here for review.</kw-l>
+                            </p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th><kw-l key="admin.invitations_approval_invited">Invited</kw-l></th>
+                                        <th><kw-l key="admin.invitations_approval_inviter">Inviter</kw-l></th>
+                                        <th><kw-l key="admin.invitations_approval_created">Created</kw-l></th>
+                                        <th><kw-l key="admin.invitations_approval_expires">Expires</kw-l></th>
+                                        <th class="text-end"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.PendingApprovalItems)
+                                    {
+                                        <tr>
+                                            <td>@item.Email</td>
+                                            <td><code>@item.InviterSubjectId</code></td>
+                                            <td class="text-nowrap">@item.CreatedAt.ToString("yyyy-MM-dd")</td>
+                                            <td class="text-nowrap">@item.ExpiresAt.ToString("yyyy-MM-dd")</td>
+                                            <td class="text-end">
+                                                <form method="post" action="@Url.Action("Approve", "AdminInvitations")" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="invitationId" value="@item.InvitationId" />
+                                                    <button type="submit" class="btn btn-outline-primary">
+                                                        <kw-l key="admin.invitations_approval_approve">Approve</kw-l>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
         <h2 class="h5"><kw-l key="admin.invitations_list_label">Invitations</kw-l></h2>
         @if (Model.IsEmpty)
         {

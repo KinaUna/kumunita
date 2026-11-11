@@ -24,5 +24,6 @@
   "nav.account": "Account",
   "nav.change_password": "Change password",
   "nav.my_data": "My data",
-  "nav.delete_account": "Delete account"
+  "nav.delete_account": "Delete account",
+  "nav.invite": "Invite a neighbour"
 }

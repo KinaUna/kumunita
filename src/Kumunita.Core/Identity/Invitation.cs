@@ -101,12 +101,19 @@ public sealed class Invitation
 }
 
 /// <summary>
-/// The <see cref="Invitation"/> state machine (ADR 0304 D1):
-/// <see cref="Pending"/> → <see cref="Accepted"/> (the
-/// <see cref="IInvitationService.AcceptAsync"/> single-use pin — terminal)
-/// or <see cref="Pending"/> → <see cref="Revoked"/> (the
-/// <see cref="IInvitationService.RevokeAsync"/> owner-scoped no-op shape —
-/// terminal). <see cref="Expired"/> is a **virtual** state: a
+/// The <see cref="Invitation"/> state machine (ADR 0304 D1, amended
+/// 2026-11-11 for IMPROVE-UX A12): <see cref="Pending"/> →
+/// <see cref="Accepted"/> (the <see cref
+/// "IInvitationService.AcceptAsync"/> single-use pin — terminal) or
+/// <see cref="Pending"/> → <see cref="Revoked"/> (the <see cref
+/// "IInvitationService.RevokeAsync"/> owner-scoped no-op shape — terminal).
+/// <see cref="PendingApproval"/> (IMPROVE-UX A12, ADR 0304 D6 c) — a
+/// resident-created invitation gated behind the admin approval queue: the
+/// row is refused by <see cref="IInvitationService.ValidateAsync"/> /
+/// <see cref="IInvitationService.AcceptAsync"/> until a GlobalAdmin runs
+/// <see cref="IInvitationService.ApproveAsync"/> (the
+/// <see cref="PendingApproval"/> → <see cref="Pending"/> transition).
+/// <see cref="Expired"/> is a **virtual** state: a
 /// <see cref="Pending"/> row past <see cref="Invitation.ExpiresAt"/> is
 /// refused by the validate/accept seams; the value is never explicitly
 /// set (the ADR 0304 D6 open question settles the default expiry length).
@@ -139,7 +146,25 @@ public enum EmailInvitationStatus
     /// question settles the default expiry length; the
     /// <see cref="Invitation.ExpiresAt"/> field is the check, not this
     /// value).</summary>
-    Expired
+    Expired,
+
+    /// <summary>
+    /// Pending approval (IMPROVE-UX A12, ADR 0304 D6 c) — a
+    /// resident-created invitation gated behind the admin approval queue
+    /// (the <see cref="ResidentInviteSetting.OnWithApproval"/> mode). The
+    /// row is **refused** by <see cref
+    /// "IInvitationService.ValidateAsync"/> / <see cref
+    /// "IInvitationService.AcceptAsync"/> (the ADR 0304 D1 virtual-state
+    /// precedent — the same refusal shape as a <see cref="Pending"/> row
+    /// past <see cref="Invitation.ExpiresAt"/>); a GlobalAdmin runs
+    /// <see cref="IInvitationService.ApproveAsync"/> to transition
+    /// <see cref="PendingApproval"/> → <see cref="Pending"/> (the row
+    /// becomes usable — the A08 <c>?invite=</c> gate accepts it). The
+    /// ADR 0304 D4 invariants (single-use, expiring, revocable) are
+    /// **unchanged** — the mode controls *who may create*, not *what a row
+    /// can do*.
+    /// </summary>
+    PendingApproval
 }
 
 /// <summary>

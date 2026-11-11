@@ -65,11 +65,26 @@ public interface IInvitationService
     /// ADR 0304 D6 open question settles the proposed default (7 days); the
     /// caller passes the concrete value.</param>
     /// <param name="ct">Cancellation.</param>
+    /// <param name="initialStatus">The initial state of the row
+    /// (default <see cref="EmailInvitationStatus.Pending"/>). IMPROVE-UX
+    /// A12 (ADR 0304 D6 c): the resident "Invite a neighbour" surface
+    /// passes <see cref="EmailInvitationStatus.PendingApproval"/> when the
+    /// A11 rule (<see cref="GetResidentInvitePostureAsync"/>) returns
+    /// <see cref="ResidentInvitePosture.RequiresApproval"/> =
+    /// <c>true</c> (the <c>OnWithApproval</c> mode) — the row is refused
+    /// by the A08 <c>?invite=</c> gate until a GlobalAdmin runs
+    /// <see cref="ApproveAsync"/> (the
+    /// <see cref="EmailInvitationStatus.PendingApproval"/> →
+    /// <see cref="EmailInvitationStatus.Pending"/> transition). The admin
+    /// surface (A09) and the A07/A08/A10 call sites use the default
+    /// <c>Pending</c> (unchanged — the A07/A08/A09/A10 contracts are
+    /// intact).</param>
     /// <returns>The raw token (shown once) + the stored
     /// <see cref="Invitation"/> row (which carries only the hash).</returns>
     Task<(string Token, Invitation Invitation)> CreateAsync(
         string email, string inviterSubjectId, DateTimeOffset expiresAt,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        EmailInvitationStatus initialStatus = EmailInvitationStatus.Pending);
 
     /// <summary>
     /// Revokes <paramref name="invitationId"/>: sets <see cref
@@ -91,6 +106,81 @@ public interface IInvitationService
     /// actor's.</returns>
     Task<bool> RevokeAsync(
         string invitationId, string inviterSubjectId, CancellationToken ct = default);
+
+    // ── IMPROVE-UX A12 — the resident-invitation approval lane ─────────────
+    // The PendingApproval row state (ADR 0304 D6 c) + the admin-approve seam.
+    // A11 settled the *mode* (ResidentInviteSetting.OnWithApproval) + the
+    // *rule* (GetResidentInvitePostureAsync.RequiresApproval); A12 settles
+    // the *row state* (EmailInvitationStatus.PendingApproval) + the
+    // *admin-approve lane* (ApproveAsync + ListPendingApprovalAsync). The
+    // A07/A08/A09/A10 contracts are unchanged.
+
+    /// <summary>
+    /// Approves a <see cref="EmailInvitationStatus.PendingApproval"/>
+    /// invitation (IMPROVE-UX A12, ADR 0304 D6 c): transitions the row
+    /// <see cref="EmailInvitationStatus.PendingApproval"/> →
+    /// <see cref="EmailInvitationStatus.Pending"/> (the row becomes usable
+    /// — the A08 <c>?invite=</c> sign-up gate accepts it) + exactly one
+    /// <c>invitation.approve</c> <c>AccessAudit</c> row (<c>Via = Admin</c>,
+    /// <c>TargetKind = "invitation"</c>, <c>TargetId</c> = the invitation's
+    /// id — the <see cref="RevokeAsync"/> owner-scoped no-op shape, the
+    /// ADR 0304 D3 "compatible ADD" shape). **Admin-scoped**: the A12 admin
+    /// approval queue (the <c>/admin/invitations</c> surface) enforces the
+    /// GlobalAdmin standing at the <c>[Authorize(Roles =
+    /// Roles.GlobalAdmin)]</c> boundary (the ADR 0050 split — the Core seam
+    /// does not re-check <c>User</c>, the <see cref="RevokeAsync"/> /
+    /// <see cref="KioskLinkService.RevokeAsync"/> shape). Idempotent: a
+    /// missing invitation, an already-<see cref
+    /// "EmailInvitationStatus.Pending"/> / <see cref
+    /// "EmailInvitationStatus.Accepted"/> / <see cref
+    /// "EmailInvitationStatus.Revoked"/> row is a no-op returning
+    /// <c>false</c> (the 0159 ESC·9 / ADR 0302 D3 precedent — no audit row,
+    /// no state change). The ADR 0304 D4 invariants (single-use, expiring,
+    /// revocable) are **unchanged** — the approval is an additive state
+    /// transition, not a new capability.
+    /// </summary>
+    /// <param name="invitationId">The <see cref="Invitation"/> row's id.</param>
+    /// <param name="adminSubjectId">The GlobalAdmin approving the
+    /// invitation (the audit principal for the <c>invitation.approve</c>
+    /// row — the ADR 0304 D3 audit shape, the
+    /// <see cref="ResidentInviteSetting.OnWithApproval"/> A11 mode's admin
+    /// lane).</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns><c>true</c> when the row was approved (transitioned
+    /// <see cref="EmailInvitationStatus.PendingApproval"/> →
+    /// <see cref="EmailInvitationStatus.Pending"/>); <c>false</c> when it
+    /// is missing, already approved, already accepted, or already
+    /// revoked.</returns>
+    Task<bool> ApproveAsync(
+        string invitationId, string adminSubjectId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Lists the **approval queue** (IMPROVE-UX A12, ADR 0304 D6 c): the
+    /// <see cref="EmailInvitationStatus.PendingApproval"/> rows across all
+    /// inviters, newest-first, each an <see cref="InvitationListItem"/>
+    /// (the <see cref="ListAsync"/> projection shape — the token hash is
+    /// NOT carried, the ADR 0304 D2 hash-at-rest floor). **A read lane —
+    /// zero audit rows** (the M35·5 / 0159 "the read is a config load, not
+    /// an access decision" floor — the access decision is the Web
+    /// controller's <c>[Authorize(Roles = Roles.GlobalAdmin)]</c>
+    /// boundary's job, the ADR 0050 split; the service does not re-check
+    /// <c>User</c>).
+    /// <para>
+    /// **Not owner-scoped** (unlike <see cref="ListAsync"/>): the approval
+    /// queue spans all residents' invitations (the GlobalAdmin is
+    /// approving *other* residents' rows — the A12 card: "the admin
+    /// approval queue on <c>/admin/invitations</c> that activates when the
+    /// admin-settled resident-invite mode is <c>OnWithApproval</c>"). The
+    /// <see cref="InvitationListItem.InviterSubjectId"/> field carries the
+    /// resident who created the row (the admin sees *who* invited).
+    /// </para>
+    /// </summary>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The approval queue (all <see cref
+    /// "EmailInvitationStatus.PendingApproval"/> rows, newest-first; empty
+    /// when none — the C-M19·4 empty floor, not an error).</returns>
+    Task<IReadOnlyList<InvitationListItem>> ListPendingApprovalAsync(
+        CancellationToken ct = default);
 
     /// <summary>
     /// Validates a presented token (ADR 0304 D3): returns the
@@ -306,12 +396,21 @@ public interface IInvitationService
     /// override (a test shape); null assembles
     /// <c>{BaseUrl}/account/signup?invite={token}</c>.</param>
     /// <param name="ct">Cancellation.</param>
+    /// <param name="initialStatus">The initial state of the row
+    /// (default <see cref="EmailInvitationStatus.Pending"/>). IMPROVE-UX
+    /// A12 (ADR 0304 D6 c): the resident "Invite a neighbour" surface
+    /// passes <see cref="EmailInvitationStatus.PendingApproval"/> when the
+    /// A11 rule returns <see cref
+    /// "ResidentInvitePosture.RequiresApproval"/> = <c>true</c> (the
+    /// <c>OnWithApproval</c> mode). The admin surface (A09) uses the
+    /// default <c>Pending</c> (unchanged).</param>
     /// <returns>The raw token (shown once) + the stored row (hash only) —
     /// <see cref="InvitationInviteResult"/>.</returns>
     Task<InvitationInviteResult> InviteAsync(
         string email, string inviterSubjectId, string inviterDisplayName,
         DateTimeOffset expiresAt, string? inviteLinkOverride = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        EmailInvitationStatus initialStatus = EmailInvitationStatus.Pending);
 
     // ── IMPROVE-UX A11 — the resident-invite posture rule ──────────────────
 

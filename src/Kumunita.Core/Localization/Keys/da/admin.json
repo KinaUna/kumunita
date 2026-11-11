@@ -334,6 +334,16 @@
   "admin.invitations.revoked": "Invitationen er revokeret.",
   "admin.invitations.revoke_failed": "Invitationen kunne ikke revok\u00e9res (muligvis allerede brugt, revokeret eller udl\u00f8bt).",
   "admin.invitations.resent": "En ny invitation er sendt til {0}.",
-  "admin.invitations.resend_failed": "Ikke en g\u00e6ldende e-mailadresse at sende til igen.",
-  "admin.hub.invitations_desc": "Inviter naboer \u2014 et engangsklink pr. e-mail, leveret p\u00e5 e-mail, gyldigt selvom tilmeldingen er lukket."
+  "admin.invitations.resend_failed": "Ikke en g\u00e6ldende e-mailadresse at sende til igen.",  "admin.invitations_approval_title": "Borgerinvitationer afventer godkendelse",
+  "admin.invitations_approval_lede": "Borgere har inviteret naboer. Godkend hver invitation, f\u00F8r den bliver anvendelig (overfladen \u201CInviter en nabo\u201D er i tilstand \u201CGodkendelse af GlobalAdmin\u201D \u2014 skift tilstanden p\u00E5 tilmeldingsindstillingssiden).",
+  "admin.invitations_approval_empty": "Ingen borgerinvitationer afventer godkendelse.",
+  "admin.invitations_approval_empty_hint": "N\u00E5r en borger inviterer en nabo (i tilstanden \u201CGodkendelse af GlobalAdmin\u201D), vises invitationen her til gennemg\u00E5ng.",
+  "admin.invitations_approval_status_pending_approval": "Afventer godkendelse",
+  "admin.invitations_approval_approve": "Godkend",
+  "admin.invitations_approval_inviter": "Inviterende",
+  "admin.invitations_approval_invited": "Inviteret",
+  "admin.invitations_approval_created": "Oprettet",
+  "admin.invitations_approval_expires": "Udl\u00F8ber",
+  "admin.invitations_approval_approve_success": "Invitation godkendt. Den er nu anvendelig for den inviterede adresse.",
+  "admin.invitations_approval_approve_failed": "Invitationen kunne ikke godkendes (den kan allerede v\u00E6re brugt, annulleret eller udl\u00F8bet).",  "admin.hub.invitations_desc": "Inviter naboer \u2014 et engangsklink pr. e-mail, leveret p\u00e5 e-mail, gyldigt selvom tilmeldingen er lukket."
 }

@@ -119,6 +119,29 @@ public static class NotificationKinds
     /// </summary>
     public const string InvitationAccepted = "invitation.accepted";
 
+    /// <summary>
+    /// IMPROVE-UX A12 (ADR 0304 D6 c) — the resident's pending invitation
+    /// was **approved** by a GlobalAdmin (the
+    /// <see cref="ResidentInviteSetting.OnWithApproval"/> mode): the row
+    /// transitioned <see cref
+    /// "Kumunita.Core.Identity.EmailInvitationStatus.PendingApproval"/> →
+    /// <see cref="Kumunita.Core.Identity.EmailInvitationStatus.Pending"/>
+    /// (the <see cref
+    /// "Kumunita.Core.Identity.IInvitationService.ApproveAsync"/> lane),
+    /// and the resident inviter hears back that their invitation is now
+    /// usable (the A08 <c>?invite=</c> sign-up gate accepts it). The
+    /// <see cref="InvitationAccepted"/> precedent (A10) — the resident-
+    /// facing nudge, the body carries the invited email (no PII beyond the
+    /// already-invited address), the linkPath
+    /// <c>/account/invite</c> (the A12 resident surface). Emitter:
+    /// <see cref="Kumunita.Core.Identity.InvitationService.ApproveAsync"/>
+    /// (best-effort, the D5 posture — the <c>invitation.approve</c> audit
+    /// row is the durable record). One row per (invitation, inviter) — the
+    /// stable idempotency key
+    /// <c>notification:invitation.approved:{invitationId}</c>.
+    /// </summary>
+    public const string InvitationApproved = "invitation.approved";
+
     /// <summary>A to-do was assigned to the resident (person-only; wired, U04).</summary>
     public const string TodoAssign = "todo.assign";
 
@@ -417,7 +440,7 @@ public static class NotificationKinds
         PostReply, PostMention, GroupPost, GroupAdded, GroupInvite,
         EventRsvp, EventReminder,
         ReportFiled, ReportAssigned, ReportResolved, ReportQueued,
-        IssueResolved, InvitationAccepted, TodoAssign,
+        IssueResolved, InvitationAccepted, InvitationApproved, TodoAssign,
         // The two admin-lane kinds (account.signup / account.verified, ADR
         // 0077) are appended last — they are a separate lane (the recipient is a
         // GlobalAdmin, not the resident whose inbox the resident-facing kinds

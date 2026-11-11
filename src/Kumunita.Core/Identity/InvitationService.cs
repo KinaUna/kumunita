@@ -72,7 +72,8 @@ public sealed class InvitationService(
     /// <inheritdoc />
     public async Task<(string Token, Invitation Invitation)> CreateAsync(
         string email, string inviterSubjectId, DateTimeOffset expiresAt,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        EmailInvitationStatus initialStatus = EmailInvitationStatus.Pending)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
         ArgumentException.ThrowIfNullOrWhiteSpace(inviterSubjectId);
@@ -91,7 +92,14 @@ public sealed class InvitationService(
             TokenHash        = IdentityService.Sha256Hex(token),
             CreatedAt        = now,
             ExpiresAt        = expiresAt,
-            Status           = EmailInvitationStatus.Pending,
+            // IMPROVE-UX A12 (ADR 0304 D6 c) — the initialStatus param
+            // defaults to Pending (the A07/A08/A09/A10 contract, unchanged);
+            // the A12 resident "Invite a neighbour" surface passes
+            // PendingApproval when the A11 rule returns RequiresApproval
+            // (the OnWithApproval mode). The ADR 0304 D4 invariants
+            // (single-use, expiring, revocable) are unchanged — the mode
+            // controls who may create, not what a row can do.
+            Status           = initialStatus,
             // AcceptedAt / AcceptedSubjectId stay null until AcceptAsync.
         };
 
@@ -132,6 +140,117 @@ public sealed class InvitationService(
         session.Store(AuditRow(now, inviterSubjectId, "invitation.revoke", invitationId));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return true;
+    }
+
+    // ── IMPROVE-UX A12 — the resident-invitation approval lane ─────────────
+    // A11 settled the mode (OnWithApproval) + the rule (RequiresApproval);
+    // A12 settles the row state (PendingApproval) + the admin-approve lane.
+
+    /// <inheritdoc />
+    public async Task<bool> ApproveAsync(
+        string invitationId, string adminSubjectId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(invitationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(adminSubjectId);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var stored = await session.LoadAsync<Invitation>(invitationId, ct).ConfigureAwait(false);
+
+        // ADR 0304 D6 c (IMPROVE-UX A12) — the approval transition is
+        // PendingApproval → Pending (the row becomes usable — the A08
+        // ?invite= gate accepts it). Idempotent: a missing invitation, or
+        // one already Pending / Accepted / Revoked, is a no-op (no audit
+        // row, no state change — the RevokeAsync no-op shape, the 0159
+        // ESC·9 / ADR 0302 D3 precedent). The admin standing is enforced
+        // at the Web controller's [Authorize(Roles = GlobalAdmin)] boundary
+        // (the ADR 0050 split — the Core seam does not re-check User, the
+        // RevokeAsync / KioskLinkService.RevokeAsync shape).
+        if (stored is null || stored.Status is not EmailInvitationStatus.PendingApproval)
+        {
+            return false;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        stored.Status = EmailInvitationStatus.Pending;
+        session.Store(stored);
+        // Exactly one AccessAudit row — the invitation.approve verb (the
+        // invitation.create / invitation.revoke / invitation.accept
+        // one-row convention, the ADR 0304 D3 shape; the admin is the actor
+        // — Via = Admin, the ADR 0050 admin-standing value, the
+        // AdminSignupController.SaveResidentInvite signup.set-resident-invite
+        // shape).
+        session.Store(AuditRow(now, adminSubjectId, "invitation.approve", invitationId, AccessVia.Admin));
+
+        // IMPROVE-UX A12 (ADR 0304 D6 c) — the inviter hears back: a
+        // best-effort notification to the resident inviter that their
+        // pending invitation was approved and is now usable. Staged into
+        // the SAME committed session (the A10 AcceptAsync notify lane's D5
+        // posture — the notify row is part of this write). Best-effort: a
+        // null emitter or an emit error is swallowed — the domain write +
+        // the invitation.approve audit row are the durable record; the
+        // inbox row is the nudge (the A10 invitation.accepted precedent —
+        // the new invitation.approved kind, the NotificationKinds closed
+        // set).
+        if (notifications is not null)
+        {
+            try
+            {
+                await notifications.EmitAsync(
+                    session,
+                    recipientId: stored.InviterSubjectId,
+                    kind: NotificationKinds.InvitationApproved,
+                    idempotencyKey: $"notification:{NotificationKinds.InvitationApproved}:{invitationId}",
+                    body: stored.Email,
+                    linkPath: "/account/invite",
+                    ct: ct).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Best-effort (D5): the domain write + audit row are durable;
+                // a notify-lane failure must not fail the approve.
+            }
+        }
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<InvitationListItem>> ListPendingApprovalAsync(
+        CancellationToken ct = default)
+    {
+        // A read lane (the M35·5 / 0159 "the read is a config load, not an
+        // access decision" floor) — zero audit rows (the ListAsync
+        // precedent). **Not owner-scoped** (unlike ListAsync): the
+        // approval queue spans all residents' PendingApproval rows (the
+        // GlobalAdmin is approving other residents' rows — the A12 card).
+        // The access decision is the Web controller's [Authorize(Roles =
+        // Roles.GlobalAdmin)] boundary's job — the ADR 0050 split; the
+        // service does not re-check User. The token hash is NOT carried
+        // (the list never needs the credential — the ADR 0304 D2
+        // hash-at-rest floor).
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var rows = await session.Query<Invitation>()
+            .Where(i => i.Status == EmailInvitationStatus.PendingApproval)
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return rows
+            .Select(i => new InvitationListItem(
+                InvitationId: i.Id,
+                Email: i.Email,
+                InviterSubjectId: i.InviterSubjectId,
+                CreatedAt: i.CreatedAt,
+                ExpiresAt: i.ExpiresAt,
+                Status: i.Status,
+                AcceptedAt: i.AcceptedAt,
+                AcceptedSubjectId: i.AcceptedSubjectId,
+                // The approval queue surfaces PendingApproval rows as-is
+                // (the admin decides approve/revoke — the expiry is a
+                // property of the ExpiresAt field, the ListAsync
+                // virtual-Expired computation does not apply here).
+                DisplayStatus: i.Status))
+            .ToList();
     }
 
     /// <inheritdoc />
@@ -361,7 +480,8 @@ public sealed class InvitationService(
     public async Task<InvitationInviteResult> InviteAsync(
         string email, string inviterSubjectId, string inviterDisplayName,
         DateTimeOffset expiresAt, string? inviteLinkOverride = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        EmailInvitationStatus initialStatus = EmailInvitationStatus.Pending)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
         ArgumentException.ThrowIfNullOrWhiteSpace(inviterSubjectId);
@@ -390,7 +510,13 @@ public sealed class InvitationService(
             TokenHash        = IdentityService.Sha256Hex(token),
             CreatedAt        = now,
             ExpiresAt        = expiresAt,
-            Status           = EmailInvitationStatus.Pending,
+            // IMPROVE-UX A12 (ADR 0304 D6 c) — the initialStatus param
+            // defaults to Pending (the A09 contract, unchanged); the A12
+            // resident "Invite a neighbour" surface passes PendingApproval
+            // when the A11 rule returns RequiresApproval (the
+            // OnWithApproval mode). The ADR 0304 D4 invariants are
+            // unchanged.
+            Status           = initialStatus,
         };
 
         // The ?invite= link the A08 receiving gate resolves (the
@@ -533,19 +659,26 @@ public sealed class InvitationService(
     /// <summary>The one <c>AccessAudit</c> row shape the invitation lane
     /// writes (the <see cref="KioskLinkService"/> <c>kiosk.link.create</c>
     /// field mapping — the KioskLink "the read is not an access decision"
-    /// floor applies to ValidateAsync; the three write lanes each emit
-    /// exactly one row).</summary>
+    /// floor applies to ValidateAsync; the write lanes each emit exactly
+    /// one row). The <paramref name="via"/> param defaults to
+    /// <see cref="AccessVia.Owner"/> (the A07/A08/A09/A10 contract — the
+    /// inviter is the actor); the A12 approve lane passes
+    /// <see cref="AccessVia.Admin"/> (the GlobalAdmin is the actor — the
+    /// ADR 0050 admin-standing value, the
+    /// AdminSignupController.SaveResidentInvite
+    /// <c>signup.set-resident-invite</c> shape).</summary>
     private static AccessAudit AuditRow(
-        DateTimeOffset at, string inviterSubjectId, string action, string invitationId) => new()
+        DateTimeOffset at, string actorId, string action, string invitationId,
+        AccessVia via = AccessVia.Owner) => new()
     {
         Id                   = Guid.NewGuid().ToString("N"),
         At                   = at,
-        ActorId              = inviterSubjectId,
-        EffectivePrincipalId = inviterSubjectId,
+        ActorId              = actorId,
+        EffectivePrincipalId = actorId,
         Action               = action,
         TargetKind           = "invitation",
         TargetId             = invitationId,
-        Via                  = AccessVia.Owner,
+        Via                  = via,
         Outcome              = AccessOutcome.Allow
     };
 

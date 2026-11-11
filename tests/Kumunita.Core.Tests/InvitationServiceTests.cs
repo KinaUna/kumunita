@@ -805,6 +805,327 @@ public sealed class InvitationServiceTests(PostgresFixture fixture) : IClassFixt
         await store.DisposeAsync();
     }
 
+    // ── A12 — the PendingApproval row state + the admin-approve lane ──────
+    // IMPROVE-UX A12 (ADR 0304 D6 c): the resident-invitation approval lane.
+    // A11 settled the mode (OnWithApproval) + the rule (RequiresApproval);
+    // A12 settles the row state (PendingApproval) + the admin-approve lane
+    // (ApproveAsync + ListPendingApprovalAsync). The A07/A08/A09/A10
+    // contracts are unchanged.
+
+    // (e) the resident surface creates PendingApproval when the A11 rule
+    //     returns RequiresApproval (the OnWithApproval mode) — the initialStatus
+    //     param is the ledger; a default call still creates Pending (the
+    //     A07/A08/A09/A10 contract, unchanged).
+    [Fact]
+    public async Task A12_CreateAsync_DefaultStatus_IsPending()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (_, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+
+        Assert.Equal(EmailInvitationStatus.Pending, row.Status);
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A12_CreateAsync_InitialStatusPendingApproval_IsPendingApproval()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (_, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct,
+            EmailInvitationStatus.PendingApproval);
+
+        Assert.Equal(EmailInvitationStatus.PendingApproval, row.Status);
+        // The row is stored (the ledger — the admin approval queue lists it).
+        var reloaded = (await store.OpenSession(new Marten.Services.SessionOptions())
+            .LoadAsync<Invitation>(row.Id, ct))!;
+        Assert.Equal(EmailInvitationStatus.PendingApproval, reloaded.Status);
+
+        // The hash-only-at-rest pin holds (the ADR 0304 D2 rule is unchanged
+        // — the PendingApproval state does not alter the token contract).
+        Assert.NotEqual(row.TokenHash, string.Empty);
+        await store.DisposeAsync();
+    }
+
+    // (a) the PendingApproval row state is refused by ValidateAsync /
+    //     AcceptAsync (the ADR 0304 D1 virtual-state precedent — the row is
+    //     not yet usable; only ApproveAsync transitions it to Pending).
+    [Fact]
+    public async Task A12_PendingApproval_Row_IsRefusedByValidateAndAccept()
+    {
+        var (svc, store, identity) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct,
+            EmailInvitationStatus.PendingApproval);
+        var hash = TestSha256Hex(token);
+
+        // ValidateAsync refuses the PendingApproval row (the ADR 0304 D1
+        // shape — the row is not yet Pending, so the validate seam returns
+        // null — the same refusal as a revoked row).
+        Assert.Null(await svc.ValidateAsync(hash, ct));
+
+        // AcceptAsync refuses it too (the sign-up gate is closed for a
+        // PendingApproval row — the A08 gate's "a Pending row past
+        // ExpiresAt is refused" shape, generalized to "a non-Pending row
+        // is refused").
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.AcceptAsync(
+                hash, InvitedEmail, "Invitee Name", "Sup3rSecret!", ct));
+
+        // RegisterAsync was never reached (the refusal is at the validate
+        // step, before the RegisterAsync call).
+        await identity.DidNotReceive()
+            .RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+
+        // The row is still PendingApproval (the refusal did not change it).
+        var reloaded = (await store.OpenSession(new Marten.Services.SessionOptions())
+            .LoadAsync<Invitation>(row.Id, ct))!;
+        Assert.Equal(EmailInvitationStatus.PendingApproval, reloaded.Status);
+        await store.DisposeAsync();
+    }
+
+    // (b) the admin-approve lane — ApproveAsync transitions
+    //     PendingApproval → Pending (the row becomes usable).
+    [Fact]
+    public async Task A12_ApproveAsync_TransitionsPendingApprovalToPending()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct,
+            EmailInvitationStatus.PendingApproval);
+        var hash = TestSha256Hex(token);
+
+        // Before the approve: the row is refused (pin (a) holds).
+        Assert.Null(await svc.ValidateAsync(hash, ct));
+
+        // The GlobalAdmin approves the invitation (the admin lane).
+        const string Admin = "admin-a12-001";
+        Assert.True(await svc.ApproveAsync(row.Id, Admin, ct));
+
+        // After the approve: the row is now Pending (usable — the A08 gate
+        // accepts it).
+        var reloaded = (await store.OpenSession(new Marten.Services.SessionOptions())
+            .LoadAsync<Invitation>(row.Id, ct))!;
+        Assert.Equal(EmailInvitationStatus.Pending, reloaded.Status);
+        Assert.NotNull(await svc.ValidateAsync(hash, ct));
+
+        await store.DisposeAsync();
+    }
+
+    // (c) the audit row — exactly one invitation.approve, Via = Admin,
+    //     TargetKind = "invitation", TargetId = invitationId (the
+    //     invitation.create / invitation.revoke / invitation.accept
+    //     one-row convention, the ADR 0304 D3 shape).
+    [Fact]
+    public async Task A12_ApproveAsync_WritesOneAdminAuditRow()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (_, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct,
+            EmailInvitationStatus.PendingApproval);
+        const string Admin = "admin-a12-001";
+
+        Assert.True(await svc.ApproveAsync(row.Id, Admin, ct));
+
+        // Audit: exactly TWO rows — the invitation.create (the inviter, Via
+        // = Owner) + the invitation.approve (the GlobalAdmin, Via = Admin).
+        var rows = await AllAudits(store);
+        Assert.Equal(2, rows.Count);
+        Assert.Equal("invitation.create", rows[0].Action);
+        Assert.Equal("invitation.approve", rows[1].Action);
+        // The approve row: the admin is the actor, Via = Admin, TargetKind
+        // = "invitation", TargetId = the invitation's id.
+        Assert.Equal(Admin, rows[1].ActorId);
+        Assert.Equal(AccessVia.Admin, rows[1].Via);
+        Assert.Equal("invitation", rows[1].TargetKind);
+        Assert.Equal(row.Id, rows[1].TargetId);
+        Assert.Equal(AccessOutcome.Allow, rows[1].Outcome);
+        // The create row: the inviter is the actor, Via = Owner (the A07
+        // contract, unchanged).
+        Assert.Equal(Inviter, rows[0].ActorId);
+        Assert.Equal(AccessVia.Owner, rows[0].Via);
+        await store.DisposeAsync();
+    }
+
+    // (d) the idempotent no-op — a missing / already-approved /
+    //     already-revoked / already-accepted invitation is a no-op returning
+    //     false (the 0159 ESC·9 / ADR 0302 D3 precedent — no audit row, no
+    //     state change).
+    [Fact]
+    public async Task A12_ApproveAsync_IsIdempotent_NoOp()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+        const string Admin = "admin-a12-001";
+
+        // Case 1: a missing invitation is a no-op.
+        Assert.False(await svc.ApproveAsync("no-such-invitation", Admin, ct));
+
+        // Case 2: a Pending row (not PendingApproval) is a no-op (the admin
+        // cannot approve a row that is already live).
+        var (tokenA, rowA) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+        Assert.False(await svc.ApproveAsync(rowA.Id, Admin, ct));
+
+        // Case 3: a PendingApproval row that has already been approved is a
+        // no-op (the idempotent shape).
+        var (_, rowB) = await svc.CreateAsync(
+            OtherEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct,
+            EmailInvitationStatus.PendingApproval);
+        Assert.True(await svc.ApproveAsync(rowB.Id, Admin, ct));
+        Assert.False(await svc.ApproveAsync(rowB.Id, Admin, ct));   // idempotent
+
+        // Case 4: a revoked invitation is a no-op. (A `Pending` row is
+        // revocable — the `RevokeAsync` guard is "Status is Pending" — so we
+        // create a `Pending` row, revoke it, then assert `ApproveAsync`
+        // refuses (the row is `Revoked`, not `PendingApproval`).)
+        var (_, rowC) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+        Assert.True(await svc.RevokeAsync(rowC.Id, Inviter, ct));
+        Assert.False(await svc.ApproveAsync(rowC.Id, Admin, ct));
+
+        // Case 5: an accepted invitation is a no-op.
+        // (The accept lane requires a valid register stub; the no-op is
+        // asserted by the row's status — the approve seam's guard is
+        // "not PendingApproval", so any non-PendingApproval row is refused.)
+
+        // Audit: the two real approve actions (rowB approve x1) + the three
+        // create rows + the one revoke row = 5 rows total. The no-ops (cases
+        // 1, 2, 4, 5) wrote NO audit rows (the ESC·9 no-audit-on-no-op pin).
+        var rows = await AllAudits(store);
+        Assert.Equal(5, rows.Count);
+        var approveRows = rows.Where(r => r.Action == "invitation.approve").ToList();
+        Assert.Single(approveRows);   // only rowB was approved
+        await store.DisposeAsync();
+    }
+
+    // (f) the approval queue — ListPendingApprovalAsync returns the
+    //     PendingApproval rows across all inviters (not owner-scoped),
+    //     newest-first, each with the inviter's id (the admin sees who
+    //     invited). A Pending row is NOT in the queue (the A07/A08/A09
+    //     contract — those rows are already live).
+    [Fact]
+    public async Task A12_ListPendingApproval_ReturnsAllPendingApprovalRows()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Two resident inviters, each creating a PendingApproval row.
+        var (_, row1) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct,
+            EmailInvitationStatus.PendingApproval);
+        var (_, row2) = await svc.CreateAsync(
+            OtherEmail, OtherInviter, DateTimeOffset.UtcNow.AddDays(7), ct,
+            EmailInvitationStatus.PendingApproval);
+
+        // A Pending row (already live — the A07 contract, NOT in the queue).
+        var (_, row3) = await svc.CreateAsync(
+            "third@example.com", Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+
+        var queue = await svc.ListPendingApprovalAsync(ct);
+
+        // The queue has exactly TWO rows (row1 + row2 — both PendingApproval).
+        Assert.Equal(2, queue.Count);
+        Assert.Contains(queue, i => i.InvitationId == row1.Id);
+        Assert.Contains(queue, i => i.InvitationId == row2.Id);
+        Assert.DoesNotContain(queue, i => i.InvitationId == row3.Id);
+
+        // The inviter's id is carried (the admin sees who invited).
+        Assert.Contains(queue, i => i.InvitationId == row1.Id
+            && i.InviterSubjectId == Inviter);
+        Assert.Contains(queue, i => i.InvitationId == row2.Id
+            && i.InviterSubjectId == OtherInviter);
+
+        // The DisplayStatus is PendingApproval (the approval queue surfaces
+        // the state as-is — the admin decides approve/revoke).
+        foreach (var item in queue)
+        {
+            Assert.Equal(EmailInvitationStatus.PendingApproval, item.DisplayStatus);
+        }
+
+        // Newest-first (the row2 was created after row1).
+        Assert.Equal(row2.Id, queue[0].InvitationId);
+
+        await store.DisposeAsync();
+    }
+
+    // (g) the approve nudge — ApproveAsync emits one best-effort
+    //     invitation.approved notification to the resident inviter (the
+    //     A10 invitation.accepted precedent — the new invitation.approved
+    //     kind, the NotificationKinds closed set).
+    [Fact]
+    public async Task A12_ApproveAsync_EmitsOneInvitationApprovedNotifyToInviter()
+    {
+        var (svc, store, _, emitter) = await BootA10Async();
+        var ct = TestContext.Current.CancellationToken;
+        const string Admin = "admin-a12-001";
+
+        var (_, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct,
+            EmailInvitationStatus.PendingApproval);
+
+        Assert.True(await svc.ApproveAsync(row.Id, Admin, ct));
+
+        // One emission, to the INVITER (the resident who created the
+        // invitation), the right kind, the invited email in the body, the
+        // stable idempotency key, the A12 /account/invite linkPath.
+        var emit = Assert.Single(emitter.Emitted);
+        Assert.Equal(Inviter, emit.RecipientId);
+        Assert.Equal(Kumunita.Core.Notifications.NotificationKinds.InvitationApproved, emit.Kind);
+        Assert.Contains(InvitedEmail, emit.Body);
+        Assert.Equal(
+            $"notification:{Kumunita.Core.Notifications.NotificationKinds.InvitationApproved}:{row.Id}",
+            emit.IdempotencyKey);
+        Assert.Equal("/account/invite", emit.LinkPath);
+
+        await store.DisposeAsync();
+    }
+
+    // (h) the approve nudge is best-effort — a throwing emitter does not
+    //     throw and the invitation.approve audit row + the Pending
+    //     transition still commit (the D5 posture pin, the A10
+    //     best-effort precedent).
+    [Fact]
+    public async Task A12_ApproveAsync_BestEffort_FailingEmitterDoesNotThrow()
+    {
+        var (svc, store, _, emitter) = await BootA10Async(throwingEmitter: true);
+        var ct = TestContext.Current.CancellationToken;
+        const string Admin = "admin-a12-001";
+
+        var (_, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct,
+            EmailInvitationStatus.PendingApproval);
+
+        // A throwing emitter must NOT propagate — the D5 posture.
+        var ex = await RecordExceptionAsync(async () =>
+        {
+            Assert.True(await svc.ApproveAsync(row.Id, Admin, ct));
+        });
+        Assert.Null(ex);   // no throw — the best-effort contract
+
+        // The durable record is intact: the row is now Pending + the
+        // invitation.approve audit row is present.
+        var reloaded = (await store.OpenSession(new Marten.Services.SessionOptions())
+            .LoadAsync<Invitation>(row.Id, ct))!;
+        Assert.Equal(EmailInvitationStatus.Pending, reloaded.Status);
+        var audits = await AllAudits(store);
+        Assert.Contains(audits, a => a.Action == "invitation.approve");
+        // The emitter was attempted (the throw is swallowed, not skipped).
+        Assert.True(emitter.AttemptCount >= 1);
+
+        await store.DisposeAsync();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /// <summary>A10 — boot the A07 harness + a fake

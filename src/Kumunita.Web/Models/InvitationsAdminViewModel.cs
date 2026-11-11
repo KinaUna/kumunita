@@ -30,4 +30,33 @@ public sealed class InvitationsAdminViewModel
     /// <summary>The invite textarea's current value (seeded for the
     /// create shape — a re-render does not lose the actor's input).</summary>
     public string DraftEmails { get; set; } = string.Empty;
+
+    /// <summary>
+    /// IMPROVE-UX A12 (ADR 0304 D6 c) — the **approval queue**: the
+    /// <see cref="EmailInvitationStatus.PendingApproval"/> rows across
+    /// all inviters (newest-first, each carrying the inviter's id — the
+    /// admin sees *who* invited). The section is **visible** when the
+    /// A11 setting is <see cref="ResidentInviteSetting.OnWithApproval"/>
+    /// (the resident surface can create <see cref
+    /// "EmailInvitationStatus.PendingApproval"/> rows) and **hidden**
+    /// when the setting is <see cref="ResidentInviteSetting.Off"/> (no
+    /// resident invitations can exist) or <see cref
+    /// "ResidentInviteSetting.On"/> (the resident's invitations land
+    /// <see cref="EmailInvitationStatus.Pending"/> directly — the
+    /// existing A09 list surface is unchanged, the A12 card: "The
+    /// <c>On</c> mode has **no** approval queue").
+    /// </summary>
+    public IReadOnlyList<InvitationListItem> PendingApprovalItems { get; set; } =
+        System.Array.Empty<InvitationListItem>();
+
+    /// <summary>IMPROVE-UX A12 — true when the approval queue section
+    /// should render (the A11 setting is <see cref
+    /// "ResidentInviteSetting.OnWithApproval"/> — the resident surface
+    /// can create <see cref
+    /// "EmailInvitationStatus.PendingApproval"/> rows). False when the
+    /// setting is <see cref="ResidentInviteSetting.Off"/> (no resident
+    /// invitations can exist) or <see cref
+    /// "ResidentInviteSetting.On"/> (the resident's invitations land
+    /// <see cref="EmailInvitationStatus.Pending"/> directly).</summary>
+    public bool ApprovalQueueVisible { get; init; } = false;
 }

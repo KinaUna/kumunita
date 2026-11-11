@@ -282,7 +282,12 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // hears back, the resident-facing kind the "inviter acceptance"
         // loop closes for; its settings-toggle label is
         // notifications.preference.invitation.accepted.label).
-        Assert.Equal(34, vm.AllKinds.Count);
+        // 34 → 35 (IMPROVE-UX A12, ADR 0304 D6 c — invitation.approved joins
+        // the closed set: the GlobalAdmin approves a resident's pending
+        // invitation and the inviter hears back, the resident-facing kind
+        // the "resident invite approval" loop closes for; its settings-
+        // toggle label is notifications.preference.invitation.approved.label).
+        Assert.Equal(35, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

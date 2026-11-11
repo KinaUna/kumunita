@@ -24,5 +24,6 @@
   "nav.projects": "Projets",
   "nav.change_password": "Changer le mot de passe",
   "nav.my_data": "Mes donn\u00E9es",
-  "nav.delete_account": "Supprimer le compte"
+  "nav.delete_account": "Supprimer le compte",
+  "nav.invite": "Inviter un voisin"
 }

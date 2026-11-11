@@ -92,5 +92,15 @@
   "account.signup_resend_prompt": "Never got the confirmation email?",
   "account.signup_resend_link": "Resend the confirmation email",
   "account.verify_confirm_lede": "Confirm that this is your account and you\u0027re ready to sign in.",
-  "account.verify_confirm_submit": "Confirm \u0026 sign in"
+  "account.verify_confirm_submit": "Confirm \u0026 sign in",
+  "account.invite_title": "Invite a neighbour",
+  "account.invite_lede": "Invite a neighbour to join the community. The invitation is a one-time link that opens sign-up for that address (even while sign-up is closed) and expires after 7 days. The invitation is sent as an email carrying the link.",
+  "account.invite_email_label": "Email address",
+  "account.invite_email_hint": "The neighbour\u0027s email address. Each gets a one-time sign-up link by email.",
+  "account.invite_button": "Invite",
+  "account.invite_success": "Invitation sent to {0}.",
+  "account.invite_pending_approval": "Your invitation for {0} is pending approval. A GlobalAdmin will review it.",
+  "account.invite_off": "Resident invitations are not enabled for this community. Please contact a GlobalAdmin.",
+  "account.invite_invalid_email": "Not a valid email address.",
+  "account.invite_already_invited": "{0} already has a live invitation."
 }

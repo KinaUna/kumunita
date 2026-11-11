@@ -24,5 +24,6 @@
   "nav.account": "Konto",
   "nav.change_password": "Passwort \u00E4ndern",
   "nav.my_data": "Meine Daten",
-  "nav.delete_account": "Konto l\u00F6schen"
+  "nav.delete_account": "Konto l\u00F6schen",
+  "nav.invite": "Nachbarin/ein Nachbar einladen"
 }

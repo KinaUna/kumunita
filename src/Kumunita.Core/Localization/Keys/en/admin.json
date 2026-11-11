@@ -334,6 +334,17 @@
   "admin.invitations.revoked": "Invitation revoked.",
   "admin.invitations.revoke_failed": "The invitation could not be revoked (it may already be used, revoked, or expired).",
   "admin.invitations.resent": "A fresh invitation was sent to {0}.",
-  "admin.invitations.resend_failed": "Not a valid email to resend to.",
+  "admin.invitations.resend_failed": "Not a valid email to resend to.",  "admin.invitations_approval_title": "Resident invitations pending approval",
+  "admin.invitations_approval_lede": "Residents have invited neighbours. Approve each invitation before it becomes usable (the \u201CInvite a neighbour\u201D surface is in \u201COn with admin approval\u201D mode \u2014 change the mode on the Signup settings page).",
+  "admin.invitations_approval_empty": "No resident invitations are pending approval.",
+  "admin.invitations_approval_empty_hint": "When a resident invites a neighbour (in \u201COn with admin approval\u201D mode), the invitation appears here for review.",
+  "admin.invitations_approval_status_pending_approval": "Pending approval",
+  "admin.invitations_approval_approve": "Approve",
+  "admin.invitations_approval_invited": "Invited",
+  "admin.invitations_approval_inviter": "Inviter",
+  "admin.invitations_approval_created": "Created",
+  "admin.invitations_approval_expires": "Expires",
+  "admin.invitations_approval_approve_success": "Invitation approved. It is now usable by the invited address.",
+  "admin.invitations_approval_approve_failed": "The invitation could not be approved (it may already be used, revoked, or expired).",
   "admin.hub.invitations_desc": "Invite neighbours to join \u2014 a one-time link per email, delivered by email, valid while sign-up is closed."
 }

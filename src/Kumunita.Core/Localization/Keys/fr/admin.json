@@ -334,6 +334,16 @@
   "admin.invitations.revoked": "Invitation r\u00e9voqu\u00e9e.",
   "admin.invitations.revoke_failed": "L\u2019invitation n\u2019a pas pu \u00eatre r\u00e9voqu\u00e9e (d\u00e9j\u00e0 utilis\u00e9e, r\u00e9voqu\u00e9e ou expir\u00e9e).",
   "admin.invitations.resent": "Une nouvelle invitation a \u00e9t\u00e9 envoy\u00e9e \u00e0 {0}.",
-  "admin.invitations.resend_failed": "Adresse e-mail invalide pour renvoyer.",
-  "admin.hub.invitations_desc": "Invite des voisin\u00e8s \u2014 un lien \u00e0 usage unique par e-mail, envoy\u00e9 par e-mail, valide m\u00eaame si l\u2019inscription est ferm\u00e9e."
+  "admin.invitations.resend_failed": "Adresse e-mail invalide pour renvoyer.",  "admin.invitations_approval_title": "Invitations par les r\u00E9sidents en attente d\u2019approbation",
+  "admin.invitations_approval_lede": "Les r\u00E9sidents ont invit\u00E9 des voisins. Approuvez chaque invitation avant qu\u2019elle devienne utilisable (la surface \u00AB Inviter un voisin \u00BB est en mode \u00AB Avec approbation d\u2019un GlobalAdmin \u00BB \u2014 changez le mode sur la page des param\u00E8tres d\u2019inscription).",
+  "admin.invitations_approval_empty": "Aucune invitation par les r\u00E9sidents n\u2019est en attente d\u2019approbation.",
+  "admin.invitations_approval_empty_hint": "Quand un r\u00E9sident invite un voisin (en mode \u00AB Avec approbation d\u2019un GlobalAdmin \u00BB), l\u2019invitation appara\u00EE ici pour examen.",
+  "admin.invitations_approval_status_pending_approval": "En attente d\u2019approbation",
+  "admin.invitations_approval_approve": "Approuver",
+  "admin.invitations_approval_inviter": "Invitateur",
+  "admin.invitations_approval_invited": "Invit\u00E9",
+  "admin.invitations_approval_created": "Cr\u00E9\u00E9e",
+  "admin.invitations_approval_expires": "Expire",
+  "admin.invitations_approval_approve_success": "Invitation approuv\u00E9e. Elle est maintenant utilisable pour l\u2019adresse invit\u00E9e.",
+  "admin.invitations_approval_approve_failed": "L\u2019invitation n\u2019a pas pu \u00EAtre approuv\u00E9e (elle peut d\u00E9j\u00E0 \u00EAtre utilis\u00E9e, r\u00E9voqu\u00E9e ou expir\u00E9e).",  "admin.hub.invitations_desc": "Invite des voisin\u00e8s \u2014 un lien \u00e0 usage unique par e-mail, envoy\u00e9 par e-mail, valide m\u00eaame si l\u2019inscription est ferm\u00e9e."
 }

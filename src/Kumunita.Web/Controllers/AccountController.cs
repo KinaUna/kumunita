@@ -65,6 +65,20 @@ public sealed class AccountController(
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
 
+    // ── IMPROVE-UX A12 — the resident "Invite a neighbour" surface ────────
+    // A11 settled the mode (Off / On / OnWithApproval) + the rule
+    // (GetResidentInvitePostureAsync); A12 settles the *resident surface*
+    // (the GET /account/invite + the POST /account/invite that creates the
+    // row in the mode's initialStatus: Pending when the mode is On,
+    // PendingApproval when the mode is OnWithApproval — the ADR 0304 D6 c
+    // row state). The invitation seam (IInvitationService, A07's Core
+    // service) is the same one the A08 sign-up gate uses (the
+    // AccountController ctor already carries it for the A08 ?invite= gate)
+    // — the A12 Invite actions read the A11 rule + the A12 CreateAsync
+    // initialStatus param. The admin approval queue (the /admin/invitations
+    // Approve button) is a separate surface (the
+    // AdminInvitationsController.Approve POST — the A12 admin lane).
+
     // ADR 0215 — the MFA challenge's model errors are localized from the registry
     // (account.mfa.error.*), resolved from the request scope like LocalizeValidationAsync;
     // the English text is the floor when there is no provider (unit-test harness) or
@@ -176,6 +190,204 @@ public sealed class AccountController(
             QuotaHuman        = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(quota.PerUserQuotaBytes),
             RemainingHuman    = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(remaining!.Value)
         });
+    }
+
+    // ── IMPROVE-UX A12 — the resident "Invite a neighbour" surface ────────
+    // The A11 rule (GetResidentInvitePostureAsync) decides whether the
+    // surface is visible (MayInvite = true) or hidden (MayInvite = false —
+    // the Off floor). When visible, the POST creates the invitation row in
+    // the mode's initialStatus: Pending when RequiresApproval = false
+    // (the On mode), PendingApproval when RequiresApproval = true (the
+    // OnWithApproval mode — the ADR 0304 D6 c row state). The ADR 0304
+    // D4 invariants (single-use, expiring, revocable) are unchanged.
+
+    /// <summary>
+    /// <c>GET /account/invite</c> (IMPROVE-UX A12, ADR 0304 D6 c) — the
+    /// resident's "Invite a neighbour" form. The A11 rule
+    /// (<see cref="IInvitationService.GetResidentInvitePostureAsync"/>)
+    /// decides whether the surface is **visible**
+    /// (<see cref="ResidentInvitePosture.MayInvite"/> = <c>true</c> — the
+    /// <c>On</c> / <c>OnWithApproval</c> modes) or **hidden**
+    /// (<see cref="ResidentInvitePosture.MayInvite"/> = <c>false</c> —
+    /// the <c>Off</c> floor, the surface is absent, not a 403). The
+    /// subject is the signed-in principal (self-only, never a path
+    /// param). The <see cref="ResidentInvitePosture.RequiresApproval"/>
+    /// flag is carried on the view model (the view renders the
+    /// "pending approval" notice when <c>true</c> — the A12
+    /// <c>OnWithApproval</c> mode's "your invitation is pending
+    /// approval" text, the ADR 0304 D6 c shape). The ADR 0304 D6(a)
+    /// expiry default (7 days) is the A09 call-site's default
+    /// (<see cref="AdminInvitationsController.DefaultExpiryDays"/>).
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    public async Task<IActionResult> Invite([FromQuery] string? email = null)
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // Fail-closed (the A08 "null AND a token is presented, the gate
+        // decides" idiom): the invitation seam is the A12 surface's whole
+        // contract (the A11 rule + the CreateAsync initialStatus lane). A
+        // null seam (the A09 harness shape) is a refusal, not a silent
+        // create (the C3 no-silent-missing-email floor).
+        if (invitationService is null)
+            return Challenge();
+        var invites = invitationService;   // the non-null local (the null guard above)
+
+        // The A11 rule (the A12 surface's gate — the MayInvite /
+        // RequiresApproval posture). The service does not re-check User
+        // (the ADR 0050 split — the [Authorize] boundary is the access
+        // decision; the rule is the resident-invite-mode read).
+        var posture = await invites.GetResidentInvitePostureAsync(subject);
+
+        return View(new InviteViewModel
+        {
+            MayInvite          = posture.MayInvite,
+            RequiresApproval   = posture.RequiresApproval,
+            Email              = email ?? string.Empty,
+        });
+    }
+
+    /// <summary>
+    /// <c>POST /account/invite</c> (IMPROVE-UX A12, ADR 0304 D6 c) —
+    /// create the invitation for <paramref name="email"/>. The A11 rule
+    /// is re-read (the gate — <see cref
+    /// "ResidentInvitePosture.MayInvite"/> must be <c>true</c> for the
+    /// create to proceed; a <c>false</c> posture is a refusal flash, not
+    /// a 403). The row's initial status is
+    /// <see cref="EmailInvitationStatus.PendingApproval"/> when
+    /// <see cref="ResidentInvitePosture.RequiresApproval"/> is
+    /// <c>true</c> (the <c>OnWithApproval</c> mode — the row is gated
+    /// behind the admin approval queue) or
+    /// <see cref="EmailInvitationStatus.Pending"/> when
+    /// <see cref="ResidentInvitePosture.RequiresApproval"/> is
+    /// <c>false</c> (the <c>On</c> mode — the row is immediately usable).
+    /// The ADR 0304 D4 invariants are unchanged (the
+    /// <see cref="IInvitationService.CreateAsync"/> seam owns the
+    /// token-hash-at-rest, the single-use pin, the expiring contract).
+    /// The <c>invitation.create</c> audit row is the service's
+    /// (<c>Via = Owner</c>, <c>TargetKind = "invitation"</c> — the
+    /// ADR 0304 D3 shape, the A07 contract). The A12
+    /// <c>invitation.approved</c> nudge (the
+    /// <see cref="IInvitationService.ApproveAsync"/> seam) is the
+    /// admin-lane's — this surface does not emit it.
+    /// </summary>
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Invite(InviteViewModel model)
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // Fail-closed (the A08 "null AND a token is presented, the gate
+        // decides" idiom): the invitation seam is the A12 surface's whole
+        // contract (the A11 rule + the InviteAsync initialStatus lane). A
+        // null seam (the A09 harness shape) is a refusal, not a silent
+        // create (the C3 no-silent-missing-email floor).
+        if (invitationService is null)
+            return Challenge();
+        var invites = invitationService;   // the non-null local (the null guard above)
+
+        // The A11 rule (the gate — re-read on the POST, not just the GET;
+        // the mode may have changed between the GET and the POST).
+        var posture = await invites.GetResidentInvitePostureAsync(subject);
+        if (!posture.MayInvite)
+        {
+            TempData["error"] = await this.FlashAsync(
+                "account.invite_off",
+                "Resident invitations are not enabled for this community. Please contact a GlobalAdmin.");
+            return RedirectToAction(nameof(Invite));
+        }
+
+        // The email shape check (the A09 IsPlausibleEmail shape — a
+        // local@domain with a dot in the domain; no regex dependency).
+        var email = (model.Email ?? string.Empty).Trim().ToLowerInvariant();
+        if (!IsPlausibleEmail(email))
+        {
+            TempData["error"] = await this.FlashAsync(
+                "account.invite_invalid_email",
+                "Not a valid email address.");
+            return RedirectToAction(nameof(Invite), new { Email = model.Email });
+        }
+
+        // The ADR 0304 D6(a) expiry default (7 days) — the A09 call-site's
+        // default (the ADR "ships no default — the A09/A12 surfaces will
+        // set it; the proposed default is 7 days"; this call site settles
+        // it for the resident surface, the A09 AdminInvitationsController
+        // shape).
+        var expiresAt = DateTimeOffset.UtcNow.AddDays(7);
+
+        // The initialStatus (the A12 mode's row state — the ADR 0304 D6 c
+        // "approval state"): PendingApproval when the mode is
+        // OnWithApproval (the RequiresApproval = true flag, the A11 rule's
+        // output), Pending when the mode is On (the RequiresApproval =
+        // false flag). The ADR 0304 D4 invariants are unchanged.
+        var initialStatus = posture.RequiresApproval
+            ? EmailInvitationStatus.PendingApproval
+            : EmailInvitationStatus.Pending;
+
+        // The resident's display name (the email's {0}) — the service
+        // floors to "there" when null/blank (the
+        // BuildVerificationEmailAsync shape). Read through the request
+        // services (no ctor change, the AdminInvitationsController
+        // ActorDisplayNameAsync shape).
+        string inviterDisplayName;
+        try
+        {
+            inviterDisplayName = (await userInfo.GetProfileAsync(subject))?.DisplayName ?? string.Empty;
+        }
+        catch
+        {
+            inviterDisplayName = string.Empty;   // fail-open (the email lane is best-effort on the name)
+        }
+
+        // The A09 InviteAsync delivery seam (create + stage the invitation
+        // email in one transaction — the C3 no-silent-missing-email
+        // guarantee). The initialStatus param (the A12 mode's row state)
+        // is the last named argument (the A07/A08/A09 contract is
+        // unchanged — the A09 call sites use the default Pending).
+        await invites.InviteAsync(
+            email, subject, inviterDisplayName, expiresAt,
+            initialStatus: initialStatus);
+
+        // The flash names the mode (the A12 "your invitation is pending
+        // approval" notice when OnWithApproval; the simple "sent" when On).
+        if (posture.RequiresApproval)
+        {
+            TempData["info"] = await this.FlashAsync(
+                "account.invite_pending_approval",
+                "Your invitation for {0} is pending approval. A GlobalAdmin will review it.",
+                email);
+        }
+        else
+        {
+            TempData["info"] = await this.FlashAsync(
+                "account.invite_success",
+                "Invitation sent to {0}.",
+                email);
+        }
+        return RedirectToAction(nameof(Invite));
+    }
+
+    /// <summary>A shape check for an invited address (the A09
+    /// <see cref="AdminInvitationsController.IsPlausibleEmail"/> shape — a
+    /// <c>local@domain</c> with a dot in the domain; no regex dependency,
+    /// the house "no new package" rule).</summary>
+    private static bool IsPlausibleEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        var at = email.LastIndexOf('@');
+        if (at <= 0 || at == email.Length - 1) return false;
+        var local = email[..at];
+        var domain = email[(at + 1)..];
+        if (local.Length == 0 || local.Contains(" ")) return false;
+        if (domain.Length < 3 || !domain.Contains('.')) return false;
+        if (domain.StartsWith('.') || domain.EndsWith('.')) return false;
+        return !domain.Contains("..");
     }
 
     // ── Change password (self-serve; ADR 0138) ───────────────────────────────

@@ -262,3 +262,85 @@ reads it and returns a resident's invite posture — A12's resident
   signup-gate surface is intact). The 3 option labels + the flash
   strings land in the 4-language `admin.*` key surface (C02 parity, the
   de/fr/da machine-written + flagged-for-parked-native-review shape).
+
+**2026-11-11 (IMPROVE-UX A12) — the approval state + the admin-approve lane
+ship (completes D6 c).** A12 ships the `PendingApproval` row state (the
+A11 `OnWithApproval` mode's *ledger*) + the admin-approve lane + the
+resident "Invite a neighbour" surface + the admin approval queue — the
+A07–A12 invitation lane closes with this.
+
+- **The row state (Core).** `EmailInvitationStatus.PendingApproval`
+  (a compatible ADD to the ADR's `Pending` / `Accepted` / `Revoked` /
+  `Expired` machine — the D4 invariants, single-use / expiring / revocable,
+  are **unchanged**; the new state is additive). A `PendingApproval` row
+  is **refused** by `ValidateAsync` / `AcceptAsync` (the A08 `?invite=`
+  gate does not open on it) until `ApproveAsync` transitions it to
+  `Pending`.
+- **The approve lane (Core, on `IInvitationService`).**
+  `ApproveAsync(invitationId, adminSubjectId, ct)` → `bool` — the
+  `PendingApproval → Pending` transition, **exactly one** `AccessAudit`
+  row (`invitation.approve`, `Via = Admin`, `TargetKind = "invitation"`,
+  `TargetId = invitationId`, `Outcome = Allow` — the
+  `invitation.create` / `invitation.revoke` / `invitation.accept`
+  one-row convention, the ADR 0304 D3 shape). **Idempotent:** a missing
+  invitation, or one already `Pending` / `Accepted` / `Revoked`, is a
+  no-op returning `false` (the 0159 ESC·9 / ADR 0302 D3 precedent — no
+  audit row, no state change, the `RevokeAsync` no-op shape). The admin
+  standing is enforced at the Web controller's
+  `[Authorize(Roles = Roles.GlobalAdmin)]` boundary (the ADR 0050 split —
+  the Core seam does not re-check `User`). Best-effort notify: the inviter
+  hears an `invitation.approved` nudge (the A10 `invitation.accepted`
+  precedent, the `NotificationKinds` closed set) in the same committed
+  session; a null emitter or an emit error is swallowed (the D5 posture —
+  the domain write + audit row are the durable record).
+- **The resident surface (Web).** `AccountController.Invite` (
+  `GET /account/invite` + `POST /account/invite`, both
+  `[Authorize]`): the A11 rule (`GetResidentInvitePostureAsync`) is the
+  gate — the view model's `MayInvite` flag renders the form (visible for
+  the `On` / `OnWithApproval` modes) or the `account.invite_off` alert
+  (hidden for the `Off` floor — the A11 `Refused` posture), and
+  `RequiresApproval` renders the `account.invite_pending_approval` notice.
+  The POST re-reads the rule (the mode may have changed between the GET and
+  the POST), refuses on `MayInvite = false` (a flash redirect, not a 403),
+  and calls `InviteAsync` with `initialStatus = PendingApproval` when
+  `RequiresApproval` is `true` (the `OnWithApproval` mode) or
+  `initialStatus = Pending` when it is `false` (the `On` mode) — the
+  A11 rule is the *gate*; the row state is the *ledger*. The account-nav
+  "Invite a neighbour" entry (`nav.invite`) is visible when
+  `MayInvite = true` (the `_AccountNav.cshtml` fail-closed read of the A11
+  rule).
+- **The admin approval queue (Web).** `AdminInvitationsController` gains a
+  `Approve(invitationId)` POST (`[ValidateAntiForgeryToken]`) that
+  delegates to `ApproveAsync` (the success / no-op flashes) and an
+  `Index` read that, **only** when the A11 setting is
+  `OnWithApproval` (read through the `IIdentityService.
+  GetResidentInviteSettingAsync` seam, the `Off` floor on a null
+  identity), lists the `PendingApproval` rows across all inviters
+  (`ListPendingApprovalAsync` — **not** owner-scoped, the admin approves
+  other residents' rows) and surfaces them in a
+  `InvitationsAdminViewModel.PendingApprovalItems` section
+  (`ApprovalQueueVisible = true`). The section is **hidden** for the
+  `Off` mode (no resident invitations can exist) and the `On` mode (the
+  resident's invitations land `Pending` directly — the existing A09 list
+  surface is unchanged; "the `On` mode has no approval queue").
+- **Keys (4 languages).** The resident surface's labels
+  (`account.invite_*`), the admin approval queue's labels
+  (`admin.invitations_approval_*`), the nav entry (`nav.invite`), and the
+  new `notification` kind (`notifications.kind.invitation.approved` +
+  `notifications.preference.invitation.approved.label`) — the
+  en + de/fr/da machine-written + flagged-for-parked-native-review shape.
+  C02 four-language parity stays green; the `NotificationsControllerTests`
+  closed-set count re-baselines 34 → 35 (the A10 `invitation.accepted`
+  precedent — the documented re-baseline).
+- **D6 c (the approval state) — settled.** A12 ships the `PendingApproval`
+  row state + the admin-approve lane (this amendment); the ADR's D6 c
+  "recorded here as held, not decided" line is superseded for the
+  approval lane. D6 b (the rate ceiling) **remains open** — the
+  `// TODO ❓` who-may-invite + how-many-per-period refinement is
+  **flagged, not built** (a `// TODO ❓` comment at the seam, the A10
+  precedent); the proposed 5-per-30-days ceiling from D6 b stands.
+- **The A11 setting surface is unchanged** (`AdminSignupController.
+  SaveResidentInvite` + the 3-option radio group) — A12 *consumes* the
+  mode; the ADR 0050 signup-gate seams, the A07/A08/A09/A10
+  `IInvitationService` contracts, and the A10 inviter-acceptance notify
+  are all intact.

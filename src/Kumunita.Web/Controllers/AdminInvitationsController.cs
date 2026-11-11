@@ -33,7 +33,18 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Route("admin/invitations")]
 [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
-public sealed class AdminInvitationsController(IInvitationService invitations) : Controller
+public sealed class AdminInvitationsController(
+    IInvitationService invitations,
+    // IMPROVE-UX A12 (ADR 0304 D6 c) — the A11 setting read (the approval
+    // queue's visibility gate: the section renders when the setting is
+    // OnWithApproval — the resident surface can create PendingApproval
+    // rows). OPTIONAL (the `IInvitationService?` harness idiom, the
+    // AccountController A08 shape) so the existing A09 direct-construction
+    // harness (a single-arg `new AdminInvitationsController(invitations)`)
+    // keeps compiling; DI always supplies the live IIdentityService, and
+    // the A12 tests pass an NSubstitute. When null the approval queue is
+    // hidden (the Off floor — the fail-closed shape).
+    IIdentityService? identity = null) : Controller
 {
     /// <summary>ADR 0304 D6(a) — the invitation expiry default (the ADR
     /// "ships no default — the A09/A12 surfaces will set it; the proposed
@@ -64,11 +75,82 @@ public sealed class AdminInvitationsController(IInvitationService invitations) :
     public async Task<IActionResult> Index()
     {
         var actor = ActorId(User) ?? string.Empty;
+
+        // IMPROVE-UX A12 (ADR 0304 D6 c) — the approval queue: the
+        // PendingApproval rows across all inviters (newest-first, the
+        // A12 ListPendingApprovalAsync seam — not owner-scoped, the
+        // admin is approving other residents' rows). The section is
+        // visible when the A11 setting is OnWithApproval (the resident
+        // surface can create PendingApproval rows) and hidden when the
+        // setting is Off (no resident invitations can exist) or On (the
+        // resident's invitations land Pending directly — the A12 card:
+        // "The On mode has no approval queue"). The A11 setting read is
+        // the IIdentityService.GetResidentInviteSettingAsync seam (the
+        // Off floor, the A11 shape). A null identity (the A09 direct-
+        // construction harness shape) floors the queue to hidden (the
+        // fail-closed Off-floor shape — the A09 contract, unchanged).
+        ResidentInviteSetting setting;
+        if (identity is not null)
+        {
+            setting = await identity.GetResidentInviteSettingAsync();
+        }
+        else
+        {
+            setting = ResidentInviteSetting.Off;   // the harness floor
+        }
+        var approvalQueueVisible = setting == ResidentInviteSetting.OnWithApproval;
+        var pendingApproval = approvalQueueVisible
+            ? await invitations.ListPendingApprovalAsync()
+            : System.Array.Empty<InvitationListItem>();
+
         var model = new InvitationsAdminViewModel
         {
-            Items = await invitations.ListAsync(actor)
+            Items              = await invitations.ListAsync(actor),
+            PendingApprovalItems = pendingApproval,
+            ApprovalQueueVisible = approvalQueueVisible,
         };
         return View(model);
+    }
+
+    /// <summary>
+    /// <c>POST /admin/invitations/approve</c> (IMPROVE-UX A12, ADR 0304
+    /// D6 c) — approve a <see cref
+    /// "Kumunita.Core.Identity.EmailInvitationStatus.PendingApproval"/>
+    /// invitation. Delegates to <see cref
+    /// "Kumunita.Core.Identity.IInvitationService.ApproveAsync"/> (the
+    /// PendingApproval → Pending transition — the row becomes usable, the
+    /// A08 <c>?invite=</c> sign-up gate accepts it; exactly one
+    /// <c>invitation.approve</c> audit row, <c>Via = Admin</c>, the
+    /// service's lane). Idempotent: a missing / already-approved /
+    /// already-revoked / already-accepted invitation is a no-op returning
+    /// <c>false</c> (the 0159 ESC·9 / ADR 0302 D3 precedent — no audit
+    /// row, no state change). The GlobalAdmin standing is enforced at
+    /// this controller's <c>[Authorize(Roles = Roles.GlobalAdmin)]</c>
+    /// boundary (the ADR 0050 split — the Core seam does not re-check
+    /// <c>User</c>, the <see cref="Revoke"/> owner-scoped shape).
+    /// </summary>
+    [HttpPost("approve")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Approve(string invitationId)
+    {
+        var actor = ActorId(User) ?? string.Empty;
+        var approved = await invitations.ApproveAsync(invitationId, actor);
+        if (approved)
+        {
+            TempData["info"] = await this.FlashAsync(
+                "admin.invitations_approval_approve_success",
+                "Invitation approved. It is now usable by the invited address.");
+        }
+        else
+        {
+            // The no-op (missing / already approved / terminal / not a
+            // PendingApproval row) — reported, not an error page (the
+            // idempotent shape, the Revoke no-op precedent).
+            TempData["error"] = await this.FlashAsync(
+                "admin.invitations_approval_approve_failed",
+                "The invitation could not be approved (it may already be used, revoked, or expired).");
+        }
+        return RedirectToAction(nameof(Index));
     }
 
     /// <summary>

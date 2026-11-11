@@ -92,5 +92,15 @@
   "account.signup_resend_prompt": "Vous n\u2019avez pas re\u00E7u l\u2019e-mail de confirmation ?",
   "account.signup_resend_link": "Renvoyer l\u2019e-mail de confirmation",
   "account.verify_confirm_lede": "Confirme que c\u0027est ton compte et que tu es pr\u00EAt\u00B7e \u00E0 te connecter.",
-  "account.verify_confirm_submit": "Confirmer \u0026 me connecter"
+  "account.verify_confirm_submit": "Confirmer \u0026 me connecter",
+  "account.invite_title": "Inviter un voisin",
+  "account.invite_lede": "Invite un voisin \u00E0 rejoindre la communaut\u00E9. L\u2019invitation est un lien \u00E0 usage unique qui ouvre l\u2019inscription pour cette adresse (m\u00EAme pendant que l\u2019inscription est ferm\u00E9e) et expire apr\u00E8s 7 jours. L\u2019invitation est envoy\u00E9e par e-mail avec le lien.",
+  "account.invite_email_label": "Adresse e-mail",
+  "account.invite_email_hint": "L\u2019adresse e-mail du voisin. Chacun re\u00E7oit un lien d\u2019inscription \u00E0 usage unique par e-mail.",
+  "account.invite_button": "Inviter",
+  "account.invite_success": "Invitation envoy\u00E9e \u00E0 {0}.",
+  "account.invite_pending_approval": "Votre invitation pour {0} est en attente d\u2019approbation. Un GlobalAdmin l\u2019examinera.",
+  "account.invite_off": "Les invitations par les r\u00E9sidents ne sont pas activ\u00E9es pour cette communaut\u00E9. Veuillez contacter un GlobalAdmin.",
+  "account.invite_invalid_email": "Adresse e-mail non valide.",
+  "account.invite_already_invited": "{0} a d\u00E9j\u00E0 une invitation active."
 }

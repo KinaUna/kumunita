@@ -8,6 +8,7 @@
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject IIdentityService Identity
 @inject IUserInfoService UserInfo
+@inject IInvitationService Invitations
 @inject Kumunita.Core.Messaging.IMessagingService Messaging
 @inject IModerationService Moderation
 @inject Microsoft.Extensions.Caching.Memory.IMemoryCache MemoryCache
@@ -209,6 +210,42 @@
                 <li class="nav-item">
                     <a class="dropdown-item text-dark" href="/reports/mine"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-error-reports"/></svg><kw-l key="reports.nav">My reports</kw-l></a>
                 </li>
+                @* IMPROVE-UX A12 (ADR 0304 D6 c) — the resident's "Invite a
+                   neighbour" surface: rendered only when signed in AND the
+                   A11 rule (GetResidentInvitePostureAsync) returns
+                   MayInvite = true (the On / OnWithApproval modes — the
+                   resident may create an invitation). Hidden when the A11
+                   rule returns MayInvite = false (the Off floor — a fresh
+                   instance ships with resident self-invite off, the ADR
+                   0304 §Amendments A11 rule; the surface is simply absent,
+                   no explanation — the M9 messaging gate's non-leaky
+                   shape). One <li> in the existing dropdown — no navbar
+                   reflow. The A11 rule is a read (zero audit rows, the
+                   M35·5 "the read is not an access decision" floor — the
+                   write decision is the /account/invite POST's job). A
+                   null Invitations (the harness shape) or a null
+                   navAvatarSubject (signed out) floors the entry to
+                   hidden (the fail-closed Off-floor shape — the A09
+                   contract, unchanged). *@
+                @if (navAvatarSubject is not null
+                     && Invitations is not null)
+                {
+                    bool canInvite = false;
+                    try
+                    {
+                        canInvite = (await Invitations.GetResidentInvitePostureAsync(navAvatarSubject)).MayInvite;
+                    }
+                    catch
+                    {
+                        canInvite = false;   // fail-closed (the seam throws, e.g. the store is unavailable)
+                    }
+                    if (canInvite)
+                    {
+                        <li class="nav-item">
+                            <a class="dropdown-item text-dark" href="/account/invite"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-messages"/></svg><kw-l key="nav.invite">Invite a neighbour</kw-l></a>
+                        </li>
+                    }
+                }
                 <li class="nav-item">
                     <a class="dropdown-item text-dark" href="/settings/language"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-settings"/></svg><kw-l key="settings.settings">Settings</kw-l></a>
                 </li>

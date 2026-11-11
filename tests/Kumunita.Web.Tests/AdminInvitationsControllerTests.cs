@@ -286,6 +286,23 @@ public class AdminInvitationsControllerTests
             "admin.invitations.resent",
             "admin.invitations.resend_failed",
             "admin.hub.invitations_desc",
+            // IMPROVE-UX A12 (ADR 0304 D6 c) — the approval queue (the
+            // PendingApproval rows + the admin-approve lane; the
+            // OnWithApproval mode's admin surface). Re-baselined + annotated
+            // (the closed-set-translation-key-test-pins memory: add the new
+            // keys, do NOT loosen the assertion).
+            "admin.invitations_approval_title",
+            "admin.invitations_approval_lede",
+            "admin.invitations_approval_empty",
+            "admin.invitations_approval_empty_hint",
+            "admin.invitations_approval_status_pending_approval",
+            "admin.invitations_approval_approve",
+            "admin.invitations_approval_inviter",
+            "admin.invitations_approval_invited",
+            "admin.invitations_approval_created",
+            "admin.invitations_approval_expires",
+            "admin.invitations_approval_approve_success",
+            "admin.invitations_approval_approve_failed",
             // the invitation email (the four-language C02 parity set)
             "email.invitation_subject",
             "email.invitation_body",
@@ -322,7 +339,149 @@ public class AdminInvitationsControllerTests
         Assert.Contains("admin.invitations.empty", html, StringComparison.Ordinal);
     }
 
+    // ═══════════════ IMPROVE-UX A12 — the admin approval queue (ADR 0304 D6 c) ═══════════════
+    //
+    // (f) — the pending-approval section is present (with its rows) only when the
+    //      A11 mode is <see cref="ResidentInviteSetting.OnWithApproval"/>; hidden
+    //      for <see cref="ResidentInviteSetting.Off"/> / <see cref="ResidentInviteSetting.On"/>.
+    // (g) — the <see cref="AdminInvitationsController.Approve"/> POST calls
+    //      <c>ApproveAsync</c> (the A12 seam) once.
+    //
+    // Harness: the single-arg <see cref="Build"/> leaves <c>identity</c> null (the
+    // <see cref="ResidentInviteSetting.Off"/> floor — the queue is hidden, A11's
+    // default is unchanged). The 2-arg <see cref="BuildWithIdentity"/> drives the
+    // <see cref="ResidentInviteSetting.OnWithApproval"/> path.
+
+    [Fact]
+    public async Task A12_Index_OnWithApproval_ShowsPendingApprovalSection_WithRows()
+    {
+        var (controller, invitations, identity) = BuildWithIdentity(ResidentInviteSetting.OnWithApproval);
+        identity.GetResidentInviteSettingAsync().Returns(ResidentInviteSetting.OnWithApproval);
+
+        var pending = new InvitationListItem(
+            InvitationId: "inv-1",
+            Email: "new-neighbour@example.com",
+            InviterSubjectId: "resident-inviter-1",
+            CreatedAt: new DateTimeOffset(2026, 7, 1, 9, 0, 0, TimeSpan.Zero),
+            ExpiresAt: new DateTimeOffset(2026, 7, 8, 9, 0, 0, TimeSpan.Zero),
+            Status: EmailInvitationStatus.PendingApproval,
+            AcceptedAt: null,
+            AcceptedSubjectId: null,
+            DisplayStatus: EmailInvitationStatus.PendingApproval);
+        invitations.ListPendingApprovalAsync().Returns(new[] { pending });
+
+        var action = await controller.Index();
+        var view = Assert.IsType<ViewResult>(action);
+        var model = (InvitationsAdminViewModel)view.ViewData.Model!;
+
+        Assert.True(model.ApprovalQueueVisible);
+        Assert.Single(model.PendingApprovalItems);
+        Assert.Equal("new-neighbour@example.com", model.PendingApprovalItems[0].Email);
+
+        // Both seams are consulted — the setting read (the A11 rule) and the
+        // A12 queue list (not owner-scoped: the admin is approving other
+        // residents' rows).
+        await invitations.Received(1).ListPendingApprovalAsync();
+        await identity.Received(1).GetResidentInviteSettingAsync();
+    }
+
+    [Fact]
+    public async Task A12_Index_ModeOff_HidesThePendingApprovalSection()
+    {
+        var (controller, invitations, identity) = BuildWithIdentity(ResidentInviteSetting.Off);
+        identity.GetResidentInviteSettingAsync().Returns(ResidentInviteSetting.Off);
+
+        var action = await controller.Index();
+        var model = (InvitationsAdminViewModel)Assert.IsType<ViewResult>(action).ViewData.Model!;
+
+        Assert.False(model.ApprovalQueueVisible);
+        Assert.Empty(model.PendingApprovalItems);
+        // The queue seam is NOT consulted when the mode is not OnWithApproval —
+        // the A11 Off floor hides the resident surface, so the queue is a no-op.
+        await invitations.DidNotReceiveWithAnyArgs().ListPendingApprovalAsync();
+    }
+
+    [Fact]
+    public async Task A12_Index_ModeOn_HidesThePendingApprovalSection()
+    {
+        // Plain resident-invite (no approval) — the resident-invite surface
+        // works, but there is no pending-approval queue to show (the A12 card:
+        // "The On mode has no approval queue").
+        var (controller, invitations, identity) = BuildWithIdentity(ResidentInviteSetting.On);
+        identity.GetResidentInviteSettingAsync().Returns(ResidentInviteSetting.On);
+
+        var action = await controller.Index();
+        var model = (InvitationsAdminViewModel)Assert.IsType<ViewResult>(action).ViewData.Model!;
+
+        Assert.False(model.ApprovalQueueVisible);
+        Assert.Empty(model.PendingApprovalItems);
+        await invitations.DidNotReceiveWithAnyArgs().ListPendingApprovalAsync();
+    }
+
+    [Fact]
+    public async Task A12_Index_OnWithApproval_EmptyQueue_ShowsEmptyState()
+    {
+        // The section is present (visible) but empty → the view renders the
+        // ".kmb-empty" state. The model flag is what the view keys off.
+        var (controller, invitations, identity) = BuildWithIdentity(ResidentInviteSetting.OnWithApproval);
+        identity.GetResidentInviteSettingAsync().Returns(ResidentInviteSetting.OnWithApproval);
+        invitations.ListPendingApprovalAsync().Returns(Array.Empty<InvitationListItem>());
+
+        var action = await controller.Index();
+        var model = (InvitationsAdminViewModel)Assert.IsType<ViewResult>(action).ViewData.Model!;
+
+        Assert.True(model.ApprovalQueueVisible);
+        Assert.Empty(model.PendingApprovalItems);
+    }
+
+    // ── (g) — the Approve POST routes through the A12 seam ─────────────────────────
+
+    [Fact]
+    public async Task A12_Approve_CallsApproveAsync_WithTheInvitationId()
+    {
+        var (controller, invitations, _) = BuildWithIdentity(ResidentInviteSetting.OnWithApproval);
+        invitations.ApproveAsync("inv-123", Admin).Returns(true);
+
+        var action = await controller.Approve("inv-123");
+        Assert.IsType<RedirectToActionResult>(action);
+
+        await invitations.Received(1).ApproveAsync("inv-123", Admin);
+    }
+
+    [Fact]
+    public async Task A12_Approve_NoLiveRow_RedirectsWithNoException()
+    {
+        var (controller, invitations, _) = BuildWithIdentity(ResidentInviteSetting.OnWithApproval);
+        invitations.ApproveAsync("inv-gone", Admin).Returns(false);
+
+        // A friendly no-op (the D5 posture: the admin sees a failure flash, no
+        // crash — the Revoke no-op precedent, the 0159 ESC·9 / ADR 0302 D3 idempotency).
+        var action = await controller.Approve("inv-gone");
+        Assert.IsType<RedirectToActionResult>(action);
+    }
+
     // ── Harness ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A12 variant of <see cref="Build"/> — wires an <see cref="IIdentityService"/>
+    /// so the A11 mode gate can be driven. <paramref name="mode"/> is the default
+    /// stub; the caller then overrides the seam where the mode matters (the test
+    /// body sets the mode it wants to pin).
+    /// </summary>
+    private static (AdminInvitationsController controller, IInvitationService invitationService, IIdentityService identity)
+        BuildWithIdentity(ResidentInviteSetting mode)
+    {
+        var identity = Substitute.For<IIdentityService>();
+        identity.GetResidentInviteSettingAsync().Returns(mode);
+        var (controller, invitationService) = Build();
+        // Re-construct with the identity seam wired in — the existing A09
+        // tests keep their single-arg shape, A12 tests get the two-arg shape.
+        var withIdentity = new AdminInvitationsController(invitationService, identity);
+        // Preserve the ControllerContext + TempData the single-arg Build set.
+        withIdentity.ControllerContext = controller.ControllerContext;
+        withIdentity.TempData = controller.TempData;
+        return (withIdentity, invitationService, identity);
+    }
 
     private static string RepoRoot
     {

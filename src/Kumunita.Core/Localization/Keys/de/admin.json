@@ -335,5 +335,17 @@
   "admin.invitations.revoke_failed": "Die Einladung konnte nicht r\u00fcckgerufen werden (vermutlich bereits benutzt, r\u00fcckgerufen oder abgelaufen).",
   "admin.invitations.resent": "Eine neue Einladung wurde an {0} gesendet.",
   "admin.invitations.resend_failed": "Keine g\u00fcltige E-Mail zum erneuten Senden.",
+  "admin.invitations_approval_title": "Einladungen durch Bewohner:innen, die auf Genehmigung warten",
+  "admin.invitations_approval_lede": "Bewohner:innen haben Nachbar:innen eingeladen. Genehmige jede Einladung, bevor sie verwendbar wird (die \u201ENachbarin/ein Nachbar einladen\u201C-Oberfl\u00E4che ist im Modus \u201EMit Genehmigung durch GlobalAdmin\u201C \u2014 wechsle den Modus auf der Anmeldungs-Einstellungsseite).",
+  "admin.invitations_approval_empty": "Keine Einladungen durch Bewohner:innen warten auf Genehmigung.",
+  "admin.invitations_approval_empty_hint": "Wenn eine Bewohnerin/ein Bewohner eine/r Nachbarin/einen Nachbarn einl\u00E4dt (im Modus \u201EMit Genehmigung durch GlobalAdmin\u201C), erscheint die Einladung hier zur Pr\u00FCfung.",
+  "admin.invitations_approval_status_pending_approval": "Wartet auf Genehmigung",
+  "admin.invitations_approval_approve": "Genehmigen",
+  "admin.invitations_approval_inviter": "Einladende/r",
+  "admin.invitations_approval_invited": "Eingeladene/r",
+  "admin.invitations_approval_created": "Erstellt",
+  "admin.invitations_approval_expires": "Abl\u00E4uft",
+  "admin.invitations_approval_approve_success": "Einladung genehmigt. Sie ist jetzt f\u00FCr die eingeladene Adresse verwendbar.",
+  "admin.invitations_approval_approve_failed": "Die Einladung konnte nicht genehmigt werden (sie kann bereits verwendet, widerrufen oder abgelaufen sein).",
   "admin.hub.invitations_desc": "Lade Nachbar:innen ein \u2014 ein einmaliger Link pro E-Mail, per E-Mail zugestellt, g\u00fcltig auch bei geschlossener Anmeldung."
 }
