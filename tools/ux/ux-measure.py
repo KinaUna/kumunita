@@ -50,17 +50,25 @@ class TagCollector(html.parser.HTMLParser):
         self.controls: list[dict[str, str | None]] = []
         self.images: list[dict[str, str | None]] = []
         self.labels_for: set[str] = set()
+        self._label_depth: int = 0
 
     def handle_starttag(
         self, tag: str, attrs: list[tuple[str, str | None]]
     ) -> None:
         attributes = dict(attrs)
         if tag in {"input", "select", "textarea"}:
+            attributes["_label_depth"] = str(self._label_depth)
             self.controls.append(attributes)
         elif tag == "img":
             self.images.append(attributes)
-        elif tag == "label" and attributes.get("for"):
-            self.labels_for.add(attributes["for"] or "")
+        if tag == "label":
+            if attributes.get("for"):
+                self.labels_for.add(attributes["for"] or "")
+            self._label_depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "label" and self._label_depth > 0:
+            self._label_depth -= 1
 
 
 def count_a11y() -> int:
@@ -75,6 +83,7 @@ def count_a11y() -> int:
                 control.get("aria-label")
                 or control.get("aria-labelledby")
                 or (control.get("id") and control["id"] in collector.labels_for)
+                or int(control.get("_label_depth", "0")) > 0
             ):
                 continue
             leads += 1
