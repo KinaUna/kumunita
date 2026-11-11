@@ -1109,3 +1109,95 @@ fr/da/de kept the local `\uXXXX` / `\u0027` escape style).
     `Community/Manage`, `Community/Translations`.
 - **31 remaining NONE leads** — out of scope for the whole lane until a later
   batch.
+
+## R31 — empty states batch 3 (the 9 named projects/todo/board views) — **SHIPPED**
+
+**Scope:** the *third* empty-states batch named in the plan. Drive the 9
+named R31 projects/todo/board views to the house `.kmb-empty` idiom (a short
+title + a body + **one next action**), per the `Groups/Index.cshtml:144`
+reference (the R29/R30 handoff notes are the closest precedent).
+
+**Outcome:** all 9 views carry a `.kmb-empty` block (verified per-view); the
+`empty_plain` floor re-based **22 → 18** in `tools/ux/ux-baseline.json`
+(house-format note appended, seam clean, `empty_none` **stays 31** — none of
+the 9 was a NONE lead, so it was not re-based). `ux-measure.py --check` green,
+`dotnet build` 0 errors, the C02 four-language key-parity test green
+(15/15). 6 new title keys added (en/de/fr/da; de/fr/da machine-written,
+flagged for the parked native review); all body + action labels reuse
+existing keys.
+
+### What landed (per-view before → after)
+
+**4 COUNTED views (PLAIN → `.kmb-empty`; these moved `empty_plain` 22 → 18):**
+
+- `Boards/BoardIndex` — title `projects.board.empty_title`, body
+  `projects.board.empty`, action New board (`/projects/boards/new`,
+  `projects.board.new`).
+- `Projects/ProjectsIndex` (Goals sub-section) — title
+  `pl.index.goals_empty_title`, body `pl.index.goals_empty`, action New goal
+  (`/projects/goals/new`, `pl.index.new_goal`).
+- `Projects/ProjectsIndex` (Standalone-projects sub-section) — title
+  `pl.index.projects_empty_title`, body `pl.index.projects_empty`, action New
+  project (`/projects/projects/new`, `pl.index.new_project`).
+- `Projects/ProjectDetail` (To-dos sub-section) — title
+  `pl.project.todos_empty_title`, body `pl.project.todos_empty`, action New
+  to-do (`/projects/todos/new`, `projects.todo.new`).
+- `Projects/ProjectDetail` (Boards sub-section) — title
+  `pl.project.boards_empty_title`, body `pl.project.boards_empty`, action New
+  board (`/projects/boards/new`, `projects.board.new`).
+- `Todos/TodosIndex` — title `projects.todo.empty_title`, body
+  `projects.todo.empty`, action New to-do (`/projects/todos/new`,
+  `projects.todo.new`).
+
+**3 COUNTABLE partials (excluded from the measure; converted so the card's
+"9 views friendly" DoD holds):**
+
+- `Boards/_BoardLanes` — title `projects.board.no_lanes_title`, body
+  `projects.board.no_lanes`, action: an inline add-lane form (Title input +
+  Add-lane button) reusing the placeholder lane's `projects.board.lane.add_lane`
+  key and posting to the same `POST /projects/boards/{id}/lanes` route.
+- `Boards/_BoardList` — title `projects.board.no_lanes_title`, body
+  `projects.board.no_lanes`, action: a link to the board view
+  (`/projects/boards/{id}`, `projects.board.view_board`) — the list view is
+  read-only (ADR 0285 D6), so switching to the board view is the honest next
+  action, not an add-lane affordance.
+- `Todos/_TodoComments` — title `projects.todo.comment_empty_title`, body
+  `projects.todo.comment_empty`, action: a link to the composer's Comment
+  textarea (`#todo-comment-body`, `projects.todo.comment_reply`) — the
+  composer renders immediately below.
+
+**2 justified survivors (card components with no list-level empty state; not
+forced, recorded per the R28 / R30 `Directory/Detail` precedent):**
+
+- `Todos/_TodoDisplay` — a card/row component rendered inside the
+  `Todos/TodosIndex` `@(foreach …)` loop; no empty-check exists in the
+  partial itself.
+- `Shared/_BoardCard` — a single-board card component rendered inside the
+  `Boards/BoardIndex` `@(foreach …)` loop; no empty-check exists in the
+  partial itself.
+
+### New translation keys (6, en/de/fr/da; de/fr/da machine-written, flagged
+for the parked native review)
+
+`projects.board.empty_title`, `projects.todo.empty_title`,
+`projects.board.no_lanes_title`, `projects.todo.comment_empty_title`
+(→ `projects.json` × 4 languages); `pl.index.goals_empty_title`,
+`pl.index.projects_empty_title`, `pl.project.todos_empty_title`,
+`pl.project.boards_empty_title` (→ `pl.json` × 4 languages). All other
+labels (body + action) reuse existing keys. JSON edits are additions-only
+(32 lines, no existing key churn; fr/da/de kept the local `\uXXXX` /
+`\u0027` escape style).
+
+### Parked follow-up (NOT started — R32–R33's scope, do not open a new lane)
+
+- **18 remaining PLAIN leads** in the non-projects views named by R32–R33:
+  - R32 (content): `Document/Index`, `Document/Deleted`, `Page/Index`,
+    `Page/_PageTreeItem`, `Inventory/List`, `Inventory/Detail`,
+    `Bookmarks/Index`, `MyDrafts/Index`, `Notes/Index`.
+  - R33 (details/groups/guardian): `Announcement/Detail`, `Event/Detail`,
+    `Posts/Detail`, `Groups/Detail`, `Groups/_GroupMembers`,
+    `Groups/_GroupPostReplies`, `Guardian/Detail`, `Guardian/Index`,
+    `Guardian/_GuardianEventAttendance`, `Kiosk/Index`, `Locale/Index`,
+    `Community/Manage`, `Community/Translations`.
+- **31 remaining NONE leads** — out of scope for the whole lane until a later
+  batch.

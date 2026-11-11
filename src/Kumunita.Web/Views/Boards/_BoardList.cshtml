@@ -10,9 +10,17 @@
 <div class="kmb-board-list">
     @if (Model.Lanes.Count == 0)
     {
-        <p class="kanban-board-empty p-4 text-muted border rounded">
-            <kw-l key="projects.board.no_lanes">This board has no lanes yet.</kw-l>
-        </p>
+        @* R31 (IMPROVE-UX) — the house .kmb-empty idiom: title + the existing
+           body sentence + one next action. The list view is read-only (ADR
+           0285 D6 — adding lanes happens on the board view), so the action
+           is the page's own view switch, not a misleading add-lane affordance. *@
+        <div class="kmb-empty">
+            <p class="kmb-empty-title"><kw-l key="projects.board.no_lanes_title">No lanes yet.</kw-l></p>
+            <p class="kmb-empty-body">
+                <kw-l key="projects.board.no_lanes">This board has no lanes yet.</kw-l>
+            </p>
+            <a class="btn btn-primary" href="/projects/boards/@Model.Board.Id"><kw-l key="projects.board.view_board">Board</kw-l></a>
+        </div>
     }
     @foreach (var lane in Model.Lanes.OrderBy(l => l.Order))
     {

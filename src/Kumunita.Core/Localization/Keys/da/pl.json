@@ -66,5 +66,9 @@
   "pl.lane.delete_confirm": "Slet denne bane? Dens kort kommer af dette board \u2014 to-dos\u0027ene selv beholdes.",
   "pl.todo.assignee_remove_confirm": "Fjern den tildelte fra denne to-do?",
   "pl.todo.move_confirm": "Flyt denne to-do til et andet board? Den er ikke l\u00E6ngere p\u00E5 dette board.",
-  "pl.todo.delete_confirm": "Slet denne to-do og dens underafg\u00F8relser? Det kan ikke fortrydes."
+  "pl.todo.delete_confirm": "Slet denne to-do og dens underafg\u00F8relser? Det kan ikke fortrydes.",
+  "pl.index.goals_empty_title": "Ingen m\u00E5l endnu.",
+  "pl.index.projects_empty_title": "Ingen selvst\u00E6ndige projekter endnu.",
+  "pl.project.todos_empty_title": "Ingen opgaver i dette projekt endnu.",
+  "pl.project.boards_empty_title": "Ingen boards i dette projekt endnu."
 }

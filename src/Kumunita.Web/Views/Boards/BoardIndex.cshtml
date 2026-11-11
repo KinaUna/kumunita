@@ -78,7 +78,16 @@
         <div class="airy-ann-list">
             @if (Model.Boards.Count == 0)
             {
-                <div class="p-4 text-muted"><kw-l key="projects.board.empty">No boards yet — create one to start arranging the shared work.</kw-l></div>
+                @* R31 (IMPROVE-UX) — the house .kmb-empty idiom (the
+                   Groups/Index reference): title + the existing body
+                   sentence + the page's New-board action. *@
+                <div class="kmb-empty">
+                    <p class="kmb-empty-title"><kw-l key="projects.board.empty_title">No boards yet.</kw-l></p>
+                    <p class="kmb-empty-body">
+                        <kw-l key="projects.board.empty">No boards yet — create one to start arranging the shared work.</kw-l>
+                    </p>
+                    <a class="btn btn-primary" href="/projects/boards/new"><kw-l key="projects.board.new">New board</kw-l></a>
+                </div>
             }
             @foreach (var row in Model.Boards)
             {

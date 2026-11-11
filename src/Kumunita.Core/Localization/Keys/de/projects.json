@@ -165,5 +165,9 @@
   "projects.dir_up": "oben",
   "projects.dir_down": "unten",
   "projects.todos.ics.download": "Zum Kalender hinzuf\u00FCgen",
-  "projects.todos.ics.feed": "Kalender-Feed (iCal)"
+  "projects.todos.ics.feed": "Kalender-Feed (iCal)",
+  "projects.board.empty_title": "Noch keine Boards.",
+  "projects.todo.empty_title": "Noch keine Aufgaben.",
+  "projects.board.no_lanes_title": "Noch keine Spuren.",
+  "projects.todo.comment_empty_title": "Noch keine Kommentare."
 }

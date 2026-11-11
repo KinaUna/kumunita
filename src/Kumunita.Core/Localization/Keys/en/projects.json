@@ -165,5 +165,9 @@
   "projects.dir_up": "up",
   "projects.dir_down": "down",
   "projects.todos.ics.download": "Add to calendar",
-  "projects.todos.ics.feed": "Calendar feed (iCal)"
+  "projects.todos.ics.feed": "Calendar feed (iCal)",
+  "projects.board.empty_title": "No boards yet.",
+  "projects.todo.empty_title": "No to-dos yet.",
+  "projects.board.no_lanes_title": "No lanes yet.",
+  "projects.todo.comment_empty_title": "No comments yet."
 }

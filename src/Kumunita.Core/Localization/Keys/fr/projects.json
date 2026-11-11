@@ -165,5 +165,9 @@
   "projects.dir_up": "le haut",
   "projects.dir_down": "le bas",
   "projects.todos.ics.download": "Ajouter \u00E0 l\u0027agenda",
-  "projects.todos.ics.feed": "Flux de calendrier (iCal)"
+  "projects.todos.ics.feed": "Flux de calendrier (iCal)",
+  "projects.board.empty_title": "Aucun tableau pour l\u0027instant.",
+  "projects.todo.empty_title": "Aucune t\u00E2che pour l\u0027instant.",
+  "projects.board.no_lanes_title": "Aucune voie pour l\u0027instant.",
+  "projects.todo.comment_empty_title": "Aucun commentaire pour l\u0027instant."
 }

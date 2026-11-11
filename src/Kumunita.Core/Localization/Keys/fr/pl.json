@@ -66,5 +66,9 @@
   "pl.lane.delete_confirm": "Supprimer ce couloir ? Ses cartes quittent ce tableau \u2014 les t\u00E2ches elles-m\u00EAmes sont conserv\u00E9es.",
   "pl.todo.assignee_remove_confirm": "Retirer l\u0027assignation de cette t\u00E2che ?",
   "pl.todo.move_confirm": "D\u00E9placer cette t\u00E2che sur un autre tableau ? Elle ne sera plus sur ce tableau.",
-  "pl.todo.delete_confirm": "Supprimer cette t\u00E2che et ses sous-t\u00E2ches ? Cela ne peut pas \u00EAtre annul\u00E9."
+  "pl.todo.delete_confirm": "Supprimer cette t\u00E2che et ses sous-t\u00E2ches ? Cela ne peut pas \u00EAtre annul\u00E9.",
+  "pl.index.goals_empty_title": "Pas encore d\u0027objectifs.",
+  "pl.index.projects_empty_title": "Pas encore de projets autonomes.",
+  "pl.project.todos_empty_title": "Pas encore de t\u00E2ches dans ce projet.",
+  "pl.project.boards_empty_title": "Pas encore de tableaux dans ce projet."
 }

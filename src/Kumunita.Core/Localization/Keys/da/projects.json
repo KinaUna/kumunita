@@ -165,5 +165,9 @@
   "projects.dir_up": "op",
   "projects.dir_down": "ned",
   "projects.todos.ics.download": "Tilf\u00F8j til kalender",
-  "projects.todos.ics.feed": "Kalenderfeed (iCal)"
+  "projects.todos.ics.feed": "Kalenderfeed (iCal)",
+  "projects.board.empty_title": "Ingen boards endnu.",
+  "projects.todo.empty_title": "Ingen opgaver endnu.",
+  "projects.board.no_lanes_title": "Ingen linjer endnu.",
+  "projects.todo.comment_empty_title": "Ingen kommentarer endnu."
 }

@@ -66,5 +66,9 @@
   "pl.lane.delete_confirm": "Diese Spur l\u00F6schen? Ihre Karten kommen von diesem Board \u2014 die To-dos selbst bleiben erhalten.",
   "pl.todo.assignee_remove_confirm": "Die Zuweisung von dieser Aufgabe entfernen?",
   "pl.todo.move_confirm": "Diese To-do zu einem anderen Board verschieben? Sie ist dann nicht mehr auf diesem Board.",
-  "pl.todo.delete_confirm": "Diese To-do und ihre Unteraufgaben l\u00F6schen? Das kann nicht r\u00FCckg\u00E4ngig gemacht werden."
+  "pl.todo.delete_confirm": "Diese To-do und ihre Unteraufgaben l\u00F6schen? Das kann nicht r\u00FCckg\u00E4ngig gemacht werden.",
+  "pl.index.goals_empty_title": "Noch keine Ziele.",
+  "pl.index.projects_empty_title": "Noch keine eigenen Projekte.",
+  "pl.project.todos_empty_title": "Noch keine Aufgaben in diesem Projekt.",
+  "pl.project.boards_empty_title": "Noch keine Boards in diesem Projekt."
 }

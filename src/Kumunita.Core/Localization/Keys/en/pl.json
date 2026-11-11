@@ -66,5 +66,9 @@
   "pl.lane.delete_confirm": "Delete this lane? Its cards come off this board \u2014 the to-dos themselves are kept.",
   "pl.todo.assignee_remove_confirm": "Remove the assignee from this to-do?",
   "pl.todo.move_confirm": "Move this to-do to another board? It will no longer be on this board.",
-  "pl.todo.delete_confirm": "Delete this to-do and its subtasks? This cannot be undone."
+  "pl.todo.delete_confirm": "Delete this to-do and its subtasks? This cannot be undone.",
+  "pl.index.goals_empty_title": "No goals yet.",
+  "pl.index.projects_empty_title": "No standalone projects yet.",
+  "pl.project.todos_empty_title": "No to-dos in this project yet.",
+  "pl.project.boards_empty_title": "No boards in this project yet."
 }

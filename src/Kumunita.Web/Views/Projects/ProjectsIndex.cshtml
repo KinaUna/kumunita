@@ -70,7 +70,15 @@
             <div class="airy-ann-list">
                 @if (Model.Goals.Count == 0)
                 {
-                    <div class="p-4 text-muted"><kw-l key="pl.index.goals_empty">No goals yet — create one to give the shared work a direction.</kw-l></div>
+                    @* R31 (IMPROVE-UX) — the house .kmb-empty idiom: title +
+                       the existing body sentence + the page's New-goal action. *@
+                    <div class="kmb-empty">
+                        <p class="kmb-empty-title"><kw-l key="pl.index.goals_empty_title">No goals yet.</kw-l></p>
+                        <p class="kmb-empty-body">
+                            <kw-l key="pl.index.goals_empty">No goals yet — create one to give the shared work a direction.</kw-l>
+                        </p>
+                        <a class="btn btn-primary" href="/projects/goals/new"><kw-l key="pl.index.new_goal">New goal</kw-l></a>
+                    </div>
                 }
                 @foreach (var card in Model.Goals)
                 {
@@ -128,7 +136,15 @@
             <div class="airy-ann-list">
                 @if (Model.StandaloneProjects.Count == 0)
                 {
-                    <div class="p-4 text-muted"><kw-l key="pl.index.projects_empty">No standalone projects yet — create one to start managing the shared work.</kw-l></div>
+                    @* R31 (IMPROVE-UX) — the house .kmb-empty idiom: title +
+                       the existing body sentence + the page's New-project action. *@
+                    <div class="kmb-empty">
+                        <p class="kmb-empty-title"><kw-l key="pl.index.projects_empty_title">No standalone projects yet.</kw-l></p>
+                        <p class="kmb-empty-body">
+                            <kw-l key="pl.index.projects_empty">No standalone projects yet — create one to start managing the shared work.</kw-l>
+                        </p>
+                        <a class="btn btn-primary" href="/projects/projects/new"><kw-l key="pl.index.new_project">New project</kw-l></a>
+                    </div>
                 }
                 @foreach (var card in Model.StandaloneProjects)
                 {

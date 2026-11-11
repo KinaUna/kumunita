@@ -14,9 +14,22 @@
 
 @if (Model.Lanes.Count == 0)
 {
-    <p class="kanban-board-empty p-4 text-muted border rounded">
-        <kw-l key="projects.board.no_lanes">This board has no lanes yet.</kw-l>
-    </p>
+    @* R31 (IMPROVE-UX) — the house .kmb-empty idiom: title + the existing
+       body sentence + the board's own add-lane form (the placeholder
+       lane's single Title input + Add-lane button, compacted inline). *@
+    <div class="kmb-empty">
+        <p class="kmb-empty-title"><kw-l key="projects.board.no_lanes_title">No lanes yet.</kw-l></p>
+        <p class="kmb-empty-body">
+            <kw-l key="projects.board.no_lanes">This board has no lanes yet.</kw-l>
+        </p>
+        <form method="post" action="@($"/projects/boards/{Model.BoardId}/lanes")" class="d-flex gap-2 flex-wrap align-items-center">
+            @Html.AntiForgeryToken()
+            <input class="form-control form-control-sm" type="text" name="Title"
+                   maxlength="120" required style="max-width: 240px;"
+                   aria-label="@Model.AddLanePlaceholder" placeholder="@Model.AddLanePlaceholder" />
+            <button type="submit" class="btn btn-primary btn-sm"><kw-l key="projects.board.lane.add_lane">+ Add lane</kw-l></button>
+        </form>
+    </div>
 }
 
 <div class="kanban-board" data-board-id="@Model.BoardId">
