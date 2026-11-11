@@ -43,7 +43,22 @@ namespace Kumunita.Core.Identity;
 /// re-issue, or the admin can delete the account), never the inverse.
 /// </para>
 /// </summary>
-public sealed class InvitationService(IDocumentStore store, IIdentityService identity) : IInvitationService
+public sealed class InvitationService(
+    IDocumentStore store,
+    IIdentityService identity,
+    // IMPROVE-UX A09 — the delivery seam (InviteAsync) + the read seam
+    // (ListAsync). All optional (default null) so the A07/A08 test harness
+    // (`new InvitationService(store, identity)` in
+    // InvitationServiceTests) keeps compiling: a null mailer / base-URL
+    // reader skips the email-staging lane (the A09 InviteAsync test harness
+    // supplies them positionally); a null translation provider / community
+    // name floors to the raw-English literals (the
+    // BuildVerificationEmailAsync precedent). DI always supplies the live
+    // values.
+    IMailerStage? mailer = null,
+    IInstanceBaseUrlReader? baseUrlReader = null,
+    Kumunita.Core.Localization.ITranslationProvider? translationProvider = null,
+    Microsoft.Extensions.Options.IOptions<Kumunita.Core.CommunityOptions>? communityOptions = null) : IInvitationService
 {
     /// <inheritdoc />
     public async Task<(string Token, Invitation Invitation)> CreateAsync(
@@ -254,7 +269,180 @@ public sealed class InvitationService(IDocumentStore store, IIdentityService ide
         return AcceptAsync(tokenHash, email, displayName, password, ct);
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<InvitationListItem>> ListAsync(
+        string inviterSubjectId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(inviterSubjectId);
+
+        // A read lane (the M35·5 / 0159 "the read is a config load, not an
+        // access decision" floor) — zero audit rows (the ValidateAsync
+        // precedent). Owner-scoped: only the inviter's rows (the list view's
+        // access decision is the Web controller's [Authorize(Roles =
+        // Roles.GlobalAdmin)] boundary's job — the ADR 0050 split; the
+        // service does not re-check User). The token hash is NOT carried
+        // (the list never needs the credential — the ADR 0304 D2
+        // hash-at-rest floor).
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var rows = await session.Query<Invitation>()
+            .Where(i => i.InviterSubjectId == inviterSubjectId)
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var now = DateTimeOffset.UtcNow;
+        return rows
+            .Select(i => new InvitationListItem(
+                InvitationId: i.Id,
+                Email: i.Email,
+                InviterSubjectId: i.InviterSubjectId,
+                CreatedAt: i.CreatedAt,
+                ExpiresAt: i.ExpiresAt,
+                Status: i.Status,
+                AcceptedAt: i.AcceptedAt,
+                AcceptedSubjectId: i.AcceptedSubjectId,
+                // The virtual-Expired state (ADR 0304 D1/D6): a Pending row
+                // past ExpiresAt reads Expired in the list — computed here,
+                // never written (the ValidateAsync post-load comparison
+                // precedent).
+                DisplayStatus: i.Status == EmailInvitationStatus.Pending
+                    && i.ExpiresAt <= now
+                    ? EmailInvitationStatus.Expired
+                    : i.Status))
+            .ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<InvitationInviteResult> InviteAsync(
+        string email, string inviterSubjectId, string inviterDisplayName,
+        DateTimeOffset expiresAt, string? inviteLinkOverride = null,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        ArgumentException.ThrowIfNullOrWhiteSpace(inviterSubjectId);
+        if (mailer is null)
+        {
+            // A09 contract: InviteAsync is the delivery seam — it needs the
+            // mailer stage. A null mailer is a test shape that did not
+            // supply it (the A07/A08 CreateAsync-only harness) — refuse
+            // loudly rather than create an invitation that is never
+            // delivered (the C3 no-silent-missing-email floor).
+            throw new InvalidOperationException(
+                "The invitation delivery seam requires a mailer stage (IMailerStage).");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        // ADR 0304 D2 — the token is 32 CSPRNG bytes base64url under a
+        // kinv_ prefix (the CreateAsync shape, shared); shown once (the
+        // result carries it), then unrecoverable (the store holds only the
+        // hash).
+        var token = NewToken();
+        var invitation = new Invitation
+        {
+            Id               = Guid.NewGuid().ToString("N"),
+            Email            = email.Trim().ToLowerInvariant(),
+            InviterSubjectId = inviterSubjectId,
+            TokenHash        = IdentityService.Sha256Hex(token),
+            CreatedAt        = now,
+            ExpiresAt        = expiresAt,
+            Status           = EmailInvitationStatus.Pending,
+        };
+
+        // The ?invite= link the A08 receiving gate resolves (the
+        // VerificationLink shape: BaseUrl prefix + the same-origin relative
+        // path fallback when unset). inviteLinkOverride (a test shape)
+        // replaces the assembly.
+        var inviteLink = inviteLinkOverride
+            ?? ((baseUrlReader?.BaseUrl is string root and not ""
+                    ? root.TrimEnd('/')
+                    : string.Empty)
+                + $"/account/signup?invite={token}");
+
+        // The email (the BuildVerificationEmailAsync template shape —
+        // translation keys + a raw-English fallback floor; the body template's
+        // {0} = the inviter's name, {1} = the invite link, {2} = the community
+        // name, {3} = the expiry date — the A09 prompt: "the body must name the
+        // inviter's community and the expiry so the resident knows the window").
+        var community = communityOptions?.Value.Name ?? "Kumunita";
+        var (subject, body) = await BuildInvitationEmailAsync(
+            string.IsNullOrWhiteSpace(inviterDisplayName) ? "there" : inviterDisplayName,
+            inviteLink, community, invitation.ExpiresAt);
+
+        // ONE session, ONE commit: the domain write (the Invitation row) +
+        // the exactly-one invitation.create AccessAudit row + the outbox
+        // row + the durable envelope — atomically (the IMailerStage C3
+        // guarantee: a failed commit leaves no queued email behind).
+        // Idempotency key invite:{invitationId} (the §6.2 per-email key
+        // scheme, the A09 prompt).
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        session.Store(invitation);
+        session.Store(AuditRow(now, inviterSubjectId, "invitation.create", invitation.Id));
+        await mailer.StageAsync(
+            session,
+            idempotencyKey: $"invite:{invitation.Id}",
+            recipient: invitation.Email,
+            subject: subject,
+            body: body,
+            ct: ct).ConfigureAwait(false);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new InvitationInviteResult(token, invitation);
+    }
+
     // ── private helpers ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The invitation email's subject + body (IMPROVE-UX A09) — the
+    /// <see cref="IdentityService.BuildVerificationEmailAsync"/> template
+    /// shape: the <c>email.invitation_subject</c> / <c>email.invitation_body</c>
+    /// registry entries through the <see cref
+    /// "Kumunita.Core.Localization.ITranslationProvider"/> (the
+    /// preferred-language → en floor), with the raw-English literals as the
+    /// fallback for the two test sites that construct <see
+    /// cref="InvitationService"/> directly without a provider. The body
+    /// template's <c>{0}</c>/<c>{1}</c>/<c>{2}</c>/<c>{3}</c> placeholders
+    /// are the inviter's display name, the <c>?invite=</c> link, the
+    /// community name, and the expiry date (the <c>email.invitation_body</c>
+    /// registry entry). The body names the inviter's community + the expiry
+    /// window (the A09 prompt: "the body must name the inviter's community
+    /// and the expiry so the resident knows the window").
+    /// </summary>
+    private async Task<(string Subject, string Body)> BuildInvitationEmailAsync(
+        string inviterDisplayName, string inviteLink, string community, DateTimeOffset expiresAt)
+    {
+        // The subject + body templates resolve the {0}/{1}/{2}/{3} placeholders
+        // as the inviter's name, the invite link, the community name, and the
+        // expiry date (the email.invitation_subject / email.invitation_body
+        // registry entries — the four-language C02 parity set). The expiry is
+        // pre-formatted (a readable date) so the template carries {3}, not a
+        // raw DateTimeOffset.
+        var name = inviterDisplayName;
+        var expiryText = expiresAt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        object[] args = { name, inviteLink, community, expiryText };
+
+        string bodyTemplate = "Hi {0},\n\n{0} has invited you to join {2} on Kumunita. Open the one-time link below to create your account — the invitation stays valid until {3}:\n\n{1}\n\nIf you weren\u2019t expecting this, you can ignore this message: it only opens sign-up for your address and then expires.";
+        string subjectTemplate = "You're invited to {2}";
+
+        if (translationProvider is not null)
+        {
+            // The invitation lane has no per-recipient preferred language at
+            // creation (the inviter may not have one on file) — the provider
+            // resolves the instance default → the en floor.
+            var resolvedSubject = await translationProvider.GetAsync(
+                "email.invitation_subject", (string?)null).ConfigureAwait(false);
+            var resolvedBody = await translationProvider.GetAsync(
+                "email.invitation_body", (string?)null).ConfigureAwait(false);
+            // A missing entry (a provider without the key) would surface the raw
+            // key — fall back to the English literal (the BuildVerificationEmailAsync
+            // floor).
+            if (!string.IsNullOrWhiteSpace(resolvedSubject) && resolvedSubject != "email.invitation_subject")
+                subjectTemplate = resolvedSubject;
+            if (!string.IsNullOrWhiteSpace(resolvedBody) && resolvedBody != "email.invitation_body")
+                bodyTemplate = resolvedBody;
+        }
+
+        string subject = string.Format(subjectTemplate, args);
+        string body = string.Format(bodyTemplate, args);
+        return (subject, body);
+    }
 
     /// <summary>The one <c>AccessAudit</c> row shape the invitation lane
     /// writes (the <see cref="KioskLinkService"/> <c>kiosk.link.create</c>

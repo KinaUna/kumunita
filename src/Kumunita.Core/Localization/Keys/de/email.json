@@ -3,5 +3,7 @@
   "email.verify_body": "Hallo {0},\n\nDein Kumunita-Konto wird bei der ersten Anmeldung verifiziert. \u00D6ffne diesen einmaligen Link, um das Konto zu best\u00E4tigen (dabei wirst du auch angemeldet):\n\n{1}\n\nFalls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
   "email.verify_child_body": "Hallo {0},\n\nDein Kumunita-Konto ist bereit. \u00D6ffne diesen einmaligen Link, um das Konto zu best\u00E4tigen und dein Passwort zu setzen (dabei wirst du auch angemeldet):\n\n{1}\n\nFalls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
   "email.reminder_subject": "Erinnerung: {0}",
-  "email.reminder_body": "**{0}** steht bevor: {1}{2}."
+  "email.reminder_body": "**{0}** steht bevor: {1}{2}.",
+  "email.invitation_subject": "Du bist zu {2} eingeladen",
+  "email.invitation_body": "Hallo {0},\n\n{0} hat dich eingeladen, {2} auf Kumunita beizutreten. \u00d6ffne den einmaligen Link unten, um dein Konto zu erstellen \u2014 die Einladung ist g\u00fcltig bis {3}:\n\n{1}\n\nFalls du das nicht erwartest, kannst du diese Nachricht ignorieren: Sie erm\u00f6glicht nur die Anmeldung f\u00fcr deine Adresse und l\u00e4uft dann ab."
 }

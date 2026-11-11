@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Marten;
 using NSubstitute;
 using Xunit;
@@ -408,6 +409,256 @@ public sealed class InvitationServiceTests(PostgresFixture fixture) : IClassFixt
         await store.DisposeAsync();
     }
 
+    // ── A09 — the read seam (ListAsync) + the delivery seam (InviteAsync) ──
+    // IMPROVE-UX A09: the /admin/invitations surface's Core seams. The card's
+    // "Done when" pins (verbatim): (a) ListAsync returns the inviter's rows
+    // newest-first and surfaces the virtual-Expired state (a Pending row past
+    // ExpiresAt shows as expired); (b) ListAsync writes ZERO audit rows (the
+    // read floor); (c) ListAsync is owner-scoped (another inviter's rows are
+    // not returned). Plus the InviteAsync delivery pins: one create + one
+    // staged email (the invite:{id} idempotency key, the invitee's address, a
+    // body carrying the ?invite= link), the token shown once, the row
+    // hash-only (the A07 pins still hold on the InviteAsync path).
+
+    [Fact]
+    public async Task A09_List_ReturnsInviterRows_NewestFirst_SurfacesVirtualExpired()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Three rows for the inviter: an accepted one (oldest), a pending
+        // one, and a Pending row past expiry (newest — the virtual-Expired
+        // case). A fourth row belongs to ANOTHER inviter (pin (c) below).
+        var (_, accepted) = await svc.CreateAsync(
+            "a@example.com", Inviter, DateTimeOffset.UtcNow.AddDays(1), ct);
+        await svc.RevokeAsync(accepted.Id, Inviter, ct);   // move it to a terminal state
+        var (_, pending) = await svc.CreateAsync(
+            "b@example.com", Inviter, DateTimeOffset.UtcNow.AddDays(3), ct);
+        var (_, expired) = await svc.CreateAsync(
+            "c@example.com", Inviter, DateTimeOffset.UtcNow.AddHours(-1), ct);
+        var (_, other) = await svc.CreateAsync(
+            OtherEmail, OtherInviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+
+        var list = await svc.ListAsync(Inviter, ct);
+
+        // Pin (c) — owner-scoped: the other inviter's row is NOT returned.
+        Assert.Equal(3, list.Count);
+        Assert.DoesNotContain(other.Id, list.Select(l => l.InvitationId));
+
+        // Newest-first (pin (a)): expired (newest) → pending → accepted.
+        Assert.Equal(expired.Id, list[0].InvitationId);
+        Assert.Equal(pending.Id, list[1].InvitationId);
+        Assert.Equal(accepted.Id, list[2].InvitationId);
+
+        // The virtual-Expired surface (pin (a)): the stored Status is still
+        // Pending (the enum is NEVER written — the ADR 0304 D1/D6 rule)...
+        Assert.Equal(EmailInvitationStatus.Pending, list[0].Status);
+        // ...but DisplayStatus reads Expired (a Pending row past ExpiresAt).
+        Assert.Equal(EmailInvitationStatus.Expired, list[0].DisplayStatus);
+
+        // The live rows surface their stored status unchanged.
+        Assert.Equal(EmailInvitationStatus.Pending, list[1].DisplayStatus);
+        Assert.Equal(EmailInvitationStatus.Revoked, list[2].DisplayStatus);
+
+        // The read projection carries the row's identity + window...
+        Assert.Equal("c@example.com", list[0].Email);
+        Assert.Equal(Inviter, list[0].InviterSubjectId);
+        Assert.Equal(expired.ExpiresAt, list[0].ExpiresAt);
+        // ...and the Accepted mark when set (the accepted row here is
+        // revoked — nulls; the single-use test above pins the accepted
+        // shape).
+        Assert.Null(list[0].AcceptedAt);
+        Assert.Null(list[0].AcceptedSubjectId);
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A09_List_WritesZeroAuditRows()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (token, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+
+        // One create row exists...
+        var before = await AllAudits(store);
+        Assert.Single(before);
+        Assert.Equal("invitation.create", before[0].Action);
+
+        // ...and the list reads write NOTHING (the M35·5 "the read is a
+        // config load, not an access decision" floor — the ValidateAsync
+        // precedent, the A09 pin (b)).
+        var list = await svc.ListAsync(Inviter, ct);
+        Assert.Single(list);
+
+        var after = await AllAudits(store);
+        Assert.Single(after);   // ListAsync must write zero audit rows (the read floor)
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A09_List_OwnerScoped_EmptyFloorForUnknownInviter()
+    {
+        var (svc, store, _) = await BootAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        var (_, row) = await svc.CreateAsync(
+            InvitedEmail, Inviter, DateTimeOffset.UtcNow.AddDays(7), ct);
+
+        // The inviter sees their row...
+        var own = await svc.ListAsync(Inviter, ct);
+        Assert.Single(own);
+        Assert.Equal(row.Id, own[0].InvitationId);
+
+        // Another inviter sees NOTHING (owner-scoped, the A09 pin (c) — the
+        // list is an owner-scoped read, not a community-wide one).
+        Assert.Empty(await svc.ListAsync(OtherInviter, ct));
+
+        // A blank inviter id is refused before any store hit (the CreateAsync
+        // guard shape).
+        await Assert.ThrowsAsync<ArgumentException>(() => svc.ListAsync(string.Empty, ct));
+        await store.DisposeAsync();
+    }
+
+    // ── A09 — the delivery seam (InviteAsync: create + the staged email) ───
+
+    [Fact]
+    public async Task A09_Invite_CreatesRow_StagesOneEmail_WithInviteLinkAndIdempotencyKey()
+    {
+        var (svc, store, _, mailer) = await BootA09Async();
+        var ct = TestContext.Current.CancellationToken;
+
+        var expiresAt = DateTimeOffset.UtcNow.AddDays(7);
+        var result = await svc.InviteAsync(
+            InvitedEmail, Inviter, "Admin Name", expiresAt,
+            inviteLinkOverride: "https://maplewood.example/account/signup?invite="
+                + "<TOKEN>");
+
+        // The raw token is returned once (the ADR 0304 D2 shown-once rule)...
+        Assert.False(string.IsNullOrEmpty(result.Token));
+        Assert.StartsWith("kinv_", result.Token);
+        // ...the row carries only the hash (the A07 hash-at-rest pin holds on
+        // the InviteAsync path too).
+        Assert.NotEqual(result.Token, result.Invitation.TokenHash);
+        Assert.Equal(64, result.Invitation.TokenHash.Length);
+        Assert.Matches("^[0-9a-f]{64}$", result.Invitation.TokenHash);
+        Assert.DoesNotContain(result.Token, result.Invitation.Email);
+
+        // Exactly ONE invitation.create audit row (the CreateAsync contract —
+        // InviteAsync does not add a second row).
+        var rows = await AllAudits(store);
+        Assert.Single(rows);
+        Assert.Equal("invitation.create", rows[0].Action);
+        Assert.Equal(Inviter, rows[0].ActorId);
+        Assert.Equal("invitation", rows[0].TargetKind);
+        Assert.Equal(result.Invitation.Id, rows[0].TargetId);
+        Assert.Equal(AccessVia.Owner, rows[0].Via);
+
+        // Exactly ONE staged email (the A09 delivery pin): the invitee's
+        // address, the invite:{invitationId} idempotency key (the §6.2
+        // per-email scheme), and a body carrying the ?invite= link.
+        var staged = Assert.Single(mailer.Staged);
+        Assert.Equal(InvitedEmail, staged.Recipient);
+        Assert.Equal($"invite:{result.Invitation.Id}", staged.IdempotencyKey);
+        Assert.Contains("account/signup?invite=", staged.Body);
+        Assert.Equal("You're invited to Kumunita", staged.Subject);   // the en floor (You're invited to {2})
+        // The body names the inviter, the community, + the expiry window (the
+        // A09 prompt: "the body must name the inviter's community and the expiry").
+        Assert.StartsWith("Hi Admin Name,", staged.Body);
+        Assert.Contains("has invited you to join Kumunita", staged.Body);
+        Assert.Contains("stays valid until", staged.Body);
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A09_Invite_AssembledLink_UsesBaseUrlReaderAndFallsBackToRelative()
+    {
+        var (svc, store, _, mailer) = await BootA09Async(
+            baseUrl: "https://maplewood.example/");
+
+        var result = await svc.InviteAsync(
+            InvitedEmail, Inviter, "Admin Name",
+            DateTimeOffset.UtcNow.AddDays(7));   // no override — the assembly
+
+        // The ?invite= link is absolute (the BaseUrl prefix + the A08 gate's
+        // path) and carries the raw token — the A08 receiving gate resolves
+        // exactly this shape.
+        var staged = Assert.Single(mailer.Staged);
+        Assert.Contains(
+            "https://maplewood.example/account/signup?invite=" + result.Token,
+            staged.Body);
+
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A09_Invite_RelativeLink_FallsBack_WhenBaseUrlUnset()
+    {
+        var (svc, store, _, mailer) = await BootA09Async(baseUrl: null);
+
+        var result = await svc.InviteAsync(
+            InvitedEmail, Inviter, "Admin Name",
+            DateTimeOffset.UtcNow.AddDays(7));
+
+        // Unset BaseUrl (a dev-only shape) → the same-origin relative path
+        // (the VerificationLink precedent — a human can still copy it into
+        // the browser bar).
+        var staged = Assert.Single(mailer.Staged);
+        Assert.Contains(
+            "/account/signup?invite=" + result.Token, staged.Body);
+        await store.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A09_Invite_TranslatedTemplate_IsFormattedAndFloorsOnMissingKey()
+    {
+        var (svc, store, _, mailer) = await BootA09Async(
+            provider: FakeProvider.Of(
+                ("email.invitation_subject", "Einladung zu Kumunita"),
+                ("email.invitation_body", "Hallo {0},\n\nDu bist zu Kumunita eingeladen. Link: {1}")));
+
+        var result = await svc.InviteAsync(
+            InvitedEmail, Inviter, "Admin Name",
+            DateTimeOffset.UtcNow.AddDays(7),
+            inviteLinkOverride: "https://example.org/account/signup?invite=tok");
+
+        var staged = Assert.Single(mailer.Staged);
+        Assert.Equal("Einladung zu Kumunita", staged.Subject);
+        Assert.StartsWith("Hallo Admin Name,", staged.Body);
+        Assert.Contains("https://example.org/account/signup?invite=tok", staged.Body);
+
+        // A provider WITHOUT the key → the raw-English floor (no raw-key
+        // leak, the BuildVerificationEmailAsync floor).
+        var (svc2, store2, _, mailer2) = await BootA09Async(provider: new FakeProvider());
+        await svc2.InviteAsync(
+            InvitedEmail, Inviter, "Admin Name",
+            DateTimeOffset.UtcNow.AddDays(7),
+            inviteLinkOverride: "https://example.org/account/signup?invite=tok2");
+        var staged2 = Assert.Single(mailer2.Staged);
+        Assert.Equal("You're invited to Kumunita", staged2.Subject);
+        Assert.StartsWith("Hi Admin Name,", staged2.Body);
+        Assert.Contains("has invited you to join Kumunita", staged2.Body);
+        await store.DisposeAsync();
+        await store2.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A09_Invite_NullMailer_RefusesLoudly()
+    {
+        var (svc, store, _) = await BootAsync();   // the A07 harness — no mailer
+        var ct = TestContext.Current.CancellationToken;
+
+        // InviteAsync is the delivery seam: a null mailer is a test shape
+        // that did not supply it — refuse loudly (the C3 no-silent-missing-
+        // email floor) rather than create an undelivered invitation.
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.InviteAsync(
+                InvitedEmail, Inviter, "Admin Name",
+                DateTimeOffset.UtcNow.AddDays(7), ct: ct));
+        await store.DisposeAsync();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh <c>mt</c> schema in a new scratch database — the
@@ -434,6 +685,27 @@ public sealed class InvitationServiceTests(PostgresFixture fixture) : IClassFixt
         return (svc, store, identity);
     }
 
+    /// <summary>Boot the A09 delivery seam: the A07 harness plus a fake
+    /// <see cref="IMailerStage"/> (the staged emails are the assertion
+    /// target), a fake <see cref="IInstanceBaseUrlReader"/> (nullable
+    /// <paramref name="baseUrl"/>) and a fake
+    /// <see cref="ITranslationProvider"/> (nullable
+    /// <paramref name="provider"/> — null = the raw-English floor, the
+    /// <c>BuildVerificationEmailAsync</c> shape).</summary>
+    private async Task<(InvitationService Svc, IDocumentStore Store, IIdentityService Identity, MailerFake Mailer)> BootA09Async(
+        string? baseUrl = null, ITranslationProvider? provider = null)
+    {
+        var (svc, store, identity) = await BootAsync();
+        var mailer = new MailerFake();
+        svc = new InvitationService(
+            store, identity,
+            mailer,
+            new BaseUrlFake(baseUrl),
+            provider,
+            null);   // CommunityOptions null → the "Kumunita" floor
+        return (svc, store, identity, mailer);
+    }
+
     /// <summary>The whole <see cref="AccessAudit"/> table (unsorted — the
     /// test inspects).</summary>
     private static async Task<IReadOnlyList<AccessAudit>> AllAudits(IDocumentStore store)
@@ -456,4 +728,74 @@ public sealed class InvitationServiceTests(PostgresFixture fixture) : IClassFixt
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(value)))
         .ToLowerInvariant();   // exactly 64 lowercase hex chars
+}
+
+/// <summary>
+/// A09 test fake — the <see cref="IMailerStage"/> the
+/// <see cref="InvitationService.InviteAsync"/> delivery seam stages into.
+/// Records the staged emails (the A09 delivery pins: the recipient, the
+/// idempotency key, the body carrying the <c>?invite=</c> link).
+/// </summary>
+internal sealed class MailerFake : IMailerStage
+{
+    public List<StagedEmail> Staged { get; } = new();
+
+    public Task StageAsync(
+        Marten.IDocumentSession session,
+        string idempotencyKey,
+        string recipient,
+        string subject,
+        string body,
+        CancellationToken ct = default)
+    {
+        Staged.Add(new StagedEmail(idempotencyKey, recipient, subject, body));
+        return Task.CompletedTask;
+    }
+
+    public sealed record StagedEmail(
+        string IdempotencyKey, string Recipient, string Subject, string Body);
+}
+
+/// <summary>A09 test fake — the <see cref="IInstanceBaseUrlReader"/> (a
+/// fixed <c>BaseUrl</c> or null for the relative-path fallback).</summary>
+internal sealed class BaseUrlFake(string? baseUrl) : IInstanceBaseUrlReader
+{
+    public string? BaseUrl { get; } = baseUrl;
+}
+
+/// <summary>
+/// A09 test fake — the <see cref="ITranslationProvider"/> the
+/// <see cref="InvitationService.BuildInvitationEmailAsync"/> template
+/// resolves against (a fixed key→value map; a missing key returns the key
+/// itself — the floor-detection shape the service pins on).
+/// </summary>
+internal sealed class FakeProvider(
+    params (string Key, string Value)[] entries) : ITranslationProvider
+{
+    private readonly Dictionary<string, string> _values = entries.ToDictionary(e => e.Key, e => e.Value);
+
+    /// <summary>Test-local builder (the call-site tuple shape).</summary>
+    public static FakeProvider Of(params (string Key, string Value)[] entries) => new(entries);
+
+    public Task<string> GetAsync(string key, string? preferredLanguageCode) =>
+        Task.FromResult(_values.GetValueOrDefault(key) ?? key);
+
+    public Task<string> GetAsync(string key, IReadOnlyCollection<string>? candidates) =>
+        Task.FromResult(_values.GetValueOrDefault(key) ?? key);
+
+    public Task<string> ResolveEffectiveLanguageAsync(string? preferredLanguageCode) =>
+        Task.FromResult("en");
+
+    public Task<string> ResolveEffectiveLanguageAsync(IReadOnlyCollection<string>? candidates) =>
+        Task.FromResult("en");
+
+    public Task<IReadOnlyDictionary<string, string>> GetManyAsync(
+        IReadOnlyCollection<string> keys, string? preferredLanguageCode) =>
+        Task.FromResult<IReadOnlyDictionary<string, string>>(
+            keys.ToDictionary(k => k, k => _values.GetValueOrDefault(k) ?? k));
+
+    public Task<IReadOnlyDictionary<string, string>> GetManyAsync(
+        IReadOnlyCollection<string> keys, IReadOnlyCollection<string>? candidates) =>
+        Task.FromResult<IReadOnlyDictionary<string, string>>(
+            keys.ToDictionary(k => k, k => _values.GetValueOrDefault(k) ?? k));
 }

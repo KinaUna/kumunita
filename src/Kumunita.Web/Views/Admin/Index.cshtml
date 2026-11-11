@@ -198,5 +198,17 @@
                 </div>
             </a>
         </div>
+        @* IMPROVE-UX A09 (ADR 0304) — the invitation-lane affordance.
+           Hidden-not-disabled (the ADR 0050 rule): the card renders only for
+           GlobalAdmin actors; the controller gate ([Authorize(Roles =
+           GlobalAdmin)]) is the authoritative boundary. *@
+        <div class="col-md-6 col-lg-4">
+            <a class="card text-decoration-none" href="/admin/invitations">
+                <div class="card-body">
+                    <div class="fw-semibold"><kw-l key="admin.invitations_title">Invitations</kw-l></div>
+                    <small class="text-muted"><kw-l key="admin.hub.invitations_desc">Invite neighbours to join — a one-time link per email, delivered by email, valid while sign-up is closed.</kw-l></small>
+                </div>
+            </a>
+        </div>
     }
 </div>

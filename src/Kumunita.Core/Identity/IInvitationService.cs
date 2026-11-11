@@ -232,4 +232,84 @@ public interface IInvitationService
     Task<ThinPrincipal> AcceptPresentedAsync(
         string presentedToken, string email, string displayName, string password,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Lists the invitations created by <paramref name="inviterSubjectId"/>
+    /// (IMPROVE-UX A09 — the <c>/admin/invitations</c> list seam; ADR 0304
+    /// D3's list-read the A07/A08 seam shipped without): the inviter's rows,
+    /// newest-first, each an <see cref="InvitationListItem"/> carrying
+    /// <see cref="InvitationListItem.DisplayStatus"/> — the stored
+    /// <see cref="Invitation.Status"/> except that a
+    /// <see cref="EmailInvitationStatus.Pending"/> row past
+    /// <see cref="Invitation.ExpiresAt"/> reads <see cref
+    /// "EmailInvitationStatus.Expired"/> (the virtual-Expired state, ADR
+    /// 0304 D1/D6 — computed in the read, the enum is never written, the
+    /// <see cref="ValidateAsync"/> post-load comparison precedent).
+    /// <para>
+    /// **A read lane — zero audit rows** (the M35·5 / 0159 "the read is a
+    /// config load, not an access decision" floor — the access decision is
+    /// the Web controller's <c>[Authorize(Roles = Roles.GlobalAdmin)]</c>
+    /// boundary's job, the ADR 0050 split; the service does not re-check
+    /// <c>User</c>). The token hash is **not** carried (the list never needs
+    /// the credential — the hash-at-rest floor, ADR 0304 D2).
+    /// </para>
+    /// </summary>
+    /// <param name="inviterSubjectId">The inviter whose rows are listed
+    /// (owner-scoped — another inviter's rows are not returned).</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The inviter's invitations, newest-first (empty when the
+    /// inviter has none — the C-M19·4 empty floor, not an error).</returns>
+    Task<IReadOnlyList<InvitationListItem>> ListAsync(
+        string inviterSubjectId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Invites <paramref name="email"/> (lowercased, trimmed) issued by
+    /// <paramref name="inviterSubjectId"/> **and stages the invitation
+    /// email** in the same transaction (IMPROVE-UX A09 — the delivery seam):
+    /// creates the <see cref="Invitation"/> row (the
+    /// <see cref="CreateAsync"/> contract — exactly one
+    /// <c>invitation.create</c> <c>AccessAudit</c> row,
+    /// <c>Via: Owner</c>, <c>TargetKind = "invitation"</c>), builds the
+    /// invitation email (<see cref="Email.Invitation"/> keys — the
+    /// <c>email.invitation_subject</c> / <c>email.invitation_body</c> pair,
+    /// the <see cref="IdentityService.BuildVerificationEmailAsync"/>
+    /// template shape), and stages it via <see cref="IMailerStage
+    /// .StageAsync"/> with the idempotency key <c>invite:{invitationId}</c>
+    /// (the §6.2 per-email key scheme). One <c>SaveChangesAsync</c> = the
+    /// domain write + the audit row + the outbox row + the durable envelope
+    /// commit atomically (the C3 guarantee — a caller whose commit never
+    /// lands leaves no queued email behind).
+    /// <para>
+    /// The email's <c>?invite=</c> link is
+    /// <c>{BaseUrl}/account/signup?invite={token}</c> — <see cref
+    /// "IInstanceBaseUrlReader.BaseUrl"/> (the host-bound
+    /// <c>VerificationOptions.BaseUrl</c>), with the same-origin relative
+    /// path fallback when unset (the dev-only shape — a human can still copy
+    /// it into the browser bar, the <c>VerificationLink</c> precedent).
+    /// <paramref name="inviteLinkOverride"/> (nullable) replaces the
+    /// assembled link (a test shape: an absolute link without a host-bound
+    /// base URL). The raw token is returned **exactly once** (the ADR 0304
+    /// D2 shown-once rule); the store holds only the SHA-256 hex digest.
+    /// </para>
+    /// </summary>
+    /// <param name="email">The invited address (lowercased + trimmed).</param>
+    /// <param name="inviterSubjectId">The resident or admin issuing the
+    /// invitation (the audit principal + the email's name).</param>
+    /// <param name="expiresAt">The expiry instant (UTC) — ADR 0304 D6(a)
+    /// proposed default 7 days, settled by the A09 call site (the
+    /// <c>AdminInvitationsController</c> passes
+    /// <c>DateTimeOffset.UtcNow.AddDays(7)</c>).</param>
+    /// <param name="inviterDisplayName">The inviter's display name
+    /// (the email's <c>{0}</c> — names the inviter + their community for
+    /// the invitee; null/blank floors to "there").</param>
+    /// <param name="inviteLinkOverride">Optional absolute invite link
+    /// override (a test shape); null assembles
+    /// <c>{BaseUrl}/account/signup?invite={token}</c>.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The raw token (shown once) + the stored row (hash only) —
+    /// <see cref="InvitationInviteResult"/>.</returns>
+    Task<InvitationInviteResult> InviteAsync(
+        string email, string inviterSubjectId, string inviterDisplayName,
+        DateTimeOffset expiresAt, string? inviteLinkOverride = null,
+        CancellationToken ct = default);
 }
