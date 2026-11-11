@@ -732,6 +732,54 @@ public partial class ModerationService
                 report.ResolvedBy    = globalAdminId;
             }
 
+            // IMPROVE-UX A02 — the outcome-execution lane (the D6 "the outcome
+            // picker performs the action" promise; plan-improve-ux.md A02). The
+            // resolve form (R04) records the outcome on the Report row above;
+            // A02 makes that record **change something visible**: it re-derives
+            // the same action on the target post from the recorded outcome and
+            // runs it in the **caller's session** (the same `session` — the C3
+            // same-transaction lane, ADR 0006-C), so the resolve + the hide/remove
+            // commit atomically with this lane's AccessAudit row (the A01 read
+            // branch is what makes the post actually disappear from feed/detail —
+            // A02 only writes the PostStatus; the reads were already A01's).
+            // **Post targets only** (the plan card's scope, the A02 trap): the
+            // guard requires a non-empty `Report.PostId` — the original M3b /
+            // ADR 0023 post + reply shapes carry their id there, but the new
+            // ADR 0173 lanes (event / project / board / todo) set
+            // `PostId = string.Empty` and carry their id in `TargetId` (the
+            // `FileReportTargetAsync` lane), so a non-post target records the
+            // outcome + note and executes **nothing** (that per-target-kind
+            // execution is A04's scope). `HidePostAsync` / `RemovePostAsync`
+            // each run their own `Moderate` decision + write their own
+            // `Action = Moderate` audit row (the M3b write-lane rows,
+            // `TargetId = the post id`) — **additional** rows in this same
+            // transaction, never a change to this lane's own `report.resolve`
+            // row (the R03 pin is intact). `NoAction` / `Other` are no-action /
+            // the explanation) — no execution. `_posts` is the optional R05
+            // seam (nullable, the CS1736 precedent); the same method's R07
+            // emitter guards its optional seam the same way
+            // (`_notifications is not null && …`), so A02 degrades gracefully
+            // when it is absent (the pre-A02 R03 tests wire `_posts` as null
+            // and resolve with Hidden/Removed — they stay green because the
+            // outcome is still recorded, just not executed). Production DI
+            // always wires the PostService, so the degrade is a test-only
+            // shape, never a production path.
+            if (outcome is (ReportOutcome.Hidden or ReportOutcome.Removed)
+                && _posts is not null
+                && !string.IsNullOrEmpty(report.PostId))
+            {
+                if (outcome == ReportOutcome.Hidden)
+                {
+                    await _posts.HidePostAsync(report.PostId, globalAdminId, session)
+                        .ConfigureAwait(false);
+                }
+                else // outcome == ReportOutcome.Removed
+                {
+                    await _posts.RemovePostAsync(report.PostId, globalAdminId, session)
+                        .ConfigureAwait(false);
+                }
+            }
+
             session.Store(report);
 
             session.Store(new AccessAudit

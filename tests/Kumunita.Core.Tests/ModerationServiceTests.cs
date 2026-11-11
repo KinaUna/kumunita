@@ -1134,6 +1134,381 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         }
     }
 
+    // ═════════════════════════════════════════════════════════════════════
+    // IMPROVE-UX A02 — the outcome-execution lane (the D6 "the outcome
+    // picker performs the action" promise; the E1/E2 S-severity loop
+    // closer). R03 records the outcome on the Report row; A02 makes
+    // that record **change something visible** — it re-derives the same
+    // action on the target post and runs it in the **caller's session**
+    // (the C3 same-transaction lane, ADR 0006-C). The A01 read branch is
+    // what actually makes the post disappear from feed/detail; A02
+    // writes the PostStatus the reads honour.
+    //
+    // The "post targets only" guard (the plan card's scope + the A02
+    // trap): the hook requires a non-empty `Report.PostId` — the original
+    // M3b / ADR 0023 post + reply shapes carry their id there, but the new
+    // ADR 0173 lanes (event / project / board / todo) set
+    // `PostId = string.Empty` and carry their id in `TargetId`, so a
+    // non-post target records the outcome + note and executes **nothing**
+    // (per-target-kind execution is A04's scope).
+    // ═════════════════════════════════════════════════════════════════════
+
+    // ── A02-1 — ResolveReportAsync_OutcomeHidden_PostTarget_FlipsPostHidden ─
+    //
+    // A02 DoD, verbatim from the plan card ("resolving with Hidden hides
+    // the post"): resolving a **post-target** report (the original M3b
+    // shape — `Report.PostId` set) with `ReportOutcome.Hidden` re-derives
+    // `PostService.HidePostAsync` in the **caller's session**, so the
+    // post's `Status` flips to the exact `PostStatus.Hidden` literal. The
+    // write-lane audit row (`Action = "moderate"`, `TargetId = the post
+    // id`, `Outcome = Allow`) is committed in the **same** transaction as
+    // the lane's own `report.resolve` row (the R03 pin — that row is
+    // unchanged; these are additional M3b write-lane rows, not a reshape
+    // of the resolve row).
+
+    [Fact]
+    public async Task A02_ResolveReport_OutcomeHidden_PostTarget_FlipsPostHidden()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = ServicesWithPosts(store);
+        const string admin = "u-a02-1-admin";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a02-1-assign", UserId = admin, ComponentId = ComponentId,
+            GrantedBy = "u-a02-1-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a02-1-post", ComponentId = ComponentId, AuthorId = "u-a02-1-author",
+            Body = "body a02-1", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a02-1-member"),
+            Status = PostStatus.Active,
+        });
+        await Plant(store, new Report
+        {
+            Id = "a02-1-report", PostId = "a02-1-post", ReporterId = "u-a02-1-reporter",
+            ComponentId = ComponentId, Reason = "a02-1-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "a02-1-report", admin, session,
+                outcome: ReportOutcome.Hidden,
+                resolutionNote: "hidden per community policy"));
+
+        // The outcome is recorded on the Report row (the R03 shape)…
+        await using var s1 = store.QuerySession();
+        var report = await s1.LoadAsync<Report>("a02-1-report", TestContext.Current.CancellationToken);
+        Assert.NotNull(report);
+        Assert.Equal("resolved", report!.Status);
+        Assert.Equal(ReportOutcome.Hidden, report.Outcome);
+
+        // …AND the post actually flips to Hidden (the A02 DoD pin).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a02-1-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Hidden, post!.Status);
+
+        // The M3b write-lane audit row (Action = "moderate", the post id,
+        // Allow) — an **additional** row in the same transaction (the A02
+        // same-transaction pin).
+        var postRows = await PostAudits(store, actor: admin);
+        Assert.Contains(postRows, a => a.Action == AccessAction.Moderate.Id
+                                       && a.TargetId == "a02-1-post"
+                                       && a.Outcome == AccessOutcome.Allow);
+
+        // The R03 pin — the resolve row is the pre-A02 shape, unchanged.
+        var reportRows = await ReportAudits(store, actor: admin);
+        var resolveRow = Assert.Single(reportRows, a => a.Action == "report.resolve");
+        Assert.Equal("report", resolveRow.TargetKind);
+        Assert.Equal("a02-1-report", resolveRow.TargetId);
+        Assert.Equal(AccessOutcome.Allow, resolveRow.Outcome);
+    }
+
+    // ── A02-2 — ResolveReportAsync_OutcomeRemoved_PostTarget_FlipsPostRemoved ─
+    //
+    // A02 — same shape as A02-1 (the hide lane) but the hard lane:
+    // resolving a **post-target** report with `ReportOutcome.Removed`
+    // re-derives `PostService.RemovePostAsync`, so the post's `Status`
+    // flips to the exact `PostStatus.Removed` literal. The write-lane
+    // audit row (`Action = "moderate"`, `TargetId = the post id`,
+    // `Outcome = Allow`) is committed in the same transaction (the A02
+    // same-transaction pin; the resolve row is unchanged — the R03 pin).
+
+    [Fact]
+    public async Task A02_ResolveReport_OutcomeRemoved_PostTarget_FlipsPostRemoved()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = ServicesWithPosts(store);
+        const string admin = "u-a02-2-admin";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a02-2-assign", UserId = admin, ComponentId = ComponentId,
+            GrantedBy = "u-a02-2-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a02-2-post", ComponentId = ComponentId, AuthorId = "u-a02-2-author",
+            Body = "body a02-2", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a02-2-member"),
+            Status = PostStatus.Active,
+        });
+        await Plant(store, new Report
+        {
+            Id = "a02-2-report", PostId = "a02-2-post", ReporterId = "u-a02-2-reporter",
+            ComponentId = ComponentId, Reason = "a02-2-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "a02-2-report", admin, session,
+                outcome: ReportOutcome.Removed,
+                resolutionNote: "removed — content policy"));
+
+        await using var s1 = store.QuerySession();
+        var report = await s1.LoadAsync<Report>("a02-2-report", TestContext.Current.CancellationToken);
+        Assert.Equal(ReportOutcome.Removed, report!.Outcome);
+
+        // The post flips to the exact PostStatus.Removed literal (the A02
+        // hard-lane pin).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a02-2-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Removed, post!.Status);
+
+        var postRows = await PostAudits(store, actor: admin);
+        Assert.Contains(postRows, a => a.Action == AccessAction.Moderate.Id
+                                       && a.TargetId == "a02-2-post"
+                                       && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── A02-3 — ResolveReportAsync_OutcomeNoAction_PostTarget_PostUnchanged ─
+    //
+    // A02 (the no-action pin): resolving a **post-target** report with
+    // `ReportOutcome.NoAction` records the outcome on the Report row but
+    // executes **nothing** on the post (the `NoAction` / `Other`
+    // no-action shape — the note is the explanation). The post's `Status`
+    // stays `PostStatus.Active` (unchanged) — that is the pin. (The
+    // resolve lane's own `CanAsync(Moderate)` decision also writes a
+    // `moderate` audit row against the post's resource, so the write-lane
+    // is discriminated by the post's Status, not the presence of a
+    // `moderate` row.) The resolve row is still written (the R03 pin).
+
+    [Fact]
+    public async Task A02_ResolveReport_OutcomeNoAction_PostTarget_PostUnchanged()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = ServicesWithPosts(store);
+        const string admin = "u-a02-3-admin";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a02-3-assign", UserId = admin, ComponentId = ComponentId,
+            GrantedBy = "u-a02-3-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a02-3-post", ComponentId = ComponentId, AuthorId = "u-a02-3-author",
+            Body = "body a02-3", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a02-3-member"),
+            Status = PostStatus.Active,
+        });
+        await Plant(store, new Report
+        {
+            Id = "a02-3-report", PostId = "a02-3-post", ReporterId = "u-a02-3-reporter",
+            ComponentId = ComponentId, Reason = "a02-3-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "a02-3-report", admin, session,
+                outcome: ReportOutcome.NoAction,
+                resolutionNote: "reviewed — no action taken"));
+
+        // The outcome is recorded (NoAction)…
+        await using var s1 = store.QuerySession();
+        var report = await s1.LoadAsync<Report>("a02-3-report", TestContext.Current.CancellationToken);
+        Assert.Equal(ReportOutcome.NoAction, report!.Outcome);
+
+        // …but the post is untouched (still Active) — the no-action pin
+        // (HidePostAsync / RemovePostAsync never ran, so no Status write).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a02-3-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Active, post!.Status);
+
+        // The resolve row is still written (the lane's own row).
+        var reportRows = await ReportAudits(store, actor: admin);
+        Assert.Contains(reportRows, a => a.Action == "report.resolve"
+                                         && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── A02-4 — ResolveReportAsync_OutcomeHidden_EventTarget_RecordsOutcomeOnly ─
+    //
+    // A02 (the "post targets only" trap, the plan card's explicit
+    // guard): resolving a **non-post** target (an `event` — the new ADR
+    // 0173 shape where `Report.PostId` is `string.Empty` and the target's
+    // id lives in `Report.TargetId`) with `ReportOutcome.Hidden` records
+    // the outcome on the Report row but executes **nothing** — the
+    // `!string.IsNullOrEmpty(report.PostId)` guard blocks the
+    // `HidePostAsync` call (there is no post to hide; per-target-kind
+    // execution is A04's scope). To prove the guard is on `PostId` (not
+    // "is there a post in the store"), a **decoy post** is planted and
+    // must stay `Active` — the event-target resolve must not touch it.
+
+    [Fact]
+    public async Task A02_ResolveReport_OutcomeHidden_EventTarget_RecordsOutcomeOnly()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = ServicesWithPosts(store);
+        const string admin = "u-a02-4-admin";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a02-4-assign", UserId = admin, ComponentId = ComponentId,
+            GrantedBy = "u-a02-4-root", At = DateTimeOffset.UtcNow
+        });
+        // The event target (the ADR 0173 shape: TargetKind = "event",
+        // TargetId = the event's id). The event's ComponentId is the
+        // moderation gate (the Decide branch-2 shape).
+        await Plant(store, new Kumunita.Core.Events.Event
+        {
+            Id = "a02-4-event", ComponentId = ComponentId, AuthorId = "u-a02-4-author",
+            Title = "event a02-4", Body = "body a02-4",
+            Start = DateTimeOffset.UtcNow, End = DateTimeOffset.UtcNow.AddHours(1),
+            Created = DateTimeOffset.UtcNow,
+        });
+        // A DECOY post — planted to prove the guard is on Report.PostId
+        // (not "is there a post in the store"). It must stay Active.
+        await Plant(store, new Post
+        {
+            Id = "a02-4-decoy-post", ComponentId = ComponentId, AuthorId = "u-a02-4-decoy-author",
+            Body = "decoy a02-4", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a02-4-decoy-member"),
+            Status = PostStatus.Active,
+        });
+        // The event-target report: PostId is EMPTY (the ADR 0173 new-lane
+        // shape — FileReportTargetAsync sets it string.Empty), the
+        // target's id is in TargetId.
+        await Plant(store, new Report
+        {
+            Id = "a02-4-report", PostId = string.Empty, ReporterId = "u-a02-4-reporter",
+            ComponentId = ComponentId, Reason = "a02-4-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+            TargetKind = "event", TargetId = "a02-4-event",
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "a02-4-report", admin, session,
+                outcome: ReportOutcome.Hidden,
+                resolutionNote: "event — hide is A04's scope"));
+
+        // The outcome is recorded on the Report row (the lane recorded it)…
+        await using var s1 = store.QuerySession();
+        var report = await s1.LoadAsync<Report>("a02-4-report", TestContext.Current.CancellationToken);
+        Assert.Equal(ReportOutcome.Hidden, report!.Outcome);
+        Assert.Equal("resolved", report.Status);
+        Assert.Equal(string.Empty, report.PostId);   // the "post targets only" guard key
+
+        // …but the decoy post is untouched (still Active) — the guard
+        // blocked the HidePostAsync call (the A02 trap pin).
+        await using var s2 = store.QuerySession();
+        var decoy = await s2.LoadAsync<Post>("a02-4-decoy-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Active, decoy!.Status);
+
+        // No write-lane (moderate) row committed for the decoy post.
+        var postRows = await PostAudits(store, actor: admin);
+        Assert.DoesNotContain(postRows, a => a.TargetId == "a02-4-decoy-post");
+
+        // The resolve row is still written (the lane's own row).
+        var reportRows = await ReportAudits(store, actor: admin);
+        Assert.Contains(reportRows, a => a.Action == "report.resolve"
+                                         && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── A02-5 — ResolveReportAsync_OutcomeHidden_ReplyTarget_HidesParentPost ─
+    //
+    // A02 (the reply-report shape, the plan card's TODO ❓ read): a
+    // **reply-targeted** report (ADR 0023 — `Report.ReplyId` set,
+    // `Report.PostId` = the parent post's id, the C-M3·1 reply-inherits
+    // rule) with `ReportOutcome.Hidden` resolves the parent post — the
+    // `PostId` is set (the reply's parent, the existing comment's lever),
+    // so the guard passes and `HidePostAsync` runs on the **parent post**
+    // (not the reply — a reply-level hide would be A04's scope). The
+    // parent post's `Status` flips to `PostStatus.Hidden`; the reply is
+    // itself untouched (it has no own Status field to flip).
+
+    [Fact]
+    public async Task A02_ResolveReport_OutcomeHidden_ReplyTarget_HidesParentPost()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = ServicesWithPosts(store);
+        const string admin = "u-a02-5-admin";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a02-5-assign", UserId = admin, ComponentId = ComponentId,
+            GrantedBy = "u-a02-5-root", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a02-5-post", ComponentId = ComponentId, AuthorId = "u-a02-5-author",
+            Body = "body a02-5", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a02-5-member"),
+            Status = PostStatus.Active,
+        });
+        await Plant(store, new PostReply
+        {
+            Id = "a02-5-reply", PostId = "a02-5-post", AuthorId = "u-a02-5-replier",
+            Body = "reply body a02-5", Created = DateTimeOffset.UtcNow, LanguageCode = "en",
+        });
+        // A reply-targeted report (ADR 0023): ReplyId set, PostId = the
+        // parent post (C-M3·1 reply-inherits).
+        await Plant(store, new Report
+        {
+            Id = "a02-5-report", PostId = "a02-5-post", ReplyId = "a02-5-reply",
+            ReporterId = "u-a02-5-reporter",
+            ComponentId = ComponentId, Reason = "a02-5-reason", Status = "filed",
+            At = DateTimeOffset.UtcNow,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.ResolveReportAsync(
+                "a02-5-report", admin, session,
+                outcome: ReportOutcome.Hidden,
+                resolutionNote: "hidden — reply report resolves the parent post"));
+
+        // The outcome is recorded…
+        await using var s1 = store.QuerySession();
+        var report = await s1.LoadAsync<Report>("a02-5-report", TestContext.Current.CancellationToken);
+        Assert.Equal(ReportOutcome.Hidden, report!.Outcome);
+        Assert.Equal("a02-5-reply", report.ReplyId);   // the reply discriminator is intact
+
+        // …and the parent post (Report.PostId) flips to Hidden — the
+        // existing comment's lever (the reply-level hide is A04's scope).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a02-5-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Hidden, post!.Status);
+
+        var postRows = await PostAudits(store, actor: admin);
+        Assert.Contains(postRows, a => a.Action == AccessAction.Moderate.Id
+                                       && a.TargetId == "a02-5-post"
+                                       && a.Outcome == AccessOutcome.Allow);
+    }
+
     // ── R05-1 — ListMyReportsAsync_ReturnsReportersRows_WithResolutionShape ─
     //
     // IMPROVE-UX R05 (the D1 "My reports" read shape; the R05 DoD a pin): the
