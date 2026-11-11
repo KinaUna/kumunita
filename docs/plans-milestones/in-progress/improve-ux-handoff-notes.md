@@ -32,7 +32,10 @@ updated: 2026-11-11
 > the confirmed by-design calls (256-bit token, copy-once in `TempData`,
 > the revoke-mismatch `200`), and the open questions filed (the R16 auth,
 > the R17 `ComponentId` scope, expiry, max-links). Then **R14**, the SEC
-> review of the ADR 0301 grace period (R10–R13).
+> review of the ADR 0301 grace period (R10–R13). The **empty-states batches
+> R29 → R33 are closed out** (each section records its honest before → after;
+> R33 is the final batch — the residual `empty_plain` = 3 is a measure
+> artifact, not a forced 0).
 > **Who is it for:** the next agent in this lane and the X02 cold read.
 > **When to read the rest:** before starting a unit, or when a DoD line
 > "looks done" and you want to know if it actually is.
@@ -1293,5 +1296,154 @@ local `\uXXXX` / `\u0027` escape style; every file still parses with
   `Groups/_GroupMembers`, `Groups/_GroupPostReplies`, `Guardian/Detail`,
   `Guardian/Index`, `Guardian/_GuardianEventAttendance`, `Kiosk/Index`,
   `Locale/Index`, `Community/Manage`, `Community/Translations`.
+- **31 remaining NONE leads** — out of scope for the whole lane until a later
+  batch.
+
+## R33 — empty states batch 5 (the final named batch; close out the empty states) — **SHIPPED**
+
+**Scope:** the *fifth* and **final** empty-states batch named in the plan.
+Drive the 13 named R33 views toward the house `.kmb-empty` idiom — but **only
+where the idiom genuinely fits**. R33 is different from R29–R32 in two ways:
+(1) the 13 named views classify as **7 PLAIN + 3 NONE + 3 `_`-partials**, and
+(2) the measured `empty_plain` is **10**, of which **3 are heuristic false
+positives not in R33's named list at all** (`Boards/BoardNew`, `Kiosk/Settings`,
+`SecuritySettings/Mfa`). Converting R33's 7 named PLAIN views drives
+`empty_plain` **10 → 3** (not to 0).
+
+**Outcome:** all 7 named PLAIN views now carry a `.kmb-empty` block (verified
+per-view); `empty_plain` re-based **10 → 3** in `tools/ux/ux-baseline.json`
+(house-format note appended, seam clean, parses as valid JSON; `empty_none`
+**stays 31** — none of the 7 counted views was a NONE lead). The residual 3
+PLAIN leads are three **out-of-scope heuristic false positives** (recorded, not
+forced — see below). `ux-measure.py --check` green, `dotnet build` 0 errors,
+the C02 four-language key-parity test green (15/15). 5 new title keys added
+(en/de/fr/da; de/fr/da machine-written, flagged for the parked native review);
+all body sentences + action labels reuse existing keys.
+
+### What landed (per-view before → after)
+
+**7 COUNTED PLAIN views (PLAIN → `.kmb-empty`; these moved `empty_plain`
+10 → 3):**
+
+- `Announcement/Detail` — title `announcements.comment_empty_title` (new),
+  body `announcements.comment_empty`, action Comment (anchor to `#ann-comment-body`,
+  the composer below) — the R31 `_TodoComments` precedent.
+- `Posts/Detail` — title `posts.replies_empty_title` (new), body
+  `posts.replies_empty`, action Reply (anchor to `#reply-body`, the reply
+  form below) — the R31 `_TodoComments` precedent.
+- `Groups/Detail` — **two** sub-sections. Posts: title
+  `groups.posts_empty_title` (new), body `groups.posts_empty_can` /
+  `groups.posts_empty` (conditional on `Model.CanPost`), action New post
+  (`groups.new_post`) **only in the CanPost branch** (a justified body-only
+  survivor for the non-can branch — the viewer has no post to write here).
+  Events: title `groups.events_empty_title` (new), body
+  `groups.events_empty_can` / `groups.events_empty` (conditional on
+  `Model.CanCreateEvent`), action New event (`groups.new_event`) **only in
+  the CanCreateEvent branch** (same body-only survivor for the non-can
+  branch).
+- `Guardian/Detail` — **five** read-only sub-sections
+  (`guardian.no_groups`, `guardian.no_communities`, `guardian.no_invitations`,
+  `guardian.no_community_requests`, `guardian.otherGuardians.empty`): each
+  converts to title (the existing per-section sentence) + shared body
+  (`guardian.subsection_empty_body`, new) with **no action** (a justified
+  body-only survivor — a guardian cannot inline-create a group membership,
+  community membership, invitation, community request, or co-guardian here;
+  an "Add" button would be a dead route).
+- `Guardian/Index` — children: title reuses `guardian.empty` ("No children
+  yet." — a complete sentence, so no new title key added), no body (the
+  sentence is complete), action "Add a child account" (anchor to
+  `#guardian-add-child`, the inline Add-child form below — this view
+  genuinely has an add affordance, unlike the read-only Guardian/Detail
+  sub-sections).
+- `Community/Manage` — members: title reuses `community.manage_no_members`
+  ("No explicit members yet — add some below." — a complete sentence, no new
+  title key), action "Add a member" (anchor to `#addUser`, the inline
+  Add-member picker below). The candidates branch
+  (`community.manage_all_members` — a **terminal state**: "Everyone in the
+  neighborhood is already a member here.") is a justified survivor (no
+  action).
+- `Community/Translations` — the one-word inline chip "None yet"
+  (`community.translations_none`) converts minimally: title (the existing
+  "None yet") + body (`community.translations_page_lede` — a soft
+  context sentence), **no forced action** (a justified body-only survivor —
+  the add-translation forms for the missing languages render below when the
+  actor can translate, so a button here would duplicate them).
+
+**3 COUNTED NONE views (the measure does NOT credit these as PLAIN; recorded
+as survivors):**
+
+- `Kiosk/Index` — the wall-screen slide list. Already has a friendly
+  `.kmb-kiosk-empty` state (`kiosk.empty` — "The kiosk has no slides
+  configured yet."). Recorded as a survivor (a chrome-hidden full-page
+  display with no natural "next action").
+- `Event/Detail` — the translation-variant render loops
+  (`@foreach (var t in Model.Translations…)`) are title/body variant
+  containers, not user-facing listable collections. Recorded as a survivor.
+- `Locale/Index` — the `<select>` options loop (the platform languages,
+  always non-empty). Recorded as a survivor (a dropdown's option population,
+  not an empty state).
+
+**3 EXCLUDED partials (`_`-prefixed — the measure does NOT count them;
+recorded as survivors):**
+
+- `Groups/_GroupMembers` — has its own empty branch
+  (`groups.members_empty` — "No members yet.") but is a read-only
+  sub-section within a tab (the add-member lane is the owner's separate
+  lane, not an inline "add" on the empty branch). Recorded as a justified
+  survivor (the R31 `_BoardCard` / `_TodoDisplay` precedent).
+- `Groups/_GroupPostReplies` — has its own empty branch
+  (`groups.replies_empty` — "No replies yet…") but is a read-only
+  sub-section (the reply composer is the parent `Posts/Detail`'s, not this
+  partial's). Recorded as a justified survivor.
+- `Guardian/_GuardianEventAttendance` — the event-attendance mode selector
+  (pending / current) is not an empty-list state. Recorded as a justified
+  survivor.
+
+**3 RESIDUAL `empty_plain` false positives (out-of-scope; recorded, not
+forced):**
+
+- `Boards/BoardNew` — `@if (Model.Lanes.Count == 0)` renders a single
+  initial-lane **input** (a form branch), not an empty list.
+- `Kiosk/Settings` — a shared-links / options guard, not an empty list.
+- `SecuritySettings/Mfa` — `@if (!string.IsNullOrEmpty(Model.QrDataUri))`
+  renders a **QR code** (a form branch), not an empty list.
+
+These are **outside R33's named scope**. Do not wrap a form/QR branch in
+`.kmb-empty` — that would be misleading. The plan's "plain ≤ 1" DoD is a
+measure artifact: every genuine empty *list* in the named scope is now
+friendly, and the residual `empty_plain` = 3 is these false positives.
+
+### New translation keys (5, en/de/fr/da; de/fr/da machine-written, flagged
+for the parked native review)
+
+`announcements.comment_empty_title` (→ `announcements.json` × 4);
+`posts.replies_empty_title` (→ `posts.json` × 4); `groups.posts_empty_title`
++ `groups.events_empty_title` (→ `groups.json` × 4);
+`guardian.subsection_empty_body` (→ `guardian.json` × 4). All other labels
+(body + action) reuse existing keys. JSON edits are additions-only (20 lines
+total, no existing key churn; fr/da/de kept the local `\uXXXX` / `\u0027`
+escape style; every file still parses with `json.load`).
+
+### Empty-states work — closed out
+
+This batch **closes out** the empty-states work (R29 → R30 → R31 → R32 → R33):
+every genuine empty *list* in the named scope ends up friendly (the house
+`.kmb-empty` idiom, with one next action where one genuinely exists, and a
+justified body-only survivor where it does not). The residual `empty_plain`
+= 3 is a measure artifact (three out-of-scope form/QR/inline-ternary false
+positives). The residual `empty_none` = 31 stays parked (out of scope for the
+whole lane until a later batch — the R33 prompt's DoD line 2 "plain/none
+empty states ≤ 1" is a measure artifact; the honest outcome is "all genuine
+empty lists friendly; residual = measure artifact + out-of-scope false
+positives," not a forced 0).
+
+### Parked follow-up (recorded; do not open a new lane)
+
+- **The 3 residual `empty_plain` false positives**
+  (`Boards/BoardNew`, `Kiosk/Settings`, `SecuritySettings/Mfa`) — if a later
+  unit wants the count to reflect reality, the fix is a **heuristic
+  refinement** in `ux-measure.py` (the R23 precedent) that stops crediting
+  form / QR / inline-ternary guards as empty states — **not** wrapping those
+  branches in `.kmb-empty`.
 - **31 remaining NONE leads** — out of scope for the whole lane until a later
   batch.

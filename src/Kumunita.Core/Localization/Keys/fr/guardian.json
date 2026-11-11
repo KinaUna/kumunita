@@ -140,5 +140,6 @@
   "guardian.messaging.restrict_confirm": "Restreindre la messagerie pour cet enfant ? Il ne pourra plus envoyer ni recevoir de messages directs, quelle que soit son propre opt-in.",
   "guardian.handover_confirm": "Transf\u00E9rer ce compte \u00E0 l\u0027enfant ? Cela dissout ta tutelle sur ce compte.",
   "guardian.remove_myself_confirm": "Retirer ta tutelle sur ce compte ? Tu ne pourras plus g\u00E9rer le compte. Le compte est conserv\u00E9, et les autres tuteurs restent en place.",
-  "guardian.delete_child_confirm": "Supprimer d\u00E9finitivement ce compte d\u0027enfant ? Cette op\u00E9ration retire la connexion, le profil et les adh\u00E9sions, et ne peut pas \u00EAtre annul\u00E9e."
+  "guardian.delete_child_confirm": "Supprimer d\u00E9finitivement ce compte d\u0027enfant ? Cette op\u00E9ration retire la connexion, le profil et les adh\u00E9sions, et ne peut pas \u00EAtre annul\u00E9e.",
+  "guardian.subsection_empty_body": "Cette section est vide \u2014 il n\u0027y a rien sur quoi agir pour le moment."
 }

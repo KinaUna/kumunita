@@ -92,5 +92,6 @@
   "posts.translation_edit": "Edit",
   "posts.translation_remove": "Remove",
   "posts.delete_confirm": "Delete this post? Your replies will remain visible.",
-  "posts.reply_delete_confirm": "Delete this reply? It will be replaced by a note. The record is kept."
+  "posts.reply_delete_confirm": "Delete this reply? It will be replaced by a note. The record is kept.",
+  "posts.replies_empty_title": "No replies yet."
 }

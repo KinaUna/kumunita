@@ -92,5 +92,6 @@
   "posts.project_report_button": "Dieses Projekt melden",
   "posts.board_report_button": "Dieses Board melden",
   "posts.todo_report_button": "Diese Aufgabe melden",
-  "posts.grouppost_report_button": "Diesen Beitrag melden"
+  "posts.grouppost_report_button": "Diesen Beitrag melden",
+  "posts.replies_empty_title": "Noch keine Antworten."
 }

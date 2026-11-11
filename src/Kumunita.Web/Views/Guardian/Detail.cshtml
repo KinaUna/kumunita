@@ -77,9 +77,20 @@
             route), never a form field.
         *@
         <h2><kw-l key="guardian.group_memberships">Group memberships</kw-l></h2>
+        @* R33 (IMPROVE-UX) — the house .kmb-empty idiom applied to a read-only
+           sub-section: the existing per-section sentence as the title + a shared
+           body. There is NO "one next action" here (a justified body-only
+           survivor, the Groups/Detail non-can branch precedent) — a guardian does
+           not mint a group membership inline (joining is the group owner's / an
+           admin's lane), so an "Add" button would be a dead route. *@
         @if (Model.GroupIds.Count == 0)
         {
-            <p class="text-muted"><kw-l key="guardian.no_groups">No group memberships.</kw-l></p>
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="guardian.no_groups">No group memberships.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="guardian.subsection_empty_body">This section is empty — there's nothing to act on right now.</kw-l>
+                </p>
+            </div>
         }
         else
         {
@@ -119,7 +130,16 @@
         <p class="text-muted"><kw-l key="guardian.community_block_note">Choose which communities this child can access. Blocking a community hides it from them — including its posts — even if it is one of the mandatory communities everyone belongs to. This is the guardian's control: you decide who joins a community by inviting them or through an admin, but you can hide one you don't want this child to see.</kw-l></p>
         @if (Model.CommunityIds.Count == 0)
         {
-            <p class="text-muted"><kw-l key="guardian.no_communities">No community memberships.</kw-l></p>
+            @* R33 (IMPROVE-UX) — read-only sub-section: title (the existing
+               sentence) + shared body. No action (a justified body-only
+               survivor) — community membership is decided by admins, not
+               inlined here. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="guardian.no_communities">No community memberships.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="guardian.subsection_empty_body">This section is empty — there's nothing to act on right now.</kw-l>
+                </p>
+            </div>
         }
         else
         {
@@ -155,7 +175,16 @@
         <h2 class="mt-4"><kw-l key="guardian.pending_invitations">Pending group invitations</kw-l></h2>
         @if (Model.PendingInvitations.Count == 0)
         {
-            <p class="text-muted"><kw-l key="guardian.no_invitations">No pending invitations.</kw-l></p>
+            @* R33 (IMPROVE-UX) — read-only sub-section: title (the existing
+               sentence) + shared body. No action (a justified body-only
+               survivor) — approve/decline act on an existing invitation, of which
+               there are none. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="guardian.no_invitations">No pending invitations.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="guardian.subsection_empty_body">This section is empty — there's nothing to act on right now.</kw-l>
+                </p>
+            </div>
         }
         else
         {
@@ -199,7 +228,16 @@
         <h2 class="mt-4"><kw-l key="guardian.pending_community_requests">Pending community memberships</kw-l></h2>
         @if (Model.PendingCommunityRequests.Count == 0)
         {
-            <p class="text-muted"><kw-l key="guardian.no_community_requests">No pending community memberships.</kw-l></p>
+            @* R33 (IMPROVE-UX) — read-only sub-section: title (the existing
+               sentence) + shared body. No action (a justified body-only
+               survivor) — approve/decline act on an existing request, of which
+               there are none. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="guardian.no_community_requests">No pending community memberships.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="guardian.subsection_empty_body">This section is empty — there's nothing to act on right now.</kw-l>
+                </p>
+            </div>
         }
         else
         {
@@ -533,7 +571,15 @@
         <h2 class="mt-4"><kw-l key="guardian.otherGuardians.title">Other guardians</kw-l></h2>
         @if (Model.GuardianItems.Count == 0)
         {
-            <div class="alert alert-info"><kw-l key="guardian.otherGuardians.empty">No other guardians assigned.</kw-l></div>
+            @* R33 (IMPROVE-UX) — read-only sub-section: title (the existing
+               sentence) + shared body. No action (a justified body-only
+               survivor) — a guardian here cannot add another guardian inline. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="guardian.otherGuardians.empty">No other guardians assigned.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="guardian.subsection_empty_body">This section is empty — there's nothing to act on right now.</kw-l>
+                </p>
+            </div>
         }
         else
         {

@@ -140,5 +140,6 @@
   "guardian.messaging.restrict_confirm": "Begr\u00E6ns beskeder for dette barn? Det vil ikke l\u00E6ngere kunne sende eller modtage direkte beskeder, uanset dets eget opt-in.",
   "guardian.handover_confirm": "Overtag dette konto til barnet? Dette oph\u00E6ver din for\u00E6ldremyndighed over det.",
   "guardian.remove_myself_confirm": "Fjerner du dig selv som v\u00E6rgemand for dette barn? Du kan derefter ikke administrere kontoen. Kontoen bevares, og de \u00F8vrige v\u00E6rgem\u00E6nd bliver ved.",
-  "guardian.delete_child_confirm": "Slet denne barnkonto permanent? Dette fjerner login, profil og medlemskaber, og det kan ikke fortrydes."
+  "guardian.delete_child_confirm": "Slet denne barnkonto permanent? Dette fjerner login, profil og medlemskaber, og det kan ikke fortrydes.",
+  "guardian.subsection_empty_body": "Dette afsnit er tomt \u2014 der er intet, du kan handle p\u00E5 lige nu."
 }

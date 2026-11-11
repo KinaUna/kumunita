@@ -54,5 +54,6 @@
   "announcements.comment_submit": "Comment",
   "announcements.comment_audience_note": "Comments are visible to signed-in residents only, even on a public announcement, and follow this announcement\u0027s own audience (a community-targeted one is visible to that community\u0027s residents).",
   "announcements.comment_audience_note_label": "Who can see comments?",
-  "announcements.delete_confirm": "Delete this announcement? This cannot be undone."
+  "announcements.delete_confirm": "Delete this announcement? This cannot be undone.",
+  "announcements.comment_empty_title": "No comments yet."
 }

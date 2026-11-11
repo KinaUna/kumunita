@@ -54,5 +54,6 @@
   "announcements.comment_submit": "Commenter",
   "announcements.comment_audience_note": "Les commentaires ne sont visibles que par les habitants connect\u00E9s \u2014 m\u00EAme sur une annonce publique \u2014 et suivent le public de cette annonce (une annonce destin\u00E9e \u00E0 une communaut\u00E9 est visible par les habitants de celle-ci).",
   "announcements.comment_audience_note_label": "Qui peut voir les commentaires ?",
-  "announcements.delete_confirm": "Supprimer cette annonce ? Cela ne peut pas \u00EAtre annul\u00E9."
+  "announcements.delete_confirm": "Supprimer cette annonce ? Cela ne peut pas \u00EAtre annul\u00E9.",
+  "announcements.comment_empty_title": "Pas encore de commentaires."
 }

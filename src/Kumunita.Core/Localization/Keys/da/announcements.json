@@ -54,5 +54,6 @@
   "announcements.comment_submit": "Kommentar",
   "announcements.comment_audience_note": "Kommentarer er kun synlige for loggede indboere \u2014 ogs\u00E5 p\u00E5 en officiel meddelelse \u2014 og f\u00F8lger denne meddelelses eget publikum (en meddelelse rettet til et f\u00E6llesskab er synligt for dets indboere).",
   "announcements.comment_audience_note_label": "Hvem kan se kommentarerne?",
-  "announcements.delete_confirm": "Slet denne meddelelse? Det kan ikke fortrydes."
+  "announcements.delete_confirm": "Slet denne meddelelse? Det kan ikke fortrydes.",
+  "announcements.comment_empty_title": "Ingen kommentarer endnu."
 }

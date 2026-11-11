@@ -585,7 +585,16 @@
 
         @if (Model.Replies.Count == 0)
         {
-            <p class="text-muted kmb-discussion"><kw-l key="posts.replies_empty">No replies yet. If you can see this post, you can reply to it.</kw-l></p>
+            @* R33 (IMPROVE-UX) — the house .kmb-empty idiom (title + the
+               existing body + one next action), anchored to the reply composer
+               below (the R31 _TodoComments precedent). *@
+            <div class="kmb-empty kmb-discussion">
+                <p class="kmb-empty-title"><kw-l key="posts.replies_empty_title">No replies yet.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="posts.replies_empty">No replies yet. If you can see this post, you can reply to it.</kw-l>
+                </p>
+                <a class="btn btn-primary" href="#reply-body"><kw-l key="posts.reply_submit">Reply</kw-l></a>
+            </div>
         }
         else
         {

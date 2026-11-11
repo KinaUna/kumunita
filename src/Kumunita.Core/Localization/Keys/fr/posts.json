@@ -92,5 +92,6 @@
   "posts.project_report_button": "Signaler ce projet",
   "posts.board_report_button": "Signaler ce tableau",
   "posts.todo_report_button": "Signaler cette t\u00E2che",
-  "posts.grouppost_report_button": "Signaler ce message"
+  "posts.grouppost_report_button": "Signaler ce message",
+  "posts.replies_empty_title": "Pas encore de r\u00E9ponses."
 }

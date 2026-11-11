@@ -279,16 +279,27 @@
                 }
                 @if (Model.GroupPosts.Count == 0)
                 {
-                    <p class="kmb-group-empty">
+                    @* R33 (IMPROVE-UX) — the house .kmb-empty idiom (title +
+                       body + one next action). The "New post" action is offered
+                       only in the CanPost branch (a body-only survivor for the
+                       non-can branch — the viewer has no post to write here). *@
+                    <div class="kmb-empty kmb-group-empty">
+                        <p class="kmb-empty-title"><kw-l key="groups.posts_empty_title">No posts yet.</kw-l></p>
+                        <p class="kmb-empty-body">
+                            @if (Model.CanPost)
+                            {
+                                <text><kw-l key="groups.posts_empty_can">No posts yet. Write the first one — it will be visible to the current members.</kw-l></text>
+                            }
+                            else
+                            {
+                                <text><kw-l key="groups.posts_empty">No posts here yet.</kw-l></text>
+                            }
+                        </p>
                         @if (Model.CanPost)
                         {
-                            <text><kw-l key="groups.posts_empty_can">No posts yet. Write the first one — it will be visible to the current members.</kw-l></text>
+                            <a class="btn btn-primary" href="@($"/groups/{Model.GroupId}/posts/new")"><kw-l key="groups.new_post">New post</kw-l></a>
                         }
-                        else
-                        {
-                            <text><kw-l key="groups.posts_empty">No posts here yet.</kw-l></text>
-                        }
-                    </p>
+                    </div>
                 }
                 else
                 {
@@ -352,16 +363,28 @@
                 }
                 @if (Model.GroupEvents.Count == 0)
                 {
-                    <p class="kmb-group-empty">
+                    @* R33 (IMPROVE-UX) — the house .kmb-empty idiom (title +
+                       body + one next action). The "New event" action is offered
+                       only in the CanCreateEvent branch (a body-only survivor
+                       for the non-can branch — the viewer has no event to plan
+                       here). *@
+                    <div class="kmb-empty kmb-group-empty">
+                        <p class="kmb-empty-title"><kw-l key="groups.events_empty_title">No events yet.</kw-l></p>
+                        <p class="kmb-empty-body">
+                            @if (Model.CanCreateEvent)
+                            {
+                                <text><kw-l key="groups.events_empty_can">No events yet. Plan the first one — it will be visible to the current members.</kw-l></text>
+                            }
+                            else
+                            {
+                                <text><kw-l key="groups.events_empty">No events here yet.</kw-l></text>
+                            }
+                        </p>
                         @if (Model.CanCreateEvent)
                         {
-                            <text><kw-l key="groups.events_empty_can">No events yet. Plan the first one — it will be visible to the current members.</kw-l></text>
+                            <a class="btn btn-primary" href="@($"/groups/{Model.GroupId}/events/new")"><kw-l key="groups.new_event">New event</kw-l></a>
                         }
-                        else
-                        {
-                            <text><kw-l key="groups.events_empty">No events here yet.</kw-l></text>
-                        }
-                    </p>
+                    </div>
                 }
                 else
                 {

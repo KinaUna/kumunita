@@ -119,8 +119,14 @@
         *@
         @if (Model.Children.Count == 0)
         {
-            <div class="alert alert-info">
-                <kw-l key="guardian.empty">No children yet.</kw-l>
+            @* R33 (IMPROVE-UX) — the house .kmb-empty idiom, anchored to the
+               inline "Add a child account" form below (this view genuinely has an
+               add affordance, unlike the read-only Guardian/Detail sub-sections).
+               The existing "No children yet." sentence is the title; it is a
+               complete sentence, so no separate body is added. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="guardian.empty">No children yet.</kw-l></p>
+                <a class="btn btn-primary" href="#guardian-add-child"><kw-l key="guardian.add">Add a child account</kw-l></a>
             </div>
         }
         else
@@ -170,7 +176,7 @@
             form (G·1).
         *@
         <h2><kw-l key="guardian.add">Add a child account</kw-l></h2>
-        <form method="post" action="@Url.Action("AddChild", "Guardian")">
+        <form method="post" action="@Url.Action("AddChild", "Guardian")" id="guardian-add-child">
             @Html.AntiForgeryToken()
             <div asp-validation-summary="All" class="text-danger mb-3"></div>
 

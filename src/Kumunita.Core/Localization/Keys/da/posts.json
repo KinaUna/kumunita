@@ -92,5 +92,6 @@
   "posts.project_report_button": "Anmelde dette projekt",
   "posts.board_report_button": "Anmelde dette br\u00E6t",
   "posts.todo_report_button": "Anmelde denne todo",
-  "posts.grouppost_report_button": "Anmelde dette indl\u00E6g"
+  "posts.grouppost_report_button": "Anmelde dette indl\u00E6g",
+  "posts.replies_empty_title": "Ingen svar endnu."
 }

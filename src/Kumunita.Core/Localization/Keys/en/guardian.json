@@ -140,5 +140,6 @@
   "guardian.messaging.restrict_confirm": "Restrict messaging for this child? They will no longer be able to send or receive direct messages, regardless of their own opt-in.",
   "guardian.handover_confirm": "Hand over this account to the child? This dissolves your guardianship over it.",
   "guardian.remove_myself_confirm": "Remove yourself as this child\u0027s guardian? You will no longer be able to manage their account. They keep their account, and their other guardian(s) continue.",
-  "guardian.delete_child_confirm": "Delete this child account permanently? This removes their sign-in, profile, and memberships, and cannot be undone."
+  "guardian.delete_child_confirm": "Delete this child account permanently? This removes their sign-in, profile, and memberships, and cannot be undone.",
+  "guardian.subsection_empty_body": "This section is empty \u2014 there\u0027s nothing to act on right now."
 }
