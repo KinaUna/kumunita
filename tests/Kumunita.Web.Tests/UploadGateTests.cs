@@ -183,4 +183,100 @@ public class UploadGateTests
 
         Assert.Null(reject); // proceed (within limits, platform not full)
     }
+
+    // ── IMPROVE-UX A15 — the gate resolves the per-resident override ─────────
+    // The gate's CheckUpload reads the subject's override (best-effort) and
+    // resolves the effective quota (override ?? global) before the decision.
+    // An upload that would EXCEED the global quota is ALLOWED when the resident
+    // has a higher override (the override is honoured) and REFUSED when they
+    // have none (falls back to global). The per-file cap is untouched (unlimited
+    // here — only the quota path is exercised). The gate maps both reject
+    // reasons to the single 413 producer; the allowed case returns null.
+
+    [Fact]
+    public async Task UploadGate_ResidentOverride_Honoured_AllowsOverGlobalAndRefusesWithoutOverride()
+    {
+        const string overriddenSubject = "subj-a15-overridden";
+        const string plainSubject      = "subj-a15-plain";
+
+        // Global quota 100 bytes; a large per-file cap so only the quota bites.
+        var settings = new CommunityStorageSettings
+        {
+            MaxFileBytes = long.MaxValue,
+            PerUserQuotaBytes = 100
+        };
+        const long usage = 50;     // 50 + 60 = 110 > 100 global quota
+        const long incoming = 60;
+
+        var settingsSvc = Substitute.For<IStorageSettingsService>();
+        settingsSvc.GetPerUserUsageBytesAsync(overriddenSubject, Arg.Any<CancellationToken>()).Returns(usage);
+        settingsSvc.GetPerUserUsageBytesAsync(plainSubject, Arg.Any<CancellationToken>()).Returns(usage);
+        // A15: the overridden subject has a 5 GB override (honoured → allowed);
+        // the plain subject has no override (null → falls back to global → refused).
+        settingsSvc.GetResidentQuotaOverrideAsync(overriddenSubject, Arg.Any<CancellationToken>())
+            .Returns(5L * 1024 * 1024 * 1024);
+        settingsSvc.GetResidentQuotaOverrideAsync(plainSubject, Arg.Any<CancellationToken>())
+            .Returns((long?)null);
+
+        var metricsSvc = Substitute.For<IStorageMetricsService>();
+        metricsSvc.GetPlatformSpaceAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(new AvailablePlatformSpace(0, long.MaxValue, 0, false)); // not full
+
+        var gate = new UploadGate(settingsSvc, metricsSvc);
+        const long envMaxBytes = long.MaxValue;
+        const long platformLimit = 0; // unlimited
+
+        // The override is honoured: 110 < 5 GB → Allowed → the gate returns
+        // null (proceed), even though 110 > 100 would be refused against the
+        // global quota.
+        Assert.Null(await gate.CheckUpload(incoming, overriddenSubject, settings, envMaxBytes, platformLimit));
+
+        // No override: falls back to the 100-byte global → OverQuota → the
+        // single 413 producer (the exact type the per-lane tests pin).
+        var reject = await gate.CheckUpload(incoming, plainSubject, settings, envMaxBytes, platformLimit);
+        Assert.IsType<StatusCodeResult>(reject);
+        Assert.Equal(413, ((StatusCodeResult)reject!).StatusCode);
+
+        // The override read was consulted for BOTH subjects (the gate is the
+        // single reader of the decision's inputs).
+        await settingsSvc.Received(1).GetResidentQuotaOverrideAsync(overriddenSubject, Arg.Any<CancellationToken>());
+        await settingsSvc.Received(1).GetResidentQuotaOverrideAsync(plainSubject, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// A15 best-effort: when the override read is unavailable (a test harness
+    /// with an un-stubbed / null seam that throws), the gate falls back to the
+    /// global quota — the decision still runs (the override is a nudge on top,
+    /// not a hard dependency). A payload over the global quota is still refused.
+    /// </summary>
+    [Fact]
+    public async Task UploadGate_OverrideReadThrows_FallsBackToGlobalQuota()
+    {
+        const string subject = "subj-a15-override-read-throws";
+        var settings = new CommunityStorageSettings
+        {
+            MaxFileBytes = long.MaxValue,
+            PerUserQuotaBytes = 100
+        };
+
+        var settingsSvc = Substitute.For<IStorageSettingsService>();
+        settingsSvc.GetPerUserUsageBytesAsync(subject, Arg.Any<CancellationToken>()).Returns(50);
+        // The override read throws (a faulting async seam in a minimal harness)
+        // — the gate must swallow it and fall back to the global quota. The
+        // method returns Task<long?>, so we fault the returned Task.
+        settingsSvc.GetResidentQuotaOverrideAsync(subject, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<long?>(
+                new NotSupportedException("no override seam in this harness")));
+
+        var metricsSvc = Substitute.For<IStorageMetricsService>();
+        metricsSvc.GetPlatformSpaceAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(new AvailablePlatformSpace(0, long.MaxValue, 0, false));
+
+        var gate = new UploadGate(settingsSvc, metricsSvc);
+
+        // 50 + 60 = 110 > 100 global → refused (the fallback decision ran).
+        var reject = await gate.CheckUpload(60, subject, settings, long.MaxValue, platformLimitBytes: 0);
+        Assert.IsType<StatusCodeResult>(reject);
+        Assert.Equal(413, ((StatusCodeResult)reject!).StatusCode);
+    }
 }

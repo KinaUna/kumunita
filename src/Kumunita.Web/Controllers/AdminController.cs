@@ -48,7 +48,15 @@ public partial class AdminController(
     // compiling (the CS1736 idiom); DI always supplies the live
     // ILocalizationService in the app, and the translation surface degrades
     // to "no candidate list" when it is absent (a test harness).
-    Kumunita.Core.Localization.ILocalizationService? localization = null) : Controller
+    Kumunita.Core.Localization.ILocalizationService? localization = null,
+    // IMPROVE-UX A15 — the per-resident quota override seam (the admin half of
+    // the storage loop). Optional (the CS1736 / `localization = null` harness
+    // idiom) so the existing test-construction sites keep compiling; DI always
+    // supplies the live IStorageSettingsService in the app. The Manage detail
+    // page reads the resident's current override + usage and the Set
+    // StorageQuotaOverride action writes it (GlobalAdmin-gated at this
+    // boundary — the ADR 0050 split).
+    Kumunita.Core.Usage.IStorageSettingsService? storageSettings = null) : Controller
 {
     // SP U03 (ADR 0043 D4) — the five shipped platform surfaces, in the
     // footer-column order (about view first, then the four Page docs). The

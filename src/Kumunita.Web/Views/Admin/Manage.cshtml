@@ -213,4 +213,76 @@
     </div>
 </div>
 
+@* IMPROVE-UX A15 — the per-resident storage quota override card (the admin
+   half of the storage loop). A14's "Request more space" nudge lands on this
+   page (the /admin/accounts/{subjectId} link); here the admin sees the
+   resident's effective quota (override ?? global, the C-UP·5 sentinel
+   resolved) + their usage, and sets / clears just this resident's cap —
+   without touching the community-wide quota. The form value semantics match
+   the admin storage-settings surface: blank = clear (back to the community
+   default), 0 = unlimited for this resident, a whole MiB number = the cap.
+   The write is GlobalAdmin-gated at the controller (the class-level
+   [Authorize(Roles=GlobalAdmin)] — the ADR 0050 split). *@
+<div class="card mb-4">
+    <div class="card-header"><kw-l key="admin.manage.storage_quota">Storage quota</kw-l></div>
+    <div class="card-body">
+        <dl class="row mb-3">
+            <div class="col-sm-4 col-md-3">
+                <dt class="text-muted small"><kw-l key="admin.manage.storage_quota_effective">Effective quota</kw-l></dt>
+                <dd class="fs-5 mb-1">@Model.EffectiveQuotaHuman</dd>
+            </div>
+            <div class="col-sm-4 col-md-3">
+                <dt class="text-muted small"><kw-l key="admin.manage.storage_quota_used">Used</kw-l></dt>
+                <dd class="fs-5 mb-1">@Model.UsedHuman</dd>
+            </div>
+            <div class="col-sm-4 col-md-3">
+                <dt class="text-muted small"><kw-l key="admin.manage.storage_quota_community">Community default</kw-l></dt>
+                <dd class="fs-5 mb-1">@Model.GlobalQuotaHuman</dd>
+            </div>
+        </dl>
+        <p class="text-muted small mb-3">
+            @if (Model.QuotaOverrideBytes is null)
+            {
+                <kw-l key="admin.manage.storage_quota_no_override">No override set — this account uses the community default. Set one to give this account more (or less) space without changing everyone's.</kw-l>
+            }
+            else
+            {
+                <kw-l key="admin.manage.storage_override_active">This account has its own quota override.</kw-l>
+            }
+        </p>
+        @* Two independent forms to the same action (the two-forms-on-one-page
+           shape the Standing card above uses): the set form submits the MiB
+           value; the clear form (only when an override is active) submits a
+           blank quotaMiBInput, which the controller reads as "clear → back to
+           the community default". No inline JS (the CspInlineDiscipline
+           gate — a button just submits its own form). *@
+        <form method="post" action="/admin/accounts/@Model.Account.SubjectId/quota" class="d-flex gap-2 align-items-end flex-wrap mb-2">
+            @Html.AntiForgeryToken()
+            <div>
+                <label class="form-label small" for="quota-override-input">
+                    <kw-l key="admin.manage.storage_quota_override_label">Override quota (MiB)</kw-l>
+                </label>
+                <input type="text" class="form-control" id="quota-override-input" name="quotaMiBInput"
+                       value="@Model.QuotaOverrideInput"
+                       placeholder="0 = unlimited"
+                       style="width: 10rem;" />
+            </div>
+            <button class="btn btn-primary" type="submit"><kw-l key="admin.manage.storage_quota_save">Save override</kw-l></button>
+        </form>
+        @if (Model.QuotaOverrideBytes is not null)
+        {
+            <form method="post" action="/admin/accounts/@Model.Account.SubjectId/quota" class="d-inline-flex">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="quotaMiBInput" value="" />
+                <button class="btn btn-outline-secondary" type="submit">
+                    <kw-l key="admin.manage.storage_quota_clear">Clear override</kw-l>
+                </button>
+            </form>
+        }
+        <p class="text-muted small mt-2 mb-0">
+            <kw-l key="admin.manage.storage_quota_hint">Blank = use the community default. 0 = unlimited for this account. A whole number of MiB = this account's cap. Saving only changes this account — the community-wide quota is untouched.</kw-l>
+        </p>
+    </div>
+</div>
+
 <a href="/admin" class="btn btn-link">← Back to the admin overview</a>

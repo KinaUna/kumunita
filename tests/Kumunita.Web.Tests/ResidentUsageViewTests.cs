@@ -110,6 +110,66 @@ public class ResidentUsageViewTests
         Assert.Equal("Unlimited", vm.RemainingHuman);
     }
 
+    // ── IMPROVE-UX A15 — the resident sees their OWN effective quota ────────
+    // The admin half of the storage loop (the account-detail override) closes
+    // back to the resident: GET /account/storage resolves the **effective**
+    // per-user quota (override ?? global, the loop's feedback) instead of the
+    // raw community-wide number. The C-UP·5 sentinel is preserved: a 0 override
+    // = unlimited for this resident.
+
+    [Fact]
+    public async Task ResidentUsageView_OverrideHonoured_SeesEffectiveQuota_NotGlobal()
+    {
+        // The community-wide quota is 2_000 bytes, but this resident has a 5 GB
+        // override (the admin raised just their cap on the account detail page).
+        var settings = Substitute.For<IStorageSettingsService>();
+        settings.GetOrCreateAsync(Arg.Any<CancellationToken>())
+            .Returns(new CommunityStorageSettings { PerUserQuotaBytes = 2_000 });
+        settings.GetPerUserUsageBytesAsync(Resident, Arg.Any<CancellationToken>())
+            .Returns(1_000L);
+        // A15 — the resident's per-resident override (the loop's feedback).
+        settings.GetResidentQuotaOverrideAsync(Resident, Arg.Any<CancellationToken>())
+            .Returns(5L * 1024 * 1024 * 1024);
+
+        var controller = Build(settings);
+        var view = Assert.IsType<ViewResult>(await controller.Storage());
+        var vm = Assert.IsType<ResidentStorageViewModel>(view.Model);
+
+        // The resident sees their OWN effective quota (the override — 5 GB),
+        // not the community-wide 2_000: the loop's feedback comes back to them.
+        Assert.Equal(5L * 1024 * 1024 * 1024, vm.PerUserQuotaBytes);
+        Assert.False(vm.QuotaUnlimited);
+        // remaining = effective quota − usage (the override, not the global).
+        Assert.Equal(5L * 1024 * 1024 * 1024 - 1_000, vm.RemainingBytes);
+        // The override read was driven by the signed-in principal (self-only).
+        await settings.Received(1).GetResidentQuotaOverrideAsync(Resident, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ResidentUsageView_ZeroOverride_UnlimitedForResident()
+    {
+        // The community-wide quota is a concrete cap (2_000), but this resident
+        // has a 0 override = **unlimited for them** (the C-UP·5 sentinel
+        // preserved per-resident, distinct from an unset override).
+        var settings = Substitute.For<IStorageSettingsService>();
+        settings.GetOrCreateAsync(Arg.Any<CancellationToken>())
+            .Returns(new CommunityStorageSettings { PerUserQuotaBytes = 2_000 });
+        settings.GetPerUserUsageBytesAsync(Resident, Arg.Any<CancellationToken>())
+            .Returns(999L);
+        settings.GetResidentQuotaOverrideAsync(Resident, Arg.Any<CancellationToken>())
+            .Returns(0L);   // unlimited for this resident
+
+        var controller = Build(settings);
+        var view = Assert.IsType<ViewResult>(await controller.Storage());
+        var vm = Assert.IsType<ResidentStorageViewModel>(view.Model);
+
+        Assert.Equal(0L, vm.PerUserQuotaBytes);
+        Assert.True(vm.QuotaUnlimited);
+        Assert.Null(vm.RemainingBytes);
+        Assert.Equal("Unlimited", vm.QuotaHuman);
+        Assert.Equal("Unlimited", vm.RemainingHuman);
+    }
+
     // ── Harness ──────────────────────────────────────────────────────────────
 
     /// <summary>

@@ -190,6 +190,123 @@ public sealed class StorageLimitsTests(PostgresFixture fixture) : IClassFixture<
             StorageLimits.Decide(incomingBytes: 200, currentUsageBytes: 0, settings, envMaxBytes: 1_000_000));
     }
 
+    // ── IMPROVE-UX A15 — the per-resident quota override (the admin half) ───
+    // The override lives on the single settings row (ResidentQuotaOverrides
+    // map, keyed by subjectId) — a map, not a new doc type. Sentinel (C-UP·5)
+    // preserved per-resident: unset (null) is distinct from 0 (unlimited for
+    // that resident). The effective quota is override ?? global, resolved once
+    // in StorageLimits.EffectivePerUserQuota and folded into the 5-arg Decide.
+
+    // A15 · pin 1 — a non-null override wins over the global per-user quota.
+    [Fact]
+    public void EffectivePerUserQuota_Override_WinsOverGlobal()
+    {
+        var settings = new CommunityStorageSettings { PerUserQuotaBytes = 2L * 1024 * 1024 };
+        var overrideQuota = 5L * 1024 * 1024;
+        Assert.Equal(overrideQuota,
+            StorageLimits.EffectivePerUserQuota(overrideQuota, settings));
+    }
+
+    // A15 · pin 2 — an unset (null) override falls back to the global quota.
+    [Fact]
+    public void EffectivePerUserQuota_Unset_FallsBackToGlobal()
+    {
+        var settings = new CommunityStorageSettings { PerUserQuotaBytes = 7_777 };
+        Assert.Equal(7_777,
+            StorageLimits.EffectivePerUserQuota(perUserQuotaOverride: null, settings));
+    }
+
+    // A15 · pin 3 — an override of 0 = unlimited for that resident (the C-UP·5
+    // sentinel preserved per-resident, distinct from the unset null).
+    [Fact]
+    public void EffectivePerUserQuota_Zero_UnlimitedForResident()
+    {
+        var settings = new CommunityStorageSettings { PerUserQuotaBytes = 2L * 1024 * 1024 };
+        Assert.Equal(0,
+            StorageLimits.EffectivePerUserQuota(perUserQuotaOverride: 0, settings));
+    }
+
+    // A15 · pin 4 — the 5-arg Decide: an upload over the GLOBAL quota is
+    // ALLOWED when the resident has a higher override (the override is
+    // honoured), and REFUSED when they have none (it falls back to global).
+    // The per-file cap is independent (unlimited here) — only the quota path
+    // is exercised.
+    [Fact]
+    public void Decide_WithOverride_AllowsOverGlobalWhenOverrideIsHigher_AndRefusedWhenNoOverride()
+    {
+        var settings = new CommunityStorageSettings
+        {
+            MaxFileBytes = long.MaxValue,          // per-file cap untouched
+            PerUserQuotaBytes = 100                // global: 100 bytes
+        };
+        const long usage = 50;
+        const long incoming = 60;   // 50 + 60 = 110 > 100 global
+
+        // A resident with a 5 GB override: 110 is well under → Allowed (the
+        // override is honoured — the upload would be refused against the
+        // global quota).
+        Assert.Equal(StorageDecision.Allowed,
+            StorageLimits.Decide(incoming, usage, settings, long.MaxValue,
+                perUserQuotaOverride: 5L * 1024 * 1024 * 1024));
+
+        // A resident with no override: 110 > 100 global → OverQuota.
+        Assert.Equal(StorageDecision.OverQuota,
+            StorageLimits.Decide(incoming, usage, settings, long.MaxValue,
+                perUserQuotaOverride: null));
+    }
+
+    // A15 · pin 5 — an override of 0 = unlimited for that resident: a huge
+    // upload is Allowed even though it would be over the global quota.
+    [Fact]
+    public void Decide_WithZeroOverride_UnlimitedForResident()
+    {
+        var settings = new CommunityStorageSettings
+        {
+            MaxFileBytes = long.MaxValue,
+            PerUserQuotaBytes = 100
+        };
+        // 50 + 10_000 > 100 global, but the override is 0 = unlimited → Allowed.
+        Assert.Equal(StorageDecision.Allowed,
+            StorageLimits.Decide(incomingBytes: 10_000, currentUsageBytes: 50,
+                settings, long.MaxValue, perUserQuotaOverride: 0));
+    }
+
+    // A15 · pin 6 — the service round-trip: SetResidentQuotaOverrideAsync
+    // stores the override (a write in the caller's session) and
+    // GetResidentQuotaOverrideAsync reads it back; a null write clears it
+    // (back to the global — the read returns null); an unset key reads null
+    // (distinct from a stored 0).
+    [Fact]
+    public async Task SetResidentQuotaOverride_StoresAndClears_ReadsBackNullWhenUnset()
+    {
+        var store = await BootStoreAsync();
+        var svc = BuildService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Unset → null (the override ?? global fallback signal).
+        Assert.Null(await svc.GetResidentQuotaOverrideAsync("alice", ct));
+
+        // Set a cap (in the caller's session — the C-UP·1 shape) → reads back.
+        await using var w = store.LightweightSession();
+        await svc.SetResidentQuotaOverrideAsync("alice", 5_000, "admin", w);
+        Assert.Equal(5_000, await svc.GetResidentQuotaOverrideAsync("alice", ct));
+
+        // A stored 0 (unlimited for that resident) is distinct from unset null.
+        await svc.SetResidentQuotaOverrideAsync("alice", 0, "admin", w);
+        Assert.Equal(0, await svc.GetResidentQuotaOverrideAsync("alice", ct));
+
+        // Clear (null) → back to the global: the read returns null again.
+        await svc.SetResidentQuotaOverrideAsync("alice", null, "admin", w);
+        Assert.Null(await svc.GetResidentQuotaOverrideAsync("alice", ct));
+
+        // One resident's override is not another's (keyed by subjectId).
+        await svc.SetResidentQuotaOverrideAsync("bob", 9_000, "admin", w);
+        Assert.Equal(9_000, await svc.GetResidentQuotaOverrideAsync("bob", ct));
+        Assert.Null(await svc.GetResidentQuotaOverrideAsync("alice", ct));
+
+        await store.DisposeAsync();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh <c>mt</c> schema over <see cref="MediaObject"/> +

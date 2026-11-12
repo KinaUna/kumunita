@@ -176,18 +176,37 @@ public sealed class AccountController(
         var quota      = await quotaTask;
         long usage      = await usageTask;
 
-        bool unlimited = quota.PerUserQuotaBytes == 0;      // C-UP·5 sentinel
+        // IMPROVE-UX A15 — the **effective** per-user quota for this resident
+        // (override ?? global, the loop's feedback coming back to the resident):
+        // the admin may have raised just this account's cap on the account
+        // detail page, so the resident now sees their own number instead of the
+        // community-wide one. Null-tolerant (a harness with no override read
+        // seam degrades to the global quota — the read is a nudge, not a hard
+        // dependency). The C-UP·5 sentinel is preserved: a 0 effective quota =
+        // unlimited (shown as "Unlimited", not 0 remaining).
+        long? overrideQuota = null;
+        try
+        {
+            overrideQuota = await settings.GetResidentQuotaOverrideAsync(subject, CancellationToken.None);
+        }
+        catch
+        {
+            overrideQuota = null;   // fall back to the global quota
+        }
+        var effectiveQuota = Kumunita.Core.Usage.StorageLimits.EffectivePerUserQuota(overrideQuota, quota);
+
+        bool unlimited = effectiveQuota == 0;               // C-UP·5 sentinel
         var remaining  = unlimited ? (long?)null
-                                   : Math.Max(0, quota.PerUserQuotaBytes - usage);
+                                   : Math.Max(0, effectiveQuota - usage);
 
         return View(new ResidentStorageViewModel
         {
             MyUsageBytes      = usage,
-            PerUserQuotaBytes = quota.PerUserQuotaBytes,
+            PerUserQuotaBytes = effectiveQuota,
             RemainingBytes    = remaining,                  // null ⇒ unlimited
             QuotaUnlimited    = unlimited,
             MyUsageHuman      = ResidentStorageViewModel.FormatBytes(usage),
-            QuotaHuman        = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(quota.PerUserQuotaBytes),
+            QuotaHuman        = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(effectiveQuota),
             RemainingHuman    = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(remaining!.Value)
         });
     }
