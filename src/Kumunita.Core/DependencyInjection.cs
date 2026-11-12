@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.InstanceStatus;
 using Kumunita.Core.Media;
 using Kumunita.Core.Portability;
 using Kumunita.Core.Targets;
@@ -100,6 +101,11 @@ public static class ServiceCollectionExtensions
 
         // Operator analytics (M13 / M24 / M25)
         services.AddUsage();
+
+        // IMPROVE-UX O01 (D8) — the operator's read-only instance-status seam
+        // (the /admin/status page in O02, the dashboard notice in O03, the
+        // inbox alarm in O04). Read-only, no new doc type, no new auth surface.
+        services.AddInstanceStatus();
 
         return services;
     }

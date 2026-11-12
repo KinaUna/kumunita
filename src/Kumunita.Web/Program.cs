@@ -808,6 +808,19 @@ builder.Services.Configure<SeedAdminOptions>(
 // never carry it, so the seeder is unreachable by construction.
 builder.Services.Configure<SampleDataOptions>(
     builder.Configuration.GetSection(SampleDataOptions.SectionName));
+
+// IMPROVE-UX O01 (D8) — the two host-posture facts Core cannot read itself
+// (IWebHostEnvironment and the DataProtection__KeysDirectory wiring are Web-side):
+// IsProduction (builder.Environment.IsProduction()) and
+// DataProtectionKeysPersisted (the dataProtectionKeysDir local, defined above).
+// The InstanceStatusOptions POCO (Kumunita.Core.InstanceStatus) carries them as
+// boolean postures only — the O01 seam never echoes a value, path, or secret.
+builder.Services.Configure<Kumunita.Core.InstanceStatus.InstanceStatusOptions>(o =>
+{
+    o.IsProduction = builder.Environment.IsProduction();
+    o.DataProtectionKeysPersisted = !string.IsNullOrWhiteSpace(dataProtectionKeysDir);
+});
+
 // ADR 0078 — sample-account notification suppression: in Development the flag
 // stays false (Mailpit collects the mail, sample accounts behave like real
 // residents); in Production / Staging it is true and the
