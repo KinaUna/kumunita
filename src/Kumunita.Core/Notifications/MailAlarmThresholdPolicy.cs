@@ -24,8 +24,11 @@ namespace Kumunita.Core.Notifications;
 /// The I/O method (<see cref="MailAlarmsService.EvaluateAsync"/>) keeps the
 /// reads (ONE read-only <c>QuerySession</c>) + the best-effort
 /// <see cref="IAlertSink.ReportAsync"/> fire (the <c>null</c>-sink no-op +
-/// the <c>try/catch</c> swallow, F11 pin §2a); the behaviour is unchanged —
-/// only the decision's location moves here, where a plain unit test
+/// the <c>try/catch</c> swallow, F11 pin §2a), returning the composed
+/// <see cref="AlertEvent"/> (or <c>null</c> under threshold) so the
+/// Web-layer handler can read <see cref="AlertEvent.Subject"/> for its
+/// notification body (IMPROVE-UX O04); the behaviour is unchanged — only the
+/// decision's location moves here, where a plain unit test
 /// (<c>MailAlarmThresholdPolicyTests</c>) can name it without Postgres.
 /// </para>
 /// </summary>

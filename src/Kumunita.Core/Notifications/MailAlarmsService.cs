@@ -77,8 +77,14 @@ public static class MailAlarmsService
     /// </param>
     /// <param name="now">Injection point for tests (pin the window start so the 24 h boundary is deterministic).</param>
     /// <param name="ct">Cancellation.</param>
-    /// <returns><c>true</c> when the T4 gate was breached (the alert fired, or was a no-op on an unconfigured sink); <c>false</c> when under threshold (no alert).</returns>
-    public static async Task<bool> EvaluateAsync(
+    /// <returns>
+    /// The composed <see cref="AlertEvent"/> when the T4 gate was breached (the
+    /// alert fired, or was a no-op on an unconfigured sink) — IMPROVE-UX O04's
+    /// inbox leg reads <see cref="AlertEvent.Subject"/> for its notification
+    /// body (counts + threshold, **no PII**, pin §5.8); <c>null</c> when under
+    /// threshold (no alert, no breach).
+    /// </returns>
+    public static async Task<AlertEvent?> EvaluateAsync(
         IDocumentStore store,
         IAlertSink? alertSink,
         DateTimeOffset now,
@@ -118,14 +124,14 @@ public static class MailAlarmsService
         // there, over the three counts this method read).
         var alert = MailAlarmThresholdPolicy.Build(bounces, complaints, deadLetters);
         if (alert is null)
-            return false;   // under the T4 threshold — no alert (the pin §6 "still broken, still loud" re-fire is the intended semantics while breached)
+            return null;   // under the T4 threshold — no alert (the pin §6 "still broken, still loud" re-fire is the intended semantics while breached)
 
         // Best-effort at the boundary (the IAlertSink contract, F11 pin §2a /
         // pin §5.6): a channel failure never propagates — the
         // SuppressedAddress rows + the provider console are the load-bearing
         // signals, the alert is a copy.
         if (alertSink is null)
-            return true;    // the gate breached but there is no channel (a no-op, not a failure)
+            return alert;  // the gate breached but there is no channel (a no-op, not a failure) — O04's inbox leg still reads the Subject
         try
         {
             await alertSink.ReportAsync(alert, ct);
@@ -136,6 +142,6 @@ public static class MailAlarmsService
             // rethrown; the owner sees the SuppressedAddress rows in the DB
             // regardless.
         }
-        return true;
+        return alert;
     }
 }

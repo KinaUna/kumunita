@@ -292,7 +292,12 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // the admin-lane kind (recipient a GlobalAdmin, not the requester);
         // its settings-toggle label is
         // notifications.preference.storage.request.label).
-        Assert.Equal(36, vm.AllKinds.Count);
+        // 36 → 37 (IMPROVE-UX O04 — ops.alarm joins the closed set: the T4
+        // mail-alarm breach announcement to the GlobalAdmins, the D8 second
+        // channel (the E10 "SMTP may be what failed, so email is unreliable"
+        // fix); its settings-toggle label is
+        // notifications.preference.ops.alarm.label).
+        Assert.Equal(37, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

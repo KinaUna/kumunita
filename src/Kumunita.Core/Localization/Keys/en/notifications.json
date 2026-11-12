@@ -57,6 +57,8 @@
   "notifications.preference.account.signup.label": "When a new resident signs up",
   "notifications.preference.account.verified.label": "When a resident verifies their account",
   "notifications.preference.storage.request.label": "When a resident requests more storage space",
+  "notifications.kind.ops.alarm": "Instance alarm",
+  "notifications.preference.ops.alarm.label": "When an instance alarm fires",
   "notifications.kind.announcement": "New announcement",
   "notifications.kind.community.post": "New community post",
   "notifications.kind.page.child": "New sub-page",

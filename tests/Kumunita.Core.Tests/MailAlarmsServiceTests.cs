@@ -37,7 +37,7 @@ public sealed class MailAlarmsServiceTests(PostgresFixture fixture) : IClassFixt
         }
 
         var result = await MailAlarmsService.EvaluateAsync(store, sink, now, TestContext.Current.CancellationToken);
-        Assert.False(result);
+        Assert.Null(result);
         Assert.Equal(0, sink.Count);
     }
 
@@ -70,8 +70,12 @@ public sealed class MailAlarmsServiceTests(PostgresFixture fixture) : IClassFixt
         }
 
         var result = await MailAlarmsService.EvaluateAsync(store, sink, now, TestContext.Current.CancellationToken);
-        Assert.True(result);
+        Assert.NotNull(result);
         Assert.Equal(1, sink.Count);
+        // O04: the returned event IS the one delivered to the sink (the handler
+        // reads result.Subject for its inbox body — the same payload the e-mail
+        // leg sent).
+        Assert.Same(sink.LastAlert, result);
         Assert.Equal(MailAlarmsService.AlertKind, sink.LastAlert!.Kind);
         // No PII in the subject (pin §5.8) — only counts.
         Assert.Contains("5 new bounce/complaint rows", sink.LastAlert.Subject);
@@ -99,7 +103,7 @@ public sealed class MailAlarmsServiceTests(PostgresFixture fixture) : IClassFixt
         }
 
         var result = await MailAlarmsService.EvaluateAsync(store, sink, now, TestContext.Current.CancellationToken);
-        Assert.False(result);
+        Assert.Null(result);
         Assert.Equal(0, sink.Count);
     }
 

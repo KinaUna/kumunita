@@ -187,6 +187,40 @@ public static class NotificationKinds
     /// </summary>
     public const string StorageRequest = "storage.request";
 
+    /// <summary>
+    /// IMPROVE-UX O04 (D8) — a T4 mail-alarm breach (<see
+    /// cref="MailAlarmsService.EvaluateAsync"/>'s
+    /// <see cref="MailAlarmThresholdPolicy.Build"/> returned a non-null
+    /// <see cref="AlertEvent"/>) is announced to the <c>GlobalAdmin</c>s. An
+    /// <b>admin-lane</b> kind — the recipients are the <c>GlobalAdmin</c>s,
+    /// not a resident (the <see cref="StorageRequest"/> / <see
+    /// cref="AccountSignup"/> / <see cref="AccountVerified"/> admin-lane
+    /// precedent, which also trail the resident-facing kinds in
+    /// <see cref="Known"/>). The D8 decision (E10): a mail-alarm breach
+    /// reaches the operator over the existing e-mail channel
+    /// (<see cref="Kumunita.Core.IAlertSink"/> → <c>SupportEmailAlertSink</c>)
+    /// <b>and</b> a second, independent inbox channel — because the very SMTP
+    /// relay that failed may be what tripped the alarm (the E10 / D8 concern:
+    /// "SMTP may be what failed, so e-mail is unreliable"). Always-on
+    /// (NOT in <see cref="OptInKinds"/> — the resident cannot toggle an
+    /// admin-lane kind off). Emitter: the
+    /// <c>Kumunita.Web.SideEffects.MailAlarmsHandler.Handle</c> Web layer
+    /// (the best-effort A14 / ADR 0077 D5 posture — a missing emitter, a
+    /// fresh instance with no GlobalAdmin, or an emit error is swallowed +
+    /// logged; the e-mail leg is the existing channel, this is the additive
+    /// inbox leg). One row per GlobalAdmin (the per-recipient idempotency key
+    /// <c>notification:ops.alarm:{fireMinute}:{adminId}</c> — stable per
+    /// fire-minute, the "still broken, still loud" re-fire semantics; the T4
+    /// gate re-fires every tick while breached, and the key dedupes within the
+    /// same minute so a persistent breach yields one row per 1-h tick); the
+    /// body carries the <see cref="AlertEvent.Subject"/> (counts + threshold,
+    /// **no PII** — the suppressed e-mails stay in the DB, the
+    /// <see cref="Kumunita.Core.Identity.SuppressedAddress"/> document),
+    /// <c>LinkPath = /admin/status</c> (the O02 page, where the full row set
+    /// is rendered).
+    /// </summary>
+    public const string OpsAlarm = "ops.alarm";
+
     // ── ADR 0084 — per-target subscription kinds ─────────────────────────
 
     /// <summary>
@@ -476,7 +510,11 @@ public static class NotificationKinds
         // loop A05 closes, distinct from the signup-lane pair. StorageRequest
         // (IMPROVE-UX A14) joins the signup-lane pair as a third admin-lane
         // kind (the resident's storage-quota request, recipient a GlobalAdmin).
-        AccountSignup, AccountVerified, StorageRequest,
+        // OpsAlarm (IMPROVE-UX O04) is the fourth admin-lane kind: the T4
+        // mail-alarm breach announcement to the GlobalAdmins (the D8 second
+        // channel — the E10 "SMTP may be what failed, so email is unreliable"
+        // fix).
+        AccountSignup, AccountVerified, StorageRequest, OpsAlarm,
         Announcement, CommunityPost, PageChild, MessageNew,
         // M36 (ADR 0165, M36·3) — the six sibling mention kinds (the reserved
         // post.mention is already at the top of this set). Resident-facing,
