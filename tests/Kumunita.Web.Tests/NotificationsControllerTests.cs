@@ -287,7 +287,12 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // invitation and the inviter hears back, the resident-facing kind
         // the "resident invite approval" loop closes for; its settings-
         // toggle label is notifications.preference.invitation.approved.label).
-        Assert.Equal(35, vm.AllKinds.Count);
+        // 35 → 36 (IMPROVE-UX A14 — storage.request joins the closed set: the
+        // resident's "request more space" nudge fans out to the GlobalAdmins,
+        // the admin-lane kind (recipient a GlobalAdmin, not the requester);
+        // its settings-toggle label is
+        // notifications.preference.storage.request.label).
+        Assert.Equal(36, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

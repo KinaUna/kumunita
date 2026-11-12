@@ -192,6 +192,59 @@ public sealed class AccountController(
         });
     }
 
+    // ── IMPROVE-UX A14 — the resident "request more space" loop ────────────
+    // The "My storage" page (Storage()) shows the
+    // account.storage_remaining_note text — "…Ask an administrator to raise the
+    // quota if you need more." — with no seam to actually ask (E20, the
+    // "promise without seam" anti-pattern). A14 closes the loop: a
+    // "Request more space" button (the limited branch of Storage.cshtml) POSTs
+    // here, which calls the Core notify lane (IIdentityService.
+    // RequestStorageQuotaIncreaseAsync) that fans out to every GlobalAdmin with
+    // a link to this resident's account-detail page. The *quota override*
+    // (the admin raising the limit) is A15's separate unit; A14 only sends the
+    // nudge. The subject is the signed-in principal (self-only — never a path
+    // param, the Storage() C-UP·4/F7 shape). Best-effort (the ADR 0077 D5
+    // posture — the Core lane swallows a notify failure): the button always
+    // "succeeds" + flashes the account.storage_request_sent confirmation.
+
+    /// <summary>
+    /// <c>POST /account/storage/request</c> (IMPROVE-UX A14) — the resident's
+    /// "Request more space" action. Calls the Core notify lane
+    /// (<see cref="IIdentityService.RequestStorageQuotaIncreaseAsync"/>) on
+    /// behalf of the signed-in principal (self-only — <see
+    /// cref="SubjectId(System.Security.Claims.ClaimsPrincipal)"/>, never a path
+    /// param) and redirects back to <see cref="Storage"/> with the localized
+    /// <c>TempData["info"]</c> confirmation (the
+    /// <see cref="Kumunita.Web.Security.ControllerFlashExtensions.FlashAsync"/>
+    /// ADR 0261 seam — <c>account.storage_request_sent</c>). The lane is
+    /// best-effort (a fresh instance with no GlobalAdmin is a no-op; a
+    /// notify-lane failure is swallowed + logged in Core) — the request
+    /// "was made" is the durable fact, so the redirect always succeeds (the
+    /// <see cref="AdminGuestsController"/>.Save flash-redirect shape).
+    /// </summary>
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Route("account/storage/request")]
+    public async Task<IActionResult> RequestMoreSpace()
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // The Core notify lane (best-effort — the ADR 0077 D5 posture swallows
+        // a notify failure in Core; a null seam is a no-op, not an error — the
+        // direct-construction harnesses omit it).
+        await identity.RequestStorageQuotaIncreaseAsync(subject);
+
+        // Flash the localized confirmation (the ADR 0261 FlashAsync seam — the
+        // en value is the floor when no provider is resolvable), then redirect
+        // back to the storage page (the AdminGuestsController.Save shape).
+        TempData["info"] = await this.FlashAsync(
+            "account.storage_request_sent", "Your request was sent to the admins.");
+        return RedirectToAction(nameof(Storage));
+    }
+
     // ── IMPROVE-UX A12 — the resident "Invite a neighbour" surface ────────
     // The A11 rule (GetResidentInvitePostureAsync) decides whether the
     // surface is visible (MayInvite = true) or hidden (MayInvite = false —

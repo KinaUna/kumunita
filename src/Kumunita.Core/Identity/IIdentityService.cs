@@ -651,4 +651,35 @@ public interface IIdentityService
     /// the last <c>GlobalAdmin</c> on the instance (the lockout pin — a child
     /// is never a GlobalAdmin, so this is a no-op in practice).</exception>
     Task DeleteChildAccountAsync(string childId, string guardianId);
+
+    // ── IMPROVE-UX A14 — the resident "request more space" notify lane ──────
+
+    /// <summary>
+    /// IMPROVE-UX A14 — a resident's "request more space" (the
+    /// <c>account.storage_remaining_note</c> promise now has a seam): the
+    /// <c>POST /account/storage/request</c> surface calls this lane, which
+    /// notifies **every <c>GlobalAdmin</c>** that a resident asked for a
+    /// higher per-user storage quota, with a <c>linkPath</c> of
+    /// <c>/admin/accounts/{subjectId}</c> (the account-detail surface the
+    /// A15 per-resident quota override will extend).
+    /// <para>
+    /// <b>Best-effort, notify-only (the ADR 0077
+    /// <see cref="IdentityService"/> <c>EmitAccountNotificationAsync</c> D5
+    /// posture):</b> the request "was made" is the durable fact (the
+    /// resident's confirmed action); a missing emitter, a fresh instance
+    /// with no GlobalAdmin (a no-op — nothing to notify), or an emit error
+    /// is swallowed and logged — the request never fails because the
+    /// notification lane is unavailable. <b>No audit row</b> (a notify is
+    /// not an access decision — the A12 <see cref="IInvitationService
+    /// .ApproveAsync"/> notify precedent). One inbox row per GlobalAdmin
+    /// (the ADR 0077 F10 per-recipient idempotency key
+    /// <c>notification:storage.request:{subjectId}:{adminId} — a repeat
+    /// click does not re-flood the admins); the body carries the requesting
+    /// resident's display name / email (the admin knows *who* is asking),
+    /// resolved via <see cref="IUserInfoService.GetProfileAsync"/>.
+    /// <c>Kind = <see cref="Kumunita.Core.Notifications.NotificationKinds
+    /// .StorageRequest"/></c>.
+    /// </para>
+    /// </summary>
+    Task RequestStorageQuotaIncreaseAsync(string subjectId, CancellationToken ct = default);
 }

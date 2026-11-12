@@ -164,6 +164,29 @@ public static class NotificationKinds
     /// </summary>
     public const string AccountVerified = "account.verified";
 
+    /// <summary>
+    /// IMPROVE-UX A14 — a resident **requested** a higher per-user storage
+    /// quota (the "My storage" page's "Request more space" button; the
+    /// <c>account.storage_remaining_note</c> promise now has a seam). An
+    /// <b>admin-lane</b> kind — the recipient is a <c>GlobalAdmin</c>, not
+    /// the requesting resident (the <see cref="AccountSignup"/> /
+    /// <see cref="AccountVerified"/> / <see cref="ReportQueued"/>
+    /// admin-lane precedent, which also trail the resident-facing kinds in
+    /// <see cref="Known"/>). Emitter:
+    /// <see cref="Kumunita.Core.Identity.IIdentityService
+    /// .RequestStorageQuotaIncreaseAsync"/> (best-effort, the ADR 0077 D5
+    /// posture — the request being made is the durable fact; a notify-lane
+    /// failure is swallowed + logged, and a fresh instance with no GlobalAdmin
+    /// is a no-op). One row per GlobalAdmin (the per-recipient idempotency
+    /// key <c>notification:storage.request:{subjectId}:{adminId}</c>, the
+    /// ADR 0077 fan-out shape — a repeat request does not re-flood the same
+    /// admin); the body carries the requesting resident (display name /
+    /// email — the admin knows *who* is asking), <c>LinkPath =
+    /// /admin/accounts/{subjectId}</c> (the account-detail surface the A15
+    /// per-resident quota override will extend).
+    /// </summary>
+    public const string StorageRequest = "storage.request";
+
     // ── ADR 0084 — per-target subscription kinds ─────────────────────────
 
     /// <summary>
@@ -430,10 +453,11 @@ public static class NotificationKinds
     /// <summary>
     /// The ordered, closed kind set (for the settings toggles + the <c>kw-l</c>
     /// key table). Order is the settings page's canonical display order.
-    /// The two admin-lane kinds (<c>account.signup</c> / <c>account.verified</c>,
-    /// ADR 0077) are appended last — they are a separate lane (the recipient is a
-    /// GlobalAdmin, not the resident whose inbox the resident-facing kinds serve),
-    /// so they trail the resident-facing kinds.
+    /// The admin-lane kinds (<c>account.signup</c> / <c>account.verified</c>,
+    /// ADR 0077, and <c>storage.request</c>, IMPROVE-UX A14) are appended
+    /// last — they are a separate lane (the recipient is a GlobalAdmin, not
+    /// the resident whose inbox the resident-facing kinds serve), so they
+    /// trail the resident-facing kinds.
     /// </summary>
     public static IReadOnlyList<string> Known { get; } =
     [
@@ -449,8 +473,10 @@ public static class NotificationKinds
         // moderators / GlobalAdmins, not the reporter) but it sits with the
         // report cluster (report.filed / report.assigned / report.resolved) it
         // belongs to semantically — the report cluster is the moderator-facing
-        // loop A05 closes, distinct from the signup-lane pair.
-        AccountSignup, AccountVerified,
+        // loop A05 closes, distinct from the signup-lane pair. StorageRequest
+        // (IMPROVE-UX A14) joins the signup-lane pair as a third admin-lane
+        // kind (the resident's storage-quota request, recipient a GlobalAdmin).
+        AccountSignup, AccountVerified, StorageRequest,
         Announcement, CommunityPost, PageChild, MessageNew,
         // M36 (ADR 0165, M36·3) — the six sibling mention kinds (the reserved
         // post.mention is already at the top of this set). Resident-facing,
