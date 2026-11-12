@@ -67,6 +67,8 @@
   "admin.status.mail_unavailable": "Indisponible",
   "admin.status.warnings.title": "Avertissements de configuration",
   "admin.status.warnings.empty": "Aucun avertissement de configuration.",
+  "admin.status_notice.text": "Cette instance a des avertissements de configuration ou de santé.",
+  "admin.status_notice.action": "Voir l\u2019état de l\u2019instance",
   "admin.status.warning.seedadmin_still_set": "Les identifiants d'installation unique (SeedAdmin__Email / SeedAdmin__Token) sont encore présents alors qu'un GlobalAdmin existe déjà. Retirez-les (voir étape 4 du premier démarrage).",
   "admin.status.warning.sampledata_in_production": "Le générateur de données d'exemple (SampleData__Enabled) est activé dans un déploiement réel (Production). Les déploiements réels l'omettent.",
   "admin.status.warning.health_token_unset": "Health__Token n'est pas défini — le diagnostic complet /health est accessible sans secret partagé. Définissez-en un pour la production.",

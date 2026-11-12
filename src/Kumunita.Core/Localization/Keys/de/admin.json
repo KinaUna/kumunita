@@ -66,6 +66,8 @@
   "admin.status.mail_unavailable": "Nicht verfügbar",
   "admin.status.warnings.title": "Konfigurationswarnungen",
   "admin.status.warnings.empty": "Keine Konfigurationswarnungen.",
+  "admin.status_notice.text": "Diese Instanz hat Konfigurations- oder Gesundheitswarnungen.",
+  "admin.status_notice.action": "Instanzstatus anzeigen",
   "admin.status.warning.seedadmin_still_set": "Die einmaligen Setup-Zugangsdaten (SeedAdmin__Email / SeedAdmin__Token) sind noch gesetzt, obwohl bereits ein GlobalAdmin existiert. Entferne sie (siehe First-Boot Schritt 4).",
   "admin.status.warning.sampledata_in_production": "Die Beispieldaten-Seeder (SampleData__Enabled) ist in einer echten (Production-)Auslieferung aktiv. Echte Auslieferungen lassen sie aus.",
   "admin.status.warning.health_token_unset": "Health__Token ist nicht gesetzt – das vollständige /health-Diagnosepayload ist ohne gemeinsamen Geheimnisschlüssel erreichbar. Setze für Produktion einen.",

@@ -67,6 +67,8 @@
   "admin.status.mail_unavailable": "Unavailable",
   "admin.status.warnings.title": "Configuration warnings",
   "admin.status.warnings.empty": "No configuration warnings.",
+  "admin.status_notice.text": "This instance has configuration or health warnings.",
+  "admin.status_notice.action": "View instance status",
   "admin.status.warning.seedadmin_still_set": "The one-time setup credentials (SeedAdmin__Email / SeedAdmin__Token) are still set even though a GlobalAdmin already exists. Remove them (see first-boot step 4).",
   "admin.status.warning.sampledata_in_production": "The sample-data seeder (SampleData__Enabled) is on in a real (Production) deployment. Real deployments omit it.",
   "admin.status.warning.health_token_unset": "Health__Token is unset — the full /health diagnostic payload is reachable without a shared secret. Set one for production.",

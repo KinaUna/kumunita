@@ -37,5 +37,6 @@
   "a11y.search": "Search",
   "a11y.scope": "Scope",
   "a11y.back_to_messages": "Back to messages",
-  "a11y.resident": "Resident"
+  "a11y.resident": "Resident",
+  "a11y.status_notice": "Instance status notice"
 }

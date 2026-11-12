@@ -37,5 +37,6 @@
   "a11y.search": "S\u00F8g",
   "a11y.scope": "Omr\u00E5de",
   "a11y.back_to_messages": "Tilbage til beskeder",
-  "a11y.resident": "Beboer"
+  "a11y.resident": "Beboer",
+  "a11y.status_notice": "Instansstatus-meddelelse"
 }

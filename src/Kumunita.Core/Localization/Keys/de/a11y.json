@@ -37,5 +37,6 @@
   "a11y.search": "Suche",
   "a11y.scope": "Bereich",
   "a11y.back_to_messages": "Zur\u00FCck zu den Nachrichten",
-  "a11y.resident": "Bewohner"
+  "a11y.resident": "Bewohner",
+  "a11y.status_notice": "Instanzstatus-Mitteilung"
 }

@@ -1,10 +1,12 @@
 @using Kumunita.Web.Security
+@using Kumunita.Web.Helpers
 @using Kumunita.Core.Identity
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject IIdentityService Identity
 @inject Kumunita.Core.UserInfo.IUserInfoService UserInfo
+@inject Kumunita.Core.InstanceStatus.IInstanceStatusService InstanceStatus
 @* IMPROVE-CODE C11 — extracted from _Layout.cshtml (the .kmb-notices
    region: the flash toast, the pinned announcement, the guest notice,
    the onboarding banner, and the What's-new toast). The markup, the
@@ -127,6 +129,68 @@ else if (User.Identity?.IsAuthenticated == true
                 <span class="ms-2">
                     <a href="/issues/new" class="alert-link"><kw-l key="account.guest_reach_admins">Message the admins</kw-l></a>
                 </span>
+            </div>
+        </div>
+    }
+}
+@* IMPROVE-UX O03 (D8, ADR 0176 strip idiom) — the GlobalAdmin dashboard
+   notice. Shows on every page (the .kmb-notices strip, the same container
+   as the guest / onboarding / what's-new notices) when any of the
+   operator's instance-status rows is red (the O02 /admin/status page's
+   green / amber / red logic mirrored exactly — the SAME booleans the O01
+   POCO exposes, so the page and the notice can never disagree). One
+   line, a dismissible alert (data-kmb-notice — the ADR 0176 strip
+   idiom; data-dismiss-key + btn-close + data-bs-dismiss are the
+   _PinnedAnnouncement / _AdminOnboardingBanner dismissal pattern), and
+   a single link to /admin/status where the reasons and the full row set
+   are rendered (the notice itself carries no warning reason text — the
+   "no secret value" invariant is met: the kw-l key + the link, nothing
+   else).
+
+   Cheap short-circuit (the E10 / _AdminOnboardingBanner precedent): the
+   IInstanceStatusService.GetStatusAsync read runs ONLY when the actor is
+   a signed-in GlobalAdmin (KumunitaPrincipal.IsGlobalAdmin — the
+   Kumunita.Role claim read, the thin-token rule ADR 0001-B). A Member,
+   a Moderator, an ordinary resident, and an anonymous visitor all
+   fail the cheap claim check and never pay for the read (the same
+   "the reads never run for the other standings" discipline as the
+   guest notice's profile + GuestAccess reads above).
+
+   Read-only: no POST, no form, no audit row (a read is a read — the
+   O02 AdminStatusController precedent). The notice is the E10 fix:
+   today the operator learns about trouble only from logs (where an
+   operator does not look) and from mail (SMTP may be exactly what
+   failed — the E10 / D8 concern). The notice makes a red instance
+   announce itself on the dashboard, so the operator does not have to
+   navigate to /admin/status to find out. *@
+@if (User.Identity?.IsAuthenticated == true && KumunitaPrincipal.IsGlobalAdmin(User))
+{
+    var _status = await InstanceStatus.GetStatusAsync(default);
+    if (InstanceStatusNotice.AnyRedRow(_status))
+    {
+        // The accessible name is server-resolved through the same
+        // cookie → Accept-Language → instance-default → en chain the
+        // <kw-l> TagHelper uses (the EffectiveLanguageCode idiom — the
+        // _PinnedAnnouncement / _AdminOnboardingBanner precedent; the
+        // kw-l TagHelper can't wrap an attribute, so the a11y.* key is
+        // the accessible name). A null provider / no context degrades to
+        // the en floor (a11y.status_notice is present in en).
+        var _statusNoticeEffLang = await EffectiveLanguageCode.ResolveAsync(
+            HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        string _statusNoticeAria = await Translation.GetAsync("a11y.status_notice", _statusNoticeEffLang);
+        <div class="container-fluid">
+            <div class="kmb-notice alert alert-warning alert-dismissible fade show py-2"
+                 role="status" data-kmb-notice="admin-status" aria-label="@_statusNoticeAria">
+                <span>
+                    <kw-l key="admin.status_notice.text">This instance has configuration or health warnings.</kw-l>
+                </span>
+                <span class="ms-2">
+                    <a href="/admin/status" class="alert-link"><kw-l key="admin.status_notice.action">View instance status</kw-l></a>
+                </span>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="alert"
+                        data-dismiss-key="kumunita-admin-status-notice-dismissed"
+                        aria-label="Close"></button>
             </div>
         </div>
     }

@@ -67,6 +67,8 @@
   "admin.status.mail_unavailable": "Ikke tilgængelig",
   "admin.status.warnings.title": "Konfigurationvarsler",
   "admin.status.warnings.empty": "Ingen konfigurationvarsler.",
+  "admin.status_notice.text": "Denne instans har konfigurations- eller sundhedsvarsler.",
+  "admin.status_notice.action": "Se instansstatus",
   "admin.status.warning.seedadmin_still_set": "De engangige opsætnings-kreds (SeedAdmin__Email / SeedAdmin__Token) er stadig sat, selv om en GlobalAdmin allerede findes. Fjern dem (se første-opstart trin 4).",
   "admin.status.warning.sampledata_in_production": "Eksempeldata-seedderen (SampleData__Enabled) er tændt i en reel (Production-)udlevering. Reelle udleveringer undlader den.",
   "admin.status.warning.health_token_unset": "Health__Token er ikke sat — det fulde /health-diagnose-payload er någbar uden en fælles hemmelighed. Sæt en for produktion.",
