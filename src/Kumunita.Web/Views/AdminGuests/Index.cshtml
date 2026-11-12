@@ -22,11 +22,26 @@
 
     <div class="row g-3 mb-3">
         <div class="col-sm-12">
-            <label for="subjectId" class="form-label"><kw-l key="admin.guests.subject_label">Guest subject id</kw-l></label>
-            <input type="text" class="form-control" name="subjectId" id="subjectId"
-                   value="@Model.SubjectId" required />
+            <label for="subjectId" class="form-label"><kw-l key="admin.guests.subject_label">Guest account</kw-l></label>
+            <select class="form-select" name="subjectId" id="subjectId" required>
+                @if (Model.SubjectId is null or "")
+                {
+                    <option value="" disabled selected>Select the guest account…</option>
+                }
+                @foreach (var a in Model.AccountOptions)
+                {
+                    @if (a.SubjectId == Model.SubjectId)
+                    {
+                        <option value="@a.SubjectId" selected>@a.Email ?? a.DisplayName ?? a.SubjectId</option>
+                    }
+                    else
+                    {
+                        <option value="@a.SubjectId">@a.Email ?? a.DisplayName ?? a.SubjectId</option>
+                    }
+                }
+            </select>
             <div class="form-text">
-                <kw-l key="admin.guests.subject_hint">The guest account's subject id (the SubjectId of the Profile / User row for the account the guest signs in with). One allowance document per guest account.</kw-l></div>
+                <kw-l key="admin.guests.subject_hint">Pick the account the guest signs in with. One allowance document per guest account.</kw-l></div>
         </div>
     </div>
 

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Security.Claims;
 using Kumunita.Core.Identity;
+using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -346,6 +347,125 @@ public class AdminGuestsControllerTests
         int linkIdx = html.IndexOf("/admin/guests", StringComparison.Ordinal);
         Assert.True(ifIdx >= 0 && linkIdx > ifIdx,
             "The guest link must appear inside the IsGlobalAdmin conditional (hidden-not-disabled).");
+    }
+
+    // ── IMPROVE-UX A13 — the guest form's account picker (no free-text id) ─
+
+    /// <summary>
+    /// A13 — <c>GET /admin/guests</c> seeds the guest account picker from the
+    /// <b>same profile-list read the /admin add-picker uses</b>
+    /// (<see cref="IProfileSettingsService.GetProfilesAsync"/> — the ADR 0062
+    /// add-picker shape): for a non-empty account corpus the model's
+    /// <c>AccountOptions</c> is non-empty and carries each account's
+    /// SubjectId/Email/DisplayName (the <see cref="AdminIndexViewModel
+    /// .AccountRow"/> row type — the shape the /admin surfaces already render).
+    /// The picker is a *view over the accounts an admin can already see*; the
+    /// guest write seam (<see cref="IIdentityService.SetGuestAccessAsync"/>) is
+    /// untouched and is NOT consulted for the option list.
+    /// </summary>
+    [Fact]
+    public async Task Index_Seeds_The_Account_Picker_From_The_Profile_List()
+    {
+        var identity = Substitute.For<IIdentityService>();
+        var profiles = Substitute.For<IProfileSettingsService>();
+        profiles.GetProfilesAsync(false).Returns(new[]
+        {
+            new Profile { SubjectId = "acct-aaa", DisplayName = "Alice", Email = "alice@x.org", Verified = true },
+            new Profile { SubjectId = "acct-bbb", DisplayName = "Bob", Email = "bob@x.org", Verified = true },
+        });
+
+        var controller = new AdminGuestsController(identity, profiles: profiles);
+        var httpContext = new DefaultHttpContext();
+        httpContext.User = new ClaimsPrincipal(
+            new ClaimsIdentity(
+                new[]
+                {
+                    new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, Admin),
+                    new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.GlobalAdmin),
+                },
+                authenticationType: "test"));
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
+
+        var action = await controller.Index(subjectId: null);
+        var view = Assert.IsType<ViewResult>(action);
+        var vm = Assert.IsType<GuestAdminViewModel>(view.ViewData.Model);
+
+        Assert.Equal(2, vm.AccountOptions.Count);
+        Assert.Contains(vm.AccountOptions, o => o.SubjectId == "acct-aaa" && o.Email == "alice@x.org" && o.DisplayName == "Alice");
+        Assert.Contains(vm.AccountOptions, o => o.SubjectId == "acct-bbb" && o.Email == "bob@x.org" && o.DisplayName == "Bob");
+
+        // The profile-list seam was consulted for the option list…
+        await profiles.Received(1).GetProfilesAsync(false);
+        // …and the guest write seam was NOT (the picker reads profiles, not standing).
+        await identity.DidNotReceive().GetGuestAccessAsync(Arg.Any<string>());
+    }
+
+    /// <summary>
+    /// A13 — when the account-listing seam is absent (a test harness that does
+    /// not supply it), the picker is left empty (the C-M19·4 floor) — the view
+    /// renders an empty picker, not an error, and <c>Index</c> still succeeds.
+    /// This is the "harness that does not supply it" branch the optional ctor
+    /// param documents.
+    /// </summary>
+    [Fact]
+    public async Task Index_NoProfileSeam_LeavesThe_Picker_Empty()
+    {
+        var (controller, _) = Build();   // Build supplies no profile seam.
+
+        var action = await controller.Index(subjectId: null);
+        var view = Assert.IsType<ViewResult>(action);
+        var vm = Assert.IsType<GuestAdminViewModel>(view.ViewData.Model);
+
+        Assert.Empty(vm.AccountOptions);
+    }
+
+    /// <summary>
+    /// A13 — the "Done when: no free-text id" bar, as a markup pin (the house
+    /// "string pin, no TestServer" idiom of the <see
+    /// cref="AdminGuestsControllerTests.Admin_Index_Guest_Link_Hidden_For_NonGlobalAdmin"/>
+    /// test above). The <c>/admin/guests</c> form:
+    /// <list type="number">
+    /// <item>NO LONGER renders a free-text <c>subjectId</c>
+    /// <c>&lt;input&gt;</c> — the <c>type="text"</c> box is gone;</item>
+    /// <item>DOES render a <c>&lt;select name="subjectId"&gt;</c> iterating the
+    /// account options (the Accounts.cshtml:41 picker shape).</item>
+    /// </list>
+    /// The window fieldset + the surface switches are untouched by A13 (they
+    /// still bind validFrom / validUntil / announcements / events / directory).
+    /// </summary>
+    [Fact]
+    public void Guest_Form_Uses_A_Select_Picker_Instead_Of_Free_Text_Subject_Id()
+    {
+        var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "AdminGuests", "Index.cshtml");
+        Assert.True(File.Exists(path), $"Views/AdminGuests/Index.cshtml not found at {path}.");
+
+        var html = System.Text.RegularExpressions.Regex.Replace(
+            File.ReadAllText(path),
+            @"\@\*.*?\*\@",
+            "",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        // (1) No free-text subjectId <input> (the E19 re-key handoff is gone).
+        //     The old box was: <input type="text" ... name="subjectId" ...>.
+        //     xunit.v3's Assert.* 3-arg form takes a StringComparison (not a
+        //     message string) — the Admin_Index_Guest_Link_Hidden_For_NonGlobalAdmin
+        //     idiom above.
+        Assert.DoesNotContain("type=\"text\"", html, StringComparison.Ordinal);
+
+        // (2) A <select name="subjectId"> is present (the picker).
+        var selectIdx = html.IndexOf("<select", StringComparison.Ordinal);
+        Assert.True(selectIdx >= 0, "The guest form must render a <select>.");
+        var selectTag = html.Substring(selectIdx, Math.Min(html.Length - selectIdx, 200));
+        Assert.Contains("name=\"subjectId\"", selectTag, StringComparison.Ordinal);
+
+        // (3) The window fieldset + surface switches are untouched (A13 is an
+        //     affordance change, not a form rebuild).
+        Assert.Contains("name=\"validFrom\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"validUntil\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"announcements\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"events\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"directory\"", html, StringComparison.Ordinal);
     }
 
     // ── The U03 kw-l closed set is present + non-empty (the view consumes
