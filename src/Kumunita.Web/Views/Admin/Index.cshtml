@@ -130,6 +130,21 @@
             </div>
         </a>
     </div>
+    @* IMPROVE-UX O02 (D8) — the operator's read-only instance-status page:
+       the O01 Core read (IInstanceStatusService → InstanceStatus POCO)
+       rendered as the health, mail, storage, instance, and config-warning
+       rows. The GlobalAdmin gate is on the /admin/status controller
+       (O02, the AdminStorageMetricsController precedent); the hub is itself
+       GlobalAdmin-gated, so the card renders unconditionally like the other
+       core sections above it. *@
+    <div class="col-md-6 col-lg-4">
+        <a class="card text-decoration-none" href="/admin/status">
+            <div class="card-body">
+                <div class="fw-semibold"><kw-l key="admin.hub.status_title">Status</kw-l></div>
+                <small class="text-muted"><kw-l key="admin.hub.status_desc">This instance's health and configuration — database, mail relay, mail alarm, byte store, and the running build. Read-only.</kw-l></small>
+            </div>
+        </a>
+    </div>
     @* M25 (upload limits) — the storage SETTINGS surface: the per-file size
        cap, the per-user quota, and community usage. Distinct from the M24
        "Storage" metrics card above (a different route, /admin/storage/settings,

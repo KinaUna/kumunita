@@ -1,0 +1,251 @@
+@using Kumunita.Core.InstanceStatus
+@model InstanceStatus
+@{
+    ViewData["Title"] = "Admin — Instance status";
+}
+@functions {
+    @* A compact human byte formatter (IEC units) — the same idiom as
+       AdminStorageMetrics/Index.cshtml. A plain C# helper, no kw-l. *@
+    static string Bytes(long v)
+    {
+        string[] u = { "B", "KiB", "MiB", "GiB", "TiB", "PiB" };
+        double n = v;
+        int i = 0;
+        while (n >= 1024 && i < u.Length - 1) { n /= 1024; i++; }
+        return i == 0 ? $"{n:0} {u[i]}" : $"{n:0.##} {u[i]}";
+    }
+
+    @* A human uptime (TimeSpan → "Xd HHh MMm SSs"; sub-day collapses to
+       "HHh MMm SSs"). Plain C# — no kw-l. *@
+    static string Uptime(TimeSpan t)
+    {
+        if (t < TimeSpan.Zero) { t = TimeSpan.Zero; }
+        string head = t.TotalDays >= 1 ? $"{(int)t.TotalDays}d " : "";
+        return $"{head}{t.Hours}h {t.Minutes}m {t.Seconds}s";
+    }
+
+    @* Map a stable ConfigWarning key (the closed set: "seedadmin-still-set",
+       "sampledata-in-production", "health-token-unset", "dataprotection-not-persisted")
+       to its localized kw-l key (admin.status.warning.<_underscored_>). The
+       kw-l TagHelper's inner text is the Core <see cref="ConfigWarning.Reason"/>
+       (the secret-free operator-facing fallback when a UI key is missing —
+       the ConfigWarning.cs "fallback" note). *@
+    static string WarningKey(string stableKey)
+        => "admin.status.warning." + (stableKey ?? string.Empty).Replace('-', '_');
+}
+
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom). This view sits in
+   Views/AdminStatus/, so the shared partial — which lives in Views/Admin/ — is
+   referenced absolutely, the same shape as AdminStorageMetrics/Index.cshtml. *@
+@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
+
+<h1><kw-l key="admin.status.title">Instance status</kw-l></h1>
+<p class="text-muted">
+    <kw-l key="admin.status.lede">A read-only view of this instance's health and configuration: the database, the mail relay, the mail alarm, the byte store, and the running build. Read-only: this page writes nothing.</kw-l></p>
+
+@* The copy throughout is the admin shell's local convention (mostly non-kw-l
+   English, as in AdminStorageMetrics/Index.cshtml); the row values that carry
+   resident-relevant meaning (the config-warning reasons) are kw-l keys. *@
+
+@* ── Health: DB reachability + SMTP relay ─────────────────────────────────
+   Each row degrades to an explicit "unavailable / unreachable" fact (the O01
+   resilient posture), never a blank cell and never a thrown 500. *@
+<h2 class="h5 mt-4 mb-3">Health</h2>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-6">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                @if (Model.DatabaseReachable)
+                {
+                    <div class="fs-4 fw-semibold text-success">
+                        <kw-l key="admin.status.health.db_ok">Reachable</kw-l>
+                    </div>
+                    <div class="text-muted small">database</div>
+                }
+                else
+                {
+                    <div class="fs-4 fw-semibold text-danger">
+                        <kw-l key="admin.status.health.db_down">Unreachable</kw-l>
+                    </div>
+                    <div class="text-muted small">database</div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-6">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                @if (!Model.Mail.Available)
+                {
+                    <div class="fs-4 fw-semibold text-warning">
+                        <kw-l key="admin.status.mail_unavailable">Unavailable</kw-l>
+                    </div>
+                    <div class="text-muted small">mail relay</div>
+                }
+                else if (Model.Mail.Reachable)
+                {
+                    <div class="fs-4 fw-semibold text-success">
+                        <kw-l key="admin.status.mail_smtp_ok">Relay healthy</kw-l>
+                    </div>
+                    <div class="text-muted small">mail relay</div>
+                }
+                else
+                {
+                    <div class="fs-4 fw-semibold text-warning">
+                        <kw-l key="admin.status.mail_smtp_degraded">Relay degraded</kw-l>
+                    </div>
+                    <div class="text-muted small">
+                        mail relay@(Model.Mail.Reason is not null ? " — " + Model.Mail.Reason : "")
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Mail: the dead-letter count + the alarm firing state (the T4 gate) ──
+   A degraded (unavailable) section renders the "unavailable" fact, not a
+   blank row. *@
+<h2 class="h5 mt-4 mb-3">Mail</h2>
+@if (!Model.MailAlarm.Available)
+{
+    <p class="text-muted">
+        <span class="badge text-bg-warning">unavailable</span>
+        <span class="ms-1">The mail-alarm read is unavailable — the dead-letter count and firing state could not be read.</span>
+    </p>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4">
+            <div class="card text-bg-light">
+                <div class="card-body py-3">
+                    <div class="fs-4 fw-semibold @(Model.MailAlarm.DeadLetters > 0 ? "text-danger" : "")">@Model.MailAlarm.DeadLetters</div>
+                    <div class="text-muted small">dead letters</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card text-bg-light">
+                <div class="card-body py-3">
+                    <div class="fs-4 fw-semibold">
+                        @if (Model.MailAlarm.Firing)
+                        {
+                            <span class="badge text-bg-danger">firing</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-success">not firing</span>
+                        }
+                    </div>
+                    <div class="text-muted small">mail alarm (T4 gate)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card text-bg-light">
+                <div class="card-body py-3">
+                    <div class="fs-4 fw-semibold">@Model.MailAlarm.Bounces <span class="text-muted small">/</span> @Model.MailAlarm.Complaints</div>
+                    <div class="text-muted small">bounces / complaints (window)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Storage: total used / free / as-of (the Bytes() idiom) ──────────────
+   A degraded section renders the "unavailable" fact. *@
+<h2 class="h5 mt-4 mb-3">Storage</h2>
+@if (!Model.Storage.Available)
+{
+    <p class="text-muted">
+        <span class="badge text-bg-warning">unavailable</span>
+        <span class="ms-1">The storage snapshot is unavailable — the byte-store metrics could not be read.</span>
+    </p>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4">
+            <div class="card text-bg-light">
+                <div class="card-body py-3">
+                    <div class="fs-4 fw-semibold">@Bytes(Model.Storage.TotalUsedBytes)</div>
+                    <div class="text-muted small">total used</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card text-bg-light">
+                <div class="card-body py-3">
+                    <div class="fs-4 fw-semibold">@Bytes(Model.Storage.FreeVolumeBytes)</div>
+                    <div class="text-muted small">free</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card text-bg-light">
+                <div class="card-body py-3">
+                    <div class="fs-4 fw-semibold"><kw-dt dt="@Model.Storage.AsOf" format="g"></kw-dt></div>
+                    <div class="text-muted small">as of (UTC)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Instance: version (incl. build SHA where present) + uptime ────────── *@
+<h2 class="h5 mt-4 mb-3">Instance</h2>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-6">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold text-break">@Model.Version</div>
+                <div class="text-muted small">version / build</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-6">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">@Uptime(Model.Uptime)</div>
+                <div class="text-muted small">uptime</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Config warnings: the closed four-key set, each a human reason ───────
+   The row's reason text is a kw-l key (admin.status.warning.*); the inner
+   text is the Core <see cref="ConfigWarning.Reason"/> (the secret-free
+   operator-facing fallback when the UI key is missing — the kw-l floor).
+   An empty list renders the "no warnings" empty state (the E11 fix: a
+   fresh/clean instance shows "No configuration warnings"). *@
+<h2 class="h5 mt-4 mb-3"><kw-l key="admin.status.warnings.title">Configuration warnings</kw-l></h2>
+@if (Model.Warnings.Count == 0)
+{
+    <p class="text-muted"><kw-l key="admin.status.warnings.empty">No configuration warnings.</kw-l></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+            <thead>
+                <tr>
+                    <th class="small">Check</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var w in Model.Warnings)
+                {
+                    <tr>
+                        <td class="text-nowrap"><span class="badge text-bg-warning">@w.Key</span></td>
+                        <td>
+                            <kw-l key="@WarningKey(w.Key)">@w.Reason</kw-l>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
