@@ -9,7 +9,8 @@ related:
   - docs/philosophy/everyday-life.md
   - docs/SECURITY.md
   - docs/product/features.md
-updated: 2026-11-02
+  - docs/adr/0301-self-service-deletion-grace-period.md
+updated: 2026-11-12
 ---
 
 > **Abstract:** what Kumunita does, how privacy and moderation
@@ -45,11 +46,12 @@ to choose who sees what you post.
 - **Post and discuss.** Announcements and conversations, organized into
   topics like Safety, Maintenance, Social, and Governance — so a question
   about a street light isn't lost in a pile of birthday wishes.
-- **Plan events.** Events with sign-ups (RSVP) and reminders, so "who's
-  coming?" has an answer. *(Planned — later, after the platform is multilingual; not built yet.)*
+- **Plan events.** Events with sign-ups (RSVP), a day-before reminder, and
+  a link you can add to your phone's calendar — so "who's coming?" has an
+  answer.
 - **Work on projects together.** A goal, a list of tasks, and the people
-  helping — the roofer, the move on Saturday, the garden.
-  *(Planned for M5 — not built yet.)*
+  helping — the roofer, the move on Saturday, the garden. You can see who's
+  doing what, and pick up a task.
 - **Keep things safe.** If something on the platform needs attention, you can
   report it (below).
 
@@ -107,7 +109,9 @@ the whole path, because it's short and every step is checked:
 1. You file a report on a post or profile.
 2. It goes to the moderator for that topic.
 3. The moderator gets temporary, **recorded** access to look at it.
-4. They resolve it (talk it through, remove it, do nothing) and it's noted.
+4. They resolve it (talk it through, remove it, do nothing). When they do,
+   you get a note about the outcome — and you can find it any time in your
+   "My reports" page, next to your account menu.
 
 No step is invisible. If reports pile up and go unanswered, that's a problem
 with the *people* running moderation — and it's exactly the kind of thing we
@@ -166,9 +170,10 @@ argued with. A rule nobody questions is a rule nobody is checking.
 
 ### Where to put it
 
-- **Issues in this repository** are the main channel. Write the story from
-  step 1 and file it. You don't need an account with any special rights to
-  start a conversation there.
+- **Something's not working?** Tell us from inside the platform — the
+  "Report an issue" link (in the footer, or from your account menu) opens a
+  short form. When someone looks at it, you'll see the outcome in your
+  "My reports" page — no need to come back and ask.
 - **Translation:** the platform supports multiple languages, and the team
   decides which languages to offer. If your neighborhood needs a language
   that isn't there yet, tell us — and if you can write in it, that's an
@@ -179,6 +184,10 @@ argued with. A rule nobody questions is a rule nobody is checking.
   "I don't know how to use this thing" is the most valuable sentence in this
   document, because it tells us our explanations failed — and we can fix
   them.
+
+(The code is open in this repository — if you can read code, that's where
+the source of truth lives. But for "this button doesn't do what I
+expected," the in-app form above is the right place.)
 
 ## A checklist you can use when you try something new
 
@@ -195,6 +204,12 @@ questions (these are the same ones we use internally, in plain language):
    specific person remembered, carried, or held it together?
 
 If any answer made you pause, that's feedback worth writing down.
+
+## Leave when you're ready
+
+You can close your own account from your account settings — no one else
+needs to do it for you. There's a short waiting period so a change of heart
+can cancel it; after that, your content is removed from the platform.
 
 ## If you want to go deeper
 
