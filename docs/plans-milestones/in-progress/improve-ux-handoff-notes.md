@@ -1773,3 +1773,124 @@ recorded open items are F2, F3 (both need a seeded resident + a live
 re-walk) and F6 (another lane's archive docs) — the next successor's
 scope.
 
+## X05 — close F2 + F3 (the two uncertain journeys, a seeded live re-walk) — **SHIPPED**
+
+**Scope:** the successor to X04 (`04b95a52`, the close of F7). X02's honest
+held close filed 7 findings (F1–F7); X03 closed F1 + F4 + F5, X04 closed F7
+(DoD line 6 is now 6 of 6). This unit closes the **two remaining "uncertain"
+journey rows** — **F2 (J7 the guest end-date)** and **F3 (J10
+request-more-space)** — by re-walking them **live with the seed condition
+X02's anonymous / unlimited walk lacked**. **This is a live re-walk, not a
+code change:** R20 (`8e13085a`) and A14 (`b879dc9c`) are already shipped and
+green; X05 *verifies the render under the right seed data* and records the
+honest before → after. **F6 is not in this unit** (the 6 docs-check tier
+failures are `improve-sec` archive docs — another lane; X02/X03/X04 all
+deferred it). One `## X05` handoff append; no code.
+
+**Outcome (honest):** **both journeys pass live under the seeded condition.**
+- **F2 (J7):** a signed-in guest with a **live window** sees the window
+  **end date** + a working "message the admins" link — exactly what X02
+  could not see (it walked the guest home **anonymous**). The **optional
+  lapsed state does not render for a seeded resident — by design**, not a
+  defect (a guest never carries `Member`, and every seeded resident is a
+  verified `Member`, so the lapsed guard `!HasRole("Member")` skips; recorded
+  below).
+- **F3 (J10):** a **quota-set** resident sees a working "Request more space"
+  button that notifies the GlobalAdmins in-app — exactly what X02 could not
+  see (it walked `/account/storage` with the **unlimited** quota sentinel,
+  where the button is in the other branch).
+- Gate green; `dotnet build` clean; docs-check = the **6 pre-existing F6
+  failures only** (no new). No code touched.
+
+### F2 — J7 the guest end-date (R20, shipped at `8e13085a`)
+
+- **Why X02 missed it:** the R20 strip
+  (`Views/Shared/_LayoutNotices.cshtml`) renders only when
+  `User.Identity.IsAuthenticated && KumunitaPrincipal.HasRole(User, "Guest")`
+  — and the `Guest` role is minted only when `Profile.IsGuest &&
+  ValidFrom ≤ now < ValidUntil` (`KumunitaClaimsPrincipalFactory`, ADR
+  [0120](../../adr/0120-guest-accounts.md) D3). X02 walked `/` **anonymous**,
+  so the strip never rendered.
+- **Before (X02's walk):** `GET /` anonymous → 200 guest home, **no**
+  `data-kmb-notice="guest"` strip, no window end date, no "message the
+  admins" link.
+- **Seed (via the shipped A13 surface, not SQL):** `POST /admin/guests`
+  (A13 = `db0b5e57`) settled a **live window** on carla
+  (`239161b3…c80b`): `ValidFrom` 2026-11-01, `ValidUntil` 2026-12-31,
+  `SetByAdmin` = the seed admin; `Profile.IsGuest` → `true`.
+- **After (re-walk):** signed in **as carla**, `GET /` renders
+  `data-kmb-notice="guest"` with **"Your guest access ends on December 31,
+  2026"** (the `GuestAccess.ValidUntil` value via `<kw-dt>`, ADR 0019/0020)
+  **plus the "Message the admins" link → `GET /issues/new`**. **Passes** —
+  the guest sees the window end date + a working reach-the-admins link, with
+  no "ask the admin" handoff.
+- **Lapsed state (the prompt's optional step) — recorded, not a defect:**
+  setting carla's window in the past and re-walking with a **fresh** session
+  (the `Guest` role is not re-minted) leaves the `guest-lapsed` strip
+  **absent**. Cause: the lapsed branch is gated by
+  `!HasRole(User, "Member")` (the R20 comment "a guest NEVER gets Member; a
+  Member… is never a guest"), and carla is a **verified seeded resident →
+  carries `Member`**, so the guard skips her. A *pure* guest (a non-Member
+  account with `Profile.IsGuest` set) would see it; X02 did not reach this
+  state at all. The **live** branch — the actual F2 finding — renders
+  correctly, so F2 is closed on its own terms.
+
+### F3 — J10 request-more-space (A14, shipped at `b879dc9c`)
+
+- **Why X02 missed it:** the "Request more space" button
+  (`Views/Account/Storage.cshtml`) renders **only in the `else` (quota-set)
+  branch** — when `Model.QuotaUnlimited` is `false`. X02's walk had the
+  **unlimited** quota (the C-UP·5 quota-0 sentinel), so it saw the unlimited
+  note and **no button**.
+- **Before (X02's walk):** `/account/storage` (admin, unlimited) → the
+  "per-user quota is unlimited" note **present**, the "Request more space"
+  button **absent**.
+- **Seed (via the shipped A15 surface, not SQL):** `POST
+  /admin/accounts/{anna}/quota` (A15 = `89f51248`) set a **1 GiB**
+  per-resident override on anna (`35129cb3…80b`); global still the `0`
+  sentinel; `ResidentQuotaOverrides` = `{anna: 1073741824}`.
+- **After (re-walk):** signed in **as anna**, `GET /account/storage` renders
+  the **quota-set branch** — the unlimited note is **gone** and the
+  "Request more space" button (**POST `/account/storage/request`**) is
+  **present**.
+- **End-to-end (optional, walked):** submitted the button → a
+  `storage.request` notification row fired to the GlobalAdmin with
+  `LinkPath = /admin/accounts/{anna}` and body = the resident's display name
+  ("Anna Kowalska") — the A14 loop (request → admin inbox row with a link to
+  the account) completing in-app. **Passes.**
+- (The override was **cleared afterward** to restore the unlimited baseline.)
+
+### F6 (out of scope — deferred, as in X02/X03/X04)
+
+The 6 `docs-check` gate failures are all in
+`docs/archive/lanes/improve-sec/*-prompt.md` (tier `living|reference` on
+archived docs — the `improve-sec` lane's archive, **not this lane's**).
+`pwsh tools/docs/docs-check.ps1` → "6 GATE(S) FAILED", all in `improve-sec/*`.
+The `## X05` append (in `docs/plans-milestones/in-progress/`) adds **no** new
+failure. Deferred, not fixed.
+
+### Verification
+
+- `python3 tools/ux/ux-measure.py --check` → **green** (exit 0; counts
+  unchanged: `bare_status` 710, `a11y` 49, `empty_plain` 3, `empty_none` 31,
+  `jargon` 2, `notify_without_link` 4).
+- `dotnet build` (Web) → **0 errors** (no code touched this unit).
+- `pwsh tools/docs/docs-check.ps1` → **6 GATE(S) FAILED**, all F6 (pre-existing).
+- `git status` → only `improve-ux-handoff-notes.md` modified (+ untracked curl
+  cookie-jar scratch, not committed).
+
+### Journey table + open items
+
+With F2 (J7) + F3 (J10) closed here and F1 (J9) closed by X03, **every
+journey row X02 could not mark "pass" is now settled**: J7 + J10 walked live
+(this unit), J9 unblocked (X03). The only row not fully walked on a running
+instance is **J12** (the SMTP-break alarm — infra-verified only; testing it
+safely would break the instance's SMTP). **F6 is the only remaining open
+item** (another lane's `improve-sec` archive docs).
+
+**One-line summary:** IMPROVE-UX X05 closes F2 + F3 — J7 the guest end-date
+(R20 = `8e13085a`) + J10 request-more-space (A14 = `b879dc9c`) both verified
+**live under the right seed data** (a live guest window / a set quota); the
+lane's journey table is now 10 of 12 walked + 2 infra-verified (J12), with
+F6 the only remaining open item (another lane's `improve-sec` archive docs).
+
