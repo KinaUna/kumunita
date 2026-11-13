@@ -11,7 +11,8 @@ related:
   - docs/adr/0142-delete-account.md
   - docs/adr/0298-data-classes-in-code.md
   - docs/adr/0299-instance-export-operator-gated.md
-updated: 2026-11-08
+  - docs/adr/0301-self-service-deletion-grace-period.md
+updated: 2026-11-12
 ---
 
 > **Abstract:** the resident-facing data operations — viewing the audit log,
@@ -35,16 +36,17 @@ Most of this is an **in-app GlobalAdmin** action; a few need the operator at the
   **pseudonymized, not purged** (below).
 - **Suspend a resident** (abuse) → GlobalAdmin disables the account in-app (immediate).
 - **Revoke a moderator** → GlobalAdmin removes the role / component scope in-app.
-- **Resident requests data export** → self-serve in-app once the export service ships
-  (deferred). **Until then (manual):** operator extracts that user's records to a file and
-  delivers it securely; log the action.
-- **Resident requests account deletion** →
-  1. Disable the account in-app immediately.
-  2. Operator hard-deletes the user's personal data (profile, groups they own, grants).
-  3. **Audit retention nuance:** keep `AccessAudit`/`Report` rows but **pseudonymize** the
-     subject (replace the user id with a tombstone) rather than deleting — you may need to
-     prove what happened without retaining personal data. Confirm the policy before acting.
-     See [ADR 0142](../adr/0142-delete-account.md) (the design record behind this procedure).
+- **Resident requests data export** → the resident self-serves their own export
+  in-app at `/account/portability`; the operator's role is to point them at it, and
+  (in a dispute) to pull the `portability.export` audit row for what ran.
+- **Resident requests account deletion** → the resident self-serves in-app: they
+  schedule the deletion from their account settings, it executes after the grace period,
+  and they cancel it by signing back in during that window; a child under a guardian
+  cannot self-delete (see [ADR 0301](../adr/0301-self-service-deletion-grace-period.md)).
+  **Audit retention nuance (unchanged):** `AccessAudit`/`Report` rows are kept but the
+  subject is **pseudonymized** (the user id replaced with a tombstone) rather than deleted
+  — you may need to prove what happened without retaining personal data.
+  See [ADR 0142](../adr/0142-delete-account.md) (the design record).
 - **Hand over admin** → promote a resident to GlobalAdmin, then demote the outgoing one.
   **Two GlobalAdmins should be the standing state** (each can demote the other), so a
   single departure is never a lockout.
@@ -53,10 +55,14 @@ Most of this is an **in-app GlobalAdmin** action; a few need the operator at the
   1. Choose the account to elevate (an existing verified resident, ideally the backup
      admin). Note: a hostile admin cannot do this *to themselves* — no in-app endpoint
      creates an `AdminOverride` ([ARCHITECTURE](../ARCHITECTURE.md) §4.5).
-  2. Insert directly into Postgres (as the DB operator user, not the app user):
-     `INSERT INTO mt."AdminOverride" (id, userId, token, grantedAt, expiresAt)
-      VALUES (gen_random_uuid(), '<target-user-id>', '<strong-one-time-token>',
-              now(), now() + interval '6 hours');`
+  2. Insert directly into Postgres (as the DB operator user, not the app user),
+     substituting the target user id and a strong one-time token:
+     ```sql
+     INSERT INTO mt."AdminOverride" (id, userId, token, grantedAt, expiresAt)
+     VALUES (gen_random_uuid(), '<target-user-id>', '<strong-one-time-token>',
+             now(), now() + interval '6 hours');
+     ```
+
   3. Tell the target: log in, go to `/admin/break-glass`, enter the token. Consumption
      elevates them to GlobalAdmin until `expiresAt`; the app appends
      `AccessAudit (via: BreakGlass)` rows for the elevation and every subsequent
