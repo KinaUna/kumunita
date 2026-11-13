@@ -1720,6 +1720,56 @@ Measured directly from the script's `count_notifications_without_link`
   seeded quota. Next successor's scope.
 - **F6 (docs-check 6 failures in `improve-sec` archive):** pre-existing
   tier-model violations, not this lane's scope.
-- **F7 (D2 + D8 ADRs missing):** two `docs(adr):` commits (the next free
-  numbers are 0305 + 0306). Next successor's scope.
+- **F7 (D2 + D8 ADRs missing):** two ADRs needed (the next free numbers
+  were 0305 + 0306). **Closed by X04.**
+
+## X04 — close F7 (the two missing ADRs, D2 + D8) — **SHIPPED**
+
+**Scope:** the successor to X03 (the cold-read successor, `fc8ae1c2` — F1 +
+F4 + F5). X02's honest held close filed 7 findings (F1–F7); X03 closed F1,
+F4 + F5. This unit closes the remaining **DoD line 6** gap — **F7**: the
+two ADRs that were absent from `docs/adr/` for the lane's shipped
+capabilities D2 (the status page, R01/R02) and D8 (the operator's instance
+status, O01–O04). **Doc-only:** two new ADR files + this append; no code
+(the R01/R02 + O01–O04 code was already shipped and green). F2, F3, F6 are
+explicitly out of scope (F2/F3 need a seeded resident + a live re-walk; F6
+is another lane's `improve-sec` archive docs — each is a separate
+successor's unit).
+
+**Outcome:**
+- **ADR [0305](../../adr/0305-friendly-status-page.md) — D2, the status
+  page (R01/R02).** Records the decision: one friendly, localized,
+  nav-keeping `/status/{code}` page (400/403/404/413/415/429/500) with
+  Back/Home/Search, wired via a status-code re-execute **for HTML page
+  requests only** (`StatusPageGate.ReExecuteHtmlOnly`) — fetch/JSON,
+  `/health`, `.ics`, media, kiosk and `/api/` keep their bare responses —
+  with the 500-with-report affordance (ADR [0154](../../adr/0154-production-error-handling.md),
+  ADR [0155](../../adr/0155-issue-submission-escalation.md)) intact on the
+  exception path, and the rejected alternatives (per-action views; the
+  "deleted on {date}" variant).
+- **ADR [0306](../../adr/0306-operator-instance-status.md) — D8, the
+  operator's instance status (O01–O04).** Records the decision: a
+  read-only GlobalAdmin `/admin/status` page over one pure-Core
+  `IInstanceStatusService` read (version + uptime, the `/health` checks,
+  dead letters, mail alarms, storage, a boolean-posture-only
+  `ConfigWarningsPolicy` — **no secret values**), a one-line dashboard
+  notice when any row is red, and the mail-alarm lane also emitting an
+  `ops.alarm` inbox row to the GlobalAdmins; builds on ADR
+  [0136](../../adr/0136-platform-storage-limit.md) /
+  [0156](../../adr/0156-storage-metrics-history.md) /
+  [0162](../../adr/0162-analytics-history.md) /
+  [0299](../../adr/0299-instance-export-operator-gated.md); the rejected
+  alternatives (config warnings only; leave it to the deployment manager).
+
+**DoD line 6 — now met (6 of 6 ADRs present):** D2 =
+[0305](../../adr/0305-friendly-status-page.md) (this unit), D3 =
+[0301](../../adr/0301-self-service-deletion-grace-period.md), D4 =
+[0302](../../adr/0302-shared-kiosk-link.md), D6 =
+[0303](../../adr/0303-report-queued-routing.md), D7 =
+[0304](../../adr/0304-email-invitations.md), D8 =
+[0306](../../adr/0306-operator-instance-status.md) (this unit). This was
+the one DoD line X02 marked **not met**; with F7 closed the lane's
+recorded open items are F2, F3 (both need a seeded resident + a live
+re-walk) and F6 (another lane's archive docs) — the next successor's
+scope.
 
