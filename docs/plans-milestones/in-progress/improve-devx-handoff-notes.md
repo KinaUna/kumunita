@@ -24,8 +24,24 @@ moves it to the archive.
 
 ## DX01 — port the report to pwsh; add the check skeleton
 
-*(to be filled by the DX01 agent — 3–8 lines: files, numbers before → after,
-anything noticed, incl. the two drift facts from the prompt)*
+- **Files:** `tools/devx/devx-report.ps1`, `tools/devx/devx-check.ps1`,
+  `tools/devx/devx-baseline.json` (new folder `tools/devx/`).
+- **Drift fact 1:** `tools/devx/devx-report.mjs` does not exist — DX00 never
+  landed it (the plan's DX01 entry read is stale). The Evidence table in the
+  plan is the numbers' source of truth; `devx-report.ps1` is now the live
+  baseline generator.
+- **Drift fact 2:** ADR 0300 is taken (`0300-issue-resolved-notification.md`;
+  index runs to 0306). The ADR for this lane lands as **0307** (DX02).
+- **Numbers (plan 2026-11-09 → live 2026-11-13):** IClassFixture files
+  181 → 190 (154 Core + 36 Web); test files 381 → 413 (obj/bin excluded);
+  root test files 343 → 369; lane-named test files 17 → 16 (one renamed
+  between measurements); ADRs 299 → 306; ADRs unreachable by link 104 → 53.
+- **Lane-code regex:** the plan's E11 regex is unpinned; `devx-report.ps1`
+  carries a candidate (16 451 hits). `devx-baseline.json` keeps the plan's
+  3 391 as the shrink-only value until DX32 pins the canonical regex and
+  re-baselines.
+- **Exit verified:** `devx-report.ps1` prints all Evidence numbers;
+  `devx-check.ps1` → "0 rules", exit 0.
 
 ## DX02 — ADR 0307: the developer feedback loop
 
