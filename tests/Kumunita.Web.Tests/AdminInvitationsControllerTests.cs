@@ -331,8 +331,8 @@ public class AdminInvitationsControllerTests
     [Fact]
     public void Index_View_Uses_The_KmbEmpty_Friendly_State()
     {
-        var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "Admin", "Invitations", "Index.cshtml");
-        Assert.True(File.Exists(path), $"Views/Admin/Invitations/Index.cshtml not found at {path}.");
+        var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "AdminInvitations", "Index.cshtml");
+        Assert.True(File.Exists(path), $"Views/AdminInvitations/Index.cshtml not found at {path}.");
 
         var html = File.ReadAllText(path);
         Assert.Contains("kmb-empty", html, StringComparison.Ordinal);

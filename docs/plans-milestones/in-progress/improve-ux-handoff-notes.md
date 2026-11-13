@@ -1638,3 +1638,88 @@ DoD line 6. The handoff note is the cold reader's entry point — every
 journey, every DoD line, and every residual is recorded with the honest
 result + the unit (or finding) that explains it.
 
+## X03 — the cold-read successor (F1 the A09 view-location fix, F4 + F5 the two missing residual records) — **SHIPPED**
+
+**Scope:** the direct successor to X02 (the cold-read close, `8719298b`).
+X02's honest held close filed 7 findings (F1–F7); this unit closes the
+three the successor can act on in one commit — F1 (the A09
+`/admin/invitations` 500, a view-location fix that unblocks journey J9),
+F4 (the R21 `jargon` residual record), and F5 (the
+`notify_without_link` residual record — 4 kinds as measured, one of which
+is a static-heuristic artifact; see the F5 sub-section for the honest
+enumeration). F2, F3, F6, F7 are explicitly
+out of scope (each is a separate successor's unit).
+
+**Outcome:** F1 fixed (the view is at its conventional location,
+`/admin/invitations` renders 200); F4 + F5 recorded (the 2 `jargon`
+strings + the 4 `notify_without_link` kinds, each with the unit that
+introduced it + the honest justification, the R28/R33 "justified
+survivor" / "measure artifact" register). `dotnet build` green;
+`dotnet test` — `Kumunita.Core.Tests` all green, `Kumunita.Web.Tests`
+the same 3 known-reds as X02 (no new reds); `ux-measure.py --check`
+green (the 2 + 4 residuals are now *recorded*, not *unrecorded* — the
+counts themselves are unchanged, per the scope rule).
+
+### F1 — the A09 view-location fix (journey J9 unblocked)
+- **Before:** `GET /admin/invitations` → 500 (`The view 'Index' was not
+  found. … /Views/AdminInvitations/Index.cshtml`).
+- **After:** the view is at `Views/AdminInvitations/Index.cshtml`
+  (conventional location, `git mv` + the empty `Admin/Invitations/`
+  directory removed); `GET /admin/invitations` → 200 (verified live).
+- **Journey J9 (admin invites a neighbour)** is now walkable end-to-end
+  (the A09 surface renders; the A08 sign-up gate consumes the `?invite=`
+  link; the A10 acceptance notification fires).
+
+### F4 — the R21 `jargon` residual record (2 strings)
+- `account.invite_pending_approval` (`en/account.json`) — introduced by
+  A11/A12 (ADR 0304 D6 c, the approval-queue feature); the `GlobalAdmin`
+  reference is the correct term for the admin reader (the resident sees
+  the same string in the A12 approval-queue surface).
+- `account.invite_off` (`en/account.json`) — same unit, same
+  justification.
+- **Register:** justified survivor (the R28 `Shared/_GrantPickers` /
+  `Shared/_NoteButton` precedent). The `jargon` count stays 2 (not
+  re-based — the X02 scope rule).
+
+### F5 — the `notify_without_link` residual record (4 kinds, as measured)
+Measured directly from the script's `count_notifications_without_link`
+(the set it counts is **4 distinct kinds**, enumerated at HEAD):
+- `ReportFiled` (3 emit sites, `ModerationService.ReportIntake.cs`) — the
+  reporter→author kind; the author is *told* (the A05 design), the reporter's
+  own row carries no link back (the reporter's outcome comes via the R07
+  `ReportResolved` row, not this one).
+- `ReportAssigned` (1 emit site, `ModerationService.ReportIntake.cs:572`) —
+  the moderator-facing kind; the moderator acts from the A06 queue badge,
+  not from a link on this row.
+- `InstanceFullExport` (1 emit site, `PortabilityService.cs:224`) — the
+  instance full-export fan-out (one inbox row per resident, each pointing at
+  *that* resident's own export); there is no single shared link, so the row
+  carries none (by design).
+- `kind` (the literal — 1 emit site, `IdentityService.AccountOps.cs:628` the
+  generic `EmitAccountNotificationAsync` helper) — a **static-heuristic
+  artifact**: the helper passes the kind as a *variable* (`kind: kind`), so
+  the script's `kind:` regex captures the variable name, not the concrete
+  kind it carries at the three call sites (`AccountSignup`, `AccountVerified`,
+  `AccountVerified` — the ADR 0077 admin fan-out). It appears as a 4th "kind"
+  because the heuristic cannot resolve a variable to its value.
+- **Not in the set (honest clarification vs X02's prose):** `TodoAssign` and
+  `GroupAdded` carry `linkPath` (R09, commit `9f7e670c`) and are **not**
+  counted — X02's F5 enumeration named `TodoAssign` + the `IssueFiled`
+  anonymous path, but the *measured* set is the four above. No `IssueFiled`
+  emit site exists at HEAD (the anonymous-filer hold, ADR 0300, means no
+  inbox row is emitted at all — so there is nothing to count).
+- **Register:** measure artifact (the R33 precedent) — 3 are by-design
+  no-link rows, 1 is a static-heuristic artifact the heuristic cannot
+  resolve. The `notify_without_link` count stays 4 (not re-based — the X02
+  scope rule).
+
+### Parked follow-ups (F2, F3, F6, F7 — NOT in this unit)
+- **F2 (J7 guest end-date):** verify R20 landed + re-walk with a seeded
+  guest-access resident. Next successor's scope.
+- **F3 (J10 request-more-space):** verify A14 landed + re-walk with a
+  seeded quota. Next successor's scope.
+- **F6 (docs-check 6 failures in `improve-sec` archive):** pre-existing
+  tier-model violations, not this lane's scope.
+- **F7 (D2 + D8 ADRs missing):** two `docs(adr):` commits (the next free
+  numbers are 0305 + 0306). Next successor's scope.
+
