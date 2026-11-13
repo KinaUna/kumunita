@@ -87,7 +87,7 @@ questions:
 **The deliverable:** a **review note in the handoff**. Create
 `docs/plans-milestones/in-progress/improve-ux-handoff-notes.md` (this lane's
 running log — it does not exist yet; model the front-matter on
-[IS01's prompt](../../../plans-milestones/is01-prompt.md) and
+[IS01's prompt](../improve-sec/is01-prompt.md) and
 `docs/archive/lanes/improve-code/handoff-notes.md`: `tier: living`,
 `kind: handoff`, `status: current`, `lane: improve-ux`, the standard abstract
 block, and a `related:` list that includes ADR 0301 and the plan). Add a
