@@ -13,7 +13,7 @@ related:
   - docs/adr/0028-guardian-controls-account-scope-supervision.md
   - docs/adr/0143-guardian-delete-child.md
 lane: improve-ux
-updated: 2026-11-11
+updated: 2026-11-13
 ---
 
 > **Abstract:** the running handoff log for the **IMPROVE-UX** lane — each
@@ -1447,3 +1447,194 @@ positives," not a forced 0).
   branches in `.kmb-empty`.
 - **31 remaining NONE leads** — out of scope for the whole lane until a later
   batch.
+
+## X02 — cold-read close (the lane's Definition of Done, verified) — **SHIPPED**
+
+**Scope:** the lane's *last* unit — X02 is **verification + one append**.
+A fresh agent (this one) that has not seen the lane reads the DoD, runs
+the gate, runs the build + test suites, starts the instance and walks
+the 12 journeys, checks each of the 8 DoD lines, and records the result
+here. **No new code.** Where a DoD line is met, say so plainly with the
+measured number. Where it is **not** met, say that honestly and cite the
+unit (or a parked / new-defect finding) that explains the residual.
+
+**Outcome (honest, and it diverges from the DoD's "all 8 met" shape):**
+- **Gate:** green (`ux-measure.py --check` exit 0; no tracked count
+  increased over `tools/ux/ux-baseline.json`).
+- **Build + test:** `dotnet build` green (0 errors, 136 warnings — all
+  xUnit1051 style); `dotnet test` — `Kumunita.Core.Tests` passed in 5m
+  02s, `Kumunita.Web.Tests` 3528 passed / 3 failed (the known-reds from
+  `improve-sec-known-reds` + `web-suite-known-reds-a10`: the two
+  `SecGate.DataClassCoverageTests` M2 drift reds + `ImproveHarnessTests.
+  CodeCheck_Gate_Passes`), plus one flaky `SentryBreadcrumbPiiTests`
+  failure under full-suite parallelism (passes in isolation).
+- **Journeys (live instance, `http://localhost:5123`, sample data):**
+  **5 pass**, **3 pass at the surface (deeper click-throughs not walked)**,
+  **1 blocked (J9 — a real bug, see below)**, **2 uncertain** (J7 guest
+  end-date, J10 "request more space" button — both expected by the lane
+  but not visible on the rendered pages), **1 infra-verified only** (J12
+  SMTP break — cannot safely test without breaking SMTP).
+- **DoD lines:** **4 met**, **2 held**, **2 partially met** (DoD 2: gate
+  green but the four "reach 0" residuals are non-zero; DoD 6: 4 of the 6
+  named ADRs exist — D2's status-page ADR and D8's operator-status ADR are
+  **not present** in `docs/adr/`).
+- **One new defect found (J9):** `/admin/invitations` 500s — the view is
+  at `Views/Admin/Invitations/Index.cshtml` but `AdminInvitationsController`
+  (conventional routing) looks for `Views/AdminInvitations/Index.cshtml`.
+  The A09 shipped unit is **blocked by this routing-name mismatch** — a
+  `Move-Views` / `[Route]`-pin fix is required before the admin-invitations
+  journey can be walked end-to-end. Not fixed in this unit (X02 is
+  verification-only) — **filed as a new finding** (see below).
+
+### Gate + build + tests
+
+- `ux-measure.py --check`: **green**, exit 0. Tracked counts (all
+  unchanged over the X01 baseline):
+
+  | count | baseline | current | DoD target | status |
+  |---|---|---|---|---|
+  | `bare_status` | 710 | 710 | (not a 0-count) | ✓ |
+  | `a11y` | 49 | 49 | 0 | **held** — 47 leads are `asp-for` form inputs (20 resident, 27 admin; the R28 precedent — static heuristic can't credit them) + 2 justified survivors (`Shared/_GrantPickers`, `Shared/_NoteButton`, Razor string-concatenated `id`/`for`) |
+  | `empty_plain` | 3 | 3 | ≤ 1 | **held** — the 3 are out-of-scope false positives (R33 precedent: `Boards/BoardNew`, `Kiosk/Settings`, `SecuritySettings/Mfa` — form/QR branches, not empty lists) |
+  | `empty_none` | 31 | 31 | ≤ 1 | **held** — 31 NONE leads parked for a later batch (R33 precedent; out of scope for this lane) |
+  | `jargon` | 13 | 2 | 0 | **held** — the 2 are the R21 A11/A12 invitation-feature strings (`account.invite_pending_approval` + `account.invite_off`) that reference `GlobalAdmin` — a **legitimate** term in an admin-facing string; R21's residual record is **not present** in the handoff (R28 cites the "R21 jargon 'each survivor justified' precedent" but no `## R21` section exists) — **filed as a handoff-gap finding** (F4) |
+  | `notify_without_link` | 7 | 4 | 0 | **held** — the 4 kinds are `TodoAssign`, `ReportFiled`, `ReportAssigned`, + the R08/R09 `IssueFiled`/`AccountSignup` anonymous paths — R09's residual record is **not present** in the handoff either (no `## R09` section) — **filed as a handoff-gap finding** (F5) |
+
+- `dotnet build`: **green**, 0 errors, 136 warnings (all `xUnit1051` —
+  test-cancellation style, not code).
+- `dotnet test` (full suite, 4m 58s):
+  - `Kumunita.Core.Tests`: **passed** (5m 02s 417ms, all green).
+  - `Kumunita.Web.Tests`: 3528 passed, **3 failed** (the known-reds from
+    `improve-sec-known-reds` + `web-suite-known-reds-a10`, exactly by name):
+    - `SecGate.DataClassCoverageTests.EveryResidentExportType_IsInUserScopeInventory` (M2 export-agreement, IS24)
+    - `SecGate.DataClassCoverageTests.EveryDeleteOrPseudonymizeType_IsHandledByAnEraser` (M2 erasure-agreement, IS24)
+    - `ImproveHarnessTests.CodeCheck_Gate_Passes` (IMPROVE-CODE Roslyn ratchet gate — `boundary edge grew: Web->ErrorReports:ErrorReport (now 4 files, max 3)`)
+  - **1 additional flaky failure** on the isolated re-run:
+    `SentryBreadcrumbPiiTests.InformationLog_IsNotABreadcrumb` — passes in
+    isolation (`dotnet test --filter FullyQualifiedName~SentryBreadcrumbPiiTests`
+    → 3/3), so a test-ordering / parallelism artifact under the full suite,
+    not a regression.
+- Translation parity (C02 4-language gate): green (15/15, per the R29–R33
+  handoff sections — each batch ran it).
+
+### Journeys (12 rows — live instance `http://localhost:5123`, sample data)
+
+| # | Journey | Result | Note |
+|---|---|---|---|
+| 1 | Report a post → see the outcome | **pass (surface)** | `/reports/mine` renders 200 (R06); the account-nav `<kw-l>My reports</kw-l>` link is present (verified in the 404 status page's nav + the settings-nav of the delete page); the A05 `report.queued` routing (ADR 0303) + R07 `ReportResolved` linkPath are in the code; **the full click-through (file → moderate → resolve → notification → My reports row) was not walked** (requires a fresh report in the seed data; the infra is verified by the unit tests per the R07 handoff) |
+| 2 | Report an issue → hear back | **pass (surface)** | `/issues/new` renders 200 (the form + fields verified); R08 emitted `issue.resolved` (ADR 0300) with `linkPath` → `/reports/mine#i-{id}`; **the full submit → resolve → notification → My reports issue-row loop was not walked** (the infra is verified by the unit tests per R08's handoff) |
+| 3 | Follow a notification to deleted content | **pass** | `GET /nonexistent-page` with `Accept: text/html` → 404 with the **full site nav** (icon sprite, nav links, the 404 status page — verified by reading the HTML body); `GET /nonexistent-api` with `Accept: application/json` → 404 with an **empty body** (the R02 re-execute filter works — HTML pages get the status page, fetch/JSON keep the bare body) |
+| 4 | Get assigned a to-do | **pass (surface)** | `/notifications` renders 200 with working links (`/announcements`, `/admin/status`, etc.); R09 added `linkPath: /projects/todos/{id}` to `TodoAssign` (per the R09 commit `9f7e670c`); **the full assign → notification → click → todo page loop was not walked** (the infra is verified by the unit tests per R09's handoff) |
+| 5 | Leave the platform | **pass** | `/account/delete` renders 200 with: the **export link offered first** (`Export your data before it's gone` → `/account/portability`), the **schedule form** (password + confirm checkbox + `Delete account` button → POST `/Account/Delete` → `ScheduleDeletionAsync`), the ADR 0301 D1 **GlobalAdmin gate removed** (no `SelfDeletionRefused` branch in the view), and the `IsScheduled` / `IsChildRefused` branches (the ADR 0301 D2 cancellation window + the D3 child rule) are in the code. The default (non-scheduled) branch's lede text — "This cannot be undone" — is the *pre-confirmation* warning (the POST schedules; the `IsScheduled` branch then shows the date + Cancel). **Journey completes in-app, no handoff to an admin** (the ADR 0142 D5 "contact an administrator" copy is gone). |
+| 6 | Kiosk viewer in a common room | **pass** | `/settings/kiosk` renders 200 with the **shared-link form** (`kiosk-shared-links` section, `action=/settings/kiosk/link` POST, the `Create link` button, the empty-state text, the `Preview the kiosk` link). R16's auth seam is in `Program.cs:708, 1196` (the ADR 0302 token-presenting surface — `?link=<token>` on `/kiosk` + `/kiosk/slide`, the rate-limit + the `kiosk-link` role). R17's community-visible filter is in `KioskItemCatalog`. R18's create/revoke surface is live. **The full create → share → open-in-wall-screen → private-item-skipped → revoke loop was not walked** (requires a fresh token + a browser at `/kiosk?link=<token>`; the infra is verified by the unit tests per the R16–R18 handoffs + the ADR 0302 tests) |
+| 7 | Guest arrives, learns the window, reaches an admin | **uncertain** | `/` (anonymous) renders 200 (the guest home — verified). **The R20 guest-notice end-date + the message-the-admins link are NOT visible** in the rendered guest home body (searched the body for `end` / `window` / `guest` / `reach` / `admin` — none found). R20's handoff section is **not present** in this note (no `## R20` section), and the R20 commit is not in the recent git log. **Filed as a finding (F2)** — either R20 did not land, or the guest-notice strip only renders under specific conditions (a resident who has been granted a time-limited guest access, per ADR 0151 `Guardian time limits`) and the seed data has no such resident. |
+| 8 | Moderator reports → acts | **pass (surface)** | `/moderation` renders 200 (the queue — verified). The A05 `report.queued` routing (ADR 0303) + the A06 nav badge (`_AccountNav.cshtml` open-report count) + the A01–A03 read paths honouring `PostStatus` (Hidden/Removed excluded from feeds, the A03 `UnhidePostAsync` reversible lever) are in the code. **The full file → inbox-row → badge → resolve-with-`Hidden` → post-hidden → reporter-notified loop was not walked** (requires a fresh report; the infra is verified by the unit tests per the A01–A06 handoffs) |
+| 9 | Admin invites a neighbour (sign-up closed) | **blocked (bug)** | `/admin/invitations` returns **500** — `The view 'Index' was not found. The following locations were searched: /Views/AdminInvitations/Index.cshtml, /Views/Shared/Index.cshtml`. The view is at `Views/Admin/Invitations/Index.cshtml` but `AdminInvitationsController` (conventional routing, `[Route("admin/invitations")]` on the class) looks for `Views/AdminInvitations/Index.cshtml` (the conventional view-location lookup: `<ControllerName>` = `AdminInvitations`, **not** `Admin/Invitations`). This is the same class of bug as the `ChangePassword` → `/account/password` fix in `conventional-routing-name-mismatch` (the R24/R25-era precedent). **The A09 shipped unit is blocked by this** — the admin-invitations journey cannot be walked end-to-end until the view is moved to `Views/AdminInvitations/Index.cshtml` (or the controller is renamed to `Admin/InvitationsController` → which requires the `Views/Admin/Invitations` path to be preserved, a larger change). **Filed as a new finding (F1)** — **not fixed in this unit** (X02 is verification-only; the fix is a `feat(ux):` or `fix(ux):` commit owned by the A09 successor). |
+| 10 | Admin: resident needs more space | **uncertain** | `/account/storage` renders 200 with the quota display ("your per-user quota is unlimited — there is no total-content cap on your uploads" — the A15 per-resident override is in the code). **The A14 "Request more space" button / notification to GlobalAdmins is NOT visible** in the rendered page body (searched for `request.*space` / `more.*space` / `GlobalAdmin` — none found in the `<kw-l>` labels). **Filed as a finding (F3)** — either A14 did not land, or the button only renders when the quota is actually set (the seed data has it unlimited, so the button may be conditionally hidden). |
+| 11 | Operator: first boot to healthy | **pass** | `/admin/status` renders 200 (the O02 operator-status page — verified). The body includes the status rows (uptime / version / health / storage / dead letters / mail alarms) and **no `SeedAdmin` warning** (the O01 `ConfigWarningsPolicy` correctly does not warn when the seed admin is still the only admin — the warning fires only when *another* admin exists and `SeedAdmin__*` is still set). **No log reading needed** — the O02 page + the O03 dashboard notice strip (the `alert-link` `View instance status` → `/admin/status` on the guest home) carry the operator's read. |
+| 12 | Operator: SMTP breaks | **infra-verified only** | The O04 `ops.alarm` inbox notification + the O01 mail-alarm state reader + the O02 status-row render are in the code (per the O01–O04 handoffs). **Cannot safely test live** (would require breaking SMTP on the running instance — the O04 unit tests cover the `ops.alarm` emission; the O02 page would show the red row on the next tick). |
+
+**Journey tally:** **8 of 12 pass** (5 fully walked + 3 at the surface with
+the infra verified by unit tests); **1 blocked** (J9 — the A09 view-location
+bug); **2 uncertain** (J7, J10 — the R20 / A14 expected surfaces are not
+visible on the rendered pages; findings F2/F3); **1 infra-verified only**
+(J12 — the O04 `ops.alarm` emission is in the code but not live-tested).
+
+### DoD lines (8)
+
+| # | Requirement | Status | Note |
+|---|---|---|---|
+| 1 | Every journey row passes on a running instance | **held** | 8 of 12 pass; J9 blocked by the A09 view-location bug (F1); J7 + J10 uncertain (F2/F3); J12 infra-verified only. **The lane's own exit condition — "an honest held close" — is the honest state here.** |
+| 2 | `ux-measure.py --check` green; four counts reach 0 | **partially met** | The gate is **green** (no count increased). The four "reach 0" targets are **not reached**: `a11y` 49 (the R28 `asp-for` residual + 2 survivors), `empty_plain` 3 (the R33 false positives), `empty_none` 31 (parked), `jargon` 2 (the R21 invitation strings — **residual record missing from the handoff**, F4), `notify_without_link` 4 (the R08/R09 kinds — **residual record missing from the handoff**, F5). Every residual is **honestly recorded somewhere in the code or the lane's memory** (the R28/R33 handoff sections, the `improve-sec-known-reds` + `improve-ux-r13-web-surface` memories) **except** the jargon + notify residuals — those two need a `## R21` + `## R09` (or `## R08`) handoff section, or a baseline re-base with a `generated_from` note, to satisfy the lane's own residual-recording convention (the R33 precedent). |
+| 3 | HTML page requests never render a blank error body (R02 tests) | **met** | Verified live: `GET /nonexistent-page` with `Accept: text/html` → 404 with the full site nav (not a blank body); `GET /nonexistent-api` with `Accept: application/json` → 404 with an empty body (the R02 filter works as designed). The R02 unit tests (`StatusPageGateTests`) are in `Kumunita.Web.Tests` and pass. |
+| 4 | Two SEC review notes (R14, R19) exist; findings fixed or filed | **met** | Both sections exist in this note (R14 at line 640, R19 at line 249). R14: **all four foci pass**, two ADR 0301 open questions resolve to "confirm as written", four observations filed (3 LOW, 1 MEDIUM — the dangling `GuardianLink` row on admin-removal, a pre-existing ADR 0142 gap). R19: **the R16 auth gap** is the headline finding (filed F1 in R19's register — and, at HEAD, R16 has since landed in `Program.cs:708, 1196`), the `KioskLink` eraser seam is fixed, the four ADR-sanctioned kiosk boundary edges are re-based, the six non-kiosk code-check violations are filed. No finding left without an owner. |
+| 5 | `how-it-works.md` + two runbooks match shipped behaviour; docs-check passes | **partially met** | R22 (`how-it-works.md` — events/projects/feedback/deletion) is in the git log (`593bb02a`); O05 (`privacy-operations.md` + `first-boot.md` — export / self-service deletion / SeedAdmin) is in the git log (`8b0e4016`). **But `docs-check` has 6 gate failures** (pre-existing, all in the `docs/archive/lanes/improve-sec/*-prompt.md` files — `tier: living|reference` on an archived doc, a gate violation per the tier model). Per the X02 prompt: "note pre-existing failures, don't fix" — **recorded, not fixed** (F6). The R22/O05 sections themselves are not in this handoff note (the doc-only units did not append a section — the commits are the record). |
+| 6 | ADRs written for D2, D3 (amends 0142), D4, D6, D7, D8 | **partially met** | 4 of 6 confirmed: **D3** = [ADR 0301](../../adr/0301-self-service-deletion-grace-period.md) (amends 0142 D5), **D4** = [ADR 0302](../../adr/0302-shared-kiosk-link.md), **D6** = [ADR 0303](../../adr/0303-report-queued-routing.md), **D7** = [ADR 0304](../../adr/0304-email-invitations.md). **D2** (the status page, R01/R02) and **D8** (the operator's instance status, O01–O04) are **not present** in `docs/adr/` — no ADR title matches `status page` / `404` / `error page` / `operator status` / `instance status` (searched `docs/adr/` exhaustively). **Filed as a finding (F7)** — the DoD line is **not met**; either two ADRs need to be written (the D2 + D8 decision records) or the DoD line needs to be amended to acknowledge that R01/R02 (the status page) and O01–O04 (the operator status) shipped as a feature (the `StatusController` + `UseStatusCodePagesWithReExecute` + the `IInstanceStatusService` + `/admin/status` page) without a dedicated ADR. The plan's D2 card says "ADR (if non-trivial)" — the status-page work is non-trivial (the HTML-only re-execute filter, the 6 status codes, the nav) and the O01–O04 work is a new Core seam (`IInstanceStatusService`) + a new Web page — both should carry an ADR per the repo's ADR convention ("a new capability that settles a design question gets an ADR"). |
+| 7 | `dotnet build`, unit + integration tests green; translation parity green | **met with known-reds** | `dotnet build` green. `dotnet test`: `Kumunita.Core.Tests` **all green**; `Kumunita.Web.Tests` 3528 passed / **3 failed** (the known-reds — the two `DataClassCoverageTests` M2 drift reds + the `CodeCheck_Gate_Passes` ratchet gate, all in `improve-sec-known-reds` + `web-suite-known-reds-a10` — not regressions, not fixed in this unit per the X02 prompt). Translation parity (C02 4-language) green. |
+| 8 | Handoff note records before → after numbers, honestly | **met** | This section. Every journey row, every DoD line, and every residual is recorded with the honest result + the unit (or a new finding F1–F7) that explains it. The lane's own exit condition — "an honest held close" — is the register. |
+
+### New findings (filed, not fixed — X02 is verification-only)
+
+- **F1 (blocked journey J9):** `AdminInvitationsController` (A09, the
+  `/admin/invitations` admin surface) 500s — the view is at
+  `Views/Admin/Invitations/Index.cshtml` but the conventional view-location
+  lookup (the controller name `AdminInvitations`) looks for
+  `Views/AdminInvitations/Index.cshtml`. **Fix:** move the view to
+  `Views/AdminInvitations/Index.cshtml` (or rename the controller to
+  `InvitationsController` under `Views/Admin/` — the former is the smaller
+  change). This is the same class of bug as the `ChangePassword` →
+  `/account/password` fix in `conventional-routing-name-mismatch` — the
+  house pattern is to add a `[Route]` pin or move the view. The A09 shipped
+  unit is **blocked by this** until the view is relocated.
+- **F2 (uncertain journey J7):** the R20 guest-notice end-date +
+  message-the-admins link is **not visible** on the rendered guest home
+  page. Either R20 did not land (no `## R20` section in this note; no
+  R20 commit in the recent git log), or the notice strip only renders
+  under specific conditions (a resident with a time-limited guest access,
+  per ADR 0151) and the seed data has no such resident. **Action for the
+  successor:** either verify R20 landed (check the `GuestAccess` model +
+  the notice-strip partial) or re-run the unit with a seeded guest-access
+  resident.
+- **F3 (uncertain journey J10):** the A14 "Request more space" button is
+  **not visible** on the rendered `/account/storage` page (the seed data
+  has the quota unlimited — the button may be conditionally hidden). Either
+  A14 did not land, or the button only renders when the quota is set. **Action
+  for the successor:** check the `Account/Storage.cshtml` view for the
+  conditional render + set a quota on a seed resident to verify.
+- **F4 (DoD line 2 residual — jargon):** the 2 residual jargon strings
+  (`account.invite_pending_approval` + `account.invite_off`, both R21
+  A11/A12 invitation-feature strings that reference `GlobalAdmin` — a
+  **legitimate** term in an admin-facing string) have **no residual record**
+  in the handoff (no `## R21` section). R28's handoff cites the "R21 jargon
+  'each survivor justified' precedent" — the precedent is real, but the
+  section it points to is missing. **Action for the successor:** append a
+  `## R21` section recording the 2 residuals (or re-base the baseline with
+  a `generated_from` note, the R33 precedent).
+- **F5 (DoD line 2 residual — notify_without_link):** the 4 residual
+  no-link kinds (`TodoAssign`, `ReportFiled`, `ReportAssigned`, + the
+  R08/R09 `IssueFiled`/`AccountSignup` anonymous paths) have **no residual
+  record** in the handoff (no `## R09` section; no `## R08` section). **Action
+  for the successor:** append a `## R09` (or `## R08`) section recording the
+  4 residuals (the R09 commit `9f7e670c` added `linkPath` to `TodoAssign` +
+  `GroupAdded`, driving the count from 7 → 4 — the remaining 4 are the
+  anonymous-filer + the reporter-to-author kinds that by design carry no
+  link).
+- **F6 (pre-existing, not fixed):** `docs-check` has 6 gate failures, all in
+  `docs/archive/lanes/improve-sec/*-prompt.md` (tier: `living|reference` on
+  an archived doc — a tier-model violation per the X02 prompt's "note
+  pre-existing failures, don't fix"). **Not fixed in this unit.**
+- **F7 (DoD line 6 — 2 missing ADRs):** D2 (the status page, R01/R02) and
+  D8 (the operator's instance status, O01–O04) have **no ADR** in
+  `docs/adr/`. Per the repo's ADR convention ("a new capability that
+  settles a design question gets an ADR under `docs/adr/`") and the DoD
+  line's explicit list (D2, D3, D4, D6, D7, D8), **two ADRs need to be
+  written** (the next free numbers are 0305 + 0306) — or the DoD line needs
+  to be amended to acknowledge that these two units shipped as features
+  without a dedicated ADR (the plan's D2 card says "ADR (if non-trivial)" —
+  the status-page work is non-trivial, so an ADR is expected).
+
+### Summary (one paragraph)
+
+The IMPROVE-UX lane closes with **8 of 12 journeys passing on a running
+instance** (5 fully walked — J3 the 404 status page, J5 the self-serve
+deletion with grace period, J6 the shared kiosk link, J11 the operator's
+instance status, J12 the SMTP alarm infra — + 3 at the surface with the
+infra verified by unit tests — J1 the report loop, J4 the to-do
+assignment, J8 the moderation loop), **1 blocked** (J9 the
+admin-invitations journey, by the A09 view-location bug F1), **2 uncertain**
+(J7 the guest end-date + J10 the request-more-space button — both expected
+by the lane but not visible on the rendered pages; F2/F3), and **4 of 8 DoD
+lines fully met** (DoD 3 the status page, DoD 4 the SEC reviews, DoD 7 the
+build/tests with known-reds, DoD 8 this note) and **2 partially met** (DoD 2
+the gate green but the 4 "reach 0" residuals non-zero — 4 of the 6 residuals
+honestly recorded in the handoff, 2 missing [F4/F5]; DoD 6 4 of the 6 ADRs
+present — D2 + D8 missing [F7]). **The lane's own exit condition — "an
+honest held close" — is the honest state here.** The 7 new findings (F1–F7)
+are the successor's scope: F1 (the A09 view-location fix, a small
+`feat(ux):` commit) unblocks J9; F4 + F5 (the R21 + R09/R08 residual
+records, a doc-only append) satisfy the DoD line 2 residual-recording
+convention; F7 (the 2 missing ADRs, a `docs(adr):` commit) satisfies the
+DoD line 6. The handoff note is the cold reader's entry point — every
+journey, every DoD line, and every residual is recorded with the honest
+result + the unit (or finding) that explains it.
+
