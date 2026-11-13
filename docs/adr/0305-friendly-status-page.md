@@ -8,7 +8,7 @@ audiences: [developer, agent, platform-maintainer]
 related:
   - docs/adr/0154-production-error-handling.md
   - docs/adr/0155-issue-submission-escalation.md
-  - docs/plans-milestones/in-progress/plan-improve-ux.md
+  - docs/archive/lanes/improve-ux/plan-improve-ux.md
 supersedes: []
 superseded_by: []
 lane: improve-ux
@@ -31,7 +31,7 @@ existing error pipeline.
 > resident controllers render as **blank 404s/403s** with no nav, no
 > next step: a dead end for anyone following a link that has gone stale.
 > This ADR records decision **D2** of
-> [plan-improve-ux](../plans-milestones/in-progress/plan-improve-ux.md):
+> [plan-improve-ux](../archive/lanes/improve-ux/plan-improve-ux.md):
 > **one friendly status page site-wide** at `/status/{code}` — localized,
 > keeping the site nav, offering Back / Home / Search — wired via a
 > status-code re-execute **for HTML page requests only**, so fetch/JSON,

@@ -10,7 +10,7 @@ related:
   - docs/adr/0028-guardian-controls-account-scope-supervision.md
   - docs/adr/0300-issue-resolved-notification.md
   - docs/ops/privacy-operations.md
-  - docs/plans-milestones/in-progress/plan-improve-ux.md
+  - docs/archive/lanes/improve-ux/plan-improve-ux.md
 supersedes: []
 superseded_by: []
 lane: improve-ux

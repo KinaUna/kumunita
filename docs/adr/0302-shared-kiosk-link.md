@@ -10,7 +10,7 @@ related:
   - docs/adr/0164-kiosk-mode.md
   - docs/adr/0159-escalation-authorization.md
   - docs/adr/0142-delete-account.md
-  - docs/plans-milestones/in-progress/plan-improve-ux.md
+  - docs/archive/lanes/improve-ux/plan-improve-ux.md
 supersedes: []
 superseded_by: []
 lane: improve-ux
@@ -30,7 +30,7 @@ personal-kiosk mode (0164/0285) is untouched.
 > session, so a wall display in a common room needs a signed-in resident and
 > lands on the login screen when the session expires. This ADR adds the
 > *shared kiosk link* (decision D4 of
-> [plan-improve-ux](../plans-milestones/in-progress/plan-improve-ux.md)): a
+> [plan-improve-ux](../archive/lanes/improve-ux/plan-improve-ux.md)): a
 > **per-playlist, revocable, long-random-token** credential that authenticates
 > **only** on `/kiosk` + its slides, is **read-only**, shows **community-
 > visible items only** (anything else renders the existing denied slide),

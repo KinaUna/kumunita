@@ -10,7 +10,7 @@ related:
   - docs/adr/0156-storage-metrics-history.md
   - docs/adr/0162-analytics-history.md
   - docs/adr/0299-instance-export-operator-gated.md
-  - docs/plans-milestones/in-progress/plan-improve-ux.md
+  - docs/archive/lanes/improve-ux/plan-improve-ux.md
 supersedes: []
 superseded_by: []
 lane: improve-ux
@@ -37,7 +37,7 @@ all **reused, unchanged**; this ADR adds one read seam above them.
 > (SMTP down); first-boot config mistakes (`SeedAdmin__*` left set) are
 > invisible until someone reads the docs. This ADR records decision
 > **D8** of
-> [plan-improve-ux](../plans-milestones/in-progress/plan-improve-ux.md):
+> [plan-improve-ux](../archive/lanes/improve-ux/plan-improve-ux.md):
 > **`/admin/status`** — a read-only GlobalAdmin view (version + uptime,
 > the `/health` checks, dead-letter count, mail-alarm state, storage
 > metrics, and a `ConfigWarningsPolicy` such as "SeedAdmin still set after

@@ -41,7 +41,7 @@ to live here are in
 
 ## Current in-progress lane
 
-**IMPROVE-UX** is underway in [`in-progress/plan-improve-ux.md`](in-progress/plan-improve-ux.md); R01 (the status page) has shipped — begin its next unit with the [R02 prompt](in-progress/r02-prompt.md).
+**IMPROVE-UX** — closed on 2026-11-13 — shipped and closed; the register, the `x`/`r`/`a`/`o`-prompt unit prompts, and the handoff notes moved to the archive at [`archive/lanes/improve-ux/`](../archive/lanes/improve-ux/) (register [plan-improve-ux](../archive/lanes/improve-ux/plan-improve-ux.md), closing log [improve-ux-handoff-notes](../archive/lanes/improve-ux/improve-ux-handoff-notes.md)).
 
 **Latest lane: `CODE-HYGIENE`** — the code-hygiene lane (units `U00`–`U14`,
 proposed 2026-11-06) **shipped and closed on 2026-11-09** — the close unit

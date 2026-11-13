@@ -10,7 +10,7 @@ related:
   - docs/adr/0142-delete-account.md
   - docs/adr/0159-escalation-authorization.md
   - docs/adr/0302-shared-kiosk-link.md
-  - docs/plans-milestones/in-progress/plan-improve-ux.md
+  - docs/archive/lanes/improve-ux/plan-improve-ux.md
 supersedes: []
 superseded_by: []
 lane: improve-ux
@@ -34,7 +34,7 @@ the `?invite=` gate above it; A10 adds the acceptance notification).
 > dead end: the closed page promises "an administrator will add your
 > account" but no create/invite action exists. This ADR adds the
 > *invitation* (decision D7 of
-> [plan-improve-ux](../plans-milestones/in-progress/plan-improve-ux.md)):
+> [plan-improve-ux](../archive/lanes/improve-ux/plan-improve-ux.md)):
 > a **single-use, expiring, revocable** credential that opens sign-up for
 > one email address while the platform gate (`IsSignupOpenAsync`) is
 > closed. The token is **CSPRNG-generated (256 bits), shown to the inviter

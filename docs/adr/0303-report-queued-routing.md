@@ -6,7 +6,7 @@ kind: adr
 status: accepted
 audiences: [developer, agent, platform-maintainer]
 related:
-  - docs/plans-milestones/in-progress/plan-improve-ux.md
+  - docs/archive/lanes/improve-ux/plan-improve-ux.md
   - docs/adr/0077-admin-account-signup-verify-notification.md
   - docs/adr/0076-notifications-inbox-and-recipient-email.md
   - docs/adr/0006-module-boundary-contracts.md
