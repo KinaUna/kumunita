@@ -45,4 +45,17 @@ moves it to the archive.
 
 ## DX02 — ADR 0307: the developer feedback loop
 
-*(to be filled by the DX02 agent)*
+- **Files:** `docs/adr/0307-developer-feedback-loop.md` (new, 72 lines,
+  Accepted, records D1–D7); `docs/adr/README.md` index row.
+- **Renumber:** the plan's DX02 named "ADR 0300" — that is taken
+  (`0300-issue-resolved-notification.md`). The ADR lands as **0307** (next
+  free after 0306).
+- **Drift fact (index):** the prompt said "append after the 0306 row," but
+  the index's actual last row is **0304** — rows 0305 and 0306 are missing
+  (pre-existing; `improve-check` gate b already carries them as missing).
+  Appended 0307 after the real last row (0304); that reduces gate-b's
+  new-missing set from 3 (0305/0306/0307) to 2 (0305/0306). Not mine to
+  fix.
+- **Exit verified:** docs-check green *for the ADR* — no `0307` line in any
+  gate output; the 4 pre-existing reds (archive-stamp, missing front-matter
+  on archived prompts, one over-250-line ADR, broken links) are unchanged.
