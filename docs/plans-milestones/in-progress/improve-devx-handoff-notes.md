@@ -77,3 +77,24 @@ moves it to the archive.
   resolvable only from `in-progress/`, and not caused by, nor fixable from,
   this unit's deliverables. Gate 5 orphans improved 2 → 1 (the README/AGENTS
   rows de-orphanned the new doc).
+
+## DX04 — trim ci.yml, add dispatch, land first rule
+
+- **Files:** `.github/workflows/ci.yml` (282 → 145 lines);
+  `tools/devx/devx-check.ps1` (first rule `ci-triggers`);
+  `tools/devx/devx-baseline.json` (optional `ci_triggers` traceability entry).
+- **Comment ratio:** 158 of 282 (56 %) → 17 of 145 (11.7 %), target ≤ 20 %;
+  every prose block collapsed to one pointer line to its real home (ADR 0307 §D1,
+  the F14/F19 design docs, `docs/dev/testing-and-ci.md`) — the stale
+  "AGENTS.md § Running the tests" pointer is gone.
+- **Untouched:** all five jobs' `run:`/`uses:`/`with:`/`env:` lines are
+  byte-identical to HEAD (verified by diff); the three pinned F14 gate
+  commands and their step order are unchanged.
+- **Rule landed:** `ci-triggers` reads `branch-flow.md`'s declared CI branch
+  (ADR 0307 §D1, not the plan's "0300") at check time and compares it to
+  `ci.yml`'s `on:` branches — no baseline value needed.
+- **Superseded clause:** `branch-flow.md`'s "no `workflow_dispatch` yet (lands
+  in DX04)" is now stale — one-line reword deferred to DX35 (the doc is the
+  rule's source of truth, not a DX04 deliverable).
+- **Exit verified:** PyYAML parse OK; `devx-check.ps1` → "rules landed : 1",
+  result PASS.

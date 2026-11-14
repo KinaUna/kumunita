@@ -63,6 +63,12 @@
       "source": "E12 — tests/{coretest,coretest2,webtest,parity}.out tracked (300 KB). Target 0 (DX34).",
       "gate": "DX34 — devx-check, tracked *.out / *.log / *.trx baseline 0"
     },
+    "ci_triggers": {
+      "value": "release",
+      "shrink_only": false,
+      "source": "DX04 — traceability only: the declared CI branch. The rule (ci-triggers) reads docs/dev/branch-flow.md's 'Which branch CI watches' section at check time and compares it to ci.yml's on: push/pull_request branches; it needs no baseline value to pass.",
+      "gate": "DX04 — devx-check, ci.yml on: branches match branch-flow.md's declared CI branch"
+    },
     "ci_seconds": {
       "value": {
         "build": 72,

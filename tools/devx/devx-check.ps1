@@ -68,7 +68,39 @@ try {
 # none. DX04 adds the first (ci.yml triggers vs branch-flow.md); DX08 the
 # second (IClassFixture outside the allowlist). Each is a function appended
 # here that reads $baseline and calls Check — no change to this header.
-$ruleCount = 0
+
+# --- rule: ci-triggers (DX04) ----------------------------------------------------
+# ci.yml's on: branches (push + pull_request) must equal the CI branch declared in
+# docs/dev/branch-flow.md (the "Which branch CI watches" section). workflow_dispatch
+# carries no branches and is ignored. Fails if either file is unreadable (fail closed).
+function Get-CiTriggersBranches([string]$path) {
+  $branches = [System.Collections.Generic.List[string]]::new()
+  $inOn = $false; $trigger = $null; $expectBranch = $false
+  foreach ($raw in (Get-Content -LiteralPath $path)) {
+    $line = $raw -replace '\s+$', ''
+    if (-not $inOn) { if ($line -match '^on:\s*$') { $inOn = $true } ; continue }
+    if ($line -match '^\S') { break }
+    if ($line -match '^  (push|pull_request|workflow_dispatch|schedule|merge_group):\s*$') { $trigger = $Matches[1]; $expectBranch = $false; continue }
+    if ($line -match '^    branches:\s*$') { $expectBranch = ($trigger -in 'push','pull_request'); continue }
+    if ($line -match '^      -\s*(\S+)') { if ($expectBranch) { $branches.Add($Matches[1]) } ; continue }
+  }
+  return ,$branches
+}
+
+$ciPath = Join-Path $repo '.github/workflows/ci.yml'
+$bfPath = Join-Path $repo 'docs/dev/branch-flow.md'
+$ciBranches = if (Test-Path $ciPath) { Get-CiTriggersBranches $ciPath } else { @() }
+$declared = $null
+if (Test-Path $bfPath) {
+  $bf = Get-Content -LiteralPath $bfPath -Raw
+  if ($bf -match '(?ms)^##\s+Which branch CI watches\s*\n(.*?)(?=^##\s|\Z)') {
+    if ($Matches[1] -match 'CI runs on `([A-Za-z0-9_]+)`') { $declared = $Matches[1] }
+  }
+}
+$ciSet = @($ciBranches | Sort-Object -Unique)
+$triggersMatch = ($null -ne $declared) -and ($ciSet.Count -eq 1) -and ($ciSet[0] -eq $declared)
+Check "ci-triggers" "ci.yml on: branches ($($ciSet -join ', ')) match branch-flow.md's declared CI branch ($declared)" $triggersMatch
+$ruleCount = 1
 
 # --- summary --------------------------------------------------------------------
 Write-Host ""
@@ -76,7 +108,7 @@ Write-Host "devx-check — IMPROVE-DEVX gate (D7)"
 Write-Host "  rules landed : $ruleCount"
 if ($ruleCount -eq 0) { Write-Host "  (DX01 skeleton: 0 rules — rules land with their fixing units, D7)" }
 if ($failures.Count -eq 0) {
-  Write-Host "  result       : PASS (0 rules)"
+  Write-Host "  result       : PASS ($ruleCount rule(s))"
   exit 0
 } else {
   Write-Host "  result       : FAIL ($($failures.Count) failure(s))" -ForegroundColor Red
