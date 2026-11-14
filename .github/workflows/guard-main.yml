@@ -1,0 +1,24 @@
+# Guard main — a PR into `main` must come from `release` (ADR 0307 §D1).
+# The CI-side tripwire for the `main` owner-ops ruleset; see docs/dev/branch-flow.md.
+name: Guard main
+
+on:
+  pull_request:
+    branches:
+      - main
+
+# Least-privilege token: read-only (mirrors ci.yml's permissions block).
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      # Skipped (job passes) when the source branch is `release`; runs and
+      # fails for any other head — the guard's whole job.
+      - name: Require source branch `release`
+        if: github.head_ref != 'release'
+        run: |
+          echo "::error::PRs into main must come from the release branch — see docs/dev/branch-flow.md (ADR 0307 §D1)."
+          exit 1

@@ -98,3 +98,24 @@ moves it to the archive.
   rule's source of truth, not a DX04 deliverable).
 - **Exit verified:** PyYAML parse OK; `devx-check.ps1` → "rules landed : 1",
   result PASS.
+
+## DX05 — guard PRs into main
+
+- **Files:** `.github/workflows/guard-main.yml` (new, 26 lines) — the only
+  deliverable; `ci.yml` and `branch-flow.md` untouched (verified clean).
+- **Logic:** single step gated on `if: github.head_ref != 'release'` —
+  *skipped* (job passes) for a `release` PR, *runs + `exit 1`* (job fails)
+  for any other source branch; the failure message links
+  `docs/dev/branch-flow.md` and names ADR 0307 §D1.
+- **Not edited:** `branch-flow.md` already names this workflow (line 52) as
+  the CI-side tripwire for the `main` owner-ops ruleset — delivering that
+  line's target state, no duplication.
+- **No rule / baseline change:** DX04 (ci-triggers) and DX08 (IClassFixture)
+  are the lane's rule units; DX05 lands neither, so `devx-check.ps1` and
+  `devx-baseline.json` are unchanged.
+- **Owner-ops (deferred):** the throwaway-PR confirmation from `development`
+  (a non-`release` PR into `main` must fail) is recorded in `branch-flow.md`'s
+  ledger — cannot be opened from the sandbox.
+- **Exit verified:** PyYAML parse OK — `on: {pull_request: {branches: [main]}}`,
+  `permissions: contents: read`; `git status --short` shows only the new
+  workflow + this handoff note.
