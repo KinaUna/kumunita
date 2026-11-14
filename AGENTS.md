@@ -43,6 +43,7 @@ no multi-tenant data model.
   authoritative constraint.
 - [`docs/DOCS-CONVENTIONS.md`](docs/DOCS-CONVENTIONS.md) — the shared doc rules (front-matter, abstract,
   ADR cap, linking) — read before your first doc change.
+- [`docs/dev/branch-flow.md`](docs/dev/branch-flow.md) — the branch flow (`development` → `release` → `main`), which branch CI watches, and the owner-ops ledger (ADR 0307 D1).
 - `docs/dev/` — the working doctrine: [razor-verification](docs/dev/razor-verification.md), [testing-and-ci](docs/dev/testing-and-ci.md), [live-server-debugging](docs/dev/live-server-debugging.md), [agent-environment-quirks](docs/dev/agent-environment-quirks.md).
 
 ## The shape of the code

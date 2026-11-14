@@ -59,3 +59,21 @@ moves it to the archive.
 - **Exit verified:** docs-check green *for the ADR* — no `0307` line in any
   gate output; the 4 pre-existing reds (archive-stamp, missing front-matter
   on archived prompts, one over-250-line ADR, broken links) are unchanged.
+
+## DX03 — branch flow as a written rule
+
+- **Files:** `docs/dev/branch-flow.md` (new, 56 lines: front-matter + Abstract,
+  the three-branch table, CI-on-`release` fact, the pre/post-DX04 signal story,
+  owner-ops ledger); `docs/dev/README.md` (sixth table row); `AGENTS.md`
+  (one new `Start here` bullet before the `docs/dev/` doctrine bullet).
+- **Drift facts relied on:** `ci.yml` has no `workflow_dispatch` yet (the doc
+  says "lands in DX04", not "exists"); the `devx` required check is flagged
+  in the ledger as joining once DX33 lands.
+- **Exit:** docs-check FAIL set byte-for-byte identical to pre-DX03
+  (front-matter 17 / ADR-over-250 1 / broken 16 / archive 50 — all
+  pre-existing). One nuance: gate 4 names `branch-flow.md` as a target of a
+  link *inside the untracked `dx03-prompt.md` brief itself* (its line-94
+  README-row example) — pre-existing (present in the stashed-HEAD run),
+  resolvable only from `in-progress/`, and not caused by, nor fixable from,
+  this unit's deliverables. Gate 5 orphans improved 2 → 1 (the README/AGENTS
+  rows de-orphanned the new doc).

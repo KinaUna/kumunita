@@ -38,6 +38,7 @@ one fact, one place (the [linking rule](../DOCS-CONVENTIONS.md)).
 | [`testing-and-ci.md`](testing-and-ci.md) | The xunit.v3 test-runner quirk, the CI known-failure cheatsheet, and the by-design CI gates / anti-regression pins. |
 | [`live-server-debugging.md`](live-server-debugging.md) | The Postgres conventions that trip you up (`mt_doc_` naming, the `kumunita` vs `postgres` DB, `pgcrypto`, the `/admin/setup` 404). |
 | [`agent-environment-quirks.md`](agent-environment-quirks.md) | The git-state gotcha, the browser trusted-folder quirk, and the terminal-command safety rules for the WSL2 / Copilot sandbox. |
+| [`branch-flow.md`](branch-flow.md) | The `development` → `release` → `main` flow, which branch CI watches, and the owner-ops branch-protection ledger (ADR 0307 D1). |
 
 The entry pages that point into this folder are
 [`start/developer.md`](../start/developer.md) and
