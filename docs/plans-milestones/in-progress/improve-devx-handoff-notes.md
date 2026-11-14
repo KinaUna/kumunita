@@ -119,3 +119,27 @@ moves it to the archive.
 - **Exit verified:** PyYAML parse OK — `on: {pull_request: {branches: [main]}}`,
   `permissions: contents: read`; `git status --short` shows only the new
   workflow + this handoff note.
+
+## DX06 — server-scoped triage (no code)
+
+- **Files:** none (triage only) — no source, no `csproj`, no fixture, and no
+  `devx-check` rule / `devx-baseline.json` entry; the rule that *consumes* this
+  allowlist lands at **DX08**.
+- **The grep + its 3 hits:** the plan's own command (`grep -rln "CREATE ROLE\|
+  ALTER SYSTEM\|CREATE EXTENSION\|BootConnectionString\|Container\." tests
+  --include=*.cs`) yields exactly three files: `Core.Tests/PostgresFixture.cs`
+  and `Web.Tests/PostgresFixture.cs` are *the fixture, not a test class* (they
+  define `Container` / `BootConnectionString` / `NewDatabaseAsync` — the thing
+  being shared), so both are **excluded**; `F22_AppRoleCannotDropSchemaTests.cs`
+  is the **only test class**.
+- **Allowlist (Core) = `F22_AppRoleCannotDropSchemaTests` only** — catalog-level
+  `CREATE ROLE` / `CREATE DATABASE … OWNER kumunita_migrate` / `DROP DATABASE`
+  (ADR 0171 two-role-split witness) cannot share a per-class container with
+  parallel classes, so it keeps a private `IClassFixture<PostgresFixture>`.
+- **The rule that consumes this:** DX08 lands "devx-check counts
+  `IClassFixture<PostgresFixture>` usages outside the allowlist; baseline 0" —
+  so this section *is* the allowlist's source of truth.
+- **Cite:** ADR 0307 (D2); the plan body's "0300" is a stale number (same drift
+  the DX04 handoff recorded).
+- **Exit verified:** `git status --short` shows only this handoff note modified
+  (the untracked `dx0N-prompt.md` briefs stay untracked — DX37 archives them).
