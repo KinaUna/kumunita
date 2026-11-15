@@ -165,6 +165,23 @@ $badDesc = if ($badTasks.Count -eq 0) { 'none' } else { ($badTasks -join '; ') }
 Check "vscode-task-dotnet-test" "VS Code task(s) running 'dotnet test': $badDesc (expected none — the IDE loop routes through tools/check.ps1, D3)" ($badTasks.Count -eq 0)
 $ruleCount = 4
 
+# --- rule: code-map (DX15) --------------------------------------------------------
+# The generated code map (docs/dev/code-map.md, D4) must stay fresh: regenerating
+# it must produce no diff. code-map.ps1 -Check regenerates in memory and diffs
+# against the committed map (exit 0 = identical, 1 = stale or missing). This is
+# the "generated text only, no hand edits" gate — hand-editing the map fails here,
+# so the map and the code cannot drift apart. Runs code-map.ps1 in a child pwsh
+# (the house gate invocation check.ps1 uses for its scripts; the child's `exit`
+# only ends that process, so it cannot terminate this one — the DX13 contrast).
+$codeMapScript = Join-Path $repo 'tools/devx/code-map.ps1'
+$codeMapFresh = $false
+if (Test-Path $codeMapScript) {
+  $null = & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $codeMapScript -Check 2>&1
+  $codeMapFresh = ($LASTEXITCODE -eq 0)
+}
+Check "code-map" "docs/dev/code-map.md is fresh — regenerate with `pwsh tools/devx/code-map.ps1` when it goes stale (D4)" $codeMapFresh
+$ruleCount = 5
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"
