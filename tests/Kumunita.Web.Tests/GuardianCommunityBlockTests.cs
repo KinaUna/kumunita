@@ -44,7 +44,7 @@ namespace Kumunita.Web.Tests;
 /// cref="IUserInfoService.SetChildCommunityBlockAsync"/> seam, and the
 /// <c>guardian.community_block</c> audit row is only produced by the real store.
 /// </summary>
-public sealed class GuardianCommunityBlockTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class GuardianCommunityBlockTests(PostgresFixture fixture)
 {
     private const string Guardian = "cb-guardian-001";
     private const string Child = "cb-child-001";

@@ -85,7 +85,7 @@ namespace Kumunita.Web.Tests;
 /// no LINQ read).
 /// </para>
 /// </summary>
-public sealed class TagControllerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class TagControllerTests(PostgresFixture fixture)
 {
     // ── U8c reword lane — C-TG·5 standing split (404 vs 403) ─────────────
 

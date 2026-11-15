@@ -43,7 +43,7 @@ namespace Kumunita.Web.Tests;
 /// <c>SignInAsync</c>.
 /// </para>
 /// </summary>
-public sealed class VerifyConfirmStepTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class VerifyConfirmStepTests(PostgresFixture fixture)
 {
     private const string Subject = "user-a";
     private const string Email = "a@example.test";

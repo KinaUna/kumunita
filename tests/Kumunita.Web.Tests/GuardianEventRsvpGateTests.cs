@@ -53,7 +53,7 @@ namespace Kumunita.Web.Tests;
 /// <c>guardian.event_rsvp_mode</c> audit row is only produced by the real
 /// store.
 /// </summary>
-public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
 {
     private const string Guardian = "ge-guardian-0144";
     private const string Child = "ge-child-0144";

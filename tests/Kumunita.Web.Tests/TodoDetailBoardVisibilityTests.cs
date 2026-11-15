@@ -33,7 +33,7 @@ namespace Kumunita.Web.Tests;
 /// precedent).
 /// </para>
 /// </summary>
-public sealed class TodoDetailBoardVisibilityTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class TodoDetailBoardVisibilityTests(PostgresFixture fixture)
 {
     // A board the actor **may** read (the visible board + its lane).
     private const string Actor = "subj-is10-actor";

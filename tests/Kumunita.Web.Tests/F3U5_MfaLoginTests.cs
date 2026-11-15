@@ -39,7 +39,7 @@ namespace Kumunita.Web.Tests;
 /// <item><see cref="NonAdmin_MfaOptional"/> — proves §5 Leg 1.5c.</item>
 /// </list>
 /// </summary>
-public sealed class F3U5_MfaLoginTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
 {
     private const string Password  = "Sup3rSecret!";
     private const string AdminEmail  = "mfa-admin@examplium.com";

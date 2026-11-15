@@ -90,7 +90,7 @@ namespace Kumunita.Web.Tests;
 /// repo's role-claim convention).
 /// </para>
 /// </summary>
-public class PageControllerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class PageControllerTests(PostgresFixture fixture)
 {
     // ── 404 vs 403 split (the page-specific pin) ─────────────────────────
 

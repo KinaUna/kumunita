@@ -45,7 +45,7 @@ namespace Kumunita.Web.Tests;
 /// <c>SaveChangesAsync</c>, the F1 witness).</item>
 /// </list>
 /// </summary>
-public sealed class M16AcceptanceGateTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class M16AcceptanceGateTests(PostgresFixture fixture)
 {
     /// <summary>
     /// Extract the item id (the second path segment) from a

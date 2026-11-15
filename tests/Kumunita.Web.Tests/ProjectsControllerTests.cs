@@ -40,7 +40,7 @@ namespace Kumunita.Web.Tests;
 /// plain substitute).
 /// </para>
 /// </summary>
-public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ProjectsControllerTests(PostgresFixture fixture)
 {
     // ── 1 — Todos_List_AudienceFiltered ──────────────────────────────────────
 

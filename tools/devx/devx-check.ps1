@@ -122,6 +122,20 @@ $coreFixtureOk = ($coreFixtureNames.Count -le $coreFixtureAllowlist.Count) -and
 Check "iclassfixture" "Core IClassFixture<PostgresFixture> files ($($coreFixtureNames -join ', ')) ⊆ allowlist ($($coreFixtureAllowlist -join ', '))" $coreFixtureOk
 $ruleCount = 2
 
+# --- rule: iclassfixture-web (DX09) ---------------------------------------------
+# The Web side of D2: Kumunita.Web.Tests shares Core.Tests' PostgresFixture via
+# the assembly fixture, so *no* Web test file may still declare
+# IClassFixture<PostgresFixture> — there is no Web allowlist (the DX06 triage
+# found no server-scoped Web test; the only hit was PostgresFixture.cs itself,
+# which is the fixture, not a test class). obj/ and bin/ are excluded. Fails on
+# any Web file that still declares the pattern.
+$webFixtureFiles = @(Get-ChildItem -Path (Join-Path $repo 'tests/Kumunita.Web.Tests') -Filter '*.cs' -File -Recurse |
+  Where-Object { $_.FullName -notmatch '/obj/|/bin/' } |
+  Where-Object { (Select-String -LiteralPath $_.FullName -Pattern 'IClassFixture<PostgresFixture>' -SimpleMatch -Quiet) })
+$webFixtureNames = @($webFixtureFiles | ForEach-Object { $_.Name })
+Check "iclassfixture-web" "Web IClassFixture<PostgresFixture> files ($($webFixtureNames -join ', ')) — none expected (Web has no allowlist)" ($webFixtureNames.Count -eq 0)
+$ruleCount = 3
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"

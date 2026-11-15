@@ -49,7 +49,7 @@ namespace Kumunita.Web.Tests;
 /// established.
 /// </para>
 /// </summary>
-public sealed class GuardianTimeLimitSurfaceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class GuardianTimeLimitSurfaceTests(PostgresFixture fixture)
 {
     private const string Guardian = "m28-sf-guardian-001";
     private const string Child    = "m28-sf-child-001";

@@ -41,7 +41,7 @@ namespace Kumunita.Web.Tests;
 /// reshape it.
 /// </para>
 /// </summary>
-public sealed class M15AcceptanceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class M15AcceptanceTests(PostgresFixture fixture)
 {
     private const string Translator = "m15-acceptance-translator-001";
     private const string GlobalAdmin = "m15-acceptance-admin-001";

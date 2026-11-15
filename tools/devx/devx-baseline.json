@@ -10,14 +10,14 @@
   ],
   "rules": {
     "iclassfixture_classes": {
-      "value": 37,
+      "value": 1,
       "core": 1,
-      "web": 36,
+      "web": 0,
       "plan": 181,
       "plan_breakdown": "147 Core + 34 Web (E2, 2026-11-09)",
       "shrink_only": true,
-      "source": "E2 — one postgres:18 container per test class. DX07/DX08 landed: Core = 1 = the DX06 allowlist class only (F22_AppRoleCannotDropSchemaTests, server-scoped); the iclassfixture rule asserts the set outside the allowlist is empty. Web = 36, converted at DX09 (target 0 there).",
-      "gate": "DX08 — devx-check, iclassfixture: Core files declaring IClassFixture<PostgresFixture> ⊆ the DX06 allowlist (rules landed 1 → 2)"
+      "source": "E2 — one postgres:18 container per test class. DX07/DX08/DX09 landed: Core = 1 = the DX06 allowlist class only (F22_AppRoleCannotDropSchemaTests, server-scoped); Web = 0 = fully converted (DX09) — no Web allowlist (the DX06 triage found no server-scoped Web tests). 0 = Web fully converted (DX09); Core = 1 = the DX06 allowlist class only (DX08).",
+      "gate": "DX08+DX09 — devx-check, iclassfixture: Core files declaring IClassFixture<PostgresFixture> ⊆ the DX06 allowlist AND iclassfixture-web: the Web set is empty (rules landed 1 → 3)"
     },
     "test_files": {
       "value": 413,

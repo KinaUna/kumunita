@@ -46,7 +46,7 @@ namespace Kumunita.Web.Tests;
 /// <c>AttachmentController.Upload</c> convention): the write is the single
 /// <c>Document</c> store in the caller's session.
 /// </summary>
-public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class DocumentControllerTests(PostgresFixture fixture)
 {
     private const string Actor = "subj-m21-actor";
 

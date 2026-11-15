@@ -56,7 +56,7 @@ namespace Kumunita.Web.Tests;
 /// <c>AllKeys</c> and pin the same closure).</item>
 /// </list>
 /// </summary>
-public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class LocaleControllerQuietSectionTests(PostgresFixture fixture)
 {
     private const string Subject = "subj-quiet-001";
 

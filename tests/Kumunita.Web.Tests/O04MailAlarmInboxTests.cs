@@ -43,7 +43,7 @@ namespace Kumunita.Web.Tests;
 /// fully captured, no Notification row is written.
 /// </para>
 /// </summary>
-public sealed class O04MailAlarmInboxTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class O04MailAlarmInboxTests(PostgresFixture fixture)
 {
     private const string Admin1 = "admin-001";
     private const string Admin2 = "admin-002";

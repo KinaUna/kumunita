@@ -44,7 +44,7 @@ namespace Kumunita.Web.Tests;
 /// test consumes.
 /// </para>
 /// </summary>
-public sealed class SessionsKillAllExtTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class SessionsKillAllExtTests(PostgresFixture fixture)
 {
     private const string Password = "Sup3rSecret!";
 

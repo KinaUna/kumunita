@@ -38,7 +38,7 @@ namespace Kumunita.Web.Tests;
 /// live Marten query).
 /// </para>
 /// </summary>
-public sealed class AdminReadAuditTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class AdminReadAuditTests(PostgresFixture fixture)
 {
     private const string Admin = "is36-admin-001";
 

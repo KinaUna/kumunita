@@ -35,7 +35,7 @@ namespace Kumunita.Web.Tests;
 /// only — no PII).
 /// </para>
 /// </summary>
-public sealed class AdminTwoFactorMiddlewareTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class AdminTwoFactorMiddlewareTests(PostgresFixture fixture)
 {
     private const string Subject = "user-a";
     private const string Email = "a@example.test";

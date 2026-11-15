@@ -44,7 +44,7 @@ namespace Kumunita.Web.Tests;
 /// the <c>guardian.messaging_restrict</c> audit row is only produced by
 /// the real store.
 /// </summary>
-public sealed class GuardianMessagingRestrictionTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class GuardianMessagingRestrictionTests(PostgresFixture fixture)
 {
     private const string Guardian = "gm-guardian-001";
     private const string Child = "gm-child-001";

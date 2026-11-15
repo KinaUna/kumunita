@@ -46,7 +46,7 @@ namespace Kumunita.Web.Tests;
 ///   resolution needed (the <c>KwLRegistryConsistencyTests</c> idiom).</item>
 /// </list>
 /// </summary>
-public sealed class MfaQrTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class MfaQrTests(PostgresFixture fixture)
 {
     private const string Email = "mfa-qr@examplium.com";
     private const string Password = "Sup3rSecret!";

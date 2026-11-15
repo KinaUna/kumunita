@@ -30,7 +30,7 @@ namespace Kumunita.Web.Tests;
 ///       seed).</item>
 /// </list>
 /// </summary>
-public class NotificationFlushHandlerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class NotificationFlushHandlerTests(PostgresFixture fixture)
 {
     // ── Pin 1 — handler flushes + re-schedules at the resolved cadence ─────
 

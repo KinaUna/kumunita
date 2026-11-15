@@ -40,7 +40,7 @@ namespace Kumunita.Web.Tests;
 /// Synthetic fixture ids only — no real PII (the IS08 log gate).
 /// </para>
 /// </summary>
-public sealed class DeletionDueHandlerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class DeletionDueHandlerTests(PostgresFixture fixture)
 {
     // ── Happy path (the R12 headline) ─────────────────────────────────────
 

@@ -68,7 +68,7 @@ namespace Kumunita.Web.Tests;
 /// <see cref="EscalationOutboundConfig"/> singleton (the M15 GA-lane
 /// "integration test" idiom in this assembly).
 /// </para>
-public class EscalationInboundEndpointTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EscalationInboundEndpointTests(PostgresFixture fixture)
 {
     // ── 16 — a valid token + description → 200 + the escalated row (ESC·5) ──
     // FACES ESC-3: the endpoint parses the Bearer token, validates it (the

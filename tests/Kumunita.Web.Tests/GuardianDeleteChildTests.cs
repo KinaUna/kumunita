@@ -45,7 +45,7 @@ namespace Kumunita.Web.Tests;
 /// expected and irrelevant to the assertion target).
 /// </para>
 /// </summary>
-public sealed class GuardianDeleteChildTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class GuardianDeleteChildTests(PostgresFixture fixture)
 {
     private const string Guardian = "gd-guardian-001";
     private const string Child = "gd-child-001";

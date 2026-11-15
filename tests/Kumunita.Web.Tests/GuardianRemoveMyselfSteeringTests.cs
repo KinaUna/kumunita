@@ -39,7 +39,7 @@ namespace Kumunita.Web.Tests;
 /// excluded — they confer no standing, the G·2 rule).
 /// </para>
 /// </summary>
-public sealed class GuardianRemoveMyselfSteeringTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class GuardianRemoveMyselfSteeringTests(PostgresFixture fixture)
 {
     private const string Child = "rms-child-001";
     private const string GuardianA = "rms-guardian-a-001";

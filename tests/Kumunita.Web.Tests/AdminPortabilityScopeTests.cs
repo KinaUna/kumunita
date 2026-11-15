@@ -48,7 +48,7 @@ namespace Kumunita.Web.Tests;
 /// <c>Via: BreakGlass</c>.
 /// </para>
 /// </summary>
-public sealed class AdminPortabilityScopeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class AdminPortabilityScopeTests(PostgresFixture fixture)
 {
     private const string Admin = "pt-scope-admin-001";
 

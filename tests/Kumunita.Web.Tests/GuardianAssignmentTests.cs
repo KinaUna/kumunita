@@ -52,7 +52,7 @@ namespace Kumunita.Web.Tests;
 /// pause, not a silent add.
 /// </para>
 /// </summary>
-public sealed class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class GuardianAssignmentTests(PostgresFixture fixture)
 {
     private const string Guardian = "ga-guardian-001";
     private const string Child = "ga-child-001";

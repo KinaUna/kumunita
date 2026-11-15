@@ -48,7 +48,7 @@ namespace Kumunita.Web.Tests;
 /// <see cref="ProjectsControllerTests"/> / <see cref="PostgresFixture"/>
 /// precedent). The event-detail + write-lane directions are pure NSubstitute.
 /// </summary>
-public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class M14InterlockTests(PostgresFixture fixture)
 {
     // ── The three §gate acceptance tests (the pinned names, verbatim) ────────
 

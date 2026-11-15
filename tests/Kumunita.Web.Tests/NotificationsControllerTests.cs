@@ -42,7 +42,7 @@ namespace Kumunita.Web.Tests;
 /// cookie via <see cref="KumunitaPrincipal"/>.
 /// </para>
 /// </summary>
-public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class NotificationsControllerTests(PostgresFixture fixture)
 {
     private const string Actor = "subj-notif-actor";
 

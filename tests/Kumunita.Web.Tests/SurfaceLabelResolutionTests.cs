@@ -41,7 +41,7 @@ namespace Kumunita.Web.Tests;
 /// resolves to the *namespace*) — the exact <c>SiteContent.SiteContent</c>
 /// idiom.
 /// </para>
-public sealed class SurfaceLabelResolutionTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class SurfaceLabelResolutionTests(PostgresFixture fixture)
 {
     // ── 1 — a fresh instance's nav shows the shipped kw-l text (M29·1/M29·2/M29·4) ──
 

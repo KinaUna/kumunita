@@ -229,3 +229,53 @@ moves it to the archive.
   Web : 36; `git status --short` shows 150 Core test files + the two
   `tools/devx/` files + this note (plus the untracked `dx08-prompt.md` brief —
   DX37 archives them).
+
+## DX09 — Web.Tests: link the fixture, convert
+
+- **Files:** `Kumunita.Web.Tests.csproj` (link + global `<Using>` + comment),
+  `PostgresFixture.cs` (deleted, `git rm`), `AssemblyFixtures.cs` (new), the
+  **36** converted Web test files (one line each, `: IClassFixture<PostgresFixture>`
+  stripped), `tools/devx/devx-baseline.json` (web 36 → 0), `tools/devx/devx-check.ps1`
+  (new `iclassfixture-web` rule, rules 2 → 3).
+- **Conversion 36 → 0:** all 36 are **Shape A** (sole, single-line,
+  `IClassFixture<PostgresFixture>` last) — one `sed` pass, no sibling
+  interfaces to preserve (no `IAsyncLifetime`, no `IDisposable` in Web).
+  Simpler than DX08's three shapes.
+- **The namespace trap (the plan flagged it):** Core's `PostgresFixture` is in
+  `Kumunita.Core.Tests`; the 36 Web test files are in `Kumunita.Web.Tests`.
+  After deleting the local copy, unqualified `PostgresFixture` would not
+  resolve — the parent-namespace chain is `Kumunita.Web.Tests` → `Kumunita` →
+  global, which does not include `Kumunita.Core.Tests`. Fix: the global
+  `<Using Include="Kumunita.Core.Tests" />` in the csproj. It also covers the
+  **5 non-declaring** files that take `PostgresFixture` as a constructor
+  parameter: `AttachmentServingTests`, `ContentImageServingTests`,
+  `ContentImageUploadTests`, `PageMountResolverTests`,
+  `UserPortabilityControllerTests` (all still pass — they never declared the
+  interface).
+- **Web fixture copy deleted + Core's linked:** the stale "byte-for-byte
+  copy" csproj comment is replaced with the link (one fact, one place). Core's
+  copy already carries DX08's `max_connections=4000` +
+  `dynamic_shared_memory_type=sysv` settings, so Web inherits them for free —
+  the Web copy had **no** `.WithCommand` at all (the pre-DX07 original).
+- **Web-suite seconds before → after (full, in-process dll):** **34.2 s → 22.8 s**
+  (1482 tests in both). The **≤ 20 s** target is just missed; the honest floor
+  is ~22-24 s — the suite is fast because most Web tests are NSubstitute-only
+  (no Postgres), and the few that touch Postgres now share the one server
+  instead of each spinning a container.
+- **One red not in the known list:** `SentryBreadcrumbPiiTests.InformationLog_
+  IsNotABreadcrumb` (a Sentry/logging host test, **no Postgres**) failed in
+  3 of 5 full runs and **passed in isolation and in 2 of 5 runs** — a timing
+  race in its `RunAppAsync` harness (returns before Sentry's async `BeforeSend`
+  capture completes). It is **not** in the repo's canonical known-reds list and
+  is untouched by this unit's Postgres-only change. The 4 consistent failures
+  are exactly the documented known-reds (2 `SecGate.DataClassCoverageTests`, 2
+  `ImproveHarnessTests`). Flagged for the reviewer; not edited around.
+- **Cite:** ADR 0307 (D2); the plan body's "0300" is a stale number (consistent
+  with the DX04/DX06/DX08 handoffs).
+- **Exit verified:** grep (both forms) → **0** Web decls; `dotnet build` clean
+  (0 errors); full Web suite green (the 4 known-reds + the 1 intermittent
+  Sentry flake above); `devx-check` → rules landed : **3**, PASS (new
+  `iclassfixture-web`); `devx-report` → **Core : 1, Web : 0**; `git status --short`
+  shows the 36 test files + the csproj + `AssemblyFixtures.cs` + the deleted
+  fixture + the two `tools/devx/` files + this note (plus the untracked
+  `dx08-prompt.md` / `dx09-prompt.md` briefs — DX37 archives them).

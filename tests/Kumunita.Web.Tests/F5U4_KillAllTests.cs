@@ -80,7 +80,7 @@ namespace Kumunita.Web.Tests;
 /// AUTH-04 per the Razor-verification doctrine (AGENTS.md). These unit tests
 /// assert the seams; the E2E is the real evidence for AUTH-04.
 /// </summary>
-public sealed class F5U4_KillAllTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class F5U4_KillAllTests(PostgresFixture fixture)
 {
     private const string Password = "Sup3rSecret!";
 

@@ -63,7 +63,7 @@ namespace Kumunita.Web.Tests;
 /// leg</b> — a separate optional test for it is a judgment call, not required;
 /// this test drives the security-critical <c>Infected</c> path.</b>
 /// </para>
-public sealed class F16U3_ServeScanTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class F16U3_ServeScanTests(PostgresFixture fixture)
 {
     /// <summary>
     /// The pinned <c>InfectedUpload_NotServed</c> — all four §6 legs:

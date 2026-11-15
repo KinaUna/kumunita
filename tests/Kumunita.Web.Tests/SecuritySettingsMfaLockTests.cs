@@ -71,7 +71,7 @@ namespace Kumunita.Web.Tests;
 ///   <c>ResetAuthenticatorKeyAsync</c> seams are NOT called.</item>
 /// </list>
 /// </summary>
-public sealed class SecuritySettingsMfaLockTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class SecuritySettingsMfaLockTests(PostgresFixture fixture)
 {
     private const string Email = "mfa-lock@examplium.com";
     private const string Password = "Sup3rSecret!";

@@ -67,7 +67,7 @@ namespace Kumunita.Web.Tests;
 /// EF boot is load-bearing for <c>UserManager</c> stamp rotation, which has no
 /// analog in this test).
 /// </para>
-public sealed class F11U3_DeadLetterAlertTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class F11U3_DeadLetterAlertTests(PostgresFixture fixture)
 {
     // Fixed synthetic inputs (pin §4a leg-3 — direct-property asserts against
     // these exact values, not a self-referential "matches what I passed in").

@@ -72,7 +72,7 @@ namespace Kumunita.Web.Tests;
 /// <see cref="Kumunita.Core.Tests.EscalationTokenTests"/> — the service owns
 /// them).
 /// </para>
-public class EscalationTokenPageTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EscalationTokenPageTests(PostgresFixture fixture)
 {
     private const string Admin = "admin-esc-u08";
 
