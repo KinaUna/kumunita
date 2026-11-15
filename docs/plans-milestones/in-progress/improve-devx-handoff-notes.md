@@ -319,3 +319,41 @@ moves it to the archive.
   missing-tool rule proven (E6); a full run recorded above. `git status --short`
   shows `tools/check.ps1` + this note (plus the untracked `dx08`/`dx09`/`dx10`
   prompt briefs — DX37 archives them).
+
+## DX11 — `check.ps1 -Doctor`: the environment self-check
+
+- **Files:** `tools/check.ps1` (now **259 lines** — DX10 landed at 192; this
+  adds **+67** ≤ the plan's "≤ 80 more" budget, finished ≤ ~272). `-Doctor` is
+  a **mode, not a step**: a `[switch]$Doctor` in the existing `param()`, and
+  when set it runs the five checks and **`exit`s before the step loop** — it
+  never appends a step, so the step runner (and its green `-Only devx`) is
+  untouched. It reuses DX10's `Tool-Ensure`, `$installHints`, and `Find-RepoRoot`
+  — nothing re-copied.
+- **The five checks, in order, each printing `OK` (green) or the one-line fix:**
+  (1) `dotnet --version` == the `global.json` pin; (2) `node` / `pwsh` / `git`
+  on PATH; (3) Docker reachable — under rootless, `DOCKER_HOST` ==
+  `unix://$XDG_RUNTIME_DIR/docker.sock`; (4) a **real container start** (the plan
+  flagged Ryuk/socket as *unverified* — it is **detected** by `docker create` +
+  `start` on `alpine:3.20`, not assumed); (5) not a shallow clone (the base ref
+  `origin/development`, or `CODE_BASELINE_BASE`, is present). Exit **0** all-OK,
+  **1** on any failure.
+- **In *this* sandbox it comes out all-OK (exit 0):** `dotnet` 10.0.400 = the
+  pin; `node`/`pwsh`/`git` present; Docker **rootless** (`DockerRootDir`
+  `/home/agent/.local/share/docker`) with `DOCKER_HOST` ==
+  `unix://$XDG_RUNTIME_DIR/docker.sock`; no `TESTCONTAINERS_*` is set yet
+  containers start (the probe succeeds); the clone is **not** shallow (1858
+  commits, `--is-shallow-repository` → `false`).
+- **Both failure modes were forced to fire (verify, don't assume):**
+  (a) the **shallow-clone** line — a scratch `git clone --depth 1 -b
+  development` (shallow=`true`), with `CODE_BASELINE_BASE` pointed at an absent
+  ref, prints `run: git fetch --depth 50 origin development (bounded — not an
+  unbounded unshallow)`, exit 1; (b) the **Ryuk/socket** line — a scratch shell
+  with `DOCKER_HOST=unix:///nonexistent/dx11-broken.sock` prints `set
+  TESTCONTAINERS_RYUK_DISABLED=true and TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`
+  (and check 3's `DOCKER_HOST` fix), exit 1.
+- **DX10's exits unregressed:** `-Only devx` → **PASS, exit 0**; `-Only
+  docs,devx` → runs (`docs` FAIL + `devx` PASS), **exit 1**; `-Only tsc` →
+  **PASS**. `git status --short` shows `tools/check.ps1` + this note (plus the
+  untracked prompt briefs — DX37 archives them).
+- **Cite:** ADR **0307** (D3); the plan body's "0300" is a stale number
+  (consistent with the DX04/DX06/DX08/DX09/DX10 handoffs).

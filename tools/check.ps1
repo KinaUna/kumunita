@@ -32,7 +32,8 @@
 [CmdletBinding()]
 param(
   [switch]$Fast,
-  [string]$Only
+  [string]$Only,
+  [switch]$Doctor
 )
 
 $ErrorActionPreference = "Stop"
@@ -71,6 +72,72 @@ function Tool-Ensure([string]$name) {
   Write-Host "[FAIL] tool : $name is not on PATH" -ForegroundColor Red
   Write-Host "       install: $($installHints[$name])"
   return $false
+}
+
+# --- -Doctor self-check (DX11) — a mode, not a step: exits before the step loop -------
+# Verifies the prerequisites a full `check.ps1` run depends on (D3). Each check
+# prints OK (green) or a single-line FAIL with the fix. Reuses Tool-Ensure and
+# $installHints above. The plan flags the Ryuk/socket check as unverified — it is
+# *detected* by a real container start (alpine), not assumed.
+$doctorFailed = [System.Collections.Generic.List[string]]::new()
+function Doc-Check([string]$label, [bool]$ok, [string]$fix = '') {
+  if ($ok) { Write-Host "  [OK]  $label" -ForegroundColor Green }
+  else { Write-Host "  [FAIL]  $label" -ForegroundColor Red; if ($fix) { Write-Host "        $fix" }; $doctorFailed.Add($label) }
+}
+function Doc-Probe-ContainerStart {
+  $cid = ''; $ok = $false
+  $eapPrev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  $name = "dx11-$([guid]::NewGuid().ToString('n').Substring(0,8))"
+  try {
+    $cid = (& docker create --name $name alpine:3.20 echo ok 2>&1 | Out-String).Trim()
+    if ($cid.Length -lt 12) { return $false }
+    $null = & docker start $cid 2>&1; $ok = ($LASTEXITCODE -eq 0)
+  } finally {
+    if ($cid.Length -ge 12) { $null = & docker rm -f $cid 2>&1 }
+    $ErrorActionPreference = $eapPrev
+  }
+  return $ok
+}
+if ($Doctor) {
+  Write-Host "check.ps1 -Doctor — environment self-check (DX11)" -ForegroundColor Cyan
+  Write-Host "  repo : $repo"
+  Write-Host ""
+  Write-Host " 1. dotnet pin" -ForegroundColor Cyan
+  $pin = ''; if ((Test-Path global.json) -and [regex]::IsMatch((Get-Content global.json -Raw), '"version"\s*:\s*"\d+\.\d+\.\d+"')) { $pin = [regex]::Match((Get-Content global.json -Raw), '"version"\s*:\s*"(\d+\.\d+\.\d+)"').Groups[1].Value }
+  $v   = (dotnet --version 2>&1 | Select-Object -First 1).Trim()
+  Doc-Check "dotnet $v == global.json pin $pin" ($pin -ne '' -and $v -eq $pin) "install .NET 10 SDK 10.0.400 — $($installHints.dotnet)"
+  Write-Host ""
+  Write-Host " 2. node / pwsh / git" -ForegroundColor Cyan
+  Doc-Check "node on PATH" (Tool-Ensure 'node') "install Node.js — $($installHints.node)"
+  Doc-Check "pwsh on PATH" (Tool-Ensure 'pwsh') "install PowerShell 7 — $($installHints.pwsh)"
+  Doc-Check "git on PATH"  (Tool-Ensure 'git')  "install git — $($installHints.git)"
+  Write-Host ""
+  Write-Host " 3. Docker reachable" -ForegroundColor Cyan
+  $dockerOk = Tool-Ensure 'docker'
+  $dockerRoot = ''; $dockerInfoOk = $false
+  if ($dockerOk) { $eapPrev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; $dockerRoot = (& docker info --format '{{.DockerRootDir}}' 2>&1 | Out-String).Trim(); $dockerInfoOk = ($LASTEXITCODE -eq 0); $ErrorActionPreference = $eapPrev }
+  $rootless = ($dockerRoot -ne '' -and $dockerRoot -notmatch '^/var/lib/docker$')
+  $sockOk = $true
+  if ($rootless) {
+    $xrt      = $env:XDG_RUNTIME_DIR
+    $expected = if ($xrt) { "unix://$xrt/docker.sock" } else { 'unix://$XDG_RUNTIME_DIR/docker.sock' }
+    $sockOk   = ($env:DOCKER_HOST -eq $expected) -or ($xrt -and (Test-Path (Join-Path $xrt 'docker.sock')))
+  }
+  $dockerReach = ($dockerOk -and $dockerInfoOk -and $sockOk)
+  Doc-Check "docker reachable$(if ($rootless) { ' (rootless)' })" $dockerReach "check DOCKER_HOST points at unix://`$XDG_RUNTIME_DIR/docker.sock (rootless)"
+  Write-Host ""
+  Write-Host " 4. Testcontainers (real container start)" -ForegroundColor Cyan
+  $tcOk = if ($dockerReach) { (Doc-Probe-ContainerStart) } else { $false }
+  Doc-Check "a real container starts via the Docker socket" $tcOk 'set TESTCONTAINERS_RYUK_DISABLED=true and TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock'
+  Write-Host ""
+  Write-Host " 5. shallow clone" -ForegroundColor Cyan
+  $baseRef = if ($env:CODE_BASELINE_BASE) { $env:CODE_BASELINE_BASE } else { 'origin/development' }
+  $shallow = ((git rev-parse --is-shallow-repository 2>&1 | Out-String).Trim() -eq 'true')
+  $baseRefOk = -not ($shallow -and -not (& git rev-parse --verify -q $baseRef 2>$null | Out-String).Trim())
+  Doc-Check "not a shallow clone (base ref $baseRef present)" $baseRefOk 'run: git fetch --depth 50 origin development   (bounded — not an unbounded unshallow)'
+  Write-Host ""
+  if ($doctorFailed.Count -eq 0) { Write-Host "doctor: ALL CHECKS OK — the environment is ready for `check.ps1`." -ForegroundColor Green; exit 0 }
+  else { Write-Host "doctor: $($doctorFailed.Count) CHECK(S) FAILED: $($doctorFailed -join '; ')" -ForegroundColor Red; exit 1 }
 }
 
 # --- step selection ----------------------------------------------------------------
