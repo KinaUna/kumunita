@@ -86,7 +86,7 @@ namespace Kumunita.Core.Tests;
 /// written — the same C-M9·2 hard gate as the M9 surface.</item>
 /// </list>
 /// </summary>
-public class GroupMessagingServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GroupMessagingServiceTests(PostgresFixture fixture)
 {
     // ── Open — the creator is the only initial participant ───────────────
 

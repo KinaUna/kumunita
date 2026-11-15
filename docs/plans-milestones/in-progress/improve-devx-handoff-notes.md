@@ -174,3 +174,58 @@ moves it to the archive.
 - **Exit verified:** the 5 classes pass via `-class`; the full Core suite is
   green; `git status --short` shows the 6 test files + `AssemblyFixtures.cs` +
   this note (plus the untracked `dx08-prompt.md` brief — DX37 archives them).
+
+## DX08 — convert the rest of Core.Tests
+
+- **Files:** the 148 non-allowlist Core test classes (one line each),
+  `F22_AppRoleCannotDropSchemaTests.cs` (the `// server-scoped:` comment,
+  pattern untouched), `tools/devx/devx-check.ps1` (the `iclassfixture` rule),
+  `tools/devx/devx-baseline.json` (`core` 154 → 1, value 190 → 37), and — a
+  required deviation, see below — `PostgresFixture.cs` (the shared-server
+  connection settings).
+- **The 149 → 1 conversion:** `grep -rln` now returns exactly
+  `F22_AppRoleCannotDropSchemaTests.cs` (its `AppRoleCannotDropSchemaTests`
+  class keeps `IClassFixture<PostgresFixture>` — the DX06 allowlist). The
+  sibling interfaces are preserved: the 5 Shape-B classes keep `IAsyncLifetime`,
+  `Media/LocalVolumeMediaStoreTests` keeps `IDisposable`.
+- **The three shapes are why a blind sed was unsafe** (counted from the diff):
+  **Shape A — sole, single-line — 130** files (`…fixture) : IClassFixture<…>`);
+  **Shape B — sibling `IAsyncLifetime` — 5** (drop the token + its comma, keep the
+  sibling); **Shape C — declared on its own line — 14** (13 sole, deleted the
+  line; `Media/LocalVolumeMediaStoreTests` kept `IDisposable`). A naive
+  `s/.*IClassFixture<…>.*/…/` would have mangled B (deleted `IAsyncLifetime`) and
+  missed all of C entirely.
+- **Rule + baseline moved:** the `iclassfixture` devx rule landed (rules 1 → 2,
+  PASS) asserting the Core file set is `⊆ { F22_… }` (allowlist inline, cited to
+  this note's `## DX06` as source of truth); `devx-baseline.json`
+  `iclassfixture_classes.core` **154 → 1** (shrink-only-legal), `value` 190 → 37.
+  `devx-report.ps1` confirms **Core : 1, Web : 36** (Web is DX09, untouched).
+- **The required deviation — `PostgresFixture.cs`:** DX07's
+  `max_connections=300` was sized for its 5-class proof. Once the whole assembly
+  shares one server, 154 classes each carry a default `MaxPoolSize=100` Npgsql
+  pool and idle connections linger → **1323 fails `53300: too many clients
+  already`**. Raising to 4000 cleared the client demand (no more 53300) but
+  exposed the container's 64 MB `/dev/shm` (Docker default, not the host's 24 GB)
+  on Postgres's `posix` per-backend shared memory → **559 fails `53100: could not
+  resize shared memory segment … No space left on device`**. The fix is two
+  standard Postgres settings on the D2 fixture line: `max_connections=4000`
+  (host has 46 GB / 32 cores) + `dynamic_shared_memory_type=sysv` (route
+  per-connection shared memory to host kernel SHM, not the 64 MB `/dev/shm`).
+  With both, **2051 tests, 0 failed, 2 skipped** — the full suite is green.
+  This was not in the DX08 deliverable list; it was a hard exit (green suite) the
+  plan's ceiling could not meet on its own. Flagging for the reviewer, not
+  editing around a failing test.
+- **Core-suite seconds before → after (full, in-process dll):** **220 s → 178 s**
+  (2051 tests, 0 failed, 2 skipped in both). The 90 s target is **not met** —
+  the honest floor with its reason: with one shared container the ~148 redundant
+  container startups are gone (a small fraction), but the dominant cost is
+  per-class `CREATE DATABASE` (`NewDatabaseAsync`, one fresh scratch DB per class)
+  plus test execution itself, neither of which sharing a server reduces. 178 s is
+  the real floor at 32-core parallelism.
+- **Cite:** ADR 0307 (D2); the plan body's "0300" is a stale number (consistent
+  with the DX04/DX06 handoffs).
+- **Exit verified:** grep → exactly `F22_…`; `dotnet build` clean; full Core
+  suite green; `devx-check` → rules landed : 2, PASS; `devx-report` → Core : 1,
+  Web : 36; `git status --short` shows 150 Core test files + the two
+  `tools/devx/` files + this note (plus the untracked `dx08-prompt.md` brief —
+  DX37 archives them).

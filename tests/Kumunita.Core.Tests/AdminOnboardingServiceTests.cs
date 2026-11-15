@@ -70,7 +70,7 @@ namespace Kumunita.Core.Tests;
 /// No new Core or Web code; the service is U03's deliverable — these pins
 /// are the first M30 service tests (the U06 seam-test unit).
 /// </para>
-public class AdminOnboardingServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class AdminOnboardingServiceTests(PostgresFixture fixture)
 {
     // ── 1 — a missing store degrades to null (M30·2 / M30·3) ──────────────
     // A test construction with no usable IDocumentStore (the QuerySession

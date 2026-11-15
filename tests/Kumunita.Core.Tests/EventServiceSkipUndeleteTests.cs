@@ -25,7 +25,7 @@ namespace Kumunita.Core.Tests;
 /// them is not done.
 /// </para>
 /// </summary>
-public class EventServiceSkipUndeleteTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EventServiceSkipUndeleteTests(PostgresFixture fixture)
 {
     // ── GATE-3 (1) — skip is a soft-delete of one row (reversible) ─────────
 

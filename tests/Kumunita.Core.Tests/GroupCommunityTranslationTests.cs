@@ -23,7 +23,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="PostgresFixture"/> / <c>BootStoreAsync</c> /
 /// <c>UserInfoService</c> harness as the M3 tests.
 /// </summary>
-public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GroupCommunityTranslationTests(PostgresFixture fixture)
 {
     private const string GroupId = "a026-grp";
     private const string ComponentId = "a026-comp";

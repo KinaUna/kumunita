@@ -18,7 +18,7 @@ namespace Kumunita.Core.Tests.Posts;
 /// <see cref="PostService.ListFeedAsync"/> (the community-feed seam; the
 /// other two seams share the identical <c>OrderByPostSort</c> helper).
 /// </summary>
-public class PostSortTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class PostSortTests(PostgresFixture fixture)
 {
     private const string ComponentId = "c-u4-sort";
 

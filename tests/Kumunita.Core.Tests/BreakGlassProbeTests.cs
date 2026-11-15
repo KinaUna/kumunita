@@ -22,7 +22,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="AuthorizationServiceTests"/>.
 /// </para>
 /// </summary>
-public class BreakGlassProbeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class BreakGlassProbeTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task Probe_ActiveOverride_True()

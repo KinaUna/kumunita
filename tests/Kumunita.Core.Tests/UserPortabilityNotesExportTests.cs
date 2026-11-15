@@ -54,7 +54,7 @@ namespace Kumunita.Core.Tests;
 /// real addresses, no note bodies beyond the synthetic strings.
 /// </para>
 /// </summary>
-public sealed class UserPortabilityNotesExportTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class UserPortabilityNotesExportTests(PostgresFixture fixture)
 {
     // ── The shared boot (the same shape as UserPortabilityExportTests,
     //    with PersonalNotesDocTypes added so the new closed-set rows

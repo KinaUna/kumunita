@@ -41,7 +41,7 @@ namespace Kumunita.Core.Tests;
 /// inclusive, the end bound is exclusive.
 /// </para>
 /// </summary>
-public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EventCalendarSeamTests(PostgresFixture fixture)
 {
     // The pinned test window — 2099-09-01T00:00Z (inclusive) …
     // 2099-10-01T00:00Z (exclusive). A 31-day span (the controller's 30-day

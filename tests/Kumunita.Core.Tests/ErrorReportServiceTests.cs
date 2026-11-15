@@ -59,7 +59,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="Kumunita.Core.CoreDocTypes.Configure"/> is included because it
 /// registers the <c>AccessAudit</c> doc (the audit-row half of every write).
 /// </para>
-public class ErrorReportServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ErrorReportServiceTests(PostgresFixture fixture)
 {
     // ── 1 — anonymous create: row + audit (Via = Anonymous) (M31·5) ───────
     // A blank SubjectId (an anonymous 500 submitter, FACES M31-1) stores the

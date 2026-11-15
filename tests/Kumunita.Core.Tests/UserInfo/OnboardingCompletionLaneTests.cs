@@ -42,7 +42,6 @@ namespace Kumunita.Core.Tests.UserInfo;
 /// </list>
 /// </summary>
 public sealed class OnboardingCompletionLaneTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     // ── GATE-1 — fresh profile reads null (the floor) on both seams ──────
     [Fact]

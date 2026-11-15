@@ -29,7 +29,7 @@ namespace Kumunita.Core.Tests;
 /// "moderation does not override owner" assertion.
 /// </para>
 /// </summary>
-public class AuthorizationServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class AuthorizationServiceTests(PostgresFixture fixture)
 {
     // ── Pure matcher truth table (no Postgres) ───────────────────────────
     //

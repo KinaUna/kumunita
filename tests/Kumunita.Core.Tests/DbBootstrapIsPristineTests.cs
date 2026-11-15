@@ -12,7 +12,7 @@ namespace Kumunita.Core.Tests;
 /// gate runs), so a <c>mt</c>-only DB is still a valid "first boot" and must be reported
 /// as pristine (see the method docs on <see cref="DbBootstrap.IsPristineAsync"/>).
 /// </summary>
-public class DbBootstrapIsPristineTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public class DbBootstrapIsPristineTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private string _connection = "";
 

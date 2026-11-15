@@ -26,7 +26,7 @@ namespace Kumunita.Core.Tests;
 /// reused to pin GE·2 lane exclusivity (a group event never reaches them).
 /// </para>
 /// </summary>
-public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GroupEventServiceTests(PostgresFixture fixture)
 {
     // ── 1 — GE1_MemberSeesGroupEventsFeed (GE·1, GE·5 aggregate Allow) ─────
     //

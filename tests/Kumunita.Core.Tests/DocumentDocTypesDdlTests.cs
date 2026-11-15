@@ -24,7 +24,7 @@ namespace Kumunita.Core.Tests;
 /// (outside the design doc's §9 gate list — the M16/U01 precedent; GATE-4 is
 /// the zero-new-authorization-surface pin this unit's adapter upholds).
 /// </summary>
-public class DocumentDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public class DocumentDocTypesDdlTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private string _connection = "";
 

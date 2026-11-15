@@ -30,7 +30,7 @@ namespace Kumunita.Core.Tests;
 /// seam-test Rule 2 (<see cref="IGroupPostService"/> named by a test file).
 /// </para>
 /// </summary>
-public class GroupPostServiceSeamTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GroupPostServiceSeamTests(PostgresFixture fixture)
 {
     // ── 1 — the feed: a member sees the group channel (G1) ────────────────
     //

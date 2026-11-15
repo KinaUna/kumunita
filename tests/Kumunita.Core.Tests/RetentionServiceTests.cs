@@ -25,7 +25,7 @@ namespace Kumunita.Core.Tests;
 /// <c>a@example.test</c>) — no real PII (rule 8 / the IS08 gate).
 /// </para>
 /// </summary>
-public sealed class RetentionServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class RetentionServiceTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task Retention_DeletesOldRevokedSessions_KeepsLive()

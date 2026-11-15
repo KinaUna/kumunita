@@ -44,7 +44,7 @@ namespace Kumunita.Core.Tests;
 /// time — the test name is kept verbatim (a rename is a breaking change to §6.4).
 /// </para>
 /// </summary>
-public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class NotificationServiceTests(PostgresFixture fixture)
 {
     // ── F1 — Emit_PostReply_Stores_InboxRow_And_Stages_Email_For_Author ─────
     //

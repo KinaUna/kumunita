@@ -43,7 +43,7 @@ namespace Kumunita.Core.Tests;
 /// <c>GetBundledBaselineAsync("pl")</c> is <c>null</c>.</li>
 /// </ol>
 /// </summary>
-public class ADR_0044_BaselineTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ADR_0044_BaselineTests(PostgresFixture fixture)
 {
     // ── 1 — Parity (the headline): warm-add seeds the full baseline, exact ──
     [Theory]

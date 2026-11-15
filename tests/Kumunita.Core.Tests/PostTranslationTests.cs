@@ -24,7 +24,7 @@ namespace Kumunita.Core.Tests;
 /// display probe. Same <see cref="PostgresFixture"/> / <c>BootStoreAsync</c> /
 /// <c>Services</c> harness as the M3 tests.
 /// </summary>
-public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class PostTranslationTests(PostgresFixture fixture)
 {
     private const string ComponentId = "c-a022-comp";
 

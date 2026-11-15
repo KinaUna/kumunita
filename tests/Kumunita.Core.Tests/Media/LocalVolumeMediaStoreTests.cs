@@ -14,7 +14,7 @@ namespace Kumunita.Core.Tests.Media;
 /// temp-dir <see cref="IMediaFileStore"/> (no live volume).
 /// </summary>
 public sealed class LocalVolumeMediaStoreTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>, IDisposable
+    : IDisposable
 {
     private static readonly List<string> Roots = [];
 

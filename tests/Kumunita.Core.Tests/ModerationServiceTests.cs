@@ -35,7 +35,7 @@ namespace Kumunita.Core.Tests;
 /// file, the M3b ADDs).
 /// </para>
 /// </summary>
-public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ModerationServiceTests(PostgresFixture fixture)
 {
     private const string ComponentId = "c-m3b-comp";
 

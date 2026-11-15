@@ -33,7 +33,7 @@ namespace Kumunita.Core.Tests.MiscList;
 /// <c>*_SortModified*</c> tests pin that *actual* documented behavior.
 /// </para>
 /// </summary>
-public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class MiscListSortTests(PostgresFixture fixture)
 {
     // ═══════════════════════════ ANNOUNCEMENTS (row 11) ═════════════════
 

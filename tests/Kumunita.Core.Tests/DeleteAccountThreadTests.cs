@@ -37,7 +37,7 @@ namespace Kumunita.Core.Tests;
 /// is constructed directly, no Web types.
 /// </para>
 /// </summary>
-public sealed class DeleteAccountThreadTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class DeleteAccountThreadTests(PostgresFixture fixture)
 {
     // ── D3 pinned tests (design §2.3, verbatim names) ──────────────────────
 

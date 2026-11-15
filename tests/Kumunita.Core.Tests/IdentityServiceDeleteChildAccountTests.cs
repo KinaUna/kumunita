@@ -45,7 +45,7 @@ namespace Kumunita.Core.Tests;
 /// </para>
 /// </summary>
 public sealed class IdentityServiceDeleteChildAccountTests(
-    PostgresFixture fixture) : IClassFixture<PostgresFixture>
+    PostgresFixture fixture)
 {
     // ── C·2 — a non-guardian cannot delete (deny-by-default, 404) ─────────
 

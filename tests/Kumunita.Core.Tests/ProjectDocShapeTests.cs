@@ -24,7 +24,7 @@ namespace Kumunita.Core.Tests;
 /// shapes** compiling + registering, not behavior (the behavior pins are
 /// U02–U09's, the §9.6 pinned names).
 /// </summary>
-public class ProjectDocShapeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ProjectDocShapeTests(PostgresFixture fixture)
 {
     /// <summary>
     /// The two PL documents boot through <see cref="ProjectDocTypes.Configure"/>

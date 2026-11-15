@@ -34,7 +34,7 @@ using Xunit;
 
 namespace Kumunita.Core.Tests;
 
-public sealed class ResidentInviteSettingTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class ResidentInviteSettingTests(PostgresFixture fixture)
 {
     private const string Admin = "admin-resident-invite-001";
     private const string Resident = "resident-001";

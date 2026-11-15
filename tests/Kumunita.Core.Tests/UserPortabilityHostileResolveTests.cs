@@ -33,7 +33,7 @@ namespace Kumunita.Core.Tests;
 /// hostile row is never stored, and the result's message list carries
 /// <c>import.rejected:&lt;reason&gt;</c> (the guard's verbatim reason code).
 /// </summary>
-public sealed class UserPortabilityHostileResolveTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class UserPortabilityHostileResolveTests(PostgresFixture fixture)
 {
     private sealed record Booted(
         IDocumentStore store,

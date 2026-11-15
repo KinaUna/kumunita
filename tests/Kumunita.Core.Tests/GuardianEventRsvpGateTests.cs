@@ -52,7 +52,6 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     private const string EventId = "ev-0144";
     private const string AuthorId = "subj-author-0144";

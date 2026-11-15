@@ -45,7 +45,7 @@ namespace Kumunita.Core.Tests;
 /// L8's <see cref="Post"/> plant).
 /// </para>
 /// </summary>
-public class MLUI_FacesTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class MLUI_FacesTests(PostgresFixture fixture)
 {
     // ── L1 — a signed-in resident with a `pl` preference sees the nav in Polish ──
     // (M·1, M·10.) D8-2: the view path at the cookie→provider seam. Seed the

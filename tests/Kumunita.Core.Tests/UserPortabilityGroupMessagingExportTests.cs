@@ -47,7 +47,7 @@ namespace Kumunita.Core.Tests;
 /// <c>m32-resident-a</c> / <c>m32-resident-b</c>; emails
 /// <c>a@x.com</c> / <c>b@x.com</c>. No real PII.
 /// </para>
-public sealed class UserPortabilityGroupMessagingExportTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class UserPortabilityGroupMessagingExportTests(PostgresFixture fixture)
 {
     private sealed record Booted(
         IDocumentStore store,

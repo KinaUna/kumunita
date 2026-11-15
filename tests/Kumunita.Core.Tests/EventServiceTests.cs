@@ -68,7 +68,7 @@ namespace Kumunita.Core.Tests;
 /// read + standing names above are pinned.
 /// </para>
 /// </summary>
-public class EventServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EventServiceTests(PostgresFixture fixture)
 {
     // ── 1 — M4_FeedVisibleToAudienceMember (feed, C6 / C3) ───────────────────
     //

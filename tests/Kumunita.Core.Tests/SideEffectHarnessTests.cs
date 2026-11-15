@@ -35,7 +35,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="AuditPurgeSummary"/> audit-of-audit per run (§5).</item>
 /// </list>
 /// </summary>
-public class SideEffectHarnessTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class SideEffectHarnessTests(PostgresFixture fixture)
 {
     // ── Dead-letter row shape + same-transaction commit ──────────────────
 

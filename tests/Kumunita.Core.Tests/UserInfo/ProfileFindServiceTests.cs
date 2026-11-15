@@ -37,7 +37,6 @@ namespace Kumunita.Core.Tests.UserInfo;
 /// </para>
 /// </summary>
 public sealed class ProfileFindServiceTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     // ── Test 1 — by-tag over visible profiles only (GATE-2) ───────────────
     //

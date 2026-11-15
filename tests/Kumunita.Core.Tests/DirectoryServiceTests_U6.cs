@@ -24,7 +24,7 @@ namespace Kumunita.Core.Tests;
 /// assembly — the same <c>PostgresFixture</c>, same <c>BootStoreAsync</c> shape,
 /// same service-composition pattern U5 established.
 /// </summary>
-public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class DirectoryServiceTests_U6(PostgresFixture fixture)
 {
     // ── Test 1 — ContactVisibility_FourShape_TrightTable (§2.4, C-M2·1) ──────
     //

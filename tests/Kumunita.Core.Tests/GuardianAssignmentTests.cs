@@ -45,7 +45,7 @@ namespace Kumunita.Core.Tests;
 /// silent add.
 /// </para>
 /// </summary>
-public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GuardianAssignmentTests(PostgresFixture fixture)
 {
     // ── The known-email resolution — the seam's happy path ───────────────────
     // Seed a verified account through the M1 lifecycle (RegisterAsync +

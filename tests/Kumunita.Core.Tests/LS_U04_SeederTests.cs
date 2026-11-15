@@ -38,7 +38,7 @@ namespace Kumunita.Core.Tests;
 /// No new Core or Web code beyond the U04 seeder change; no new seams.
 /// </para>
 /// </summary>
-public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class LS_U04_SeederTests(PostgresFixture fixture)
 {
     // ── 1 — the first-boot catalog state (ADR 0042 D4) ─────────────────────
     // After a seeded boot: the catalog is exactly en(sort 0) / de(sort 1) /

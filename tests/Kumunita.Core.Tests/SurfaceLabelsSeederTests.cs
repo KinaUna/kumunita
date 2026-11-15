@@ -45,7 +45,7 @@ namespace Kumunita.Core.Tests;
 /// <para>
 /// No new Core or Web code beyond the U04 seeder change; no new seams.
 /// </para>
-public class SurfaceLabelsSeederTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class SurfaceLabelsSeederTests(PostgresFixture fixture)
 {
     // ── 1 — a fresh boot stores exactly one SurfaceLabels row ───────────────
     // (the SiteContent / LocaleSettings "one row per instance" shape,

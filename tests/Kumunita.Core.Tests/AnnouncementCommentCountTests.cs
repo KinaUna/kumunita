@@ -12,7 +12,7 @@ namespace Kumunita.Core.Tests;
 /// behind the announcement card footer's comment count. Its own file, like
 /// <c>PostReplyCountTests</c>, so the big <c>AnnouncementServiceTests</c> stays untouched.
 /// </summary>
-public class AnnouncementCommentCountTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class AnnouncementCommentCountTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task CountAnnouncementCommentsAsync_EmptyInput_ReturnsEmpty()

@@ -25,7 +25,7 @@ namespace Kumunita.Core.Tests;
 /// membership read, its C4 live-on-next-call lane, and its no-audit-row shape.
 /// </para>
 /// </summary>
-public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture)
 {
     // ── Test 1 — GetGroupsForUserAsync: owner ∪ member, deduped ─────────────
     //

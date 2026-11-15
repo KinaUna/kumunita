@@ -15,7 +15,7 @@ namespace Kumunita.Core.Tests.Usage;
 /// The <see cref="StorageDecision"/> result is asserted — the
 /// <c>413</c> mapping is the Web gate's (U8) job (C-UP·3).
 /// </summary>
-public sealed class StorageLimitsTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class StorageLimitsTests(PostgresFixture fixture)
 {
     private static int _plantCounter;
 

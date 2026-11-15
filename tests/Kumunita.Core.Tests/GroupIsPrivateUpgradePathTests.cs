@@ -15,7 +15,7 @@ namespace Kumunita.Core.Tests;
 /// ADR's "no manual migration" position rests on two things an old
 /// deployment must survive when it reboots with the new feature shape:
 /// </summary>
-public class GroupIsPrivateUpgradePathTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GroupIsPrivateUpgradePathTests(PostgresFixture fixture)
 {
     // ── Old-shape docs (the <c>data</c> JSONB of a group written before
     //    the feature landed) read back as public (flag = false) through the

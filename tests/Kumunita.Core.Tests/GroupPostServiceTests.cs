@@ -32,7 +32,7 @@ namespace Kumunita.Core.Tests;
 /// status of these 19 is the data U10 consumes.
 /// </para>
 /// </summary>
-public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GroupPostServiceTests(PostgresFixture fixture)
 {
     // ── 1 — G1_MemberSeesGroupFeed (G1 FACES; G·1, G·5 aggregate Allow) ────
     //

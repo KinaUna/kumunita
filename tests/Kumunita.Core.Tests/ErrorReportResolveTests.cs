@@ -56,7 +56,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="Kumunita.Core.CoreDocTypes.Configure"/> is included because it
 /// registers the <c>AccessAudit</c> doc (the audit-row half of every write).
 /// </para>
-public class ErrorReportResolveTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ErrorReportResolveTests(PostgresFixture fixture)
 {
     // ── 1 — mark a new report resolved: stamp + audit (Via = Admin) (M32·8) ─
     // FACES M32-5: a "new" report is stamped TriageStatus "resolved" +

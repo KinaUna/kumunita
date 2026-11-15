@@ -39,7 +39,7 @@ namespace Kumunita.Core.Tests;
 /// (<see cref="IImportOwnershipGuardService"/> named by a test file).
 /// </para>
 /// </summary>
-public sealed class ImportOwnershipGuardServiceSeamTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class ImportOwnershipGuardServiceSeamTests(PostgresFixture fixture)
 {
     private sealed record Booted(IDocumentStore store, UserManager<User> userManager, ImportOwnershipGuardService guard);
 

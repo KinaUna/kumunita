@@ -30,7 +30,7 @@ namespace Kumunita.Core.Tests;
 /// shape, fail-closed absence on the throw path).
 /// </para>
 /// </summary>
-public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class LocalizationServiceTests(PostgresFixture fixture)
 {
     // ── M1 — a resident with a `pl` preference sees a UI string in Polish ──
     // Seed `en` + `pl` (both enabled); `en` + `pl` rows for key "nav.home".

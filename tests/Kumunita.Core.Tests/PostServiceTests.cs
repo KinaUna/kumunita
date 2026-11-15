@@ -29,7 +29,7 @@ namespace Kumunita.Core.Tests;
 /// e2e (U11). The pass/red status of these 18 is the data U10 consumes.
 /// </para>
 /// </summary>
-public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class PostServiceTests(PostgresFixture fixture)
 {
     private const string ComponentId = "c-u9-comp";
 

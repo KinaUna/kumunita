@@ -27,7 +27,7 @@ namespace Kumunita.Core.Tests.Usage;
 /// contract).
 /// </para>
 /// </summary>
-public sealed class UsageHistoryTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class UsageHistoryTests(PostgresFixture fixture)
 {
     private static int _plantCounter;
 

@@ -29,7 +29,7 @@ namespace Kumunita.Core.Tests;
 /// around it.
 /// </para>
 /// </summary>
-public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ProjectServiceTests(PostgresFixture fixture)
 {
     /// <summary>A plain <see cref="Roles.Member"/> role set — a resident with
     /// no elevated standing (the §2.5 standing matrix's base case).</summary>

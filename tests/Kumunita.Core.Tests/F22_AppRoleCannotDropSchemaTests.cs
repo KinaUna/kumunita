@@ -33,6 +33,7 @@ namespace Kumunita.Core.Tests;
 /// that needs it (the boot schema-apply / operator restore role).</item>
 /// </list>
 /// </summary>
+// server-scoped: catalog-level CREATE ROLE / CREATE DATABASE … OWNER (ADR 0171) — keeps a private container
 public sealed class AppRoleCannotDropSchemaTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
     private const string MigrateRole = "kumunita_migrate";

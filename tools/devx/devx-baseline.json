@@ -10,14 +10,14 @@
   ],
   "rules": {
     "iclassfixture_classes": {
-      "value": 190,
-      "core": 154,
+      "value": 37,
+      "core": 1,
       "web": 36,
       "plan": 181,
       "plan_breakdown": "147 Core + 34 Web (E2, 2026-11-09)",
       "shrink_only": true,
-      "source": "E2 — one postgres:18 container per test class; the tree grew since the plan's measurement (181 → 190). Target 0 outside the DX06 server-scoped allowlist (DX08).",
-      "gate": "DX08 — devx-check counts IClassFixture<PostgresFixture> usages outside the allowlist"
+      "source": "E2 — one postgres:18 container per test class. DX07/DX08 landed: Core = 1 = the DX06 allowlist class only (F22_AppRoleCannotDropSchemaTests, server-scoped); the iclassfixture rule asserts the set outside the allowlist is empty. Web = 36, converted at DX09 (target 0 there).",
+      "gate": "DX08 — devx-check, iclassfixture: Core files declaring IClassFixture<PostgresFixture> ⊆ the DX06 allowlist (rules landed 1 → 2)"
     },
     "test_files": {
       "value": 413,

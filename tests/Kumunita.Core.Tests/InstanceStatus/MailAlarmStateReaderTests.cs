@@ -26,7 +26,7 @@ namespace Kumunita.Core.Tests.InstanceStatus;
 /// section to <see cref="MailAlarmStatus.Unavailable"/> (not a throw).
 /// </para>
 /// </summary>
-public sealed class MailAlarmStateReaderTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class MailAlarmStateReaderTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task ReadAsync_WindowCountsAndFiringDecision_AreCorrect()

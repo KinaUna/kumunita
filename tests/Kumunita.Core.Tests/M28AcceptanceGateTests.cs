@@ -56,7 +56,7 @@ namespace Kumunita.Core.Tests;
 /// <c>BootStoreAsync</c> + <c>CreateGuardianLinkAsync</c> lane).
 /// </para>
 /// </summary>
-public class M28AcceptanceGateTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class M28AcceptanceGateTests(PostgresFixture fixture)
 {
     // ── GATE-1 — Closed-loop: a Blocked window containing "now" restricts ──
     // A guardian with an active link sets a Blocked-mode window whose hour

@@ -46,7 +46,7 @@ namespace Kumunita.Core.Tests;
 /// alongside its invitations when the group is deleted.</item>
 /// </list>
 /// </summary>
-public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture)
 {
     // ── Lifecycle 1 — request, then approve: membership lands ONLY on approve ──
 

@@ -44,7 +44,7 @@ namespace Kumunita.Core.Tests;
 /// opt-in; the allowance merely lifts the veto and defers to the child).
 /// </para>
 /// </summary>
-public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class MessagingPerActorGateTests(PostgresFixture fixture)
 {
     // ── 1 — the resident's own opt-in write lane (no audit row, C3) ─────
 

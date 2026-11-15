@@ -22,7 +22,7 @@ namespace Kumunita.Core.Tests;
 /// per-row lane, byte-identical (C-M15·7).
 /// </para>
 /// </summary>
-public class TranslationBulkSaveAllTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class TranslationBulkSaveAllTests(PostgresFixture fixture)
 {
     // ── Bulk_SaveAll_UpsertsPresentRows_Only ───────────────────────────────
     // The present non-blank rows upsert (insert-or-update, same row store

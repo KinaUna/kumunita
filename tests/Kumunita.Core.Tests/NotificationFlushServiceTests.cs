@@ -47,7 +47,7 @@ namespace Kumunita.Core.Tests;
 /// C-M20·5 — zero new authorization surface).
 /// </para>
 /// </summary>
-public class NotificationFlushServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class NotificationFlushServiceTests(PostgresFixture fixture)
 {
     // ── GATE-4 / pin 1 — Flush_Cleared_Row_Stages_One_Email_Flips_Deferred ──
     //

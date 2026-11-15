@@ -32,7 +32,7 @@ namespace Kumunita.Core.Tests;
 /// <c>Clean</c> (invariant S-1 — an import never creates or changes a row
 /// the actor does not own).
 /// </summary>
-public sealed class UserPortabilityHostileClassifyTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class UserPortabilityHostileClassifyTests(PostgresFixture fixture)
 {
     private sealed record Booted(
         IDocumentStore store,

@@ -54,7 +54,7 @@ namespace Kumunita.Core.Tests;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class UserPortabilityAcceptanceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class UserPortabilityAcceptanceTests(PostgresFixture fixture)
 {
     // ── The shared boot (the same shape as U03/U04/U06 + M11 round-trip) ──
     // The frozen seams the UserPortabilityService consumes: the

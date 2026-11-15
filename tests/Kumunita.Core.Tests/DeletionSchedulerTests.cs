@@ -49,7 +49,7 @@ namespace Kumunita.Core.Tests;
 /// over a fresh scratch Postgres (the <see cref="PostgresFixture"/> harness).
 /// </para>
 /// </summary>
-public sealed class DeletionSchedulerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class DeletionSchedulerTests(PostgresFixture fixture)
 {
     // ── Schedule (the happy path) ────────────────────────────────────────
 

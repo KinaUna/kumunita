@@ -29,7 +29,7 @@ namespace Kumunita.Core.Tests;
 /// pinned-test list).
 /// </para>
 /// </summary>
-public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class MessagingServiceTests(PostgresFixture fixture)
 {
     // ── The `false` floor — a fresh instance ships with messaging off ────
 

@@ -31,7 +31,7 @@ namespace Kumunita.Core.Tests;
 /// input documents directly through a raw session, since those are testing the read half only.
 /// </para>
 /// </summary>
-public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class UserInfoServiceTests(PostgresFixture fixture)
 {
     // ── Test 1 — profile round-trip (plan test 1) ─────────────────────────
     // Upsert a Profile with SubjectId/DisplayName/Verified/Visibility set, read it back

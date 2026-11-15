@@ -48,7 +48,7 @@ namespace Kumunita.Core.Tests;
 /// scratch Postgres (the <see cref="PostgresFixture"/> harness).
 /// </para>
 /// </summary>
-public sealed class IdentityServiceDeleteAccountTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class IdentityServiceDeleteAccountTests(PostgresFixture fixture)
 {
     // ── Self-deletion (actor == target) ────────────────────────────────────
 

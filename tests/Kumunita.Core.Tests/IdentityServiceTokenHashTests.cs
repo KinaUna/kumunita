@@ -39,7 +39,7 @@ namespace Kumunita.Core.Tests;
 /// (which <c>NewVerifyToken</c> discards by design).
 /// </para>
 /// </summary>
-public sealed class IdentityServiceTokenHashTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class IdentityServiceTokenHashTests(PostgresFixture fixture)
 {
     private static readonly System.Text.RegularExpressions.Regex Hex64 =
         new("^[0-9a-f]{64}$", System.Text.RegularExpressions.RegexOptions.Compiled);

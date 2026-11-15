@@ -46,7 +46,7 @@ namespace Kumunita.Core.Tests;
 /// and the localization fallback both no-op for these assertions).
 /// </para>
 /// </summary>
-public sealed class ChildAccountPasswordTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class ChildAccountPasswordTests(PostgresFixture fixture)
 {
     // ── 1 — Formation: the child account is password-less ────────────────
 

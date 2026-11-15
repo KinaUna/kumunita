@@ -24,7 +24,7 @@ namespace Kumunita.Core.Tests;
 /// untouched (C-M15·7).
 /// </para>
 /// </summary>
-public class TranslationBulkExporterTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class TranslationBulkExporterTests(PostgresFixture fixture)
 {
     // ── Bulk_Export_RoundTrips_TheClosedSetMatrix ───────────────────────────
     // The full closed-set matrix (registry keys × catalog languages) exports

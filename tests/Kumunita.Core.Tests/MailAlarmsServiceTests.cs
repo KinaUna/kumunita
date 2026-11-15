@@ -12,7 +12,7 @@ namespace Kumunita.Core.Tests;
 /// Two legs: under-threshold → false, no alert; at-threshold → true, exactly
 /// one alert with the pin §3 payload mapping (Kind = "mail.bounce-alarm").
 /// </summary>
-public sealed class MailAlarmsServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class MailAlarmsServiceTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task Evaluate_UnderThreshold_ReturnsFalse_NoAlert()

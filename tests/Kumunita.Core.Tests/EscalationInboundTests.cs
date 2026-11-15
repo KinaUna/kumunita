@@ -57,7 +57,7 @@ namespace Kumunita.Core.Tests;
 /// re-validation + the idempotent lookup + the received-row write all hit the
 /// same live Postgres.
 /// </para>
-public class EscalationInboundTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EscalationInboundTests(PostgresFixture fixture)
 {
     // ── 6 — a valid token + description creates an escalated row (ESC·5) ──
     // FACES ESC-3: the origin admin escalates (valid token + configured

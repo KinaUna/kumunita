@@ -68,7 +68,7 @@ using static Marten.QueryableExtensions;
 /// pause, not a silent add.
 /// </para>
 /// </summary>
-public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class PortabilityRoundTripTests(PostgresFixture fixture)
 {
     // ── The shared boot — a full instance (M11 D9's "representative instance") ─
     // The frozen seams the PortabilityService consumes, wired exactly the way

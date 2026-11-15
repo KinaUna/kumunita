@@ -45,7 +45,7 @@ namespace Kumunita.Core.Tests;
 /// resolves to the *namespace*) — the exact <c>SiteContent.SiteContent</c>
 /// idiom used throughout <see cref="SiteContentSeederTests"/>.
 /// </para>
-public class SurfaceLabelsServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class SurfaceLabelsServiceTests(PostgresFixture fixture)
 {
     // ── 1 — a missing store degrades to the all-null fallback (M29·2/M29·6) ──
 

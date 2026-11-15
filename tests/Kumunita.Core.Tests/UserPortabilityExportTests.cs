@@ -41,7 +41,7 @@ namespace Kumunita.Core.Tests;
 /// additive-frozen-surface precedent).</item>
 /// </list>
 /// </summary>
-public sealed class UserPortabilityExportTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class UserPortabilityExportTests(PostgresFixture fixture)
 {
     // ── The shared boot (the same shape as PortabilityRoundTripTests) ────
     // The frozen seams the UserPortabilityService consumes: the

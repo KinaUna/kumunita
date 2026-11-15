@@ -16,7 +16,6 @@ namespace Kumunita.Core.Tests.UserInfo;
 /// Postgres-per-test harness idiom).
 /// </summary>
 public sealed class ProfileFirstDayOfWeekLaneTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     // ── 1 — default: a fresh profile has no preference (null = unset) ─────
     [Fact]

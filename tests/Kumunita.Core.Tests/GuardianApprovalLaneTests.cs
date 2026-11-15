@@ -45,7 +45,6 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     private const string GroupId = "grp-0141";
     private const string GroupName = "Garden Club";

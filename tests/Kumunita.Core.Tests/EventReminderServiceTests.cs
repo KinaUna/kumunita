@@ -39,7 +39,7 @@ namespace Kumunita.Core.Tests;
 ///       the verification-email posture).</item>
 /// </list>
 /// </summary>
-public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EventReminderServiceTests(PostgresFixture fixture)
 {
     // ── T19 — M4_ReminderWindowFiltersOutsideEvents ───────────────────────
     //

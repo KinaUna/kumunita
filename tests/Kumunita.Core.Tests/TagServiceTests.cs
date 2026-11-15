@@ -36,7 +36,7 @@ namespace Kumunita.Core.Tests;
 /// in this file (U4's scope pin).
 /// </para>
 /// </summary>
-public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class TagServiceTests(PostgresFixture fixture)
 {
     // ─── F5 — the System-page write-lane refusal (C-TG·6, D6) ───────────
     //

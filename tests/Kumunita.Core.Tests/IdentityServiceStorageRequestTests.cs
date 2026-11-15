@@ -38,7 +38,7 @@ using Xunit;
 
 namespace Kumunita.Core.Tests;
 
-public sealed class IdentityServiceStorageRequestTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class IdentityServiceStorageRequestTests(PostgresFixture fixture)
 {
     private const string Admin1 = "admin-001";
     private const string Admin2 = "admin-002";

@@ -42,7 +42,7 @@ namespace Kumunita.Core.Tests;
 /// </item>
 /// </list>
 /// </summary>
-public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class UserInfoServiceGroupPrivacyTests(PostgresFixture fixture)
 {
     // ── Test 1 — the write is strong-consistency (C4) on the owner's reads,
     //    and GetPublicGroupsAsync excludes the group the moment it flips to

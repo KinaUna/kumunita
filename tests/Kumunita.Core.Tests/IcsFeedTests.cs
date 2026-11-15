@@ -20,7 +20,7 @@ namespace Kumunita.Core.Tests;
 /// call shape); call <see cref="IcsWriter.Build"/>; assert the ICS contains
 /// exactly one <c>VEVENT</c> (the visible community event).
 /// </summary>
-public class IcsFeedTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class IcsFeedTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task IcsFeed_ContainsExactlyTheVisibleUpcomingSet()

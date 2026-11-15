@@ -38,7 +38,7 @@ namespace Kumunita.Core.Tests;
 /// kinds follow the same pattern.
 /// </para>
 /// </summary>
-public class PersonalNoteServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class PersonalNoteServiceTests(PostgresFixture fixture)
 {
     private const string ComponentId = "c-u9-comp";
 

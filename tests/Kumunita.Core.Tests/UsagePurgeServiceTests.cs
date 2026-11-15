@@ -13,7 +13,7 @@ namespace Kumunita.Core.Tests;
 /// Mirrors <see cref="MediaLifecycleTests"/> — the same store-injected static
 /// shape with a <c>now</c> injection point for a deterministic boundary.
 /// </summary>
-public sealed class UsagePurgeServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class UsagePurgeServiceTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task Purge_DeletesExpired_KeepsLive_NoOpOnSecondRun()

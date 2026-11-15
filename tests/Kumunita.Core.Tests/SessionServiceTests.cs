@@ -30,7 +30,7 @@ namespace Kumunita.Core.Tests;
 /// consumes.
 /// </para>
 /// </summary>
-public sealed class SessionServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class SessionServiceTests(PostgresFixture fixture)
 {
     // ── 1 — F1 (C-S1·4, ADR 0001-B) ─────────────────────────────────────
     //

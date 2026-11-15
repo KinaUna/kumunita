@@ -31,7 +31,7 @@ namespace Kumunita.Core.Tests;
 /// (<see cref="ITodoCommentService"/> named by a test file).
 /// </para>
 /// </summary>
-public class TodoCommentServiceSeamTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class TodoCommentServiceSeamTests(PostgresFixture fixture)
 {
     private static readonly IReadOnlySet<string> NoRoles = new HashSet<string>(StringComparer.Ordinal);
 

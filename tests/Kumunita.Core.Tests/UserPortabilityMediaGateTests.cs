@@ -35,7 +35,7 @@ namespace Kumunita.Core.Tests;
 /// fails the gate is <em>skipped</em> (no byte written) and recorded as
 /// <c>media.skipped:&lt;reason&gt;</c>; the import stays <c>Ok</c>.
 /// </summary>
-public sealed class UserPortabilityMediaGateTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class UserPortabilityMediaGateTests(PostgresFixture fixture)
 {
     private sealed record Booted(
         IDocumentStore store,

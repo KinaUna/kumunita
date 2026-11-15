@@ -46,7 +46,6 @@ namespace Kumunita.Core.Tests.UserInfo;
 /// </para>
 /// </summary>
 public sealed class ProfileBioTagsShapeTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     // ── Test 1 — the two new Profile fields round-trip ────────────────────
     [Fact]

@@ -46,7 +46,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="IdentityService"/>). Core stays HTTP-free — the seam is
 /// constructed directly, no Web types.
 /// </para>
-public sealed class F9U4_DisposableEmailSignupTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class F9U4_DisposableEmailSignupTests(PostgresFixture fixture)
 {
     /// <summary>A domain **on** the committed blocklist (line 1 of <c>disposable-emails.txt</c>).</summary>
     private const string BlockedDomain = "mailinator.com";

@@ -12,7 +12,7 @@ namespace Kumunita.Core.Tests;
 /// the feed card footer's reply count. Kept in its own file because
 /// <c>PostServiceTests</c> pins its test names (§2.6 drift-guard).
 /// </summary>
-public class PostReplyCountTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class PostReplyCountTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task CountRepliesAsync_EmptyInput_ReturnsEmpty()

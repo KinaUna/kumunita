@@ -40,7 +40,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="AccessAudit"/> row.</item>
 /// </list>
 /// </summary>
-public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class UserInfoServiceGroupInvitationsM2bTests(PostgresFixture fixture)
 {
     // ── Lifecycle 1 — invite, then accept: membership lands ONLY on accept ──
 

@@ -47,7 +47,7 @@ namespace Kumunita.Core.Tests;
 /// <c>RegisterAsync</c> once; the test asserts the call was made).
 /// </para>
 /// </summary>
-public sealed class InvitationServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class InvitationServiceTests(PostgresFixture fixture)
 {
     private const string Inviter = "inviter-001";
     private const string OtherInviter = "inviter-other-002";

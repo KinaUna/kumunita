@@ -37,7 +37,7 @@ namespace Kumunita.Core.Tests;
 /// the ADR 0043 D1 exact-set pin and the ADR 0040 namespace guard green.
 /// </para>
 /// </summary>
-public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class UG_GuideRegistryTests(PostgresFixture fixture)
 {
     private async Task<IDocumentStore> BootStoreAsync()
     {

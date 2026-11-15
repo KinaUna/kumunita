@@ -23,7 +23,7 @@ namespace Kumunita.Core.Tests;
 /// not land them is not done.
 /// </para>
 /// </summary>
-public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EventServiceCascadeTests(PostgresFixture fixture)
 {
     private static readonly IReadOnlySet<string> EmptyRoles =
         new HashSet<string>(StringComparer.Ordinal);

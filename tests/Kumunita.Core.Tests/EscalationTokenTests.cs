@@ -46,7 +46,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="EscalationTokenService"/> generate / revoke write lanes, the
 /// ESC·9 pin).
 /// </para>
-public class EscalationTokenTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EscalationTokenTests(PostgresFixture fixture)
 {
     // ── 1 — generate stores the SHA-256 hash, never the plaintext (ESC·3) ──
     // FACES ESC-1: the receiving admin generates a labeled token → the

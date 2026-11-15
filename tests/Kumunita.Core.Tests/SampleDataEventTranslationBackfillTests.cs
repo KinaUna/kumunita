@@ -30,7 +30,7 @@ namespace Kumunita.Core.Tests;
 /// lane's "no such event" skip path (the other three registry keys) is also
 /// exercised for free.
 /// </para>
-public class SampleDataEventTranslationBackfillTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class SampleDataEventTranslationBackfillTests(PostgresFixture fixture)
 {
     private const string SampleTitle = "Community Cleanup Day";
 

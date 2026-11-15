@@ -33,7 +33,7 @@ namespace Kumunita.Core.Tests;
 /// verifying the stored matrix is identical after a clean round-trip.
 /// </para>
 /// </summary>
-public class TranslationBulkImporterTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class TranslationBulkImporterTests(PostgresFixture fixture)
 {
     // ── Bulk_Import_UpsertsPresentRows_Only ─────────────────────────────────
     // Present non-blank rows upsert; a blank cell (no row for that language)

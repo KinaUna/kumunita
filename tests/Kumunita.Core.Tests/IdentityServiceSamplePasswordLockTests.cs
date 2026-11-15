@@ -43,7 +43,7 @@ namespace Kumunita.Core.Tests;
 /// profile e-mail read) + substitutes for the seams the gate does not touch.
 /// </para>
 /// </summary>
-public sealed class IdentityServiceSamplePasswordLockTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class IdentityServiceSamplePasswordLockTests(PostgresFixture fixture)
 {
     // A sample account's closed-set e-mail (a member of
     // SampleDataSeeder.SampleAccountEmails, the seeder's embedded document).

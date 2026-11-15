@@ -13,7 +13,7 @@ namespace Kumunita.Core.Tests;
 /// Naming <see cref="ISuppressionService"/> (the seam) keeps it off the gate's
 /// "I*Service named by a test" red list.
 /// </summary>
-public sealed class SuppressionServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class SuppressionServiceTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task Suppress_StoresLowercasedAnd_IsSuppressed()

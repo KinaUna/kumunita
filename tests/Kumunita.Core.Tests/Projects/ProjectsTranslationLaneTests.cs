@@ -25,7 +25,7 @@ namespace Kumunita.Core.Tests.Projects;
 /// <c>RunInSession</c> / <c>AuditsFor</c> harness as
 /// <see cref="PostTranslationTests"/> (the C2-01 reference surface).
 /// </summary>
-public class ProjectsTranslationLaneTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ProjectsTranslationLaneTests(PostgresFixture fixture)
 {
     private static IReadOnlySet<string> RoleSet(params string[] roles) =>
         new HashSet<string>(roles);

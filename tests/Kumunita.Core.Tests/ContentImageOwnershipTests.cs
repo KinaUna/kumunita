@@ -62,7 +62,7 @@ namespace Kumunita.Core.Tests;
 /// Core suite takes ~20 s and leaves Docker containers behind if killed).
 /// </para>
 /// </summary>
-public class ContentImageOwnershipTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ContentImageOwnershipTests(PostgresFixture fixture)
 {
     private const string ComponentId = "c-rc-u07-comp";
     private const string Actor = "u-rc-u07-actor";

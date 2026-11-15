@@ -43,7 +43,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="GoalPage"/> / <see cref="ProjectPage"/>. See the M7 drift log.
 /// </para>
 /// </summary>
-public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class M7PaginationSeamTests(PostgresFixture fixture)
 {
     private const int PageSize = 30; // the shared seam constant (D4 shape)
     private const string ComponentId = "c-m7-comp";

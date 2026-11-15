@@ -37,7 +37,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="Kumunita.Core.CoreDocTypes"/> surface).
 /// </para>
 /// </summary>
-public sealed class KioskLinkServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class KioskLinkServiceTests(PostgresFixture fixture)
 {
     private const string Owner = "kiosk-link-owner-001";
     private const string Other = "kiosk-link-other-002";

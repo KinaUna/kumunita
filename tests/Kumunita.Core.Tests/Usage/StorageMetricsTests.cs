@@ -16,7 +16,7 @@ namespace Kumunita.Core.Tests.Usage;
 /// a Postgres query). The service is read-only (C-SM·2); these assert the
 /// *results* (the design doc shapes), not the SQL emitted.
 /// </summary>
-public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class StorageMetricsTests(PostgresFixture fixture)
 {
     private static int _plantCounter;
 

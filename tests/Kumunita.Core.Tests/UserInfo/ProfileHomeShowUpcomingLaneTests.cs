@@ -15,7 +15,6 @@ namespace Kumunita.Core.Tests.UserInfo;
 /// <see cref="ProfileTimezoneLaneTests"/> exactly.
 /// </summary>
 public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     // ── 1 — default: a fresh profile has the flag OFF (the floor) ─────────
     [Fact]

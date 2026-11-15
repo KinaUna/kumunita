@@ -19,7 +19,7 @@ namespace Kumunita.Core.Tests;
 /// /> surface is what this test targets — the seam-test rule-2 gate reads this
 /// type name.
 /// </summary>
-public class IdentityPlatformGateServiceSeamTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class IdentityPlatformGateServiceSeamTests(PostgresFixture fixture)
 {
     // ── The `false` floor — a fresh instance ships invitation-only (ADR 0050) ──
 

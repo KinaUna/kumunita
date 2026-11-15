@@ -36,7 +36,7 @@ namespace Kumunita.Core.Tests;
 /// match, body excerpt, no drafts) which is independent of that mechanism.
 /// </para>
 /// </summary>
-public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class SearchServiceTests(PostgresFixture fixture)
 {
     private const string ComponentId = "c-m8-comp";
     private const string GroupId = "g-m8";

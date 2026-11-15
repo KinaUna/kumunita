@@ -31,7 +31,6 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     private const string GroupId = "grp-0083";
     private const string OwnerId = "subj-owner-0083";

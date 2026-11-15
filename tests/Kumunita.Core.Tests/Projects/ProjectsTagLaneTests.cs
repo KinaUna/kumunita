@@ -36,7 +36,7 @@ namespace Kumunita.Core.Tests.Projects;
 ///   GlobalAdmin), refusing a non-standing actor at the Core level.</item>
 /// </list>
 /// </summary>
-public class ProjectsTagLaneTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ProjectsTagLaneTests(PostgresFixture fixture)
 {
     private static readonly IReadOnlySet<string> MemberRoles =
         new HashSet<string> { Roles.Member };

@@ -26,7 +26,7 @@ namespace Kumunita.Core.Tests;
 /// them is not done.
 /// </para>
 /// </summary>
-public class EventServiceCreateRecurrenceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EventServiceCreateRecurrenceTests(PostgresFixture fixture)
 {
     // ── GATE-2 (1) — a weekly rule materializes the full series ─────────────
 

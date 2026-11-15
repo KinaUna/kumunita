@@ -31,7 +31,7 @@ namespace Kumunita.Core.Tests;
 /// (<see cref="IBoardLaneService"/> named by a test file).
 /// </para>
 /// </summary>
-public class BoardLaneServiceSeamTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class BoardLaneServiceSeamTests(PostgresFixture fixture)
 {
     private static readonly IReadOnlySet<string> GlobalAdminRoles =
         new HashSet<string>(StringComparer.Ordinal) { Roles.GlobalAdmin };

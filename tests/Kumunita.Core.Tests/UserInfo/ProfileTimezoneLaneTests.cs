@@ -35,7 +35,6 @@ namespace Kumunita.Core.Tests.UserInfo;
 /// </list>
 /// </summary>
 public sealed class ProfileTimezoneLaneTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     // Pick a well-formed non-UTC IANA id that is guaranteed to exist on whatever
     // OS runs this test (Windows ids, IANA ids, or both, depending on platform)

@@ -34,7 +34,7 @@ namespace Kumunita.Core.Tests.Media;
 /// post-commit byte-delete genuinely runs and is asserted via
 /// <c>ExistsAsync(id) == false</c> (pin §6 / GOTCHA-2).</item>
 /// </list>
-public sealed class MediaLifecycleTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class MediaLifecycleTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task Lifecycle_DeletesExpiredBytes()

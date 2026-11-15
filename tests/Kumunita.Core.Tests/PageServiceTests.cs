@@ -33,7 +33,7 @@ namespace Kumunita.Core.Tests;
 /// <c>string?</c> — the plan's <c>Guid</c> wording was a typo, corrected here.
 /// </para>
 /// </summary>
-public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class PageServiceTests(PostgresFixture fixture)
 {
     // ─── 1 — The PageToAuditableResource adapter (pure, no store) ──────────
     //

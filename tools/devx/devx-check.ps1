@@ -102,6 +102,26 @@ $triggersMatch = ($null -ne $declared) -and ($ciSet.Count -eq 1) -and ($ciSet[0]
 Check "ci-triggers" "ci.yml on: branches ($($ciSet -join ', ')) match branch-flow.md's declared CI branch ($declared)" $triggersMatch
 $ruleCount = 1
 
+# --- rule: iclassfixture (DX08) ---------------------------------------------------
+# The set of Kumunita.Core.Tests files that still declare IClassFixture<PostgresFixture>
+# must be a subset of the server-scoped allowlist. The allowlist is exactly one file
+# (the DX06 triage, ADR 0171 — AppRoleCannotDropSchemaTests does catalog-level
+# CREATE ROLE / CREATE DATABASE … OWNER and must keep its own private container).
+# Source of truth for the allowlist: docs/plans-milestones/in-progress/improve-devx-
+# handoff-notes.md (## DX06). obj/ and bin/ are excluded (build artifacts). An
+# empty set is a valid subset (the allowlist file may legitimately stop declaring
+# the pattern in the future); the rule fails only when a file *outside* the
+# allowlist still declares it.
+$coreFixtureAllowlist = @('F22_AppRoleCannotDropSchemaTests.cs')
+$coreFixtureFiles = @(Get-ChildItem -Path (Join-Path $repo 'tests/Kumunita.Core.Tests') -Filter '*.cs' -File -Recurse |
+  Where-Object { $_.FullName -notmatch '/obj/|/bin/' } |
+  Where-Object { (Select-String -LiteralPath $_.FullName -Pattern 'IClassFixture<PostgresFixture>' -SimpleMatch -Quiet) })
+$coreFixtureNames = @($coreFixtureFiles | ForEach-Object { $_.Name })
+$coreFixtureOk = ($coreFixtureNames.Count -le $coreFixtureAllowlist.Count) -and
+  (@($coreFixtureNames | Where-Object { $coreFixtureAllowlist -notcontains $_ }).Count -eq 0)
+Check "iclassfixture" "Core IClassFixture<PostgresFixture> files ($($coreFixtureNames -join ', ')) ⊆ allowlist ($($coreFixtureAllowlist -join ', '))" $coreFixtureOk
+$ruleCount = 2
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"

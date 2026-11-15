@@ -40,7 +40,7 @@ namespace Kumunita.Core.Tests.Usage;
 /// byte write on its own).
 /// </para>
 /// </summary>
-public sealed class StorageLimitsAcceptanceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class StorageLimitsAcceptanceTests(PostgresFixture fixture)
 {
     private static int _plantCounter;
 

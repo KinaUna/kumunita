@@ -43,7 +43,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="Privacy.DataClassKind.AuditModeration"/> with
 /// <see cref="Privacy.ExportScope.InstanceOnly"/>) are kept.
 /// </summary>
-public sealed class PortabilityExportScopeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class PortabilityExportScopeTests(PostgresFixture fixture)
 {
     // ── The minimal boot — the docs-only store (no Identity/Media needed) ──
 

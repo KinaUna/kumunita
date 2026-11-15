@@ -52,7 +52,7 @@ namespace Kumunita.Core.Tests;
 /// for the recipient's e-mail.
 /// </para>
 /// </summary>
-public class F17U3_SuppressionGateTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class F17U3_SuppressionGateTests(PostgresFixture fixture)
 {
     // ── SuppressedAddress_NotMailed — the pin's UNRENAMED gate test ─────────
     //

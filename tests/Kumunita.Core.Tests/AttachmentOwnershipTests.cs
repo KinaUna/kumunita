@@ -58,7 +58,7 @@ namespace Kumunita.Core.Tests;
 /// empty list).
 /// </para>
 /// </summary>
-public class AttachmentOwnershipTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class AttachmentOwnershipTests(PostgresFixture fixture)
 {
     private const string ComponentId = "c-att-u06-comp";
     private const string Actor = "u-att-u06-actor";

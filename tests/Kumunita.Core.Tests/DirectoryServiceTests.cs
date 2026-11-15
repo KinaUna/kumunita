@@ -23,7 +23,7 @@ namespace Kumunita.Core.Tests;
 /// list (F8 boundary).
 /// </para>
 /// </summary>
-public class DirectoryServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class DirectoryServiceTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task ListAsync_Shows_All_NonBlock_Residents_to_Any_SignedIn_Viewer()

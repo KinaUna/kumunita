@@ -22,7 +22,7 @@ namespace Kumunita.Core.Tests;
 /// <c>BootStoreAsync</c>, same <c>Plant</c> helper, fresh scratch Postgres per
 /// test method):
 /// </summary>
-public class PostDraftModeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class PostDraftModeTests(PostgresFixture fixture)
 {
     // ── Community lane: feed excludes drafts ───────────────────────────
 
