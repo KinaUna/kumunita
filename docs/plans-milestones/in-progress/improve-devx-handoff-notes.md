@@ -415,3 +415,36 @@ moves it to the archive.
   (both pre-existing `SecGate.DataClassCoverageTests`, unrelated to the deletion).
 - **Cite:** ADR **0307** (D9); the plan body's "0300" is a stale number
   (consistent with the DX04–DX12 handoffs).
+
+## DX14 — sandbox prerequisites
+
+- **Files:** `docs/dev/agent-environment-quirks.md` — one new **`## Toolchain`**
+  section (≤ 12 lines, placed right after the H1 as the "before you run
+  anything" concern). It sends readers to `pwsh tools/check.ps1 -Doctor` as the
+  **single source** for the machine's toolchain prerequisites + the one-line
+  fix for each (`dotnet` pin vs `global.json`; `node`/`pwsh`/`git`; Docker
+  reachability + the rootless socket; a real container start; the shallow-clone
+  base ref — each printing **OK** or the **one-line fix**), and points at the
+  owner-managed project doc `claude/agent-sandbox-setup.md` for the *install*
+  steps (its **step 3** is the `pwsh` install). **No tool versions listed**
+  (that is `-Doctor`'s job; verified: grep `pwsh 7\.` / `node 20\.` / `dotnet
+  10\.` → none). Front-matter `updated:` bumped `2026-11-02` → `2026-11-15`
+  (it is `tier: living`).
+- **Owner-ops recorded, not applied — the file is not in this repo:**
+  `claude/agent-sandbox-setup.md` is **not git-tracked** and has **no `claude/`
+  directory** here, so it was **not** edited. Its edits, for the owner to apply:
+  **step 3** = install PowerShell 7 from Microsoft's apt repo; **step 5 and
+  §8** = run `pwsh tools/check.ps1 -Doctor`. It is referenced in the new section
+  as **inline code, not a markdown link**, so docs-check gate 4 (broken relative
+  `.md` links) is unaffected — it stayed at **17**, byte-identical to the
+  pre-DX14 baseline.
+- **No devx-check rule landed** (DX14 is docs-only): `devx-check.ps1`
+  byte-untouched. `-Only devx` → **PASS, exit 0, 4 rules**; `-Doctor` → **all
+  5 checks OK, exit 0** (DX11/DX12 unregressed).
+- **`-Only docs` reds are pre-existing (recorded, not fixed):** `docs-check: 5
+  GATE(S) FAILED` (front-matter 17, ADR >250 lines 1, broken links 17, orphans
+  12, archive 50) + `improve-check` gate `b` (ADR-index drift, `0305`/`0306`).
+  The failure set is unchanged from the pre-DX14 baseline — the new section
+  added **no new** gate failure.
+- **Cite:** ADR **0307** (D3, the one-command loop + `-Doctor`); the plan body's
+  "0300" is a stale number (consistent with the DX04–DX13 handoffs).
