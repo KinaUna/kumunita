@@ -279,3 +279,43 @@ moves it to the archive.
   shows the 36 test files + the csproj + `AssemblyFixtures.cs` + the deleted
   fixture + the two `tools/devx/` files + this note (plus the untracked
   `dx08-prompt.md` / `dx09-prompt.md` briefs — DX37 archives them).
+
+## DX10 — `tools/check.ps1`: the one-command loop
+
+- **Files:** `tools/check.ps1` (new, **192 lines** ≤ the 200 ceiling). One
+  runner, seven steps in order — `build` → `tsc` → `web` → `core` → `docs` →
+  `code` → `devx` (the `tsc` step is `npm --prefix src/Kumunita.Web run build`
+  **then** the compiled-JS drift check `git diff --exit-code --
+  src/Kumunita.Web/wwwroot/js`). Flags: `-Fast` (skips **`core`** — the slow
+  one — not `web`) and `-Only <step[,step]>` (`-Only docs,devx`, `-Only tsc`).
+  Output is a summary table (`step | seconds | PASS|FAIL|SKIPPED | why`);
+  exit 1 on any FAIL. A missing tool is a **FAIL with the install line** (E6)
+  — verified by stripping `npm`/`dotnet` from PATH and running `-Only tsc` /
+  `-Only build`: both FAIL with their install line in the `why` column, exit 1,
+  never a silent skip.
+- **The reds trap (the plan assumed these green):** measured live — a **full**
+  run exits **1** today, and that is the runner faithfully surfacing real,
+  *pre-existing* signal, not a DX10 defect. `docs` FAIL (the 5 pre-existing
+  `docs-check` gates: front-matter 17, ADR >250 lines 1, broken links 17,
+  living orphans 7, archive not frozen 50); `code` FAIL (**33** `code-check`
+  violations — file/view/class/method ceilings + boundary edges, incl. the new
+  `InstanceStatus->Identity:*` and `Moderation->Posts:PostService`); `web`
+  FAIL — **exactly the 4 known-reds** (2 `SecGate.DataClassCoverageTests`, 2
+  `ImproveHarnessTests`), `Total: 1482, Failed: 4` (the intermittent
+  `SentryBreadcrumbPiiTests` flake **passed** this run). **No gate, test, or
+  source file was edited to force a green (D8).**
+- **The one step you can assert green is `devx`:** `-Only devx` → PASS, **exit 0**.
+  (`core` is also green — 2051 tests, 0 failed — but it is the slow one and is
+  what `-Fast` skips.)
+- **Full-run wall-clock + per-step seconds** (11:52:42 → 11:57:03, **~4 m 21 s**):
+  `build` **35.5 s** PASS · `tsc` **0.3 s** PASS · `web` **24.7 s** FAIL (known-reds)
+  · `core` **175.8 s** PASS (the slow step, matches the ~170–205 s budget) ·
+  `docs` **8 s** FAIL (pre-existing) · `code` **8.4 s** FAIL (pre-existing) ·
+  `devx` **0.6 s** PASS → **exit 1**.
+- **Cite:** ADR **0307** (D3); the plan body's "0300" is a stale number
+  (consistent with the DX04/DX06/DX08/DX09 handoffs).
+- **Exit verified:** `-Only devx` → exit 0; `-Only docs,devx` → runs, `docs`
+  FAIL + `devx` PASS, **exit 1**; `-Only tsc` → PASS; `-Only devx -Fast` → runs;
+  missing-tool rule proven (E6); a full run recorded above. `git status --short`
+  shows `tools/check.ps1` + this note (plus the untracked `dx08`/`dx09`/`dx10`
+  prompt briefs — DX37 archives them).
