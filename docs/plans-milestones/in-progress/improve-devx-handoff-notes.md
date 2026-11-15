@@ -494,3 +494,65 @@ moves it to the archive.
   DX16 links it).
 - **Cite:** ADR **0307** (D4, the code map); the plan body's "0300" is a stale
   number (consistent with the DX04–DX14 handoffs).
+
+## DX16 — slim AGENTS.md onto the code map
+
+- **Files:** `AGENTS.md` (slimmed), `docs/start/agent.md` (read-when + map row),
+  `tools/devx/devx-check.ps1` (rules 6 + 7 appended after `code-map`, plus a
+  shared `Get-Tokens` estimator — first five rule blocks byte-untouched).
+- **The 7-context list is gone** — replaced by a link to `docs/dev/code-map.md`
+  in "The shape of the code" (the map is the source of truth for *which*
+  contexts exist). It **dropped `Bootstrap/`**, correctly — `Bootstrap/` has no
+  `DependencyInjection.cs`, so it is not one of the 30 self-registering contexts
+  and is not a map row (drift fact 4). `Kumunita.Web`, the persistence split
+  (Marten vs EF-Identity), and "`Announcements` is a feature module, not a
+  context" are kept — they are not in the map and are still must-knows.
+- **`## Commands` block added** (three lines): `pwsh tools/check.ps1` (full
+  loop), `-Fast` (skip the slow `core` step), `-Doctor` (environment
+  self-check). **"Start here" → read-when triggers:** the small mandatory set
+  (README, `branch-flow.md`, `DOCS-CONVENTIONS.md`) stays in `## Start here`;
+  the rest (ARCHITECTURE, ADR 0004/0006, SECURITY, razor-verification,
+  testing-and-ci, live-server-debugging, agent-environment-quirks, code-map)
+  move to a new **`## Read when`** section, each worded as a condition. All
+  eleven original `.md` links are preserved (only reorganized, not deleted), so
+  gate-4 / gate-5 are unaffected.
+- **Stale timings replaced:** the "Don't pause" long-running line's
+  `~20 s / ~1 min / ~8 s` → "name the duration (per-step budget in `check.ps1`
+  output)".
+- **The two token rules landed** (drift facts 7 + 8): a shared `Get-Tokens`
+  helper pins the estimator (`tokens = floor(chars/4)`, a *proxy* — the comment
+  says it deliberately avoids a real tokenizer so the number is reproducible
+  across runners). Rule 6 `agents-md-tokens`: `AGENTS.md` ≤ **2 000** tokens.
+  Rule 7 `read-before-tokens`: the read-before chain ≤ **8 000** tokens, where
+  the chain is **ONE reproducible definition** (in the rule's comment):
+  `AGENTS.md` + every relative `.md` link from its `## Start here` section only
+  (the `## Read when` section is *excluded* — those are conditional, not
+  up-front — and no recursive transclusion). `$ruleCount` **5 → 7**; the first
+  five rule blocks are byte-untouched (verified by `git diff`: the only hunk
+  starts after `$ruleCount = 5`).
+- **Before → after tokens (the rule's own estimator, not by hand):**
+  `AGENTS.md` **2 096 → 1 996** (was already over the 2 000 cap, so rule 6 forced
+  a real trim, not just a hold-the-line); read-before chain **29 040 → 5 381**
+  (the mandatory set shrank from 11 up-front links to 3; the heavy ones —
+  `ARCHITECTURE.md` ≈ 11 307, ADR 0004/0006, the doctrine docs — are now
+  read-when, not up-front).
+- **`docs/start/agent.md`:** the same read-when treatment (intro now says
+  "`AGENTS.md` is the up-front read; the rest are *read-when* pointers"), plus
+  a new `code-map.md` row (the natural home for the map link beside the doctrine
+  links). Still links-only, no new facts; `updated:` bumped to 2026-11-15.
+- **Exits:** `-Only devx` → **PASS, exit 0, 7 rules** (rules 6 = 1 996 ≤ 2 000,
+  7 = 5 381 ≤ 8 000; the DX15 `code-map` rule still green). `-Doctor` →
+  **all 5 checks OK, exit 0** (DX11 unregressed). `-Only docs` → **FAIL for the
+  pre-existing set, byte-identical** to pre-DX16 (front-matter **17**, ADR >250
+  **1**, broken links **19**, orphans **14**, archive **50**; improve-check gate
+  `b` `0305`/`0306`) — `AGENTS.md` and `docs/start/agent.md` add **no new**
+  gate-4 broken link (the `code-map.md` links resolve) and **no new** gate-5
+  orphan (both are reachable from the `docs/start/` entry pages). **Drift note:**
+  the prompt's exit cites **18 / 13**; the live tree at DX16 is **19 / 14**
+  (drifted after DX15 — same kind of drift the DX15 handoff recorded); the
+  pre-DX16 baseline this unit is byte-identical to is **19 / 14**.
+- **Out of scope (not done here):** **DX17 rewrites `testing-and-ci.md`** (the
+  message → script table); this unit only *links* the doctrine, it does not
+  rewrite it.
+- **Cite:** ADR **0307** (D4, the code map + entry cost); the plan body's
+  "0300" is a stale number (consistent with the DX04–DX15 handoffs).

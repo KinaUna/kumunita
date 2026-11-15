@@ -182,6 +182,56 @@ if (Test-Path $codeMapScript) {
 Check "code-map" "docs/dev/code-map.md is fresh — regenerate with `pwsh tools/devx/code-map.ps1` when it goes stale (D4)" $codeMapFresh
 $ruleCount = 5
 
+# --- token estimator (DX16) ------------------------------------------------------
+# Pinned, reproducible proxy: tokens ≈ chars / 4 (integer division). This is a
+# *proxy* gate — it tracks growth, not an exact tokenizer. We deliberately do not
+# call a real tokenizer: that would make the number machine- and model-dependent
+# (non-reproducible across CI runners and dev boxes). The same estimator is used
+# by rule 6 (agents-md-tokens), rule 7 (read-before-tokens), and devx-report.ps1,
+# so the cap and the report agree by construction.
+function Get-Tokens([string]$path) {
+  return [math]::Floor((Get-Content -LiteralPath $path -Raw).Length / 4)
+}
+
+# --- rule: agents-md-tokens (DX16) -------------------------------------------------
+# AGENTS.md is loaded into every agent session, so its length is a per-session
+# cost (E7: a cold agent burned 123 K tokens partly on a long mandatory chain).
+# Cap it at 2 000 tokens (the pinned chars/4 estimator, above) so it cannot
+# silently re-bloat. Fails closed if AGENTS.md is missing.
+$agentsPath = Join-Path $repo 'AGENTS.md'
+$agentsTokens = 0
+if (Test-Path $agentsPath) { $agentsTokens = Get-Tokens $agentsPath }
+Check "agents-md-tokens" "AGENTS.md is ≤ 2 000 tokens (measured $agentsTokens; pinned chars/4 estimator)" ($agentsTokens -le 2000)
+$ruleCount = 6
+
+# --- rule: read-before-tokens (DX16) ---------------------------------------------
+# The "read before your first change" chain must stay small. ONE reproducible
+# definition (drift fact 8): the chain is AGENTS.md plus every relative .md file
+# it links from its `## Start here` section (parse that one section, resolve each
+# `[…](…)` to a file, sum chars/4). The `## Read when` section is intentionally
+# EXCLUDED — those are conditional read-when pointers, not up-front reads — and
+# we do NOT transclude recursively (that would pull in the whole docs/ tree and
+# make the 8 000 cap unreachable). Cap: 8 000 tokens (same estimator as rule 6).
+# The definition lives in this comment so DX17/DX18 (which read AGENTS.md) see
+# the same number.
+$readBefore = 0
+$agentsRaw = ''
+if (Test-Path $agentsPath) {
+  $agentsRaw = Get-Content -LiteralPath $agentsPath -Raw
+  $readBefore = Get-Tokens $agentsPath
+  if ($agentsRaw -match '(?ms)^##\s+Start here\s*\n(.*?)(?=^##\s|\Z)') {
+    foreach ($m in [regex]::Matches($Matches[1], '\[[^\]]*\]\(([^()\s]+)\)')) {
+      $target = ($m.Groups[1].Value -split '#')[0]
+      if ($target -match '\.md$' -and -not $target.StartsWith('http')) {
+        $tp = Join-Path $repo $target
+        if (Test-Path $tp) { $readBefore += Get-Tokens $tp }
+      }
+    }
+  }
+}
+Check "read-before-tokens" "read-before chain (AGENTS.md + its `## Start here` .md links) is ≤ 8 000 tokens (measured $readBefore; pinned chars/4 estimator)" ($readBefore -le 8000)
+$ruleCount = 7
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"

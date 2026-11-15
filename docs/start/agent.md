@@ -12,7 +12,7 @@ related:
   - docs/DOCS-CONVENTIONS.md
   - docs/archive/lanes/improve-docs/plan-improve-docs.md
   - docs/philosophy/START-HERE.md
-updated: 2026-11-02
+updated: 2026-11-15
 ---
 
 > **Abstract:** the links an AI agent working in this repo is most likely
@@ -23,15 +23,16 @@ updated: 2026-11-02
 
 # Agent entry
 
-You're an AI agent working in this repo. The docs below are the ones that
-matter for *you* — the things to read before you touch code or docs.
+You're an AI agent working in this repo. `AGENTS.md` is the up-front read; the
+rest are *read-when* pointers — read them when the trigger fires.
 
 | Link | Why |
 |---|---|
 | [`AGENTS.md`](../../AGENTS.md) | The must-knows — the shape of the code, the conventions, the "don't pause mid-task" rule, and a pointer to the working doctrine. Loaded into every agent session. |
-| [`docs/dev/`](../dev/README.md) | The working doctrine — the Razor verification traps, the test-runner quirk + CI cheatsheet + gates, the live-server debugging conventions, and the sandbox / browser / terminal quirks. Read it before verifying a bug, running tests, reading CI, or debugging the live server. |
-| [`docs/DOCS-CONVENTIONS.md`](../DOCS-CONVENTIONS.md) | The shared rules every doc in this repo follows — the front-matter schema, the abstract rule, the ADR cap, the linking rule, the "one fact, one place" rule. Read before your first doc change. |
-| [`docs/README.md`](../README.md) | The docs map — where things live, the tier model, the entry pages. |
+| [`docs/dev/code-map.md`](../dev/code-map.md) | The context map — one row per bounded context (folder, DocTypes, service, controllers, views, tests, top ADRs). Read when you need to find where a concern lives. |
+| [`docs/dev/`](../dev/README.md) | The working doctrine — the Razor verification traps, the test-runner quirk + CI cheatsheet + gates, the live-server debugging conventions, and the sandbox / browser / terminal quirks. Read when you verify a bug, run tests, read CI, or debug the live server. |
+| [`docs/DOCS-CONVENTIONS.md`](../DOCS-CONVENTIONS.md) | The shared rules every doc in this repo follows — the front-matter schema, the abstract rule, the ADR cap, the linking rule, the "one fact, one place" rule. Read when making a doc change. |
+| [`docs/README.md`](../README.md) | The docs map — where things live, the tier model, the entry pages. Read when looking for where a doc lives. |
 | [`docs/archive/lanes/improve-docs/plan-improve-docs.md`](../archive/lanes/improve-docs/plan-improve-docs.md) | The lane register for the (shipped) doc restructure — the `D00`–`D14` units, the evidence, the target shape. Frozen at the lane's close; the unit spec for the *current* task is the `AGENTS.md` + `docs/dev/` doctrine. |
 | [`docs/philosophy/START-HERE.md`](../philosophy/START-HERE.md) | The philosophy in one hour — the "why" behind the conventions, the integration argument that the seams are the point. |
 | [`docs/philosophy/templates/design-doc.md`](../philosophy/templates/design-doc.md) | The design-doc template — the "Seams & contracts" section is mandatory; use it when proposing a non-trivial change. |
