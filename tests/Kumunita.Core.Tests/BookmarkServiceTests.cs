@@ -39,7 +39,7 @@ namespace Kumunita.Core.Tests;
 /// the audience) is Refused. The other four kinds follow the same pattern.
 /// </para>
 /// </summary>
-public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class BookmarkServiceTests(PostgresFixture fixture)
 {
     private const string ComponentId = "c-u9-comp";
     private string? _conn;   // set by BootStoreAsync; used by Services() to build the EF identity schema

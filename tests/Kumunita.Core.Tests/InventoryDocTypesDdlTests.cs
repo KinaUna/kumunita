@@ -21,7 +21,7 @@ namespace Kumunita.Core.Tests;
 /// <c>KumunitaFeatureDdlTests</c> / <c>AdminOverrideDdlTests</c> shape), not the
 /// in-memory object graph.
 /// </summary>
-public class InventoryDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public class InventoryDocTypesDdlTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private string _connection = "";
 

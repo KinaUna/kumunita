@@ -6,9 +6,11 @@ namespace Kumunita.Core.Tests;
 
 /// <summary>
 /// One shared postgres:18 container (matches the repo's docker-compose dev image) per test
-/// class. Each test method is handed a connection string to a *fresh scratch database* so
-/// no test clobbers another's schema state — critical because both <c>IsPristineAsync</c>
-/// and <c>KumunitaFeature</c> read/modify the live Postgres catalog.
+/// *assembly* (one shared container; each test method still gets a fresh scratch database
+/// via <c>NewDatabaseAsync</c>). That fresh-database hand-off is what keeps parallel classes
+/// from clobbering each other's schema state — critical because both <c>IsPristineAsync</c>
+/// and <c>KumunitaFeature</c> read/modify the live Postgres catalog. <c>max_connections</c>
+/// is raised because many classes now share the one server.
 /// </summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
@@ -23,6 +25,9 @@ public sealed class PostgresFixture : IAsyncLifetime
             .WithDatabase("kumunita")
             .WithUsername("kumunita")
             .WithPassword("kumunita")
+            // Parallel classes now share one server (per-assembly fixture), so raise the
+            // connection ceiling from Postgres' 100 default (ADR 0307 §D2).
+            .WithCommand("-c", "max_connections=300")
             .Build();
 
         await _container.StartAsync();

@@ -13,7 +13,7 @@ namespace Kumunita.Core.Tests;
 /// <c>BookmarkServiceTests</c> pins its test names. The read touches only the
 /// store, so the other dependencies are substituted.
 /// </summary>
-public class BookmarkBatchReadTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class BookmarkBatchReadTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task ListBookmarkedIdsAsync_ReturnsOnlyOwnersRowsOfThatKindAmongTheRequestedIds()

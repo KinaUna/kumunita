@@ -143,3 +143,34 @@ moves it to the archive.
   the DX04 handoff recorded).
 - **Exit verified:** `git status --short` shows only this handoff note modified
   (the untracked `dx0N-prompt.md` briefs stay untracked — DX37 archives them).
+
+## DX07 — assembly fixture, first context
+
+- **Files:** `tests/Kumunita.Core.Tests/AssemblyFixtures.cs` (new —
+  `[assembly: AssemblyFixture(typeof(PostgresFixture))]`, non-generic form
+  verified against the 4.0.3 package XML, not memory); `PostgresFixture.cs`
+  (added `.WithCommand("-c", "max_connections=300")` before `.Build()` + refreshed
+  the "per test class" summary to per-assembly); the five Bookmark\*/Inventory\*
+  classes (`BookmarkBatchReadTests`, `BookmarkServiceTests`,
+  `BookmarkDocTypesDdlTests`, `InventoryServiceTests`, `InventoryDocTypesDdlTests`)
+  — one-line strip of `IClassFixture<PostgresFixture>` each.
+- **The two trap classes kept their sibling:** `BookmarkDocTypesDdlTests` and
+  `InventoryDocTypesDdlTests` still declare `IAsyncLifetime` (the strip removed
+  only the fixture, not the whole interface list); the three others had no
+  `IAsyncLifetime` and got none added.
+- **`F22` untouched:** `AppRoleCannotDropSchemaTests` still declares
+  `IClassFixture<PostgresFixture>` (the DX06 allowlist; verified by grep).
+- **No devx rule / `devx-baseline.json` change** — the consuming rule ("count
+  `IClassFixture` outside the allowlist; baseline 0") lands at **DX08**; this
+  unit only proves the shared-container mechanism on one context and records the
+  timing delta.
+- **`max_connections=300` added** because the parallel classes now share one
+  server (the 100-default ceiling was sized for one class at a time).
+- **Numbers — Core suite before → after (full, in-process dll):** **243 s →
+  208 s** (2051 tests, 0 failed, 2 skipped in both). The 5-class `-class` run:
+  39 tests, 0 failed, 22 s. First data point toward DX08's ≤ 90 s target.
+- **Cite:** ADR 0307 (D2); the plan body's "0300" is a stale number (consistent
+  with the DX04/DX06 handoffs).
+- **Exit verified:** the 5 classes pass via `-class`; the full Core suite is
+  green; `git status --short` shows the 6 test files + `AssemblyFixtures.cs` +
+  this note (plus the untracked `dx08-prompt.md` brief — DX37 archives them).

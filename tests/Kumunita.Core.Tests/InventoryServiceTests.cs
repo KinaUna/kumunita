@@ -28,7 +28,7 @@ namespace Kumunita.Core.Tests;
 /// always the <see cref="InventoryItem.Audience"/>.
 /// </para>
 /// </summary>
-public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class InventoryServiceTests(PostgresFixture fixture)
 {
     // The thin-principal role sets the U03 write lanes' D5 standing probes
     // consume (the <c>ProjectServiceTests</c> <c>MemberRoles</c> /

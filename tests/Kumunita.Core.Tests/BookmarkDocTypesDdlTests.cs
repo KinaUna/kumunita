@@ -19,7 +19,7 @@ namespace Kumunita.Core.Tests;
 /// in-memory object graph. The test name is a doc-registration shape pin
 /// (outside the design doc's §2.5 seam list — the M16/U01 precedent).
 /// </summary>
-public class BookmarkDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public class BookmarkDocTypesDdlTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private string _connection = "";
 
