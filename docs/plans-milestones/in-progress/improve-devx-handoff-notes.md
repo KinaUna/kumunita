@@ -357,3 +357,32 @@ moves it to the archive.
   untracked prompt briefs — DX37 archives them).
 - **Cite:** ADR **0307** (D3); the plan body's "0300" is a stale number
   (consistent with the DX04/DX06/DX08/DX09/DX10 handoffs).
+
+## DX12 — VS Code tasks + Copilot pointer: route the loop through check.ps1
+
+- **Files:** `.vscode/tasks.json` (40 → 52 lines — the `test` task's command
+  `dotnet test` → `pwsh tools/check.ps1 -Only build,web,core`, keeping
+  `group.kind: test` / `isDefault: true`; two **new** tasks `check` (full loop)
+  and `check:fast` (`-Fast`), both `shell`, no `group`, `problemMatcher: []` —
+  `build` / `run` / `ts:build` / `ts:watch` untouched); `.github/copilot-
+  instructions.md` (**41 → 13 lines**, the restated-doctrine bullets deleted;
+  kept: read-`AGENTS.md`, the `docs/dev/` link, and the "add VS Code-specific
+  rules here, not in `AGENTS.md` / `docs/dev/`" line); `tools/devx/devx-
+  check.ps1` (151 → 180 lines — the 4th rule `vscode-task-dotnet-test` appended
+  after `iclassfixture-web`, `$ruleCount` 3 → 4; the first three rules
+  byte-untouched).
+- **The trap that bit first (recorded, not edited around):** the rule's
+  `Get-ChildItem -Recurse` **skipped `.vscode`** (a dot-directory — hidden on
+  Linux without `-Force`), so the scan found **0** `tasks.json` and the rule
+  trivially PASSed *even with the `test` task reverted to `dotnet test`*. Fix:
+  `-Force` on the scan (commented in the rule; verified `0 → 1` file). The other
+  two `-Recurse` scans in the rule hit non-hidden `tests/` dirs, so only this
+  one needed it. This is the "the rule must catch the thing it was built to
+  catch" case — the edit won, the *rule* was the thing to fix.
+- **Failure probe (forced to fire):** a scratch `sed` of the `test` task's
+  command back to `dotnet test` → `devx-check.ps1` **FAIL**s, naming
+  `test in .vscode/tasks.json`, exit 1; restore → **PASS (4 rules)**, exit 0.
+- **DX10/DX11 exits unregressed:** `-Only devx` → **PASS, exit 0, 4 rules**;
+  `-Only tsc` → **PASS**; `-Doctor` → **all 5 checks OK, exit 0**.
+- **Cite:** ADR **0307** (D3); the plan body's "0300" is a stale number
+  (consistent with the DX04/DX06/DX08/DX09/DX10/DX11 handoffs).

@@ -134,7 +134,36 @@ $webFixtureFiles = @(Get-ChildItem -Path (Join-Path $repo 'tests/Kumunita.Web.Te
   Where-Object { (Select-String -LiteralPath $_.FullName -Pattern 'IClassFixture<PostgresFixture>' -SimpleMatch -Quiet) })
 $webFixtureNames = @($webFixtureFiles | ForEach-Object { $_.Name })
 Check "iclassfixture-web" "Web IClassFixture<PostgresFixture> files ($($webFixtureNames -join ', ')) — none expected (Web has no allowlist)" ($webFixtureNames.Count -eq 0)
-$ruleCount = 3
+
+# --- rule: vscode-task-dotnet-test (DX12) -------------------------------------
+# The IDE's one-command loop must route through tools/check.ps1 (D3). A VS Code
+# task whose command runs "dotnet test" is the path testing-and-ci.md calls
+# broken — so no tasks.json in the repo may carry a command matching the plain
+# text "dotnet test" (substring: "dotnet test /p:..." still matches, intended).
+# Covers every tasks.json (a new one is caught too), excluding build artifacts.
+# -Force is required: .vscode is a dot-directory and Get-ChildItem skips hidden
+# dirs on Linux without it (verified — without -Force it finds 0 files and the
+# rule trivially passes). The message names the offending task label so the fix
+# is one hop.
+$taskFiles = @(Get-ChildItem -Path $repo -Filter 'tasks.json' -File -Recurse -Force |
+  Where-Object { $_.FullName -notmatch '/node_modules/|/obj/|/bin/' })
+$badTasks = [System.Collections.Generic.List[string]]::new()
+foreach ($tf in $taskFiles) {
+  $tj = $null
+  try { $tj = Get-Content -LiteralPath $tf.FullName -Raw | ConvertFrom-Json } catch { continue }
+  $tasksArr = if ($tj.PSObject.Properties['tasks']) { @($tj.tasks) } else { @() }
+  foreach ($t in $tasksArr) {
+    $cmd = if ($t.PSObject.Properties['command']) { [string]$t.command } else { '' }
+    if ($cmd -match 'dotnet test') {
+      $label = if ($t.PSObject.Properties['label']) { [string]$t.label } else { '?' }
+      $rel = $tf.FullName -replace [regex]::Escape($repo + '/'), ''
+      $badTasks.Add("$label in $rel")
+    }
+  }
+}
+$badDesc = if ($badTasks.Count -eq 0) { 'none' } else { ($badTasks -join '; ') }
+Check "vscode-task-dotnet-test" "VS Code task(s) running 'dotnet test': $badDesc (expected none — the IDE loop routes through tools/check.ps1, D3)" ($badTasks.Count -eq 0)
+$ruleCount = 4
 
 # --- summary --------------------------------------------------------------------
 Write-Host ""
