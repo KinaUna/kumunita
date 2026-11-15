@@ -386,3 +386,32 @@ moves it to the archive.
   `-Only tsc` → **PASS**; `-Doctor` → **all 5 checks OK, exit 0**.
 - **Cite:** ADR **0307** (D3); the plan body's "0300" is a stale number
   (consistent with the DX04/DX06/DX08/DX09/DX10/DX11 handoffs).
+
+## DX13 — the pwsh-shell-out test (D9): move improve-check into the loop
+
+- **Files:** `.github/workflows/ci.yml` (docs job only — a **new** `Run improve
+  gate` step after `Run docs gate`, running `improve-check.ps1`; the `on:` block
+  byte-identical, `test`/`code`/`e2e` untouched); `tools/check.ps1` (the `docs`
+  step now runs `improve-check.ps1` **in addition to** `docs-check.ps1`, FAIL if
+  either is non-zero); `tests/Kumunita.Web.Tests/ImproveHarnessTests.cs`
+  (**deleted**, `git rm` — 149 lines, its two `*Gate_Passes` facts were the only
+  in-repo caller).
+- **The trap that bit first (recorded, not edited around):** `exit 1` inside the
+  `.cmd` scriptblock (invoked via `&` by `Invoke-Step`) **terminated `check.ps1`
+  itself** — `-Only docs` printed `>> docs` then died with no summary table. Fix:
+  set `$LASTEXITCODE = 1` instead of `exit` (commented in the docs step). The
+  `code` step already relied on `$LASTEXITCODE` via the script's own exit code, so
+  only this multi-script step needed the guard.
+- **No gate loses coverage:** `code-check.ps1` was already in the CI `code` job
+  + `check.ps1`; `improve-check.ps1` is now in the CI `docs` job + `check.ps1`.
+  Net: one `.NET → pwsh` seam removed, no gate dropped.
+- **Red gates are pre-existing (recorded, not fixed, not hidden):** `-Only docs`
+  → **FAIL**, both scripts run and reported — `docs-check: 5 GATE(S) FAILED`,
+  `improve-check: 1 GATE(S) FAILED` (gate `b` ADR-index drift: `0305`/`0306` on
+  disk but not in `docs/adr/README.md`; `code-check` red likewise). All outside
+  DX13's scope.
+- **DX10/DX11/DX12 exits unregressed:** `-Only devx` → **PASS, exit 0, 4 rules**;
+  `-Doctor` → **all 5 checks OK, exit 0**; Web suite **Total 1480, Failed 2**
+  (both pre-existing `SecGate.DataClassCoverageTests`, unrelated to the deletion).
+- **Cite:** ADR **0307** (D9); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX12 handoffs).

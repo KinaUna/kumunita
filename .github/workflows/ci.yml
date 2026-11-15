@@ -55,6 +55,11 @@ jobs:
       - name: Run docs gate
         run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/docs-check.ps1
 
+      # DX13 (ADR 0307 D9): improve-check.ps1 was previously run from ImproveHarnessTests.cs;
+      # the test is deleted — this step is now the CI home for the gate.
+      - name: Run improve gate
+        run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/improve-check.ps1
+
   # IMPROVE-UX X01 — report-only; prints the measurements table without gating PRs.
   ux-report:
     runs-on: ubuntu-latest

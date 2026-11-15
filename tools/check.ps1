@@ -18,7 +18,7 @@
 #            drift check (git diff --exit-code -- src/Kumunita.Web/wwwroot/js)
 #   web    — dotnet exec tests/Kumunita.Web.Tests/…/Kumunita.Web.Tests.dll
 #   core   — dotnet exec tests/Kumunita.Core.Tests/…/Kumunita.Core.Tests.dll
-#   docs   — pwsh tools/docs/docs-check.ps1
+#   docs   — pwsh tools/docs/docs-check.ps1 + improve-check.ps1 (DX13)
 #   code   — pwsh tools/code/code-check.ps1
 #   devx   — pwsh tools/devx/devx-check.ps1
 #
@@ -205,7 +205,14 @@ function Invoke-Step([PSCustomObject]$r) {
 (Get-Result 'core').tools = @('dotnet')
 (Get-Result 'core').cmd = { dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll }
 (Get-Result 'docs').tools = @('pwsh')
-(Get-Result 'docs').cmd = { pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/docs-check.ps1 }
+# DX13 (ADR 0307 D9): run both docs-family gates; FAIL if either is non-zero.
+# NB: set $LASTEXITCODE (not `exit`) — `exit` inside a `&`-invoked scriptblock
+# would terminate check.ps1 before the summary table prints (DX13 gotcha).
+(Get-Result 'docs').cmd = {
+  pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/docs-check.ps1; $d = $LASTEXITCODE
+  pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/improve-check.ps1; $i = $LASTEXITCODE
+  if ($d -ne 0 -or $i -ne 0) { $LASTEXITCODE = 1 }
+}
 (Get-Result 'code').tools = @('pwsh','dotnet')
 (Get-Result 'code').cmd = { pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/code/code-check.ps1 }
 (Get-Result 'devx').tools = @('pwsh')
