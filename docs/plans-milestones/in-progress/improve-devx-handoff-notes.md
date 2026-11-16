@@ -693,3 +693,36 @@ moves it to the archive.
 - **Cite:** ADR **0307** (E13, the "ratchet base documented wrong" finding);
   the plan body's "0300" is a stale number (consistent with the DX04–DX19
   handoffs).
+
+## DX21 — translation-key surface rule (D10)
+
+- **Files:** `tools/devx/code-map.ps1` (one new **Key surfaces** column added
+  as the **last** column: a `keySurfaces` set from
+  `Localization/Keys/en/*.json`, the per-row cell matching each surface to the
+  lower-case context stem — clean when equal (or singular/plural), a `*` marker
+  when a proper **prefix** of the stem (the D10 abbreviation); header + separator
+  cells and a two-line legend in the doc body; the other seven columns
+  **byte-identical**) + `docs/dev/code-map.md` (**regenerated**, 30 contexts).
+  The **rule text already existed** — DX18 wrote it into `recipes.md` "Add a UI
+  string" (lines 34–37: *surface = lower-case controller name*, *exceptions in
+  the code map*, *rename nothing*) — so DX21 added the **column that rule
+  points at**, not the rule.
+- **The `*` rows:** Inventory `inv *, inventory` (both `inv.json` and
+  `inventory.json` exist; `inv` is a leading 3-char substring, matched by
+  proper-prefix — not collapsed into one); also Notifications
+  `notif *, notification, notifications`, ErrorReports `error *, errorreport`,
+  AdminOnboarding `admin *, adminonboarding`; Tag/Tags both clean.
+- **No new devx rule** — the existing `code-map` rule (rule **5** of 9) runs
+  `code-map.ps1 -Check` and gates the fresh map, so the new column is gated for
+  free; `devx-check` still **PASS, 9 rules**, exit 0. `-Doctor` **all 5 checks
+  OK**, exit 0. `code-map.ps1 -Check` → **exit 0** (fresh, 30 contexts).
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **20**, orphans **19**, archive **50**;
+  improve-check gate `b` `0305`/`0306`) — the **19 orphans include this brief**
+  (`dx21-prompt.md`), one more than DX20's **18** (archived at DX37); the brief
+  is link-free (backticks only), so it adds **no** gate-4 broken link.
+  `code-map.md` is `tier: reference` — it appears in **neither** the gate-4
+  broken list nor the gate-5 orphan list. **Nothing renamed** (D10 — a rename
+  orphans admin-edited translation rows in the DB).
+- **Cite:** ADR **0307** (D10, the "surface names disagree" finding); the plan
+  body's "0300" is a stale number (consistent with the DX04–DX20 handoffs).

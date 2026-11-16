@@ -85,6 +85,19 @@ function DtMatches([string]$stem, [string]$ctxName) {
   return ($stem -eq $ctxName) -or ($stem -eq ($ctxName + 's')) -or (($stem + 's') -eq $ctxName)
 }
 
+# --- the key surfaces (D10) --------------------------------------------------------
+# One JSON file per translation-key surface per language under
+# src/Kumunita.Core/Localization/Keys/<lang>/. A surface belongs to a context if
+# it equals the lower-case context stem (or its singular/plural) — clean; or if it
+# is a proper prefix of the stem (an abbreviation, e.g. `inv` on Inventory) — a
+# D10 exception, rendered with a `*`. The rule is uniform so a new abbreviation
+# is picked up automatically; nothing is renamed (a rename orphans admin-edited
+# translation rows in the DB).
+$keySurfaces = [System.Collections.Generic.HashSet[string]]::new()
+foreach ($k in (Get-ChildItem -Path (Join-Path $repo 'src/Kumunita.Core/Localization/Keys/en') -Filter '*.json' -File)) {
+  [void]$keySurfaces.Add($k.BaseName)
+}
+
 # --- helpers per row ---------------------------------------------------------------
 function MatchFiles([object[]]$seams, [object[]]$names, $texts) {
   $hits = [System.Collections.Generic.List[string]]::new()
@@ -140,8 +153,17 @@ foreach ($c in $contexts) {
   $folderCs = @(Get-ChildItem -Path (Join-Path $repo $c) -Filter '*.cs' -File | ForEach-Object { $_.FullName } | Sort-Object)
   $adrs = TopAdrs $folderCs
 
+  # col 8: key surfaces (D10) — clean (= ctx stem) vs abbreviation (proper prefix, `*`).
+  $lcCtx = $ctxName.ToLowerInvariant()
+  $keys = @()
+  foreach ($s in ($keySurfaces | Sort-Object)) {
+    if ($s -eq $lcCtx -or $s -eq ($lcCtx + 's') -or ($s + 's') -eq $lcCtx) { $keys += $s }
+    elseif ($lcCtx.StartsWith($s) -and $s.Length -lt $lcCtx.Length) { $keys += ($s + ' *') }
+  }
+
   $rows.Add('| ' + $ctxName + ' | ' + (JoinList $dts) + ' | ' + (JoinList $seams) + ' | ' +
-    (JoinList $ctlHit) + ' | ' + (JoinList $views) + ' | ' + (JoinList $testHit) + ' | ' + $adrs + ' |')
+    (JoinList $ctlHit) + ' | ' + (JoinList $views) + ' | ' + (JoinList $testHit) + ' | ' + $adrs + ' | ' +
+    (JoinList $keys) + ' |')
 }
 
 # --- the document ------------------------------------------------------------------
@@ -170,10 +192,13 @@ $doc.Add('')
 $doc.Add('One row per bounded context: a `Kumunita.Core` folder with its own `DependencyInjection.cs`.')
 $doc.Add('The composition-root aggregator (`src/Kumunita.Core`) and the `Announcements` feature')
 $doc.Add('module are excluded (by rule). Every cell is derived from the code; the ADR column is')
-$doc.Add('a list of the most-cited numbers in the folder, not links.')
+$doc.Add('a list of the most-cited numbers in the folder, not links. The `Key surfaces` column')
+$doc.Add("lists the context's translation-key surfaces (one JSON file per surface under")
+$doc.Add('`Localization/Keys/<lang>/`): a surface equal to the lower-case context stem is clean;')
+$doc.Add('a `*` marks a D10 abbreviation — a proper prefix of the stem, e.g. `inv` on Inventory.')
 $doc.Add('')
-$doc.Add('| Context | *DocTypes.cs | I*Service | Controllers | Views | Tests | Top ADRs |')
-$doc.Add('|---|---|---|---|---|---|---|')
+$doc.Add('| Context | *DocTypes.cs | I*Service | Controllers | Views | Tests | Top ADRs | Key surfaces |')
+$doc.Add('|---|---|---|---|---|---|---|---|')
 foreach ($r in $rows) { $doc.Add($r) }
 $doc.Add('')
 $markdown = ($doc -join "`n") + "`n"
