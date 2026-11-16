@@ -267,6 +267,39 @@ $tcDetail = if ($tcPrefixes.Count -eq 0) { 'table missing (zero quoted prefixes 
 Check "testing-and-ci-messages" "every quoted message prefix in testing-and-ci.md's table resolves to tools/ or tests/: $tcDetail" $tcOk
 $ruleCount = 8
 
+# --- rule: recipes-paths-exist (DX18) -------------------------------------------
+# docs/dev/recipes.md is the six how-tos a cold maintainer copies and runs
+# (plan E8: the cold agent's "wished existed" list started with recipes). A
+# recipe is only trustworthy if its paths are real — so every backtick-quoted
+# REPO PATH in the doc must resolve to an existing file or directory. The
+# extractor is pinned so the definition cannot drift (D8 reproducible contract):
+# a quoted token counts as a repo path iff it (1) contains a '/' and (2) starts
+# with one of the top-level roots src/, tools/, tests/, docs/, or e2e/ — this
+# deliberately EXCLUDES prose like `keys/en`, `wwwroot/js`, and `dotnet exec …`
+# command spans (a span that starts with a non-root token is not a path). A
+# missing doc, or a doc with zero repo-path tokens, FAILS CLOSED — the recipes
+# are the point, so an empty doc cannot silently pass.
+$recipesPath = Join-Path $repo 'docs/dev/recipes.md'
+$recipeRoots = @('src/', 'tools/', 'tests/', 'docs/', 'e2e/')
+$recipeTokens = [System.Collections.Generic.List[string]]::new()
+if (Test-Path $recipesPath) {
+  $recipesRaw = Get-Content -LiteralPath $recipesPath -Raw
+  foreach ($m in [regex]::Matches($recipesRaw, '`([^`]+)`')) {
+    $tok = $m.Groups[1].Value
+    if ($tok.Contains('/')) {
+      foreach ($r in $recipeRoots) { if ($tok.StartsWith($r)) { $recipeTokens.Add($tok); break } }
+    }
+  }
+}
+$recipeMissing = [System.Collections.Generic.List[string]]::new()
+foreach ($t in $recipeTokens) {
+  if (-not (Test-Path (Join-Path $repo $t))) { $recipeMissing.Add($t) }
+}
+$recipeOk = ($recipeTokens.Count -gt 0) -and ($recipeMissing.Count -eq 0)
+$recipeDetail = if ($recipeTokens.Count -eq 0) { 'doc missing or zero repo-path tokens (fails closed)' } elseif ($recipeMissing.Count -gt 0) { 'not found: ' + ($recipeMissing -join '; ') } else { 'all ' + $recipeTokens.Count + ' repo paths resolve' }
+Check "recipes-paths-exist" "every backtick-quoted repo path in docs/dev/recipes.md resolves to a file or directory: $recipeDetail" $recipeOk
+$ruleCount = 9
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"

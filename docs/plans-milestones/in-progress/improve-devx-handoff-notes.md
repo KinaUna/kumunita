@@ -606,3 +606,37 @@ moves it to the archive.
   (17 / 1 / 19 / 50) are byte-identical to the pre-DX17 baseline.
 - **Cite:** ADR **0307** (D7, the gate form; E4, the retired-gate finding); the
   plan body's "0300" is a stale number (consistent with the DX04–DX16 handoffs).
+
+## DX18 — recipes
+
+- **Files:** `docs/dev/recipes.md` (**new**, six recipes each ≤ 25 lines — live
+  max **15**): add a UI string · add a field to a doc type · add a new doc type ·
+  add a controller + view · add a test (and where it goes) · read a red CI run.
+  Each lists **files** (real paths), **tests**, **live gates**, and the **one
+  command**; every "run it" is the **`check.ps1` / `dotnet exec <dll>`** form
+  (never `dotnet test`). The "add a UI string" recipe states **surface =
+  lower-case controller name** (the `inv.*` exception) and says **rename
+  nothing** (D10). The recipes are **pointers** to `docs/dev/code-map.md` and
+  the live gates, not a restatement. `AGENTS.md` gained one `## Read when` line
+  (not `## Start here`, so the **8 000** read-before chain stays green — measured
+  **5 378**); the **2 000** `AGENTS.md` cap was 1 char over after the add, fixed
+  by trimming the "long-running things" sentence → measured **1 993**.
+  `docs/dev/README.md` gained one table row (what keeps `recipes.md` reachable
+  for gate-5; it is **not** in any gate-4/gate-5 failure list).
+- **Rule 9 landed (`recipes-paths-exist`):** every backtick-quoted repo path in
+  `recipes.md` (a token with a `/` starting under `src/` `tools/` `tests/`
+  `docs/` `e2e/`) must resolve; a missing/empty doc fails closed; the definition
+  is pinned in the rule's comment. Proven: planted `tools/devx/no-such.ps1` →
+  **FAIL (rule 9)**, exit 1 → restored → **PASS**. The first eight rule blocks
+  are **byte-untouched**; `$ruleCount` **8 → 9**. (The extractor correctly
+  ignored the prose `keys/en` / `dotnet exec …` spans and the `<Name>` controller
+  placeholder — the latter is named in backticks but *not* as a repo path.)
+- **Exits:** `-Only devx` → **PASS, exit 0, 9 rules**. `-Doctor` → **all 5
+  checks OK, exit 0** (DX11 unregressed). `-Only docs` → **FAIL for the
+  pre-existing set**, byte-identical to the session-start baseline (front-matter
+  **17**, ADR >250 **1**, broken links **19**, orphans **16**, archive **50**;
+  improve-check gate `b` `0305`/`0306`). **The 16 orphans include this brief**
+  (`dx18-prompt.md`), one more than the DX17 handoff's **15** — archived at DX37;
+  `recipes.md` adds **no new** gate-4 broken link and **no new** gate-5 orphan.
+- **Cite:** ADR **0307** (D8, the unit shape; E8, the "no recipes" finding); the
+  plan body's "0300" is a stale number (consistent with the DX04–DX17 handoffs).

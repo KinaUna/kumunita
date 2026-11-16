@@ -36,6 +36,7 @@ one fact, one place (the [linking rule](../DOCS-CONVENTIONS.md)).
 | [`running-locally.md`](running-locally.md) | How to run the app locally — the dev container, the no-app-container loop, the sample-data / demo accounts, and the prod topology (split from the [`README.md`](../../README.md) Running section in `D07`). |
 | [`razor-verification.md`](razor-verification.md) | "The rendered HTML is the evidence" rule, the known Razor traps in this codebase, and how to get a live server to verify against. |
 | [`testing-and-ci.md`](testing-and-ci.md) | The xunit.v3 test-runner quirk, the CI known-failure cheatsheet, and the by-design CI gates / anti-regression pins. |
+| [`recipes.md`](recipes.md) | The six one-hop how-tos (add a UI string, field, doc type, controller + view, test, or read a red CI run) — files, tests, live gates, and the one command per change. |
 | [`live-server-debugging.md`](live-server-debugging.md) | The Postgres conventions that trip you up (`mt_doc_` naming, the `kumunita` vs `postgres` DB, `pgcrypto`, the `/admin/setup` 404). |
 | [`agent-environment-quirks.md`](agent-environment-quirks.md) | The git-state gotcha, the browser trusted-folder quirk, and the terminal-command safety rules for the WSL2 / Copilot sandbox. |
 | [`branch-flow.md`](branch-flow.md) | The `development` → `release` → `main` flow, which branch CI watches, and the owner-ops branch-protection ledger (ADR 0307 D1). |

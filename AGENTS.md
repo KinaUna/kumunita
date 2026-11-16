@@ -38,6 +38,7 @@ The few every change needs — read up front:
 Read when the trigger fires (each a full doc, still linked):
 
 - **Where a concern lives:** [`docs/dev/code-map.md`](docs/dev/code-map.md) — context → folder, DocTypes, service, controllers, views, tests, ADRs.
+- **Recipes (add a string / field / doc / controller / test):** [`docs/dev/recipes.md`](docs/dev/recipes.md).
 - **Stack / data model / CQRS-lite & Wolverine:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - **Persistence / schema:** **ADR [0004](docs/adr/0004-data-persistence-and-schema-evolution.md)** — before persistence or schema.
 - **Cross-context calls:** **ADR [0006](docs/adr/0006-module-boundary-contracts.md)** — before cross-context calls.
@@ -68,7 +69,7 @@ This repo uses **Marten and Wolverine** on **.NET 10**; the idiomatic patterns i
 
 Partway through a multi-step task, if a tool batch returns with no error, keep going — don't stop to announce the next step and wait for a "continue." Stop only on a real blocker (an error, a missing file, an ambiguous requirement, or something destructive) — say what happened and what you need. **A failed tool call is a recoverable step, not a stopping point**: read the error, adjust, continue; if the *same* command failed twice, change approach.
 
-**The flip side — long-running things in flight.** When a known-long test suite, build, or `docker compose up` is running in the background, say so *proactively* in the same turn — name the duration (per-step budget in `check.ps1` output) and that you'll report on completion.
+**Long-running things in flight:** a background suite, build, or `docker compose up` — say so *proactively* in the same turn; I'll report on completion.
 
 ## Keeping the docs in sync with the code
 
