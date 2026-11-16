@@ -381,4 +381,48 @@ public class KnownTranslationKeys_ParityTests
         Assert.Equal(pnKeys.OrderBy(k => k).ToList(),
             registryPnKeys.OrderBy(k => k).ToList());
     }
+
+    // ── DX19 — the declared language set and the Keys/ folders agree (ADR 0005) ──
+    // IMPROVE-DEVX DX19 (plan E8): "what languages does this platform support"
+    // was declared nowhere — implied only by the four Keys/{en,de,fr,da}/
+    // folders plus four hard-coded Load("…") literals. Languages is now the
+    // single source of truth; this fact pins the folder set == Languages so
+    // the two can't drift apart.
+
+    [Fact(DisplayName = "Localization/Keys folders equal KnownTranslationKeys.Languages (set equality)")]
+    public void Keys_Folders_Equal_Declared_Languages_Set()
+    {
+        // Resolve src/Kumunita.Core/Localization/Keys/ relative to the running
+        // test assembly (tests/Kumunita.Core.Tests/bin/<cfg>/net10.0/ → up to
+        // src/, then the source tree), the same convention this file already
+        // implies for the embedded-resources loader. Fail closed if it can't
+        // be resolved — never silently pass.
+        var assemblyDir = System.IO.Path.GetDirectoryName(
+            System.Reflection.Assembly.GetExecutingAssembly().Location)
+            ?? throw new InvalidOperationException("cannot resolve the running test assembly's directory");
+
+        var dir = assemblyDir;
+        string? keysDir = null;
+        for (var i = 0; i < 6 && dir != null; i++)
+        {
+            var candidate = System.IO.Path.Combine(dir, "src", "Kumunita.Core", "Localization", "Keys");
+            if (System.IO.Directory.Exists(candidate)) { keysDir = candidate; break; }
+            dir = System.IO.Path.GetDirectoryName(dir);
+        }
+        Assert.True(keysDir != null,
+            "could not resolve src/Kumunita.Core/Localization/Keys/ relative to the running " +
+            $"test assembly ({assemblyDir}) — the parity pin must not pass silently");
+
+        var folderSet = System.IO.Directory
+            .GetDirectories(keysDir!)
+            .Select(p => System.IO.Path.GetFileName(p))
+            .ToHashSet(StringComparer.Ordinal);
+        var declaredSet = KnownTranslationKeys.Languages.ToHashSet(StringComparer.Ordinal);
+
+        Assert.True(declaredSet.SetEquals(folderSet),
+            "the Localization/Keys/<lang>/ folder set must equal KnownTranslationKeys.Languages " +
+            "(the closed platform UI-language set, ADR 0005): declared " +
+            string.Join(", ", declaredSet.OrderBy(x => x)) + " vs folders " +
+            string.Join(", ", folderSet.OrderBy(x => x)));
+    }
 }

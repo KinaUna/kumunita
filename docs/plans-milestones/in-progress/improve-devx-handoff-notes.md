@@ -640,3 +640,31 @@ moves it to the archive.
   `recipes.md` adds **no new** gate-4 broken link and **no new** gate-5 orphan.
 - **Cite:** ADR **0307** (D8, the unit shape; E8, the "no recipes" finding); the
   plan body's "0300" is a stale number (consistent with the DX04–DX17 handoffs).
+
+## DX19 — declare the UI languages once
+
+- **Files:** `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` (one new
+  member `Languages` = `IReadOnlyList<string>` `["en","de","fr","da"]`, doc
+  comment cites ADR 0005 — the **closed set**; the four `*Values` and the
+  `Load`/`SurfacesFor` loader are **byte-untouched**, the data is ADR 0289, this
+  is only the *set*) +
+  `tests/Kumunita.Core.Tests/KnownTranslationKeys_ParityTests.cs` (one new
+  `[Fact]`: the `Localization/Keys/<lang>/` **folder set == `Languages`**,
+  set-equality, **fail-closed** — `Assert.True` with the declared vs folder
+  lists if the path can't be resolved; fully-qualified `System.IO`/
+  `System.Reflection`, no new usings).
+- **Exit:** `dotnet exec <Core.Tests.dll> -class
+  Kumunita.Core.Tests.KnownTranslationKeys_ParityTests` → **Total: 9, Failed: 0**
+  (8 existing + the new folder-equality fact). **No new devx rule** — `devx-check`
+  still **PASS, 9 rules**, exit 0; `-Doctor` **all 5 checks OK**, exit 0.
+- **`code-check` (the Roslyn ratchet) reds are pre-existing** (the baseline-growth
+  list — `Posts/Detail.cshtml`, `IdentityService`, `ModerationService`, boundary
+  edges, etc.) — **none name `Localization/` or the new member**; the ratchet was
+  not loosened. **`-Only docs` reds are pre-existing and unchanged** (front-matter
+  **17**, ADR >250 **1**, broken links **19**, orphans **17**, archive **50**;
+  improve-check gate `b` `0305`/`0306`) — the **17 orphans include this brief**
+  (`dx19-prompt.md`), one more than DX18's **16** (archived at DX37); DX19 adds
+  **no new** gate-4 broken link and **no new** doc.
+- **Cite:** ADR **0307** (D8, the unit shape; E8, the "languages implied by the
+  folders" finding); the plan body's "0300" is a stale number (consistent with
+  the DX04–DX18 handoffs).
