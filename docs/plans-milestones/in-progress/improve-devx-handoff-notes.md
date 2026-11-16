@@ -935,3 +935,51 @@ moves it to the archive.
   extract them).
 - **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
   (consistent with the DX04–DX25 handoffs).
+
+## DX27 — move Core.Tests P–Z contexts (git mv only)
+
+- **Files:** the **37** Core root files `git mv`'d into their P–Z context
+  folders via `test-layout.ps1 -Apply -Project Core -Range P-Z` (the DX25
+  `-Apply`, only *run* — no script edit): `UserInfo/` **16**,
+  `Posts/` **12**, `Projects/` **4**, `Pages/` **1**,
+  `Portability/` **1**, `Sessions/` **1**, `Tags/` **1**,
+  `Usage/` **1** — the exact fact-1 list. **`git mv` only**
+  (all **`R100`** × 37, namespaces unchanged, csproj untouched — SDK-style
+  globs), **no** content edits, **no** ADR. The lane-looking names
+  (`LS_U04_SeederTests.cs`, `M7PaginationSeamTests.cs`,
+  `DirectoryServiceTests_U6.cs`, `UserInfoServiceGroupsU9Tests.cs`) were
+  **moved, not renamed** (rule 10's regex requires the digit right after the
+  lane letter — none of them match; rule 10 stays **0**).
+- **`git status`: exactly 37 `R` renames, all at 100 % similarity** (proven
+  by `git diff --cached --find-renames --summary` — 37 at 100 %, zero
+  below), **no** `M` on any moved file, **no** new untracked test file. The
+  5 no-ops (`Posts/PostSortTests.cs`, `Projects/ProjectSortTests.cs`,
+  `Usage/UsageHistoryTests.cs`, `UserInfo/ProfileBioTagsWriteLaneTests.cs`,
+  `UserInfo/ProfileFindServiceTests.cs`) are already in the right subfolder
+  and were skipped. The 2 candidate subfolder files
+  (`Mentions/MentionsTests.cs` → UserInfo,
+  `Projects/ProjectsTagLaneTests.cs` → Tags) show **no** rename —
+  **flagged, not moved** (`// TODO ❓` owner call: those subfolders were
+  created by earlier lanes for their own contexts; a cross-context move
+  fights the existing structure).
+- **Core suite: 2052 → 2052 tests, the same 9 `SmtpHealthCheckTests` socket
+  failures, zero new** (167.9 s). `PostServiceTests` (one of the moved
+  classes, now in `Posts/`) verified via `-class`: 64 tests, 0 failures.
+- **DX27 lands no devx rule** — `devx-check` **PASS, 10 rules**, exit 0
+  (rules 2, 5 and 10 re-verified green). `devx-baseline.json` **untouched** —
+  `test_files_at_project_root` stays **369** until DX30 lands the
+  root-baseline-0 gate (DX35's before→after reads **369 → 0**); the *report*
+  number (`devx-report.ps1` E9) legitimately drops **318 → 281**
+  (115 → 78 Core root) — a report line, not a gate.
+- **The Core move is complete** — all **88** non-`_Shared/` Core root files
+  (17 A–F + 34 G–O + 37 P–Z) are in context folders; the **78** files still
+  at the root are **all `_Shared/`** in the mapping (plus
+  `AssemblyFixtures.cs`, `PostgresFixture.cs`, `GlobalUsings.cs`).
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **25** — incl. this brief
+  `dx27-prompt.md`, one more than DX26's **24**, archived at DX37 — archive
+  **50**; improve-check gate `b` `0305`/`0306`). This brief adds **+1 orphan**
+  (expected) and **zero** broken links (backtick paths, gate-4 regex does not
+  extract them).
+- **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX26 handoffs).
