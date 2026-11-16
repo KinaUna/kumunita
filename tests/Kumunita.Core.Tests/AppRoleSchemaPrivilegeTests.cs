@@ -4,6 +4,7 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 /// <summary>
+/// Renamed from AppRoleCannotDropSchemaTests (F22): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F22 (DB-18, ADR 0171) — the enforcement witness for the two-role split: the
 /// runtime APP role is demoted to DML and holds no schema-level DDL, while the
 /// MIGRATION role keeps it. This is the Postgres-privilege-layer proof that the
@@ -34,7 +35,7 @@ namespace Kumunita.Core.Tests;
 /// </list>
 /// </summary>
 // server-scoped: catalog-level CREATE ROLE / CREATE DATABASE … OWNER (ADR 0171) — keeps a private container
-public sealed class AppRoleCannotDropSchemaTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class AppRoleSchemaPrivilegeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
     private const string MigrateRole = "kumunita_migrate";
     private const string AppRole = "kumunita_app";

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Xunit;
 
 /// <summary>
+/// Renamed from ADR_0046_RequestLanguageTests (ADR 0046): the previous lane-coded file/class name, kept so a search for it still lands.
 /// ADR 0046 — the default-language step: when a resident has not selected a
 /// language, the page tries to match the browser's <c>Accept-Language</c>
 /// settings (against the **enabled** catalog), and only if that is not
@@ -19,7 +20,7 @@ using Xunit;
 /// degrades to "no browser signal", never a fault.
 /// </para>
 /// </summary>
-public class ADR_0046_RequestLanguageTests
+public class RequestLanguageBrowserFallbackTests
 {
     private static LanguageCatalog[] Catalog(
         (string Id, bool Enabled)[] rows)

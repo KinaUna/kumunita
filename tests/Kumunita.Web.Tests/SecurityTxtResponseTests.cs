@@ -9,6 +9,7 @@ using Xunit;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
+/// Renamed from F13U2_SecurityTxtTests (F13.U2): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F13 (OPS-05: <c>/.well-known/security.txt</c> + VDP) — **U2**, the LAST
 /// unit of F13. The single pinned test <c>SecurityTxt_ReturnsValidFields</c>
 /// (F13.U1 pin, <c>WellKnownController</c> doc-comment + handoff note
@@ -53,12 +54,13 @@ namespace Kumunita.Web.Tests;
 /// <c>SECURITY-VDP.md</c> from F13.U1 are **untouched**).
 /// </para>
 /// </summary>
-public sealed class F13U2_SecurityTxtTests
+public sealed class SecurityTxtResponseTests
 {
     private const string SupportEmail = "support@examplium.com";
     private const string PolicySuffix = "/.well-known/security.txt";
 
     /// <summary>
+/// Renamed from F13U2_SecurityTxtTests (F13.U2): the previous lane-coded file/class name, kept so a search for it still lands.
     /// The pinned <c>SecurityTxt_ReturnsValidFields</c> — the action returns
     /// **200** + <c>text/plain</c> with the five RFC 9116 fields (the six legs
     /// above). Harness: a hand-rolled <see cref="WellKnownController"/> with a
@@ -129,6 +131,7 @@ public sealed class F13U2_SecurityTxtTests
     // ── Harness ──────────────────────────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F13U2_SecurityTxtTests (F13.U2): the previous lane-coded file/class name, kept so a search for it still lands.
     /// Build the <see cref="WellKnownController"/> with a hand-rolled
     /// <see cref="IOptions{CommunityOptions}"/> (<c>SupportEmail</c> set to
     /// the leg-2 stub) and a stubbed <see cref="HttpContext"/> (Scheme
@@ -159,6 +162,7 @@ public sealed class F13U2_SecurityTxtTests
     }
 
     /// <summary>
+/// Renamed from F13U2_SecurityTxtTests (F13.U2): the previous lane-coded file/class name, kept so a search for it still lands.
     /// Extract the value of an RFC 9116 <c>Field: value</c> line from the
     /// body. Fails the test (via <see cref="Assert.False"/>) if the field is
     /// absent — the five pinned fields are all mandatory here.

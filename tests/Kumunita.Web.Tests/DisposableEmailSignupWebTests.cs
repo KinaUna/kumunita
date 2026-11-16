@@ -15,6 +15,7 @@ using Marten;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
+/// Renamed from F9U4_SignupTests (F9.U4): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F9 (AUTH-15: signup bot challenge + disposable-email blocklist) — **U4**, the
 /// <b>Web half</b> of the pinned test <c>Signup_DisposableEmail_Rejected</c>
 /// (design <c>prod-hardening-f9-signup.md</c> §5, assertion 4) + the separate
@@ -52,11 +53,12 @@ namespace Kumunita.Web.Tests;
 /// <c>IBotChallengeVerifier</c> seam (F9.U3) and the blocklist check (F9.U2) are
 /// already landed and are tested here, not re-derived.
 /// </para>
-public sealed class F9U4_SignupTests
+public sealed class DisposableEmailSignupWebTests
 {
     // ── Signup_DisposableEmail_Rejected (Web half — pin §5 assertion 4) ────
 
     /// <summary>
+/// Renamed from F9U4_SignupTests (F9.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// <c>Signup_DisposableEmail_Rejected</c> (pin §5, **assertion 4**):
     /// <c>AccountController.Signup(POST)</c> with a blocklisted email — a
     /// substituted <c>IIdentityService.RegisterAsync</c> that throws the
@@ -107,6 +109,7 @@ public sealed class F9U4_SignupTests
     // ── Signup_BotChallengeEnforced (the F9.U3 seam test — pin §4b) ────────
 
     /// <summary>
+/// Renamed from F9U4_SignupTests (F9.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// <c>Signup_BotChallengeEnforced</c> (F9.U3's deferred seam test, pin §4b).
     /// <para>
     /// **Flag-on leg:** a stub <c>IBotChallengeVerifier</c> (in the request
@@ -211,6 +214,7 @@ public sealed class F9U4_SignupTests
     // ── Harness ──────────────────────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F9U4_SignupTests (F9.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A real <see cref="AccountController"/> whose <c>HttpContext.RequestServices</c>
     /// resolves the given <paramref name="verifier"/> for
     /// <see cref="IBotChallengeVerifier"/> (the F9.U3 "resolved from the request
@@ -243,6 +247,7 @@ public sealed class F9U4_SignupTests
     }
 
     /// <summary>
+/// Renamed from F9U4_SignupTests (F9.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A request-scope provider that resolves the given
     /// <see cref="IBotChallengeVerifier"/> (the F9.U3 "resolved from the request
     /// scope" idiom) — registered only when non-<c>null</c> (so
@@ -271,6 +276,7 @@ public sealed class F9U4_SignupTests
     }
 
     /// <summary>
+/// Renamed from F9U4_SignupTests (F9.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A no-op <see cref="IUrlHelperFactory"/> (the <c>NullUrlHelper</c> fallback
     /// equivalent) whose <c>GetUrlHelper</c> returns a no-op <see cref="IUrlHelper"/>
     /// (the <c>UploadGateTestSupport</c> idiom).
@@ -281,6 +287,7 @@ public sealed class F9U4_SignupTests
     }
 
     /// <summary>
+/// Renamed from F9U4_SignupTests (F9.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A no-op <see cref="ITempDataDictionaryFactory"/> (the
     /// <c>NullTempDataDictionary</c> fallback equivalent) so the controller's
     /// <c>TempData</c> reads succeed under a non-null request-scope provider.

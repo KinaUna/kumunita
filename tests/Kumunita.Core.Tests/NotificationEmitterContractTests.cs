@@ -9,6 +9,7 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 /// <summary>
+/// Renamed from C03_NotificationEmitterContractTests (C03): the previous lane-coded file/class name, kept so a search for it still lands.
 /// C03 (IMPROVE-CODE lane — plan §C03, D6) — the seam test for the new
 /// <see cref="INotificationEmitter"/> emission contract.
 /// <para>
@@ -31,7 +32,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="Conversation"/> participant lookup, both stubbed.
 /// </para>
 /// </summary>
-public class C03_NotificationEmitterContractTests
+public class NotificationEmitterContractTests
 {
     private const string ConversationId = "conv-c03";
     private const string ActorId = "u-c03-actor";
@@ -39,6 +40,7 @@ public class C03_NotificationEmitterContractTests
     private const string Body = "hi, saw the post?";
 
     /// <summary>
+/// Renamed from C03_NotificationEmitterContractTests (C03): the previous lane-coded file/class name, kept so a search for it still lands.
     /// Fakes the frozen seams a <see cref="MessagingService"/> needs to reach
     /// its send-lane emission: a store whose enablement toggle reads "on" and
     /// whose write session returns the two-participant conversation, plus the

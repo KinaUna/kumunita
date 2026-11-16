@@ -5,6 +5,7 @@ using Xunit;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
+/// Renamed from F3U2_TokenStoreApiCompileCheckTests (F3.U2): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F3 · U2 — build-verification (round-3). Compile-check of the round-3 re-pin's
 /// §2.1 two-factor surface against the real <c>Microsoft.AspNetCore.Identity 10.0.13</c>
 /// <c>UserManager&lt;User&gt;</c> / <c>SignInManager&lt;User&gt;</c> of the repo.
@@ -22,7 +23,7 @@ namespace Kumunita.Web.Tests;
 /// no <c>.slnx</c> change, no <c>.cs</c> feature change, <c>Program.cs:403</c> untouched.
 /// F3.U3 (enroll/verify surface) is NOT started by this unit.
 /// </summary>
-public class F3U2_TokenStoreApiCompileCheckTests
+public class TokenStoreApiSurfaceCompileTests
 {
     /// <summary>Pinned-name surface guard (F3.U2 build-verification, round-3).</summary>
     [Fact]
@@ -36,6 +37,7 @@ public class F3U2_TokenStoreApiCompileCheckTests
     }
 
     /// <summary>
+/// Renamed from F3U2_TokenStoreApiCompileCheckTests (F3.U2): the previous lane-coded file/class name, kept so a search for it still lands.
     /// The round-3 compile-check body. Every member is referenced against the real
     /// generic managers so the compiler resolves each one. The four
     /// round-3-corrected shapes are marked <c>// (R3)</c>; the rest are the

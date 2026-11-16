@@ -7,6 +7,7 @@ using Xunit;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
+/// Renamed from F11U3_DeadLetterAlertTests (F11.U3): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F11 (JOB-02: alert on dead-letter exhaustion) — **U3**, the third and final
 /// unit of F11. The single pinned test <c>DeadLetter_FiresAlert</c> (design
 /// <c>prod-hardening-f11-dlq-alert.md</c> §4a legs 1–4, §4b harness gotcha).
@@ -67,7 +68,7 @@ namespace Kumunita.Web.Tests;
 /// EF boot is load-bearing for <c>UserManager</c> stamp rotation, which has no
 /// analog in this test).
 /// </para>
-public sealed class F11U3_DeadLetterAlertTests(PostgresFixture fixture)
+public sealed class DeadLetterExhaustionAlertTests(PostgresFixture fixture)
 {
     // Fixed synthetic inputs (pin §4a leg-3 — direct-property asserts against
     // these exact values, not a self-referential "matches what I passed in").
@@ -80,6 +81,7 @@ public sealed class F11U3_DeadLetterAlertTests(PostgresFixture fixture)
     // ── The pinned test (all four §4a legs) ─────────────────────────────────
 
     /// <summary>
+/// Renamed from F11U3_DeadLetterAlertTests (F11.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// The pinned <c>DeadLetter_FiresAlert</c> — all four §4a legs (pin §4a):
     /// <list type="number">
     /// <item><b>leg-1</b> — the <see cref="EmailDeadLetter"/> row is STILL
@@ -161,6 +163,7 @@ public sealed class F11U3_DeadLetterAlertTests(PostgresFixture fixture)
     // ── A synthetic Fault<OutboxEmail> envelope (the §4b access-path) ───────
 
     /// <summary>
+/// Renamed from F11U3_DeadLetterAlertTests (F11.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// Build the synthetic <c>Wolverine.Fault{OutboxEmail}</c> envelope. The
     /// origin <see cref="OutboxEmail"/> carries the <c>Recipient</c> /
     /// <c>IdempotencyKey</c> / <c>Subject</c> the writer copies onto the row;
@@ -202,6 +205,7 @@ public sealed class F11U3_DeadLetterAlertTests(PostgresFixture fixture)
     // ── Harness (the F5U4_KillAllTests.BootAsync shape, trimmed to Marten) ─
 
     /// <summary>
+/// Renamed from F11U3_DeadLetterAlertTests (F11.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// Boot a real <see cref="DocumentStore"/> over a fresh scratch database
     /// (the <see cref="PostgresFixture"/> seam) with the <c>mt</c> schema +
     /// <see cref="CoreDocTypes"/> (which registers <see cref="EmailDeadLetter"/>),
@@ -227,6 +231,7 @@ public sealed class F11U3_DeadLetterAlertTests(PostgresFixture fixture)
     // ── The two §4a stubs ───────────────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F11U3_DeadLetterAlertTests (F11.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// leg-2 / leg-3 — a recording <see cref="IAlertSink"/> (pin §4a leg-2:
     /// "a <c>RecordingAlertSink : IAlertSink</c> stub that appends each
     /// <c>AlertEvent</c> to a <c>List{AlertEvent}</c> and returns
@@ -244,6 +249,7 @@ public sealed class F11U3_DeadLetterAlertTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from F11U3_DeadLetterAlertTests (F11.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// leg-4 (load-bearing) — a <see cref="ThrowingAlertSink"/> (pin §4a
     /// leg-4: "a <c>ThrowingAlertSink</c> (a stub whose <c>ReportAsync</c>
     /// throws)"). <see cref="AttemptCount"/> records that the firing path

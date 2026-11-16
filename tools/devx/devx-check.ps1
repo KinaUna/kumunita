@@ -112,7 +112,7 @@ $ruleCount = 1
 # empty set is a valid subset (the allowlist file may legitimately stop declaring
 # the pattern in the future); the rule fails only when a file *outside* the
 # allowlist still declares it.
-$coreFixtureAllowlist = @('F22_AppRoleCannotDropSchemaTests.cs')
+$coreFixtureAllowlist = @('AppRoleSchemaPrivilegeTests.cs')
 $coreFixtureFiles = @(Get-ChildItem -Path (Join-Path $repo 'tests/Kumunita.Core.Tests') -Filter '*.cs' -File -Recurse |
   Where-Object { $_.FullName -notmatch '/obj/|/bin/' } |
   Where-Object { (Select-String -LiteralPath $_.FullName -Pattern 'IClassFixture<PostgresFixture>' -SimpleMatch -Quiet) })
@@ -299,6 +299,25 @@ $recipeOk = ($recipeTokens.Count -gt 0) -and ($recipeMissing.Count -eq 0)
 $recipeDetail = if ($recipeTokens.Count -eq 0) { 'doc missing or zero repo-path tokens (fails closed)' } elseif ($recipeMissing.Count -gt 0) { 'not found: ' + ($recipeMissing -join '; ') } else { 'all ' + $recipeTokens.Count + ' repo paths resolve' }
 Check "recipes-paths-exist" "every backtick-quoted repo path in docs/dev/recipes.md resolves to a file or directory: $recipeDetail" $recipeOk
 $ruleCount = 9
+
+# --- rule: lane-named-test-files (DX23) ----------------------------------------
+# The D5 "flat, lane-named tests" finding: test files named by lane/unit code
+# (F22_…, LS_U04_…, ADR_0044_…) are a differentiation smell — the file name
+# should say what it tests, not which unit wrote it. DX23 renamed the 16
+# existing files to behavior names; this rule keeps it at 0. The regex is the
+# same one devx-report.ps1 uses for its E9 "lane" count, so the gate and the
+# report agree by construction. obj/ and bin/ are excluded (build artifacts).
+$laneNamedRegex = '^(F|U|C|D|IS|LS|R|A|O|GP|UPL)[0-9]+[U]?[0-9]*[_-]|^ADR_0[0-9]{3}_'
+$laneNamedFiles = [System.Collections.Generic.List[string]]::new()
+foreach ($proj in @('tests/Kumunita.Core.Tests', 'tests/Kumunita.Web.Tests')) {
+  $p = Join-Path $repo $proj
+  if (-not (Test-Path $p)) { continue }
+  foreach ($f in (Get-ChildItem -Path $p -Filter '*.cs' -File -Recurse | Where-Object { $_.FullName -notmatch '/obj/|/bin/' })) {
+    if ($f.Name -match $laneNamedRegex) { $laneNamedFiles.Add(($f.FullName -replace [regex]::Escape($repo + '/'), '')) }
+  }
+}
+Check "lane-named-test-files" "lane/unit-coded test file names in Core.Tests + Web.Tests: $($laneNamedFiles.Count) (expected 0 — rename to a behavior name; the lane code belongs in the class XML summary)" ($laneNamedFiles.Count -eq 0)
+$ruleCount = 10
 
 # --- summary --------------------------------------------------------------------
 Write-Host ""

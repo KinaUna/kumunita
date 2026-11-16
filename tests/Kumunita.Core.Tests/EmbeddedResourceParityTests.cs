@@ -6,6 +6,7 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 /// <summary>
+/// Renamed from C02_DataAsEmbeddedResourcesTests (C02): the previous lane-coded file/class name, kept so a search for it still lands.
 /// C02 (ADR 0289) — the data-move parity tests (the permanent guard).
 /// <para>
 /// The C# registry and the seeded guide / default-page data moved out of C#
@@ -31,7 +32,7 @@ namespace Kumunita.Core.Tests;
 /// parity above, plus the existing value assertions scattered across the suites.
 /// </para>
 /// </summary>
-public sealed class C02_DataAsEmbeddedResourcesTests
+public sealed class EmbeddedResourceParityTests
 {
     // A key present in `en` but absent in a non-`en` language is a deliberate gap,
     // not a bug. Today the de / fr / da baselines are full-registry (the ADR 0015

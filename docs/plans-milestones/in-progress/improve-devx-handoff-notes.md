@@ -766,3 +766,43 @@ moves it to the archive.
   only** (row count preserved at 305; `0305`/`0306` are not DX22's to add).
 - **Cite:** ADR **0307** (D4/E12, the "ADRs unreachable by link" finding); the
   plan body's "0300" is a stale number (consistent with the DX04–DX21 handoffs).
+
+## DX23 — rename the 16 lane-coded test files
+
+- **Count was 16, not the plan's 17.** One was renamed between the plan's
+  2026-11-09 measurement and DX01; `devx-baseline.json`'s
+  `lane_named_test_files` already reads `value: 16, plan: 17`. **No** baseline
+  edit (DX35's before→after reads **16 → 0**).
+- **The F22 rename and the allowlist update were one atomic step.** `devx-check`
+  rule **2** (`iclassfixture`, the `$coreFixtureAllowlist`) keys on the file
+  *name*; renaming `F22_AppRoleCannotDropSchemaTests.cs` →
+  `AppRoleSchemaPrivilegeTests.cs` (the plan's own example) without updating
+  that entry would have flipped rule 2 red with a misleading "outside the
+  allowlist" message. The other 15 do not declare the fixture, so only this one
+  is allowlist-coupled. (Note: the F22 class was *already* named
+  `AppRoleCannotDropSchemaTests` — file name ≠ class name — so this was the one
+  rename where the class name moved too.)
+- **DX23 landed the 10th devx rule** (the lane-named test file names = 0 gate),
+  so `devx-check` is now **PASS, 10 rules**, exit 0 — unlike DX21/DX22 which
+  landed no rule and kept 9. The rule's regex is the same one `devx-report.ps1`
+  uses for its E9 "lane" count, so gate and report agree (now **lane: 0, names:
+  0**).
+- **Side effect on a pre-existing rule:** the renames changed the test-file
+  names in the generated `code-map.md`, so rule **5** (`code-map`, run by
+  `code-map.ps1 -Check`) went stale — regenerating the map (16 lines changed,
+  30 contexts) restored it. This is the map rule doing its job, not a new rule.
+- **No test behavior changed.** 16 files in, 16 out; classes renamed to match
+  their file names, the old lane code preserved in the class `<summary>` so a
+  search still lands; namespaces unchanged. Core suite **2052** tests (the 9
+  failures are `SmtpHealthCheckTests`, socket errors, pre-existing — none of the
+  16 renamed classes); Web suite **1480** tests (19 failures are
+  `StatusPageGateTests` + `SecGate.DataClassCoverageTests`, pre-known reds —
+  none of the 16). Both renamed-class sets verified green via `-class`.
+  `-Doctor` **all 5 checks OK**.
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **21** — incl. this brief
+  `dx23-prompt.md`, one more than DX22's **20**, archived at DX37 — archive
+  **50**; improve-check gate `b` `0305`/`0306`). The renames add **no** gate-4
+  broken link (the old-name code is in a `.cs` XML summary, outside gate 4).
+- **Cite:** ADR **0307** (D5, the "flat, lane-named tests" finding); the plan
+  body's "0300" is a stale number (consistent with the DX04–DX22 handoffs).

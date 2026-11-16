@@ -21,6 +21,7 @@ using NSubstitute;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
+/// Renamed from F5U4_KillAllTests (F5.U4): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F5 · U4 — the two pin §5 pinned tests for the <c>AUTH-04</c> session
 /// kill-all + invalidation seam (F5.U2's <see cref="RevocationStampMiddleware"/>
 /// + F3 leg-2 gate + F5.U3's <c>SecuritySettingsController.SessionsKillAll</c>).
@@ -80,13 +81,14 @@ namespace Kumunita.Web.Tests;
 /// AUTH-04 per the Razor-verification doctrine (AGENTS.md). These unit tests
 /// assert the seams; the E2E is the real evidence for AUTH-04.
 /// </summary>
-public sealed class F5U4_KillAllTests(PostgresFixture fixture)
+public sealed class SessionRevocationKillAllTests(PostgresFixture fixture)
 {
     private const string Password = "Sup3rSecret!";
 
     // ── Pin §5 test 1 ──────────────────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F5U4_KillAllTests (F5.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A password change (the <c>IdentityService</c> lane that calls
     /// <c>UpdateSecurityStampAsync</c>) rotates the user's
     /// <c>SecurityStamp</c>. A second, still-signed-in session (a cookie
@@ -129,6 +131,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture)
     // ── Pin §5 test 2 ──────────────────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F5U4_KillAllTests (F5.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// <c>SecuritySettingsController.SessionsKillAll</c> (the
     /// <c>POST /settings/security/sessions/kill-all</c> surface, the F5.U3
     /// seam) calls the Core seam <c>IIdentityService.KillAllSessionsAsync</c>
@@ -321,6 +324,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from F5U4_KillAllTests (F5.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// The principal the <c>KumunitaPrincipal.SubjectId(user)</c> reader
     /// resolves: a <c>Kumunita.Sub</c> claim with the user's id (the
     /// admissible claim set — invariant-set-B intact, ADR 0006-B).
@@ -351,6 +355,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from F5U4_KillAllTests (F5.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// An <see cref="IAuthenticationService"/> stub (the U7-
     /// defect-repair shape — see the U10 handoff note) so U7's
     /// <c>CurrentSessionIdAsync</c> (the <c>kumunita.sid</c> cookie-item read via
@@ -404,6 +409,7 @@ public sealed class F5U4_KillAllTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from F5U4_KillAllTests (F5.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A minimal <see cref="IUrlHelper"/> so <c>ControllerBase.Url</c> (and
     /// hence the <c>RedirectToAction(...)</c> path) resolves in the
     /// direct-construction harness (the <c>F3U5_MfaLoginTests</c> /

@@ -13,6 +13,7 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 /// <summary>
+/// Renamed from F9U4_DisposableEmailSignupTests (F9.U4): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F9 (AUTH-15: signup bot challenge + disposable-email blocklist) — **U4**, the
 /// **Core half** of the pinned test <c>Signup_DisposableEmail_Rejected</c>
 /// (design <c>prod-hardening-f9-signup.md</c> §5, assertions 1–3).
@@ -46,12 +47,13 @@ namespace Kumunita.Core.Tests;
 /// <see cref="IdentityService"/>). Core stays HTTP-free — the seam is
 /// constructed directly, no Web types.
 /// </para>
-public sealed class F9U4_DisposableEmailSignupTests(PostgresFixture fixture)
+public sealed class DisposableEmailBlocklistCoreTests(PostgresFixture fixture)
 {
     /// <summary>A domain **on** the committed blocklist (line 1 of <c>disposable-emails.txt</c>).</summary>
     private const string BlockedDomain = "mailinator.com";
 
     /// <summary>
+/// Renamed from F9U4_DisposableEmailSignupTests (F9.U4): the previous lane-coded file/class name, kept so a search for it still lands.
     /// <c>Signup_DisposableEmail_Rejected</c> (pin §5, the **Core half** —
     /// assertions 1–3): a blocklisted email is rejected with the **dedicated**
     /// <see cref="DisallowedEmailDomainException"/> type (NOT

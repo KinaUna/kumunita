@@ -19,6 +19,7 @@ using Marten;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
+/// Renamed from F3U5_MfaLoginTests (F3.U5): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F3 · U5 — the three pin §7 pinned tests for the <c>GlobalAdmin</c> MFA
 /// enforcement seam (F3.U4's <see cref="AccountController.Login"/> /
 /// <see cref="AccountController.LoginMfa"/> actions).
@@ -39,7 +40,7 @@ namespace Kumunita.Web.Tests;
 /// <item><see cref="NonAdmin_MfaOptional"/> — proves §5 Leg 1.5c.</item>
 /// </list>
 /// </summary>
-public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
+public sealed class GlobalAdminMfaLoginTests(PostgresFixture fixture)
 {
     private const string Password  = "Sup3rSecret!";
     private const string AdminEmail  = "mfa-admin@examplium.com";
@@ -48,6 +49,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
     // ── Pin §7 test 1 (§5 Leg 1.5) ─────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F3U5_MfaLoginTests (F3.U5): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A <c>GlobalAdmin</c> with <c>TwoFactorEnabled == true</c> posts a correct
     /// password to <see cref="AccountController.Login"/>. Asserts the response
     /// is the **challenge** (a <see cref="ViewResult"/> with
@@ -88,6 +90,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
     // ── Pin §7 test 2 (§6) ─────────────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F3U5_MfaLoginTests (F3.U5): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A <c>GlobalAdmin</c> at the challenge leg presents a **recovery code**.
     /// Asserts (a) the first presentation **succeeds** and completes sign-in;
     /// (b) the **same** code presented again is **rejected** (count drops by 1
@@ -132,6 +135,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
     // ── ADR 0214 — a wrong code keeps the pending sign-in ──────────────────
 
     /// <summary>
+/// Renamed from F3U5_MfaLoginTests (F3.U5): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A wrong authenticator code re-renders the challenge **without** signing out:
     /// the pending <c>TwoFactorUserId</c> cookie must survive so a retry can succeed
     /// (the old <c>SignOutAsync</c> made every retry fail). The typed code is cleared.
@@ -154,6 +158,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from F3U5_MfaLoginTests (F3.U5): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A lockout ends the challenge: the pending cookie is cleared and the password
     /// form (not the code form) is shown with a lockout message.
     /// </summary>
@@ -176,6 +181,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
     // ── Pin §7 test 3 (§5 Leg 1.5c) ────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F3U5_MfaLoginTests (F3.U5): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A non-<c>GlobalAdmin</c> (e.g. <c>Member</c>) with
     /// <c>TwoFactorEnabled == false</c> posts a correct password. Asserts
     /// sign-in completes **directly** (a redirect, no challenge) — MFA is
@@ -209,6 +215,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
     // ── ADR 0194 — the sample-admin login-enrollment exemption ─────────────
 
     /// <summary>
+/// Renamed from F3U5_MfaLoginTests (F3.U5): the previous lane-coded file/class name, kept so a search for it still lands.
     /// ADR 0194 — the sample-admin login-exemption (leg 1.5b). A
     /// <c>GlobalAdmin</c> whose account is a sample account (a member of the
     /// closed <c>SampleAccountEmails</c> set, on a <c>SampleData__Enabled</c>
@@ -253,6 +260,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from F3U5_MfaLoginTests (F3.U5): the previous lane-coded file/class name, kept so a search for it still lands.
     /// ADR 0194 — the control: a <b>non-sample</b> <c>GlobalAdmin</c> with
     /// <c>TwoFactorEnabled == false</c> posts a correct password. Asserts
     /// the response is the <b>enrollment redirect</b> (a
@@ -420,6 +428,7 @@ public sealed class F3U5_MfaLoginTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from F3U5_MfaLoginTests (F3.U5): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A minimal <see cref="IUrlHelper"/> so <c>ControllerBase.Url</c> (and hence
     /// the success-path <c>Url.IsLocalUrl(...)</c>) resolves in the
     /// direct-construction harness (the <c>KioskControllerTests</c> idiom).

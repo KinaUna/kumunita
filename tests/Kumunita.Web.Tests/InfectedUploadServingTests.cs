@@ -17,6 +17,7 @@ using Xunit;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
+/// Renamed from F16U3_ServeScanTests (F16.U3): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F16 (UPL-02: scan uploads before serving) — <b>U3</b>, the third and final
 /// unit of F16. The single pinned test <c>InfectedUpload_NotServed</c> (design
 /// <c>prod-hardening-f16-scan.md</c> §6). <b>The name is pinned — the next
@@ -63,9 +64,10 @@ namespace Kumunita.Web.Tests;
 /// leg</b> — a separate optional test for it is a judgment call, not required;
 /// this test drives the security-critical <c>Infected</c> path.</b>
 /// </para>
-public sealed class F16U3_ServeScanTests(PostgresFixture fixture)
+public sealed class InfectedUploadServingTests(PostgresFixture fixture)
 {
     /// <summary>
+/// Renamed from F16U3_ServeScanTests (F16.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// The pinned <c>InfectedUpload_NotServed</c> — all four §6 legs:
     /// <list type="number">
     /// <item><b>leg-1</b> — the serve action returns a <b>404 /
@@ -178,6 +180,7 @@ public sealed class F16U3_ServeScanTests(PostgresFixture fixture)
     // ── Harness ─────────────────────────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F16U3_ServeScanTests (F16.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// Boot a real <see cref="DocumentStore"/> over a fresh scratch database
     /// (the <see cref="PostgresFixture"/> seam, the F11U3 / F15U3 / F1U5
     /// <c>BootStoreAsync</c> shape) with the <c>mt</c> schema + BOTH the
@@ -205,6 +208,7 @@ public sealed class F16U3_ServeScanTests(PostgresFixture fixture)
     // ── The stub scanners (pin §6) ──────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F16U3_ServeScanTests (F16.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// pin §6 — a call-counting <see cref="IVirusScanner"/> that always returns
     /// <see cref="VirusScanStatus.Infected"/> (the stub: "always Infected").
     /// <see cref="ScanCount"/> records the number of <c>ScanAsync</c> invocations
@@ -223,6 +227,7 @@ public sealed class F16U3_ServeScanTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from F16U3_ServeScanTests (F16.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// pin §6 leg-4 (optional control) — a <see cref="IVirusScanner"/> that
     /// always returns <see cref="VirusScanStatus.Clean"/> (the "CleanScanner"
     /// the pin names): the serve proceeds unchanged (the §5.4 fall-through).

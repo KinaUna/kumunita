@@ -7,6 +7,7 @@ using Sentry.AspNetCore;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
+/// Renamed from F10U3_ErrorTrackerTests (F10.U3): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F10 (OBS-02: error tracker — Sentry) — **U3**, the third and final unit of F10.
 /// The pinned test <c>Error_TrackerRegisteredWhenDsnSet</c> (design
 /// <c>prod-hardening-f10-errtrack.md</c> §4, §4a leg-1/leg-2/leg-3, §4b harness
@@ -66,12 +67,13 @@ namespace Kumunita.Web.Tests;
 /// <c>Kumunita.Web.csproj</c> in F10.U2) — no <c>Sentry</c> <c>PackageReference</c>
 /// is added to this test project (pin §4b gotcha 2 did not materialize).
 /// </para>
-public sealed class F10U3_ErrorTrackerTests
+public sealed class SentryRegistrationTests
 {
     // A well-formed DSN shape (not a real DSN) — pin §4a leg-1.
     private const string TestDsn = "https://test@o0.ingest.sentry.io/0";
 
     /// <summary>
+/// Renamed from F10U3_ErrorTrackerTests (F10.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// The pinned <c>Error_TrackerRegisteredWhenDsnSet</c> — all three legs
     /// (pin §4a): leg-1 the Sentry SDK DI surface is registered when the DSN is
     /// set; leg-2 it is NOT registered when the DSN is unset (the no-op path);
@@ -157,6 +159,7 @@ public sealed class F10U3_ErrorTrackerTests
     }
 
     /// <summary>
+/// Renamed from F10U3_ErrorTrackerTests (F10.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// Faithfully mirrors <c>Program.cs</c>'s F10.U2 conditional registration:
     /// when <c>dsn</c> is non-blank the <c>builder.WebHost.UseSentry(…)</c>
     /// block runs (pin §2a, the exact F10.U2 body — including the drift-corrected

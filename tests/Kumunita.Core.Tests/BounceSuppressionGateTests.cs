@@ -11,6 +11,7 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 /// <summary>
+/// Renamed from F17U3_SuppressionGateTests (F17.U3): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F17 / MAIL-03 — the pinned gate test <c>SuppressedAddress_NotMailed</c>
 /// (pin: <c>docs/design/prod-hardening-f17-bounce.md</c> §4.1–§4.2, UNRENAMED).
 /// <para>
@@ -52,7 +53,7 @@ namespace Kumunita.Core.Tests;
 /// for the recipient's e-mail.
 /// </para>
 /// </summary>
-public class F17U3_SuppressionGateTests(PostgresFixture fixture)
+public class BounceSuppressionGateTests(PostgresFixture fixture)
 {
     // ── SuppressedAddress_NotMailed — the pin's UNRENAMED gate test ─────────
     //
@@ -115,6 +116,7 @@ public class F17U3_SuppressionGateTests(PostgresFixture fixture)
     // ── Harness ─────────────────────────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F17U3_SuppressionGateTests (F17.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// Boots the scratch store with the M1 + M3 + M6 surfaces (the
     /// <see cref="NotificationServiceTests"/> shape — <c>NotificationDocTypes</c>
     /// carries the <see cref="SuppressedAddress"/> doc, pin §1.1) and builds
@@ -158,6 +160,7 @@ public class F17U3_SuppressionGateTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from F17U3_SuppressionGateTests (F17.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A **recording** <see cref="IMailerStage"/> stand-in: counts the
     /// <c>StageAsync</c> calls (the leg-1 assert) and stores nothing — no
     /// outbox row, no envelope. The pin §4.2 "recording IMailerStage stub

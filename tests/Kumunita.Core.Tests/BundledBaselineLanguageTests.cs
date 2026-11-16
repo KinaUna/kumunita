@@ -10,6 +10,7 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 /// <summary>
+/// Renamed from ADR_0044_BaselineTests (ADR 0044): the previous lane-coded file/class name, kept so a search for it still lands.
 /// ADR 0044 — the bundled baseline language is a closed, code-owned value:
 /// adding a bundled baseline language (de / fr) on a warm instance seeds its
 /// full baseline (UI-string + system-page) create-if-missing, and removing it
@@ -43,7 +44,7 @@ namespace Kumunita.Core.Tests;
 /// <c>GetBundledBaselineAsync("pl")</c> is <c>null</c>.</li>
 /// </ol>
 /// </summary>
-public class ADR_0044_BaselineTests(PostgresFixture fixture)
+public class BundledBaselineLanguageTests(PostgresFixture fixture)
 {
     // ── 1 — Parity (the headline): warm-add seeds the full baseline, exact ──
     [Theory]
@@ -346,6 +347,7 @@ public class ADR_0044_BaselineTests(PostgresFixture fixture)
     }
 
     /// <summary>
+/// Renamed from ADR_0044_BaselineTests (ADR 0044): the previous lane-coded file/class name, kept so a search for it still lands.
     /// The pristine-boot state an <c>en</c>-defaulted instance carries: the
     /// <c>en</c> catalog row + the <c>en</c> UI-string floor + the <c>en</c>
     /// system pages (terms / help / privacy / conduct) under the <c>system</c>

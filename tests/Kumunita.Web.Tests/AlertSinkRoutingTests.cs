@@ -5,6 +5,7 @@ using Xunit;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
+/// Renamed from F12U3_AlertRoutedToChannelTests (F12.U3): the previous lane-coded file/class name, kept so a search for it still lands.
 /// F12 (OBS-06: route alerts to a human) — **U3**, the third and final
 /// code unit of F12. The single pinned test <c>Alert_RoutedToConfiguredChannel</c>
 /// (design <c>prod-hardening-f12-alerts.md</c> §4a legs 1–3, §4b harness gotcha).
@@ -42,7 +43,7 @@ namespace Kumunita.Web.Tests;
 /// Web.Tests).
 /// </para>
 /// </summary>
-public sealed class F12U3_AlertRoutedToChannelTests
+public sealed class AlertSinkRoutingTests
 {
     // ── Fixed synthetic inputs (the same "email.dead-letter" payload shape ──
     //    F11.U3 leg-3 asserts, pin §4a leg-2: "the same payload F11.U3 leg-3
@@ -56,6 +57,7 @@ public sealed class F12U3_AlertRoutedToChannelTests
     // ── The pinned test (all three §4a legs) ─────────────────────────────────
 
     /// <summary>
+/// Renamed from F12U3_AlertRoutedToChannelTests (F12.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// The pinned <c>Alert_RoutedToConfiguredChannel</c> — all three §4a legs
     /// (pin §4a):
     /// <list type="number">
@@ -164,6 +166,7 @@ public sealed class F12U3_AlertRoutedToChannelTests
     //    access path) ─────────────────────────────────────────────────────────
 
     /// <summary>
+/// Renamed from F12U3_AlertRoutedToChannelTests (F12.U3): the previous lane-coded file/class name, kept so a search for it still lands.
     /// A recording <see cref="IAlertSink"/> (pin §4a leg-2 / §4b: "a
     /// <c>RecordingAlertSink : IAlertSink</c> stub that appends each
     /// <see cref="AlertEvent"/> to a <c>List{AlertEvent}</c> and returns
