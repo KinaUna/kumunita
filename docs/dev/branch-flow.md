@@ -52,5 +52,5 @@ effect:
   CI-side tripwire is `guard-main.yml` (DX05): a `pull_request` workflow that
   fails any PR into `main` whose head is not `release`.
 - **`release`** — a ruleset that **requires** the `test`, `docs`, `code`,
-  `e2e` **and `devx`** checks to pass. `devx` joins the required set once
-  **DX33** lands (the `devx` CI job in `ci.yml`).
+  `e2e` **and `devx`** checks to pass. The `devx` CI job exists in `ci.yml`
+  (DX33) — it is part of the required set.

@@ -60,6 +60,19 @@ jobs:
       - name: Run improve gate
         run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/improve-check.ps1
 
+  # IMPROVE-DEVX D7 — devx gate (pwsh only; no .NET, no Docker). ADR 0307 §D7; DX33.
+  devx:
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 — parity with the plan's wording (none of the 13 rules reads a base ref).
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Run devx gate
+        run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/devx/devx-check.ps1
+
   # IMPROVE-UX X01 — report-only; prints the measurements table without gating PRs.
   ux-report:
     runs-on: ubuntu-latest

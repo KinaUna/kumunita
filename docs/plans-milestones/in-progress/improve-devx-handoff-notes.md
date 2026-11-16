@@ -1184,3 +1184,35 @@ moves it to the archive.
   `0305`/`0306`).
 - **Cite:** ADR **0307** (D6); the plan body's "0300" is a stale number
   (consistent with the DX04–DX31 handoffs).
+
+## DX33 — the `devx` CI job (D7, CI half)
+
+- **Files:** **2** — `.github/workflows/ci.yml` (the new **`devx`** job,
+  **+13** lines, placed after `docs` and before `ux-report` so the read-only
+  pwsh-layer jobs stay grouped — `test` / `docs` / **`devx`** / `ux-report` /
+  `code` / `e2e`), and `docs/dev/branch-flow.md` (the `release` owner-ops
+  ledger bullet, one fact, one place). **No** ADR (D7's ADR is 0307, DX02),
+  **no** `devx-check.ps1` / `devx-baseline.json` edit, **no** code change.
+- **The job is shaped like the `docs` job, not the `code` job** (drift fact 2):
+  none of the 13 rules reads a base ref (they parse `devx-baseline.json` and
+  count the live tree), so **no** `setup-dotnet`, **no** Docker, **no** `env:`.
+  One `# see ADR 0307 §D7 / DX33` comment line (house style — `docs` and `code`
+  each carry one). **`fetch-depth: 0` kept** per the plan's wording —
+  belt-and-suspenders, no rule needs it (a comment says so).
+- **Ledger firm-up:** the `release` bullet's "…the `devx` joins the required
+  set once **DX33** lands" is gone; it now states `devx` as a required check
+  (the job exists in `ci.yml`). No second ledger line, no new section.
+- **Exits:** PyYAML parse OK — jobs `test, docs, devx, ux-report, code, e2e`,
+  the `devx` job's steps `Checkout` + `Run devx gate` (actionlint unavailable,
+  the DX04/DX05 parse convention). `devx-check` re-run → **PASS, 13 rules, exit
+  0** (unchanged — the job runs the same 13-rule gate; rule 13
+  `lane-codes-ratchet` 12 231 ≤ 12 231). `-Only docs` reds **pre-existing and
+  unchanged** (front-matter **17**, ADR >250 **1**, broken links **21**,
+  orphans **31** — incl. this brief, one more than DX32's **30**; archive
+  **50**; improve-check gate `b` `0305`/`0306`). The brief is link-free
+  (backticks only), so it adds **+1 orphan** and **zero** broken links.
+- **Owner-ops (recorded, not run):** the job executing on
+  `workflow_dispatch` from a branch is a GitHub action — it cannot run in the
+  sandbox (no GitHub); recorded here as owner-ops, not a local check.
+- **Cite:** ADR **0307** (D1/D7); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX32 handoffs).
