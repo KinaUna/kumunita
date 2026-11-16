@@ -5,10 +5,10 @@ tier: reference
 kind: adr
 status: proposed
 audiences: [developer, agent, platform-maintainer]
-related: [docs/adr/0182-form-look.md, docs/adr/0188-projects-lists.md, docs/adr/0189-todos.md]
+related: [docs/adr/0117-inventory.md, docs/adr/0182-form-look.md, docs/adr/0188-projects-lists.md, docs/adr/0189-todos.md]
 supersedes: []
 superseded_by: []
-updated: 2026-11-02
+updated: 2026-11-16
 ---
 
 # ADR [0191](0191-inventory.md) — Inventory
@@ -16,6 +16,8 @@ updated: 2026-11-02
 Status: **Proposed** (scaffolding landed)
 Date: 2026-10-27
 Relates to: ADR [0189](0189-todos.md) (status chip), ADR [0188](0188-projects-lists.md) (list rows), ADR [0182](0182-form-look.md) (forms)
+
+Proposed; related to (not superseding) ADR [0117](0117-inventory.md) (the accepted M16 Inventory feature).
 
 ## Decision
 

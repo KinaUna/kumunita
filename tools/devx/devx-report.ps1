@@ -99,9 +99,9 @@ foreach ($scope in @($srcDir, $testDir)) {
 $nameHits = $laneNamed.Count
 
 # --- E12 — ADRs unreachable by link -----------------------------------------
-# An ADR is "unreachable" if no other doc under docs/ links to its filename
-# (the index row in docs/adr/README.md does not count as a reach — DX22's
-# gate is that the index *itself* emits links, and DX22's exit is 0).
+# An ADR is "unreachable" if no other doc under docs/ links to its filename.
+# DX22: the index (docs/adr/README.md) *is* a reach — its data rows each link
+# to their ADR file, so the index now reaches every ADR (exit is 0).
 # Measured 2026-11-09: 104 of 299. The tree has grown since (more ADRs, more
 # docs); this is the live number.
 $adrFiles = @(Get-ChildItem -Path (Join-Path $repo 'docs/adr') -Filter '*.md' -File |
@@ -110,9 +110,9 @@ $allDocs = @(Get-ChildItem -Path (Join-Path $repo 'docs') -Filter '*.md' -File -
   Where-Object { $_.FullName -notmatch 'node_modules|wwwroot' })
 # Load each doc's content once (matching ADR names across ~150K pairs of
 # per-pair file reads would take minutes; one load each is seconds).
+# DX22: the ADR index is included — its rows are links, so it counts as a reach.
 $docContents = [System.Collections.Generic.Dictionary[string, string]]::new()
 foreach ($d in $allDocs) {
-  if ($d.Name -eq 'README.md' -and $d.Directory.Name -eq 'adr') { continue }  # the index, not a reach
   $docContents[$d.FullName] = Get-Content -LiteralPath $d.FullName -Raw
 }
 $unreachable = 0

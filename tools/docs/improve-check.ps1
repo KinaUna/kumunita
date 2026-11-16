@@ -127,7 +127,8 @@ $adrFiles = (Get-ChildItem -Path $adrDir -Filter '0*.md' -File).BaseName |
 $adrFileCount = $adrFiles.Count
 $adrIndexText = Get-Content -LiteralPath $adrIndex -Raw
 # a row is a markdown table row whose first cell is the ADR number
-$adrIndexRows = [regex]::Matches($adrIndexText, '(?m)^\|\s*(0\d{3})\b') | ForEach-Object { $_.Groups[1].Value }
+# (DX22: the ID cell may be a link `| [0NNN](…) |`, so the `[` is optional)
+$adrIndexRows = [regex]::Matches($adrIndexText, '(?m)^\|\s*\[?(0\d{3})\b') | ForEach-Object { $_.Groups[1].Value }
 $adrIndexCount = $adrIndexRows.Count
 $adrMissing = @($adrFiles | Where-Object { $adrIndexRows -notcontains $_ } | Sort-Object)
 $adrExtra   = @($adrIndexRows | Where-Object { $adrFiles -notcontains $_ } | Sort-Object)

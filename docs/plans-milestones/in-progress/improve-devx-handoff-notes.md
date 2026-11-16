@@ -726,3 +726,43 @@ moves it to the archive.
   orphans admin-edited translation rows in the DB).
 - **Cite:** ADR **0307** (D10, the "surface names disagree" finding); the plan
   body's "0300" is a stale number (consistent with the DX04–DX20 handoffs).
+
+## DX22 — ADR index links + inventory ADR relation
+
+- **Drift the brief exists to prevent:** the plan's DX22 says *"the generator
+  emits each ID as a link; regenerate the index"* — **there is no generator**.
+  `docs/adr/README.md` is **hand-maintained** (`improve-check` gate `b` is the
+  *only* automation over it: it counts rows and compares to the `docs/adr/0*.md`
+  set). So the deliverable was a **mechanical linkify** of each data row's ID
+  cell (`| 0NNN |` → `| [0NNN](0NNN-….md) |`, href = the real ADR file name;
+  **305** rows), **not** a regen — Title/Status cells byte-identical, no rows
+  added/removed. A one-off pwsh pass over the rows (not a hand `sed` per row).
+- **The two coupled changes** (either alone leaves `unreachable` at 53):
+  (a) gate `b`'s row regex `(?m)^\|\s*(0\d{3})\b` → `(?m)^\|\s*\[?(0\d{3})\b`
+  (the `[` made optional) so linkified rows **still count** as index rows;
+  (b) `devx-report.ps1`'s E12 reach scan **no longer excludes** the ADR index
+  (the `if ($d.Name -eq 'README.md' …) { continue }` line removed, comment
+  flipped) so the linkified rows **are** a reach. Together: **unreachable
+  53 → 0** (linkify-without-metric → still 53; metric-without-linkify → the
+  index has no links to count → still 53).
+- **0117 ↔ 0191:** cross-`related:` in **both** (0117 = the accepted M16
+  Inventory *feature*, 0191 = the proposed Inventory *UI scaffolding*) + one
+  status line in 0191: *"Proposed; related to (not superseding) ADR 0117 (the
+  accepted M16 Inventory feature)."* **Not** a supersede (both `supersedes:
+  []`); the exact framing is the one `// TODO ❓` (ask, don't guess). **No ADR
+  number changed.**
+- **No new devx rule** — the "unreachable" number is a **report** line in
+  `devx-report.ps1`, not a `devx-check` rule, so `devx-check` stays **PASS,
+  9 rules**, exit 0, and `devx-baseline.json` is **untouched** (DX35's
+  before→after reads **53 → 0**). `-Doctor` **all 5 checks OK**, exit 0.
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **20**, orphans **20**, archive **50**;
+  improve-check gate `b` `0305`/`0306`): the **20 orphans include this brief**
+  (`dx22-prompt.md`), one more than DX21's **19** (archived at DX37); the
+  brief is link-free (backticks only), so it adds **no** gate-4 broken link.
+  `docs/adr/README.md` is `tier: reference` — it adds **no** gate-4/gate-5
+  entry; the index links are same-directory relative links to files gate `b`
+  already confirms exist. Gate `b` stays red **for its pre-existing reason
+  only** (row count preserved at 305; `0305`/`0306` are not DX22's to add).
+- **Cite:** ADR **0307** (D4/E12, the "ADRs unreachable by link" finding); the
+  plan body's "0300" is a stale number (consistent with the DX04–DX21 handoffs).
