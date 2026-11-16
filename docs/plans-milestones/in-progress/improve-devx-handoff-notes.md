@@ -668,3 +668,28 @@ moves it to the archive.
 - **Cite:** ADR **0307** (D8, the unit shape; E8, the "languages implied by the
   folders" finding); the plan body's "0300" is a stale number (consistent with
   the DX04–DX18 handoffs).
+
+## DX20 — ratchet-base doc fix
+
+- **Files:** `docs/philosophy/in-code.md` (one phrase in the **ratchet** bullet
+  of `## The ratchet, the split, the comment` — the stale `origin/main` → the
+  real base, `origin/development` locally or `CODE_BASELINE_BASE`
+  (`origin/<base_ref or release>`) in CI, the base the gate actually reads
+  (verified in `tools/code/CodeMetrics/Program.cs` and `.github/workflows/ci.yml`),
+  **plus one new link** from `in-code.md` to the branch-flow doc
+  (`docs/dev/branch-flow.md`) which resolves, so **gate-4 stays clean** for the
+  tracked file; the rest of the bullet and the **part-vs-whole** / **comment**
+  bullets are **byte-untouched**; no code, no other doc).
+- **No new devx rule** — `devx-check` still **PASS, 9 rules**, exit 0; no gate
+  loosened. `-Doctor` **all 5 checks OK**, exit 0.
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **20**, orphans **18**, archive **50**;
+  improve-check gate `b` `0305`/`0306`) — the **18 orphans include this brief**
+  (`dx20-prompt.md`), one more than DX19's **17** (archived at DX37). The
+  tracked `in-code.md` → branch-flow link **resolves** (absent from the gate-4
+  list); the only new gate-4 entry is **this brief's own** self-link (untracked
+  brief, archived at DX37), so broken **19 → 20** and **no tracked file gains a
+  broken link**; no new gate-5 orphan beyond this brief.
+- **Cite:** ADR **0307** (E13, the "ratchet base documented wrong" finding);
+  the plan body's "0300" is a stale number (consistent with the DX04–DX19
+  handoffs).

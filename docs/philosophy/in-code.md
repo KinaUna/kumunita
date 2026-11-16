@@ -102,7 +102,9 @@ here rather than restating it.
 - **The ratchet (shrink-only).** The code-size baseline
   (`tools/code/code-baseline.json`) only ever goes **down**. A new item over
   its ceiling, a baselined item growing past its recorded max, a stale entry
-  left behind, or a max raised above `origin/main` — each fails the close.
+  left behind, or a max raised above the base ref — `origin/development`
+  locally, or `CODE_BASELINE_BASE` (`origin/<base_ref or release>`) in CI
+  ([branch flow](../dev/branch-flow.md)) — each fails the close.
   Lowering an item re-tightens the baseline (`code-check.ps1 --tighten`).
   Raising a number is only ever legitimate with an `adr:` reason on that entry
   — the baseline is the point: a ceiling that can drift up protects nothing.
