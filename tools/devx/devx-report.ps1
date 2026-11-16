@@ -75,16 +75,19 @@ $laneNamed = @($allTestFiles | Where-Object {
 # --- E11 — lane-code hits ----------------------------------------------------
 # Lane/unit codes inside comments (the D6 ratchet's starting number). The
 # plan's E11 number is 3391 across 1305 src/test files, measured 2026-11-09
-# with a regex the plan does NOT pin. This file's regex is a candidate, not
-# the canonical one — DX32 pins the canonical regex and re-baselines when it
-# lands the ratchet. The candidate matches a lane letter, a 1–2 digit lane
-# number, an optional U/u/unit segment, an optional dash + unit, not
-# followed by a word char (so "Unit" in prose does not count). Name hits
-# are counted separately (DX23 renames the file names; DX32 ratchets the
-# line hits). Treat the live line count below as a measurement, not a
-# baseline: devx-baseline.json carries the plan's 3391 as the shrink-only
-# value until DX32 replaces it with the canonical regex's number.
-$laneLineRegex = '\b(?:F|U|C|D|IS|LS|R|A|O|GP|UPL)[0-9]{1,2}[Uu]?[0-9]*(?:-[0-9]+)?\b'
+# with a regex the plan does NOT pin. This file's regex is CANONICAL — pinned
+# at DX32 (2026-11-16), which also re-baselined devx-baseline.json to it and
+# landed the ratchet (rule 13). It matches a lane letter, a 1–2 digit lane
+# number, an optional U/u/unit segment, an optional dash + unit, not followed
+# by a word char (so "Unit" in prose does not count). `D` is EXCLUDED
+# deliberately: in src/tests a `D<n>` is an ADR-*decision* reference (e.g.
+# `ADR 0307, D1`), the DESIRED form (cite ADR numbers), not the anti-pattern
+# the ratchet tracks — including it over-counted ~16 554 vs the real ~12 231.
+# Name hits are counted separately (DX23 renames the file names; the ratchet
+# ratchets the line hits). The live line count below is a measurement;
+# devx-baseline.json's lane_code_hits is the shrink-only floor (the report and
+# devx-check rule 13 share this exact regex — keep them in sync).
+$laneLineRegex = '\b(?:F|U|C|IS|LS|R|A|O|GP|UPL)[0-9]{1,2}[Uu]?[0-9]*(?:-[0-9]+)?\b'
 $srcDir = Join-Path $repo 'src'
 $testDir = Join-Path $repo 'tests'
 $lineHits = 0

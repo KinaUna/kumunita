@@ -364,6 +364,35 @@ if (Test-Path $laneCodesScript) {
 Check "lane-codes" "docs/dev/lane-codes.md is fresh — regenerate with `pwsh tools/devx/lane-codes.ps1` when it goes stale (D6)" $laneCodesFresh
 $ruleCount = 12
 
+# --- rule: lane-codes-ratchet (DX32) --------------------------------------------
+# D6 part 2: the lane/unit-code count in src/tests comments is shrink-only.
+# DX32 pinned the canonical regex (D-excluded — a `D<n>` in src/tests is an
+# ADR-decision ref like `ADR 0307, D1`, the desired form, not the anti-pattern)
+# and re-baselined lane_code_hits to the live count under it. This rule keeps
+# that floor: a NEW unit code added to a comment (a count ABOVE the floor)
+# fails; the existing hits are the floor, like rule 11's 142 test files. Same
+# canonical regex as devx-report.ps1's E11 line — source: devx-report.ps1 E11,
+# keep in sync (house style is to duplicate the regex, not shell out). Counts
+# src/tests *.cs with obj/ and bin/ excluded (build artifacts). The limit is
+# the baseline's lane_code_hits value (shrink-only; raising needs an adr:
+# reason). Fails when the live count exceeds the limit, not when it equals it.
+$laneCodeLineRegex = '\b(?:F|U|C|IS|LS|R|A|O|GP|UPL)[0-9]{1,2}[Uu]?[0-9]*(?:-[0-9]+)?\b'  # source: devx-report.ps1 E11, keep in sync
+$laneCodeLimit = 0
+if ($baseline.PSObject.Properties['rules'] -and $baseline.rules.PSObject.Properties['lane_code_hits']) {
+  $laneCodeLimit = [int]$baseline.rules.lane_code_hits.value
+}
+$laneCodeHits = 0
+foreach ($scope in @('src', 'tests')) {
+  $p = Join-Path $repo $scope
+  if (-not (Test-Path $p)) { continue }
+  foreach ($f in (Get-ChildItem -Path $p -Filter '*.cs' -File -Recurse | Where-Object { $_.FullName -notmatch '/obj/|/bin/' })) {
+    $m = Select-String -LiteralPath $f.FullName -Pattern $laneCodeLineRegex -AllMatches
+    if ($m) { foreach ($line in $m) { $laneCodeHits += $line.Matches.Count } }
+  }
+}
+Check "lane-codes-ratchet" "lane/unit-code hits in src/tests comments: $laneCodeHits (limit $laneCodeLimit, shrink-only — a code comment cites the ADR number or its decision, not a raw unit code; unit codes belong in the plan or handoff)" ($laneCodeHits -le $laneCodeLimit)
+$ruleCount = 13
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"

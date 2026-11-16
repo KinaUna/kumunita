@@ -41,11 +41,11 @@
       "gate": "DX23 — devx-check, lane-coded test file names baseline 0"
     },
     "lane_code_hits": {
-      "value": 3391,
+      "value": 12231,
       "plan": 3391,
       "shrink_only": true,
-      "source": "E11 — lane/unit codes in src/test comments (1305 files). Recorded at the plan's measurement. The plan's regex is unpinned; devx-report.ps1 carries a candidate regex (DX32 will pin the canonical one and re-baseline when it lands the ratchet).",
-      "gate": "DX32 — devx-check, lane-code count ≤ baseline"
+      "source": "E11 — lane/unit codes in src/test comments. Re-baselined at DX32 (2026-11-16) to the live count under the CANONICAL regex `\\b(?:F|U|C|IS|LS|R|A|O|GP|UPL)[0-9]{1,2}[Uu]?[0-9]*(?:-[0-9]+)?\\b` (D-excluded, pinned in devx-report.ps1 E11; devx-check rule 13 uses the same). The plan's 3391 (2026-11-09) was measured with an unpinned regex and is superseded; the ~16 554 candidate count is the D-decision-ref over-count (a `D<n>` in src/tests is an ADR-decision ref like `ADR 0307, D1`, the desired form), the real lane-code count is 12231. Shrink-only: it may only go down; raising needs an adr: reason.",
+      "gate": "DX32 — devx-check rule 13, lane-codes-ratchet (live ≤ baseline)"
     },
     "adrs_unreachable_by_link": {
       "value": 53,

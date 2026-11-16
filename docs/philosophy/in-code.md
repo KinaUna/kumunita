@@ -115,9 +115,13 @@ here rather than restating it.
   views were the example: 12 properties, zero consumers outside tests.)
 - **The comment rule (D4: contract + link, applied on touch).** A doc-comment
   states **what, when, and throws**, plus the ADR number. History stays in the
-  ADR or the handoff note — not in a running change-log above the method. The
-  comment ratio is *reported* by the gate, not gated; the rule is about
-  *what* a comment says, not how many there are.
+  ADR or the handoff note — not in a running change-log above the method. A code
+  comment cites the **ADR number** (or the ADR's decision, e.g. `D1`); a raw
+  **unit code** (`F14.U2`, `C3-06`, `IS21`) belongs only in the **plan** or the
+  **handoff** doc, not in a code comment (the prefix → lane map is in
+  [lane-codes](../dev/lane-codes.md); the count is ratcheted shrink-only by
+  `devx-check`). The comment ratio is *reported* by the gate, not gated; the
+  rule is about *what* a comment says, not how many there are.
 
 ## Judge the whole
 

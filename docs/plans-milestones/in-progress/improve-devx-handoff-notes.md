@@ -1150,3 +1150,37 @@ moves it to the archive.
   `0305`/`0306`).
 - **Cite:** ADR **0307** (D6); the plan body's "0300" is a stale number
   (consistent with the DX04–DX30 handoffs).
+
+## DX32 — lane-code ratchet (D6, part 2)
+
+- **Files:** **4** — `tools/devx/devx-report.ps1` (E11 regex → canonical,
+  D-excluded; comment now "canonical — pinned at DX32"),
+  `tools/devx/devx-baseline.json` (`lane_code_hits` re-baselined),
+  `tools/devx/devx-check.ps1` (rule 13 `lane-codes-ratchet`),
+  `docs/philosophy/in-code.md` (comment-rule bullet extended). **No** ADR,
+  **no** code changes, **no** `lane-codes.ps1` edit (DX31's glossary stands).
+- **The canonical regex is D-excluded and pinned in `devx-report.ps1`** E11;
+  rule 13 uses the same regex (duplicated with the `# source: devx-report.ps1
+  E11, keep in sync` comment, house style — no shell-out). The candidate
+  (with `D`) over-counts **~16 554** because a `D<n>` in `src`/`tests` is an
+  ADR-*decision* ref (`ADR 0307, D1`) — the **desired** form, not the
+  anti-pattern. D-excluded, the real lane-code count is **12 231** (report and
+  rule agree — no obj/bin `.cs` carries a match).
+- **`lane_code_hits` re-baselined 3 391 → 12 231** (the plan's 3 391 was
+  measured 2026-11-09 with an unpinned regex; superseded, **not** carried
+  forward). `shrink_only: true`, `plan: 3391` kept for the DX35 before→after
+  table. **Rule 13** (`lane-codes-ratchet`): live ≤ baseline, shrink-only —
+  the ≈ 12 200 existing hits are the *floor*, like rule 11's 142 test files;
+  only a **new** unit code in a comment (a count above the floor) fails.
+  **`devx-check`: PASS, 13 rules, exit 0** (rule 13 green: 12 231 ≤ 12 231;
+  the prior 12 re-verified green).
+- **`in-code.md` comment rule extended** (one bullet, not a second): a code
+  comment cites the ADR number (or decision, e.g. `D1`); a raw unit code
+  (`F14.U2`, `C3-06`, `IS21`) belongs only in the plan or handoff; links the
+  DX31 glossary `docs/dev/lane-codes.md`.
+- **`-Only docs` reds pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **30** — incl. this brief, one
+  more than DX31's **29**; archive **50**; improve-check gate `b`
+  `0305`/`0306`).
+- **Cite:** ADR **0307** (D6); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX31 handoffs).
