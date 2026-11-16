@@ -806,3 +806,53 @@ moves it to the archive.
   broken link (the old-name code is in a `.cs` XML summary, outside gate 4).
 - **Cite:** ADR **0307** (D5, the "flat, lane-named tests" finding); the plan
   body's "0300" is a stale number (consistent with the DX04–DX22 handoffs).
+
+## DX24 — test-layout mapping (plan-only, no moves)
+
+- **Files:** `tools/devx/test-layout.ps1` (new, 165 lines: `-Plan` implemented,
+  `-Check` included for free, `-Apply` throws "DX24 is plan-only; -Apply lands
+  at DX25"), `tools/devx/test-layout.json` (new, generated, committed).
+  **No** test file moved, **no** code, **no** ADR.
+- **The mapping covers 413 test files** (166 Core root + 203 Web root + 44
+  already in subfolders) and **30 contexts**. **149 mapped to a specific
+  context, 164 to `_Shared/`** (the 143 zero-hit floor + 21 ties). Per-context
+  (top): UserInfo **52**, Identity **42**, Posts **18**, Localization **16**,
+  Notifications **12**, Events **11**, Projects **11**, Media **10**,
+  ErrorReports **8**, Pages **7**, Authorization **11**; the rest ≤ 5. Top 20
+  `_Shared/` by name: `AccessAuditFactoryTests`, `AdminOnboardingSeederTests`,
+  `AdminOverrideDdlTests`, `AnnouncementCommentCountTests`,
+  `AnnouncementServiceTests`, `AppRoleSchemaPrivilegeTests`,
+  `AssemblyFixtures`, `AuthorizationServiceTests`, `BoardStandingPolicyTests`,
+  `BookmarkDocTypesDdlTests`, `BreakGlassProbeTests`,
+  `BundledBaselineLanguageTests`, `ClaimShapingInvariantBTests`,
+  `CommunityOptionsTests`, `ContentTargetKindsTests`, `DataClassCatalogTests`,
+  `DataClassCoverageTests`, `DbBootstrapIsPristineTests`,
+  `DeleteAccountRowsTests`, `DeleteAccountThreadTests` (full list in the JSON).
+  Known lossy case for DX25–29 to flag: `BookmarkServiceTests.cs` → **Identity**
+  (7× `IIdentityService` in setup beats Bookmarks' 1 seam hit); semantically
+  Bookmarks.
+- **Attribution rule** (in the JSON's `attribution_rule`): **"context with the
+  most word-boundary seam-name hits in the file's text; ties or zero →
+  `_Shared/`"** — the seam set per context is **identical** to
+  `code-map.ps1`'s (same `DependencyInjection.cs` rule, same seam regex, same
+  exclusions), so mapping and map agree by construction. The naive any-appears
+  reading was rejected up front: it sends **293 of 413** files to `_Shared/`;
+  the count-based reading splits the ties by most-hits and lands at **164**.
+- **DX24 lands no devx rule** — `devx-check` **PASS, 10 rules**, exit 0, and
+  `devx-baseline.json` is **untouched** (`test_files_at_project_root` stays
+  **369** until DX25–29 move the files and DX30 lands the root-baseline-0
+  gate). The JSON is a **data file** for DX25–29's `-Apply`, not a gate input.
+  `-Doctor` **all 5 checks OK**, exit 0. `git status`: only the two new files
+  + this note (no `R`/`M` test files).
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **22** — incl. this brief
+  `dx24-prompt.md`, one more than DX23's **21**, archived at DX37 — archive
+  **50**; improve-check gate `b` `0305`/`0306`). The script is a `.ps1` and
+  the JSON a `.json` — neither is in the gate-4/5 corpus.
+- **Owner reviewed the JSON → approved** (2026-11-16, `development` @
+  post-DX23): the mapping is right as-is; DX25–29 may apply it, flagging the
+  44 already-in-subfolder files whose heuristic home disagrees with their
+  current folder (candidate moves) for review.
+- **Cite:** ADR **0307** (D5, the "flat, lane-named tests" finding — the
+  layout-mirror is the other half of D5); the plan body's "0300" is a stale
+  number (consistent with the DX04–DX23 handoffs).
