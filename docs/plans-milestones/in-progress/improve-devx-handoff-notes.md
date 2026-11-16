@@ -856,3 +856,41 @@ moves it to the archive.
 - **Cite:** ADR **0307** (D5, the "flat, lane-named tests" finding — the
   layout-mirror is the other half of D5); the plan body's "0300" is a stale
   number (consistent with the DX04–DX23 handoffs).
+
+## DX25 — move Core.Tests A–F contexts (git mv only)
+
+- **Files:** `tools/devx/test-layout.ps1` (the DX24 `-Apply` throw replaced by
+  the real `-Apply -Project <Core|Web> -Range <A-F|G-O|P-Z|A-M|N-Z>`
+  implementation — 165 → **200** lines, still ≤ 200), the **17** Core root
+  files `git mv`'d into their A–F context folders (`AdminOnboarding/` **1**,
+  `Authorization/` **8**, `ErrorReports/` **2**, `Events/` **6** — the exact
+  fact-1 list), and this note. **No** content edits, **no** namespace changes
+  (D5), **no** csproj edit (both csprojs are SDK-style with implicit `Compile`
+  globs — verified), **no** ADR.
+- **`git status`: exactly 17 `R` renames, all at 100 % similarity** (proven by
+  `git diff --cached -M50 --stat` — zero changed lines on every file), **no**
+  `M` on any moved file, **no** new untracked test file. The two
+  candidate subfolder files (`Kiosk/KioskServiceTests.cs` → Authorization,
+  `MiscList/MiscListSortTests.cs` → Documents) show **no** rename — **flagged,
+  not moved** (`// TODO ❓` owner call: those subfolders were created by
+  earlier lanes for their own contexts; a cross-context move fights the
+  existing structure). The 3 no-ops (`Documents/DocumentServiceTests.cs`,
+  `Documents/DocumentsOrganizationTests.cs`, `Events/EventSortTests.cs`) are
+  already in the right subfolder and were skipped.
+- **Core suite: 2052 → 2052 tests, the same 9 `SmtpHealthCheckTests` socket
+  failures, zero new** (171.99 s). `EventServiceTests` (one of the moved
+  classes) verified via `-class`: 76 tests, 0 failures.
+- **DX25 lands no devx rule** — `devx-check` **PASS, 10 rules**, exit 0
+  (rules 2, 5 and 10 re-verified green). `devx-baseline.json` **untouched** —
+  `test_files_at_project_root` stays **369** until DX30 lands the
+  root-baseline-0 gate (DX35's before→after reads **369 → 0**); the *report*
+  number (`devx-report.ps1` E9) legitimately drops **369 → 352** (166 → 149
+  Core root) — a report line, not a gate.
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **23** — incl. this brief
+  `dx25-prompt.md`, one more than DX24's **22**, archived at DX37 — archive
+  **50**; improve-check gate `b` `0305`/`0306`). This brief adds **+1 orphan**
+  (expected) and **zero** broken links (backtick paths, gate-4 regex does not
+  extract them).
+- **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX24 handoffs).

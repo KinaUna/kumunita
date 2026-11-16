@@ -3,9 +3,8 @@
 # Run:   pwsh tools/devx/test-layout.ps1 -Plan   # write tools/devx/test-layout.json
 #        pwsh tools/devx/test-layout.ps1 -Check  # regenerate in memory, diff, exit 0/1
 #
-# DX24 is PLAN-ONLY: it writes the file → folder mapping for the owner to
-# review; it moves nothing. -Apply exists as a stub that throws — the moves
-# land at DX25–29 (test-layout.ps1 -Apply -Project … -Range …).
+# DX25 implements -Apply -Project <Core|Web> -Range <A-F|G-O|P-Z|A-M|N-Z>
+# (git mv only — no content edits, no namespace changes, no csproj change).
 #
 # The context discovery and the seam set are IDENTICAL to code-map.ps1 (same
 # context rule, same seam regex, same exclusions) — the mapping and the code
@@ -24,17 +23,11 @@
 #
 # Style: matches tools/devx/code-map.ps1.
 
-param([switch]$Plan, [switch]$Check, [switch]$Apply)
+param([switch]$Plan, [switch]$Check, [switch]$Apply,
+      [string]$Project, [string]$Range)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
-
-if ($Apply) {
-  throw "DX24 is plan-only; -Apply lands at DX25 (test-layout.ps1 -Apply -Project <Core|Web> -Range <A-F|G-O|P-Z|N-Z>)"
-}
-if (-not ($Plan -or $Check)) {
-  throw "no mode given — run with -Plan (write the JSON) or -Check (diff against the committed JSON)"
-}
 
 function Find-RepoRoot {
   $dir = (Get-Location).Path
@@ -55,6 +48,48 @@ function Find-RepoRoot {
 }
 
 $repo = Find-RepoRoot
+
+# --- -Apply mode (DX25) -----------------------------------------------------------
+# Reads the committed JSON and `git mv`s the project's root-level files mapped to
+# a context in the letter range. Subfolder files are skipped (no-ops/candidates).
+if ($Apply) {
+  if ($Project -notin @('Core', 'Web') -or $Range.Length -ne 3 -or $Range[1] -ne '-') {
+    throw "-Apply needs -Project Core|Web and -Range <A>-<Z> (e.g. A-F, G-O, P-Z, A-M, N-Z)"
+  }
+  $lo = $Range[0]; $hi = $Range[2]
+
+  $jsonPath = Join-Path $repo 'tools/devx/test-layout.json'
+  if (-not (Test-Path $jsonPath)) { throw "tools/devx/test-layout.json not found — run `test-layout.ps1 -Plan` first" }
+  $json = (Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json)
+  $projDir = "tests/Kumunita.$($Project).Tests/"
+  $inRange = { param($ctx) $ctx.Length -ge 1 -and $ctx[0] -ge $lo -and $ctx[0] -le $hi }
+
+  $moved = 0; $noops = 0
+  $byCtx = @{}
+  foreach ($m in $json.mapping) {
+    if ($m.file -notlike $projDir + '*') { continue }
+    if ($m.context -eq '_Shared/') { continue }
+    if (-not (& $inRange $m.context)) { continue }
+    # only root-level files — skip subfolder files (no-ops and candidates)
+    $rest = $m.file.Substring($projDir.Length)
+    if ($rest -match '/') { $noops++; continue }
+    $srcPath = Join-Path $repo $m.file
+    $destPath = Join-Path $repo ($projDir + $m.context + '/' + $rest)
+    $destDir = Split-Path $destPath -Parent
+    if (-not (Test-Path $destDir)) { New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
+    & git mv -- $srcPath $destPath
+    if ($LASTEXITCODE -ne 0) { throw "git mv failed (exit $LASTEXITCODE): $srcPath -> $destPath" }
+    $moved++
+    $byCtx[$m.context] = 1 + $byCtx[$m.context]
+  }
+  if ($moved -eq 0) { throw "no files matched the A-F range for project '$Project' — check test-layout.json" }
+  $ctxStr = ($byCtx.Keys | Sort-Object | ForEach-Object { "$_ ($($byCtx[$_]))" }) -join ', '
+  Write-Host "[OK]   test-layout : moved $moved file(s) in '$Project' ($Range): $ctxStr; skipped $noops subfolder(s)"
+  exit 0
+}
+if (-not ($Plan -or $Check)) {
+  throw "no mode given — run with -Plan (write the JSON), -Check (diff against the committed JSON), or -Apply -Project <Core|Web> -Range <A-F|G-O|P-Z>"
+}
 $esc = [regex]::Escape($repo + '/')
 function Rel([string]$p) { return $p -replace $esc, '' -replace '\\', '/' }
 function Norm([string]$s) { return ($s -replace "`r`n", "`n") }
