@@ -232,6 +232,41 @@ if (Test-Path $agentsPath) {
 Check "read-before-tokens" "read-before chain (AGENTS.md + its `## Start here` .md links) is ≤ 8 000 tokens (measured $readBefore; pinned chars/4 estimator)" ($readBefore -le 8000)
 $ruleCount = 7
 
+# --- rule: testing-and-ci-messages (DX17) -------------------------------------
+# docs/dev/testing-and-ci.md's "Message → script → fix" table quotes each gate's
+# failure message *verbatim* so a cold maintainer can copy a red line into a
+# grep. That only works if the quoted prefix still exists in the gate — a
+# RETIRED message (one that occurs nowhere) would send a cold agent chasing a
+# gate that no longer exists (plan E4: the old doc quoted a line-count pin that
+# "no longer exists anywhere"). This rule pins the truth: every backtick-quoted
+# prefix in the table's message column must be a LITERAL SUBSTRING of the
+# combined text of tools/**/*.ps1 + tests/**/*.cs (obj/ and bin/ excluded —
+# build artifacts). A missing table (zero prefixes) fails closed — the table is
+# the point, so an empty or renamed table cannot silently pass. Fails open to
+# "table missing" only when the doc is absent (a cold read of a fresh checkout
+# still finds the doc; the rule is about the doc's claims, not the tree).
+$tcDocPath = Join-Path $repo 'docs/dev/testing-and-ci.md'
+$tcPrefixes = [System.Collections.Generic.List[string]]::new()
+if (Test-Path $tcDocPath) {
+  $tcDoc = Get-Content -LiteralPath $tcDocPath -Raw
+  if ($tcDoc -match '(?ms)^##\s+Message → script → fix\s*\n(.*?)(?=^##\s|\Z)') {
+    # The message column is the table's FIRST cell: a row whose first cell is
+    # exactly one backtick-quoted prefix. The other columns (script, fix) may
+    # also carry backticks (gate names, paths) — those are NOT prefixes and are
+    # intentionally not checked (drift fact 8: "each row's message column").
+    foreach ($m in [regex]::Matches($Matches[1], '(?m)^\|\s*`([^`]+)`\s*\|')) { $tcPrefixes.Add($m.Groups[1].Value) }
+  }
+}
+$tcFiles = @()
+$tcFiles += @(Get-ChildItem -Path (Join-Path $repo 'tools') -Filter '*.ps1' -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '/obj/|/bin/' })
+$tcFiles += @(Get-ChildItem -Path (Join-Path $repo 'tests') -Filter '*.cs' -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '/obj/|/bin/' })
+$tcCorpus = ($tcFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n"
+$tcBad = @($tcPrefixes | Where-Object { -not $tcCorpus.Contains($_) })
+$tcOk = ($tcPrefixes.Count -gt 0) -and ($tcBad.Count -eq 0)
+$tcDetail = if ($tcPrefixes.Count -eq 0) { 'table missing (zero quoted prefixes found)' } elseif ($tcBad.Count -gt 0) { 'not in tools/ or tests/: ' + ($tcBad -join '; ') } else { 'all ' + $tcPrefixes.Count + ' prefixes resolve in tools/ or tests/' }
+Check "testing-and-ci-messages" "every quoted message prefix in testing-and-ci.md's table resolves to tools/ or tests/: $tcDetail" $tcOk
+$ruleCount = 8
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"

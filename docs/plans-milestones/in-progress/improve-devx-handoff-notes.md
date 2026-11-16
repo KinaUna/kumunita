@@ -556,3 +556,53 @@ moves it to the archive.
   rewrite it.
 - **Cite:** ADR **0307** (D4, the code map + entry cost); the plan body's
   "0300" is a stale number (consistent with the DX04–DX15 handoffs).
+
+## DX17 — rewrite testing-and-ci.md
+
+- **Files:** `docs/dev/testing-and-ci.md` (rewritten, **115 lines** ≤ 120) +
+  `tools/devx/devx-check.ps1` (rule 8 appended after `read-before-tokens`; the
+  first seven rule blocks are **byte-untouched** — `git diff` is 35 insertions,
+  0 deletions, the single hunk starts right after `$ruleCount = 7`).
+- **The retired-gate text is gone:** the `KnownTranslationKeys.cs` line-count
+  pin story is deleted (that gate does not exist — `improve-check` runs **b /
+  c / d / g**, and the live firing gate is **`b` ADR index drift** `0305`/`0306`,
+  not a file pin); the **`gate f` "view over 800"** reference is deleted (gate
+  `f` retired at C00 → the `.cshtml` ceiling now lives in `code-check`); any
+  **`ImproveHarnessTests`** mention is deleted (the in-test pwsh shell-out was
+  removed at DX13 — `improve-check.ps1` is a *live* `docs`-step gate, not a test).
+- **The runner is now `check.ps1`** (+ the targeted `dotnet exec <dll>`
+  in-process form; `dotnet test` / VS Test Explorer named as the **broken**
+  xunit.v3 discovery path). **Stale timings replaced** — the "well under a
+  second" / "~20 s" are gone, measured live on this machine (2026-11-16):
+  `Kumunita.Web.Tests` ≈ **24 s** (1 480 tests), `Kumunita.Core.Tests` ≈ **3 min
+  24 s** (2 051 tests, the `postgres:18` Testcontainers step is the slow part).
+- **The `@media` pin re-pointed** to `PwaManifestTests` `M10 U06: site.css
+  media-block boundary pinned (D6)` with the **correct** count: exactly **12**
+  `@media` blocks (4 width-767.98 + 4 width-575.98 + 1 reduced-motion +
+  1 pointer:coarse + 2 dark/ADR 0133) — the prompt's drift fact 4 said "10";
+  the live test asserts **12**, so the doc quotes the test, not the stale
+  "twelve-as-of-M10" framing. **The `SecGate` surface documented as a pointer**
+  (6 test files, 2 known-reds in `DataClassCoverageTests`) — link, don't
+  restate. The **message → script → fix table** quotes each prefix *verbatim*
+  (the `code-check` row quotes `code-baseline.json not found at` from
+  `tools/code/code-check.ps1` — the `code-check:` summary lives in the
+  out-of-scope `Program.cs`).
+- **Rule 8 landed (`testing-and-ci-messages`):** every backtick-quoted prefix in
+  the table's message column (first cell) must be a literal substring of
+  `tools/**/*.ps1` + `tests/**/*.cs` (obj/bin excluded); a missing table fails
+  closed. The definition is pinned in the rule's comment. Proven: planted a
+  retired `KnownTranslationKeys` pin row → **FAIL (rule 8)**, exit 1 → removed →
+  **PASS**. `$ruleCount` **7 → 8**.
+- **Exits:** `-Only devx` → **PASS, exit 0, 8 rules** (the DX16 `agents-md-tokens`
+  1 996 / `read-before-tokens` 5 381 still green). `-Doctor` → **all 5 checks
+  OK, exit 0** (DX11 unregressed). `-Only docs` → **FAIL for the pre-existing
+  set** (front-matter **17**, ADR >250 **1**, broken links **19**, orphans
+  **15**, archive **50**; improve-check gate `b` `0305`/`0306`) — `testing-and-ci.md`
+  adds **no new** gate-4 broken link (the two gate-4 hits that name it are
+  *other* files with stale relative paths) and **no new** gate-5 orphan (it is
+  reachable from `docs/dev/README.md`). **Drift note:** the prompt cites
+  orphans **14**; the live tree at DX17 is **15** (one more `dx*-prompt.md`
+  brief — same kind of drift the DX15/DX16 handoffs recorded); the other counts
+  (17 / 1 / 19 / 50) are byte-identical to the pre-DX17 baseline.
+- **Cite:** ADR **0307** (D7, the gate form; E4, the retired-gate finding); the
+  plan body's "0300" is a stale number (consistent with the DX04–DX16 handoffs).
