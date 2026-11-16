@@ -983,3 +983,51 @@ moves it to the archive.
   extract them).
 - **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
   (consistent with the DX04–DX26 handoffs).
+
+## DX28 — move Web.Tests A–M contexts (git mv only)
+
+- **Files:** the **63** Web root files `git mv`'d into their A–M context
+  folders via `test-layout.ps1 -Apply -Project Web -Range A-M` (the DX25
+  `-Apply`, only *run* — no script edit): `Identity/` **23**,
+  `Localization/` **12**, `ErrorReports/` **6**, `Bookmarks/` **3**,
+  `Events/` **4**, `AdminOnboarding/` **2**, `Authorization/` **1**,
+  `Documents/` **1**, `GroupMessaging/` **1**, `InstanceStatus/` **2**,
+  `Inventory/` **2**, `Kiosk/` **2**, `Media/` **2**, `Messaging/` **1**,
+  `Moderation/` **1** — the exact fact-1 list. **`git mv` only** (all
+  **`R100`** × 63, namespaces unchanged, csproj untouched — SDK-style globs;
+  `PostgresFixture.cs` already a `<Compile Include>` link from DX09), **no**
+  content edits, **no** ADR. The lane-looking names
+  (`M15AcceptanceTests.cs`, `M16AcceptanceGateTests.cs`,
+  `M17AcceptanceGateTests.cs`, `O03AdminStatusNoticeTests.cs`,
+  `MLUI_FacesTests.cs`) were **moved, not renamed** (rule 10's regex requires
+  the digit right after the lane letter — none of them match; rule 10 stays
+  **0**).
+- **`git status`: exactly 63 `R` renames, all at 100 % similarity**, **no**
+  `M` on any moved file, **no** new untracked test file. **0 no-ops** (Web's
+  single subfolder `SecGate/` has no A–M no-op). The **1 candidate** subfolder
+  file (`SecGate/DecisionFreeReadGateTests.cs` → Authorization, heuristic)
+  shows **no** rename — **flagged, not moved** (`// TODO ❓` owner call: it
+  sits in `SecGate/`, the subfolder the IMPROVE-SEC lane created for its gate
+  classes; a cross-context move fights the existing structure).
+- **Web suite: 1480 → 1480 tests, the same 19 known failures
+  (2 `SecGate.DataClassCoverageTests` + 17 `StatusPageGateTests`), zero new**
+  (the `SentryBreadcrumbPiiTests.InformationLog_IsNotABreadcrumb` flake did
+  not fire). `InventoryControllerTests` (one of the moved classes, now in
+  `Inventory/`) verified via `-class`: 8 tests, 0 failures.
+- **DX28 lands no devx rule** — `devx-check` **PASS, 10 rules**, exit 0
+  (rules 2, 5 and 10 re-verified green). `devx-baseline.json` **untouched** —
+  `test_files_at_project_root` stays **369** until DX30 lands the
+  root-baseline-0 gate (DX35's before→after reads **369 → 0**); the *report*
+  number (`devx-report.ps1` E9) legitimately drops **281 → 218**
+  (203 → 140 Web root) — a report line, not a gate.
+- **The Web move is first of two ranges** — **140** Web files remain at the
+  root (the `_Shared/` files, `AssemblyFixtures.cs`, `PostgresFixture.cs`,
+  `GlobalUsings.cs`, and the N–Z contexts); **DX29** runs `-Range N-Z`.
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **26** — incl. this brief
+  `dx28-prompt.md`, one more than DX27's **25**, archived at DX37 — archive
+  **50**; improve-check gate `b` `0305`/`0306`). This brief adds **+1 orphan**
+  (expected) and **zero** broken links (backtick paths, gate-4 regex does not
+  extract them).
+- **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX27 handoffs).
