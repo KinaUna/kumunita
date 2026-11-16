@@ -1031,3 +1031,53 @@ moves it to the archive.
   extract them).
 - **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
   (consistent with the DX04–DX27 handoffs).
+
+## DX29 — move Web.Tests N–Z contexts (git mv only)
+
+- **Files:** the **76** Web root files `git mv`'d into their N–Z context
+  folders via `test-layout.ps1 -Apply -Project Web -Range N-Z` (the DX25
+  `-Apply`, only *run* — no script edit): `UserInfo/` **33**, `Usage/` **10**,
+  `Pages/` **6**, `Projects/` **6**, `Posts/` **5**, `Portability/` **3**,
+  `SiteContent/` **3**, `Notifications/` **2**, `PersonalNotes/` **2**,
+  `Sessions/` **2**, `SurfaceLabels/` **2**, `Search/` **1**, `Tags/` **1** —
+  the exact fact-1 list. **`git mv` only** (all **`R100`** × 76, namespaces
+  unchanged, csproj untouched — SDK-style globs; `PostgresFixture.cs` already
+  a `<Compile Include>` link from DX09), **no** content edits, **no** ADR.
+  **0 no-ops** (Web's single subfolder `SecGate/` has no N–Z mapped file);
+  **0 candidates to flag** — the one N–Z-adjacent candidate
+  (`SecGate/DecisionFreeReadGateTests.cs` → Authorization) is A–M and was
+  already flagged (not moved) at DX28.
+- **`git status`: exactly 76 `R` renames, all at 100 % similarity
+  (`git diff --name-status -M` shows **76 `R100`**, zero non-`R100`)**, **no**
+  `M` on any moved file, **no** new untracked test file, **no** change to any
+  file outside `tests/` (no `test-layout.ps1` / `devx-check.ps1` /
+  `devx-baseline.json` / `code-map.ps1` edit). **64** Web files remain at the
+  root.
+- **Web suite: 1480 → 1480 tests, the same 19 known failures
+  (2 `SecGate.DataClassCoverageTests` + 17 `StatusPageGateTests`), zero new**
+  (the `SentryBreadcrumbPiiTests.InformationLog_IsNotABreadcrumb` flake did
+  **not** fire — 19, not 20). `ProjectsControllerTests` (one of the moved
+  classes, now in `Projects/`) verified via `-class`: **46 tests, 0 failures**.
+- **DX29 lands no devx rule** — `devx-check` **PASS, 10 rules**, exit 0
+  (rules 2, 5 and 10 re-verified green; `code-map` stays fresh — the Tests
+  column is name-keyed, so the 76 renames change no map path).
+  `devx-baseline.json` **untouched** — `test_files_at_project_root` stays
+  **369** until DX30 lands the root-baseline-0 gate (DX35's before→after reads
+  **369 → 0**); the *report* number (`devx-report.ps1` E9 `root`) legitimately
+  drops **218 → 142** (Core **78** + Web **64**) — a report line, not a gate.
+- **The Web move is complete.** All **139** non-`_Shared/` Web root files
+  (**63** A–M at DX28 + **76** N–Z at DX29) are now in context folders (0
+  non-`_Shared/` remain at the root). **64** files still sit at the root and
+  are **all `_Shared/`** in the mapping (incl. `AssemblyFixtures.cs` and
+  `GlobalUsings.cs`) plus the `PostgresFixture.cs` `<Compile Include>` link —
+  the three D5 exception files. **Note (drift):** the brief's DoD wrote "132
+  files … 63 A–M + 76 N–Z" — that is an arithmetic slip; 63 + 76 = **139**,
+  which is what the mapping and the tree both show.
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **27** — incl. this brief
+  `dx29-prompt.md`, one more than DX28's **26**, archived at DX37 — archive
+  **50**; improve-check gate `b` `0305`/`0306`). This brief adds **+1 orphan**
+  (expected) and **zero** broken links (backtick paths, gate-4 regex does not
+  extract them).
+- **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX28 handoffs).
