@@ -894,3 +894,44 @@ moves it to the archive.
   extract them).
 - **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
   (consistent with the DX04–DX24 handoffs).
+
+## DX26 — move Core.Tests G–O contexts (git mv only)
+
+- **Files:** the **34** Core root files `git mv`'d into their G–O context
+  folders via `test-layout.ps1 -Apply -Project Core -Range G-O` (the DX25
+  `-Apply`, only *run* — no script edit): `Identity/` **18**,
+  `Notifications/` **9**, `Localization/` **4**, `GroupMessaging/` **1**,
+  `Messaging/` **1**, `Media/` **1** — the exact fact-1 list. **`git mv` only**
+  (all **`R100`** × 34, namespaces unchanged, csproj untouched — SDK-style
+  globs), **no** content edits, **no** ADR. `MLUI_FacesTests.cs` →
+  `Localization/` is a move, not a rename (the `ML` is the multilingual lane
+  ID, ADR 0005, not a unit code — rule 10's regex doesn't match an `M` start).
+- **`git status`: exactly 34 `R` renames, all at 100 % similarity** (proven by
+  `git diff --cached --find-renames --summary` — 34 at 100 %, zero below),
+  **no** `M` on any moved file, **no** new untracked test file. The 3 no-ops
+  (`Media/LocalVolumeFileStoreTests.cs`, `Media/LocalVolumeMediaStoreTests.cs`,
+  `Media/MediaLifecycleTests.cs`) are already in the right subfolder and were
+  skipped. The 6 candidate subfolder files (`InstanceStatus/MailAlarmStateReaderTests.cs`
+  → Identity, `Mentions/MentionEmitters.cs` → Notifications,
+  `Usage/StorageLimitsAcceptanceTests.cs` / `Usage/StorageLimitsTests.cs` /
+  `Usage/StorageMetricsHistoryTests.cs` / `Usage/StorageMetricsTests.cs` → Media)
+  show **no** rename — **flagged, not moved** (`// TODO ❓` owner call: those
+  subfolders were created by earlier lanes for their own contexts; a
+  cross-context move fights the existing structure).
+- **Core suite: 2052 → 2052 tests, the same 9 `SmtpHealthCheckTests` socket
+  failures, zero new** (163.8 s). `InvitationServiceTests` (one of the moved
+  classes, now in `Identity/`) verified via `-class`: 33 tests, 0 failures.
+- **DX26 lands no devx rule** — `devx-check` **PASS, 10 rules**, exit 0
+  (rules 2, 5 and 10 re-verified green). `devx-baseline.json` **untouched** —
+  `test_files_at_project_root` stays **369** until DX30 lands the
+  root-baseline-0 gate (DX35's before→after reads **369 → 0**); the *report*
+  number (`devx-report.ps1` E9) legitimately drops **352 → 318** (149 → 115
+  Core root) — a report line, not a gate.
+- **`-Only docs` reds are pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **24** — incl. this brief
+  `dx26-prompt.md`, one more than DX25's **23**, archived at DX37 — archive
+  **50**; improve-check gate `b` `0305`/`0306`). This brief adds **+1 orphan**
+  (expected) and **zero** broken links (backtick paths, gate-4 regex does not
+  extract them).
+- **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX25 handoffs).
