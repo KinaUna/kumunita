@@ -62,7 +62,7 @@ This repo uses **Marten and Wolverine** on **.NET 10**; the idiomatic patterns i
 - Audit-by-default: access to audience-restricted content is always logged.
 - Thin token, fat authorization: "may this actor see that resource?" is resolved by the `Authorization` service per request, not in an identity claim.
 - Keep `Milestones.cs` and the roadmap docs together — `Milestones.cs` is the **canonical list** (it renders the home page); [`docs/product/roadmap.md`](docs/product/roadmap.md) + [`docs/STATUS.md`](docs/STATUS.md) point at it, not restate it.
-- The code-shape rules — the **ratchet** (baseline only goes down; raising needs an `adr:` reason), the **part-vs-whole test**, and the **comment rule** (what/when/throws + ADR number) — live in [`docs/philosophy/in-code.md`](docs/philosophy/in-code.md#the-ratchet-the-split-the-comment), enforced by [`tools/code/code-check.ps1`](tools/code/code-check.ps1).
+- The code-shape rules — the **ratchet** (baseline only goes down; raising needs an `adr:` reason), the **part-vs-whole test**, and the **comment rule** (what/when/throws + ADR number) — live in [`docs/philosophy/in-code.md`](docs/philosophy/in-code.md#the-ratchet-the-split-the-comment), enforced by [`tools/code/code-check.ps1`](tools/code/code-check.ps1); `docs/dev/lane-codes.md`.
 - Security/privacy (IMPROVE-SEC, [ADR 0298](docs/adr/0298-data-classes-in-code.md)): a new registered doc type carries `[DataClass]`; a new read of an audience-bearing type is decided in-method or marked `// SEC-READ:`; log templates never carry a PII placeholder; views never carry an inline `on*` handler or `<script>` block. Enforced by a `SecGate` test in [`tests/Kumunita.Web.Tests/SecGate/`](tests/Kumunita.Web.Tests/SecGate/).
 
 ## Don't pause mid-task to check in

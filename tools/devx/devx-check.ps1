@@ -347,6 +347,23 @@ foreach ($proj in @('tests/Kumunita.Core.Tests', 'tests/Kumunita.Web.Tests')) {
 Check "test-files-at-root" "test files at the project root of Core.Tests + Web.Tests: $rootTestCount (limit $rootTestLimit, shrink-only — new test files go in a context folder; the 142 existing ones are cross-cutting `_Shared/` tests, the honest floor)" ($rootTestCount -le $rootTestLimit)
 $ruleCount = 11
 
+# --- rule: lane-codes (DX31) ---------------------------------------------------
+# The lane-code glossary (docs/dev/lane-codes.md, D6 part 1) must stay fresh:
+# regenerating it must produce no diff. lane-codes.ps1 -Check regenerates in
+# memory and diffs against the committed file (exit 0 = identical, 1 = stale
+# or missing) — the same "generated text only, no hand edits" gate as the
+# code-map rule above, so a glossary and the tree cannot drift apart. Runs
+# lane-codes.ps1 in a child pwsh (the child's `exit` only ends that process,
+# so it cannot terminate this one — the DX13 contrast).
+$laneCodesScript = Join-Path $repo 'tools/devx/lane-codes.ps1'
+$laneCodesFresh = $false
+if (Test-Path $laneCodesScript) {
+  $null = & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $laneCodesScript -Check 2>&1
+  $laneCodesFresh = ($LASTEXITCODE -eq 0)
+}
+Check "lane-codes" "docs/dev/lane-codes.md is fresh — regenerate with `pwsh tools/devx/lane-codes.ps1` when it goes stale (D6)" $laneCodesFresh
+$ruleCount = 12
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"

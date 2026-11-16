@@ -1117,3 +1117,36 @@ moves it to the archive.
   **50**; improve-check gate `b` `0305`/`0306`).
 - **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
   (consistent with the DX04–DX29 handoffs).
+
+## DX31 — lane-code glossary (D6, part 1)
+
+- **Files:** **4** — `tools/devx/lane-codes.ps1` (new, 143 lines; the
+  generator + `-Check` fresh gate), `docs/dev/lane-codes.md` (new, the
+  generated glossary), `tools/devx/devx-check.ps1` (rule 12 `lane-codes`),
+  `AGENTS.md` (one-line link). **No** ADR, **no** `devx-baseline.json` /
+  `devx-report.ps1` edit (the `lane_code_hits` ratchet is DX32's), **no**
+  code changes.
+- **Rule 12** (`lane-codes`): `lane-codes.ps1 -Check` regenerates in memory
+  and diffs the committed glossary (exit 0 = fresh) — the same "generated
+  text only, no hand edits" gate as rule 5 `code-map`. **`devx-check`:
+  PASS, 12 rules, exit 0** (rule 12 green; the prior 11 re-verified green).
+- **The glossary discovers the prefix set**, it does not hard-code the plan's
+  five examples: it reads the candidate letter set from `devx-report.ps1`'s
+  E11 regex and keeps only the letters that actually appear in `src`/`tests`
+  (case-sensitive — a case-insensitive `-match` let a lowercase `gp`+digit flag
+  a phantom `GP` row, so the discovery uses `-cmatch`). **8 prefixes → lanes:**
+  `F` → prod-hardening, `C` → improve-code, `D` → improve-docs, `IS` →
+  improve-sec, `U`/`R`/`A`/`O` → improve-ux (sub-lane series); `LS`/`GP`/`UPL`
+  have 0 hits and get no row (no guessing row).
+- **`AGENTS.md` one-line link added, still ≤ 2 000 tokens** (rule 6 green:
+  measured **1 999**). The original is 1 993 tokens — only ~28 chars of headroom
+  to the cap — so the link is a backtick path, not a markdown link (a link
+  alone is 44+ chars and would push it over; the brief's "trim the new line
+  until it fits" escape hatch). The glossary is `tier: reference`, so it is
+  excluded from the orphan count regardless.
+- **`-Only docs` reds pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **29** — incl. this brief, one
+  more than DX30's **28**; archive **50**; improve-check gate `b`
+  `0305`/`0306`).
+- **Cite:** ADR **0307** (D6); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX30 handoffs).
