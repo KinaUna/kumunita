@@ -319,6 +319,34 @@ foreach ($proj in @('tests/Kumunita.Core.Tests', 'tests/Kumunita.Web.Tests')) {
 Check "lane-named-test-files" "lane/unit-coded test file names in Core.Tests + Web.Tests: $($laneNamedFiles.Count) (expected 0 — rename to a behavior name; the lane code belongs in the class XML summary)" ($laneNamedFiles.Count -eq 0)
 $ruleCount = 10
 
+# --- rule: test-files-at-root (DX30) --------------------------------------------
+# D5 "mirror the source folders" (plan DoD): new test files belong in a context
+# folder, not at the project root. DX25–29 moved all 227 non-`_Shared/` root
+# files into context folders; the 142 that remain (Core 78 + Web 64) are ALL
+# mapped `_Shared/` — cross-cutting tests (gate tests, harnesses, fixture
+# infrastructure) that reference multiple or no single context. That 142 is the
+# HONEST FLOOR, not the plan's "baseline 0" (those tests don't belong in any
+# one context, so D5's single-folder-per-file rule correctly sends them to
+# `_Shared/`; the plan's D2 DoD permits "the honest floor recorded with its
+# reason"). The limit is the baseline's test_files_at_project_root value
+# (shrink-only: it may only go down; raising it needs an adr: reason). Counts
+# .cs files at the project root of both test projects (obj/ and bin/ excluded
+# — build artifacts). Fails when the count exceeds the limit (a NEW root-level
+# test file), not when it equals it (the 142 existing ones are the floor).
+$rootTestLimit = 0
+if ($baseline.PSObject.Properties['rules'] -and $baseline.rules.PSObject.Properties['test_files_at_project_root']) {
+  $rootTestLimit = [int]$baseline.rules.test_files_at_project_root.value
+}
+$rootTestCount = 0
+foreach ($proj in @('tests/Kumunita.Core.Tests', 'tests/Kumunita.Web.Tests')) {
+  $p = Join-Path $repo $proj
+  if (-not (Test-Path $p)) { continue }
+  $rootTestCount += @(Get-ChildItem -Path $p -Filter '*.cs' -File |
+    Where-Object { $_.FullName -notmatch '/obj/|/bin/' }).Count
+}
+Check "test-files-at-root" "test files at the project root of Core.Tests + Web.Tests: $rootTestCount (limit $rootTestLimit, shrink-only — new test files go in a context folder; the 142 existing ones are cross-cutting `_Shared/` tests, the honest floor)" ($rootTestCount -le $rootTestLimit)
+$ruleCount = 11
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"

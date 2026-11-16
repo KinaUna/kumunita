@@ -1081,3 +1081,39 @@ moves it to the archive.
   extract them).
 - **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
   (consistent with the DX04–DX28 handoffs).
+
+## DX30 — block new root-level test files + code-map Tests → folder
+
+- **Files:** **4** — `tools/devx/devx-check.ps1` (rule 11
+  `test-files-at-root`), `tools/devx/devx-baseline.json`
+  (`test_files_at_project_root` **369 → 142**, `source` notes the honest
+  floor, `shrink_only: true` + `plan: 343` kept), `tools/devx/code-map.ps1`
+  (Tests column → folder references), `docs/dev/code-map.md` (regenerated).
+  **No** test file moved or edited, **no** ADR, **no** `devx-report.ps1` /
+  `test-layout.ps1` / `test-layout.json` edit.
+- **Rule 11** (`test-files-at-root`): root `.cs` count of Core.Tests +
+  Web.Tests (obj/ and bin/ excluded) ≤ the baseline's
+  `test_files_at_project_root` value — **142 ≤ 142**. Shrink-only: the value
+  may only go down; raising needs an `adr:` reason. Fails on a *new*
+  root-level test file, not on the existing 142.
+- **The honest floor is 142, not the plan's "baseline 0."** After
+  DX25–29 the **142** remaining root files (Core **78** + Web **64**) are
+  **all** mapped `_Shared/` — cross-cutting tests (gate tests, harnesses,
+  fixture infrastructure) that reference multiple or no single context, so
+  D5's single-folder-per-file rule correctly sends them to `_Shared/`.
+  The plan's D2 DoD permits "the honest floor recorded with its reason."
+  The plan's 3 exception files (`AssemblyFixtures.cs`, `PostgresFixture.cs`,
+  `GlobalUsings.cs`) are a *subset* of the 142, not a carve-out from 0.
+- **`code-map.ps1` Tests column → folder references:** `MatchFiles` unchanged
+  (still name-keyed; the moves kept the file names) — only the rendering
+  changes: group the hit files by their parent folder, relative to the test
+  project root (e.g. `Core/Authorization/`, `Web/Authorization/`; a root file
+  renders as `Core/` / `Web/`). Column header stays `Tests`. Map
+  regenerated; **30 contexts**, no file-name leakage in the column.
+- **`devx-check`: PASS, 11 rules, exit 0** (rule 11 green: 142 ≤ 142; the
+  prior 10 re-verified green). **`-Only docs` reds pre-existing and
+  unchanged** (front-matter **17**, ADR >250 **1**, broken links **21**,
+  orphans **28** — incl. this brief, one more than DX29's **27** — archive
+  **50**; improve-check gate `b` `0305`/`0306`).
+- **Cite:** ADR **0307** (D5); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX29 handoffs).

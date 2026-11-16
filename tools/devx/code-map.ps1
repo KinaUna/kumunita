@@ -68,13 +68,31 @@ foreach ($c in (Get-ChildItem -Path (Join-Path $repo 'src/Kumunita.Web/Controlle
   $ctrlNames.Add($c.Name); $ctrlTexts[$c.Name] = Get-Content -LiteralPath $c.FullName -Raw
 }
 
-# --- the tests (name -> text) -----------------------------------------------------
+# --- the tests (name -> text, and name -> folder) ---------------------------------
+# After DX25–29 the test files live in context folders, so the Tests column
+# renders the folder(s) that contain the matching test files (DX30) — the
+# folder is the meaningful unit now, not a list of 50+ file names. The match
+# itself is still name-keyed (MatchFiles is unchanged; the moves kept the
+# file names).
+# Short project prefix for the Tests column (D5/DX30): the examples are
+# `Core/Authorization/`, `Web/Authorization/` — a Core|Web prefix plus the
+# context subfolder (relative to the test project root). A root file (the 142
+# cross-cutting `_Shared/` tests) renders as just `Core/` or `Web/`.
+$projShort = @{ 'tests/Kumunita.Core.Tests' = 'Core'; 'tests/Kumunita.Web.Tests' = 'Web' }
 $testNames = [System.Collections.Generic.List[string]]::new()
 $testTexts = @{}
+$testFolders = @{}
 foreach ($tproj in @('tests/Kumunita.Core.Tests', 'tests/Kumunita.Web.Tests')) {
+  $projRoot = Rel (Join-Path $repo $tproj)   # e.g. tests/Kumunita.Core.Tests
   foreach ($t in (Get-ChildItem -Path (Join-Path $repo $tproj) -Filter '*.cs' -File -Recurse |
     Where-Object { $_.FullName -notmatch '/obj/|/bin/' })) {
     $testNames.Add($t.Name); $testTexts[$t.Name] = Get-Content -LiteralPath $t.FullName -Raw
+    if (-not $testFolders.ContainsKey($t.Name)) {
+      $dir = Rel $t.Directory.FullName                    # …/tests/Kumunita.Core.Tests/Authorization
+      $sub = ($dir.Substring($projRoot.Length)).TrimStart('/')   # Authorization ('' for a root file)
+      if ($sub) { $testFolders[$t.Name] = $projShort[$tproj] + '/' + $sub + '/' }
+      else       { $testFolders[$t.Name] = $projShort[$tproj] + '/' }   # root file → `Core/` / `Web/`
+    }
   }
 }
 
@@ -139,8 +157,12 @@ foreach ($c in $contexts) {
   }
 
   # col 4 / col 6: controllers / tests referencing any of the context's seams.
+  # Tests (DX30): render the folder(s) holding the matching test files, not
+  # the file names — since DX25–29 the files are organized by context, so the
+  # folder is the meaningful unit (e.g. `Core/Authorization/`, `Web/Authorization/`).
   $ctlHit = @(MatchFiles $seams $ctrlNames $ctrlTexts)
   $testHit = @(MatchFiles $seams $testNames $testTexts)
+  $testHitFolders = @($testHit | ForEach-Object { $testFolders[$_] } | Sort-Object -Unique)
 
   # col 5: view folders that correspond to the matched controllers (name -> Views/<name>/).
   $views = [System.Collections.Generic.List[string]]::new()
@@ -162,7 +184,7 @@ foreach ($c in $contexts) {
   }
 
   $rows.Add('| ' + $ctxName + ' | ' + (JoinList $dts) + ' | ' + (JoinList $seams) + ' | ' +
-    (JoinList $ctlHit) + ' | ' + (JoinList $views) + ' | ' + (JoinList $testHit) + ' | ' + $adrs + ' | ' +
+    (JoinList $ctlHit) + ' | ' + (JoinList $views) + ' | ' + (JoinList $testHitFolders) + ' | ' + $adrs + ' | ' +
     (JoinList $keys) + ' |')
 }
 
@@ -181,9 +203,9 @@ $doc.Add('---')
 $doc.Add('')
 $doc.Add('> **Abstract:** the code map (D4, ADR 0307) — one row per bounded context,')
 $doc.Add('> linking the concern to the Core folder, its `*DocTypes.cs`, its DI-registered')
-$doc.Add('> service seam, the Web controllers and view folders that serve it, the test files')
-$doc.Add('> that cover it, and the top 3 ADRs the folder cites. Generated from the code; the')
-$doc.Add('> devx `code-map` rule fails the moment it goes stale.')
+$doc.Add('> service seam, the Web controllers and view folders that serve it, the test')
+$doc.Add('> folders that cover it, and the top 3 ADRs the folder cites. Generated from the')
+$doc.Add('> code; the devx `code-map` rule fails the moment it goes stale.')
 $doc.Add('')
 $doc.Add('# Code map')
 $doc.Add('')

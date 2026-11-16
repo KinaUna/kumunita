@@ -27,11 +27,11 @@
       "gate": "none (informational; see test_files_at_project_root, lane_named_test_files)"
     },
     "test_files_at_project_root": {
-      "value": 369,
+      "value": 142,
       "plan": 343,
       "shrink_only": true,
-      "source": "E9 — test files at the project root (not in a context/controller subfolder). The tree grew since the plan's measurement (343 → 369). Target 0 (DX30).",
-      "gate": "DX30 — devx-check, test files at the project root baseline 0; exceptions AssemblyFixtures.cs, PostgresFixture.cs, GlobalUsings.cs"
+      "source": "E9 — test files at the project root (not in a context/controller subfolder). DX25–DX29 moved all 227 non-_Shared/ root files into context folders; 142 cross-cutting (_Shared/) tests remain at the root (Core 78 + Web 64) — the honest floor, not 0 (those tests reference multiple or no single context, so D5's single-folder-per-file rule correctly maps them to _Shared/).",
+      "gate": "DX30 — devx-check, test-files-at-root ≤ 142 (shrink-only from 369; the honest floor recorded with its reason per the plan's D2 DoD)"
     },
     "lane_named_test_files": {
       "value": 16,
