@@ -1379,3 +1379,67 @@ moves it to the archive.
   The environmental socket failures are a sandbox property — they will be
   green in CI (DX36's `devx`/gate probes do not bind ports, so they are
   unaffected).
+## DX36 — Independent verification (cold start + probes)
+
+- **Files:** **1** — this handoff note (a section appended). **No** ADR, **no**
+  code change, **no** `devx-check.ps1` / `devx-baseline.json` edit, **no** gate
+  loosened, **no** doc "fixed." Measure-and-verify only: the probes are run and
+  reverted, the cold start is measured and reported — nothing committed but this
+  note.
+- **Precondition MET (DX35 landed):** verified this session (2026-11-17,
+  `development` @ `22be8fd0` = **DX35**, `379f8528` = DX34 below it): `devx-check`
+  at **14 rules, PASS, exit 0** before any probe ran. The probes assert "revert
+  to **14 rules** PASS," so this is the baseline they restore.
+- **Cold start (repo-docs-only; no lane-plan / brief / handoff read for the
+  answers):** the fresh entry is `AGENTS.md` (loaded every session) → `recipes.md`
+  → `testing-and-ci.md` → `code-map.md` → the `Kiosk` / `Inventory` code. All
+  three answers correct:
+  - **T1** the "Now showing" Kiosk label — add `kiosk.now_showing` to
+    `Keys/{en,de,fr,da}/kiosk.json` (Kiosk surface = `kiosk` per the map; `en`
+    is the floor; the `KnownTranslationKeys` parity tests keep green).
+  - **T2** the first `testing-and-ci.md` table row — `front-matter on every
+    doc` → `docs-check` gate 1 → fix: add the missing front-matter (template in
+    `DOCS-CONVENTIONS.md`).
+  - **T3** an optional `Location` on inventory items — a plain POCO property on
+    `Inventory/InventoryItem.cs` (Marten derives the schema delta, ADR 0004);
+    tests `Core.Tests/Authorization/InventoryServiceTests.cs` +
+    `Web.Tests/Inventory/InventoryControllerTests.cs`; `pwsh tools/check.ps1`.
+  - **Instrumented:** **7 calls / 0 wrong turns / ~15–20 K tokens** against the
+    baseline **32 / 7 / ~123 K**. Pass lines: ≤ 16 calls ✓, ≤ 2 wrong turns ✓,
+    ≤ 60 K tokens ✓, all three correct ✓ — **PASS**.
+- **The three probes (each FAILs its named rule, then reverts clean):**
+  - **Probe 1** — new `tests/Kumunita.Core.Tests/FooTests.cs` at the root →
+    **`test-files-at-root`** **FAIL**: "test files at the project root …
+    **143** (limit **142**, shrink-only)". Reverted (`rm`) → back to 142.
+  - **Probe 2** — `git mv` `src/Kumunita.Core/Posts` → `Posts2`, the map **not**
+    regenerated → **`code-map`** **FAIL**: "docs/dev/code-map.md is fresh —
+    regenerate … when it goes stale". Reverted (`git mv` back) → fresh.
+  - **Probe 3** — a new Core class declaring `IClassFixture<PostgresFixture>` →
+    **`iclassfixture`** **FAIL**: "Core IClassFixture&lt;PostgresFixture&gt; files
+    (**AppRoleSchemaPrivilegeTests.cs, FooFixtureProbeTests.cs**) ⊆ allowlist
+    (**AppRoleSchemaPrivilegeTests.cs**)". Reverted (`rm`) → ⊆ allowlist. The
+    root file also tripped **`test-files-at-root`** (143) alongside — expected;
+    the **named** rule is `iclassfixture`. **Numbering note (recorded, not
+    fudged):** the brief cites "rule 1," but the script's `$ruleCount` numbers
+    `iclassfixture` **2** (rule 1 is `ci-triggers`, which the brief's drift-fact
+    list omits). Probes 1–2 agree with their cited numbers (11, 5), so this is
+    an off-by-one in the brief's `iclassfixture` number, not a gate defect — the
+    **named** rule trips exactly as required.
+- **After all three probes:** `pwsh tools/devx/devx-check.ps1` → **PASS,
+  14 rules, exit 0** (the baseline restored). No broken gate: each probe failed
+  its named rule with the named message, and each reverted clean.
+- **`-Only docs` reds pre-existing (unchanged by DX36):** front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **34** (33 + the `dx36-prompt.md`
+  brief), archive **50**; `improve-check` gate `b` `0305`/`0306`. This handoff
+  section adds no doc, so it changes no count.
+- **The honest call:** **PASS** — all three probes failed their named rule and
+  reverted clean, and the cold start met every pass line. (A missed pass line,
+  or a probe that did not fail its named rule, would be a **recorded FAIL** —
+  neither occurred.)
+- **Cite:** ADR **0307**; the plan body's "0300" is a stale number (consistent
+  with the DX04–DX35 handoffs).
+- **Handoff / next:** **DX36 complete** — independent verification passes every
+  line. **DX37** (the close flip) is the only DX36-dependent unit and needs DX36
+  **all PASS** — that precondition is now met. The environmental socket reds
+  (DX35's `web`/`core`) are a sandbox property and do not touch `devx-check`,
+  which is why the probes are green here.
