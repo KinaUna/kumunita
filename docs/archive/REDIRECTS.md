@@ -98,6 +98,7 @@ folder (no per-file rows are needed).
 | docs/plans-milestones/done/translation-display/… | [docs/archive/lanes/translation-display/…](lanes/translation-display/) |
 | docs/plans-milestones/done/user-guides/… | [docs/archive/lanes/user-guides/…](lanes/user-guides/) |
 | docs/plans-milestones/done/wysiwyg/… | [docs/archive/lanes/wysiwyg/…](lanes/wysiwyg/) |
+| docs/plans-milestones/in-progress/plan-improve-devx.md + dx\*-prompt.md + improve-devx-handoff-notes.md | [docs/archive/lanes/improve-devx/…](lanes/improve-devx/) |
 
 Notes:
 

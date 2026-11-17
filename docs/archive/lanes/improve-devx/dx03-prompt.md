@@ -1,9 +1,9 @@
 ---
 id: dx03-prompt
 title: "DX03 prompt — the branch flow as a written rule (docs/dev/branch-flow.md), the docs/dev/README.md row, and one line in AGENTS.md"
-tier: living
+tier: archive
 kind: prompt
-status: current
+status: done
 audiences: [developer, agent]
 lane: improve-devx
 ---

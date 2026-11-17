@@ -1,9 +1,9 @@
 ---
 id: plan-improve-devx
 title: "Plan: IMPROVE-DEVX — an integrative codebase for the people and agents who maintain it"
-tier: living
+tier: archive
 kind: plan
-status: proposed
+status: done
 audiences: [developer, agent, platform-maintainer]
 related:
   - AGENTS.md

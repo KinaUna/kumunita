@@ -1,9 +1,9 @@
 ---
 id: dx07-prompt
 title: "DX07 prompt — assembly fixture in Core.Tests: the first context rides one shared Postgres container"
-tier: living
+tier: archive
 kind: prompt
-status: current
+status: done
 audiences: [developer, agent]
 lane: improve-devx
 ---

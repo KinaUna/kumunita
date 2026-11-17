@@ -41,11 +41,7 @@ to live here are in
 
 ## Current in-progress lane
 
-**IMPROVE-DEVX** — the developer feedback-loop lane (units `DX00`–`DX37`,
-proposed 2026-11-13, status **proposed**): the register is
-[plan-improve-devx.md](plan-improve-devx.md), the first unit prompt is
-[in-progress/dx01-prompt.md](in-progress/dx01-prompt.md), and the running log
-is [in-progress/improve-devx-handoff-notes.md](in-progress/improve-devx-handoff-notes.md).
+**IMPROVE-DEVX** — closed on 2026-11-17 — shipped and closed; the register, the `dx*-prompt` unit prompts, and the handoff notes moved to the archive at [`archive/lanes/improve-devx/`](../archive/lanes/improve-devx/) (register [plan-improve-devx](../archive/lanes/improve-devx/plan-improve-devx.md), closing log [improve-devx-handoff-notes](../archive/lanes/improve-devx/improve-devx-handoff-notes.md)).
 
 **IMPROVE-UX** — closed on 2026-11-13 — shipped and closed; the register, the `x`/`r`/`a`/`o`-prompt unit prompts, and the handoff notes moved to the archive at [`archive/lanes/improve-ux/`](../archive/lanes/improve-ux/) (register [plan-improve-ux](../archive/lanes/improve-ux/plan-improve-ux.md), closing log [improve-ux-handoff-notes](../archive/lanes/improve-ux/improve-ux-handoff-notes.md)).
 

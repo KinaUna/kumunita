@@ -1,9 +1,9 @@
 ---
 id: dx05-prompt
 title: "DX05 prompt — add guard-main.yml: a pull_request workflow that fails any PR into main whose head is not release"
-tier: living
+tier: archive
 kind: prompt
-status: current
+status: done
 audiences: [developer, agent]
 lane: improve-devx
 ---

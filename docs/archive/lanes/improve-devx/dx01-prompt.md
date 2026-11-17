@@ -1,9 +1,9 @@
 ---
 id: dx01-prompt
 title: "DX01 prompt — port the devx report to pwsh + the check skeleton + baseline (DX01), then ADR 0307 (plan's 0300, taken) recording D1–D7 (DX02)"
-tier: living
+tier: archive
 kind: prompt
-status: current
+status: done
 audiences: [developer, agent]
 lane: improve-devx
 ---

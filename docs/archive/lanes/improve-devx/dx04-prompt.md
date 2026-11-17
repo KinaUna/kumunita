@@ -1,9 +1,9 @@
 ---
 id: dx04-prompt
 title: "DX04 prompt — trim ci.yml comment prose to ≤ 20 %, add workflow_dispatch + concurrency, fix the stale AGENTS.md pointer, and land the first devx-check rule (ci.yml triggers vs branch-flow.md)"
-tier: living
+tier: archive
 kind: prompt
-status: current
+status: done
 audiences: [developer, agent]
 lane: improve-devx
 updated: 2026-11-14

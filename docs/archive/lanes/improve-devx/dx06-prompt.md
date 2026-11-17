@@ -1,9 +1,9 @@
 ---
 id: dx06-prompt
 title: "DX06 prompt — triage the server-scoped tests: identify the sole class-fixture allowlist class for the DX07/DX08 assembly-fixture move"
-tier: living
+tier: archive
 kind: prompt
-status: current
+status: done
 audiences: [developer, agent]
 lane: improve-devx
 ---

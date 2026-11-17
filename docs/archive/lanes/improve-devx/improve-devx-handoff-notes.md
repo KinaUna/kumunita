@@ -1,9 +1,9 @@
 ---
 id: improve-devx-handoff
 title: "IMPROVE-DEVX handoff notes — the lane's running log, one section per unit"
-tier: living
+tier: archive
 kind: log
-status: current
+status: done
 audiences: [developer, agent]
 lane: improve-devx
 updated: 2026-11-13
@@ -18,9 +18,9 @@ updated: 2026-11-13
 # IMPROVE-DEVX handoff notes
 
 Lane: IMPROVE-DEVX — an integrative codebase for the people and agents who
-maintain it. Plan: [`../plan-improve-devx.md`](../plan-improve-devx.md).
-Units append here in order; the lane close (DX37) freezes this file and
-moves it to the archive.
+maintain it. Plan: [`plan-improve-devx.md`](plan-improve-devx.md) (this
+folder — the register, the `dx*-prompt` briefs, and this handoff note all
+landed together at the lane close, DX37).
 
 ## DX01 — port the report to pwsh; add the check skeleton
 
@@ -1443,3 +1443,48 @@ moves it to the archive.
   **all PASS** — that precondition is now met. The environmental socket reds
   (DX35's `web`/`core`) are a sandbox property and do not touch `devx-check`,
   which is why the probes are green here.
+
+## DX37 — Close flip + archive (Phase H close)
+
+- **Files:** the eight close-flip members (README, `WhatsNew.cs`, STATUS,
+  ARCHITECTURE, `WhatsNewTests.cs`, the ADR `0307` row — verified present from
+  DX02, plus `archive/README.md` + `archive/REDIRECTS.md`), **and** the archive
+  move (`git mv` the plan + this note + all `dx*-prompt.md` briefs to
+  `docs/archive/lanes/improve-devx/`, stamped `tier: archive` / `status: done`).
+  **No** ADR renumber, **no** gate loosened, **nothing** under `tools/` or
+  `tests/` deleted, `Milestones` / `MilestonesTests` byte-identical.
+- **Precondition MET (DX36 all-PASS, committed):** verified this session
+  (2026-11-17, `development` @ `50ea0d6d` = **DX36**, `22be8fd0` = DX35,
+  `379f8528` = DX34 below): `devx-check` at **14 rules, PASS, exit 0** before
+  the first close-flip edit.
+- **The close flip:** all eight members touched. `WhatsNew.cs` head is
+  **`0.89.0` / `2026-11-17`** (IMPROVE-DEVX + ADR **0307**; the `0.88.0`
+  IMPROVE-UX row slides one back); the `WhatsNewTests` head-pin is bumped — the
+  whole head→ninth positional cascade slides one row down (head `0.89.0`,
+  second `0.88.0`, third `0.87.0`, …, ninth `0.81.0`) and **all 7 facts pass**
+  via the in-process runner (`All_Is_Ordered_NewestFirst` + the head-pin both
+  green); `Milestones` / `MilestonesTests` are **byte-identical** (a **named**
+  lane, out of M-letter order); the ADR **`0307`** index row is present (verify,
+  do not re-add); `README` / `STATUS` / `ARCHITECTURE` carry the shipped
+  durable-fact lines, and `archive/README.md` + `REDIRECTS.md` carry the
+  `improve-devx` row.
+- **The archive:** the `docs/archive/lanes/improve-devx/` folder holds the plan
+  register, this handoff note, and all 36 briefs (`dx01` + `dx03`…`dx37`; there
+  is no `dx02` — DX02's ADR shipped with DX01); every moved doc stamped
+  `tier: archive` / `status: done`; no lane file remains in
+  `docs/plans-milestones/`.
+- **Gates:** `devx-check` **PASS, 14 rules, exit 0** (unchanged by the flip —
+  the close flip and the archive move touch none of the 14 rules); `docs-check`
+  adds **no NEW** failure for the moved folder (the archive-stamp gate 6 is
+  clean for `improve-devx/` — every moved doc is `tier: archive`). The
+  `-Only docs` reds (front-matter **17**, ADR >250 **1**, broken links **21**,
+  orphans **~34**, archive **50**; `improve-check` gate `b` `0305`/`0306`) are
+  **pre-existing**; archiving the briefs **lowers** the orphan count (they
+  become `tier: archive` docs).
+- **Owner-ops:** the branch-protection rulesets on `main` / `release` are the
+  real CI protection (the `guard-main.yml` workflow is present; the ruleset is a
+  GitHub action, not runnable in the sandbox).
+- **The honest call:** **PASS** — the close flip is complete, the archive is
+  clean, every gate holds, and the lane is closed. **Cite:** ADR **0307**; the
+  plan body's "0300" is a stale number (consistent with the DX04–DX36
+  handoffs).
