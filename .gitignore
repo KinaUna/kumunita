@@ -57,6 +57,8 @@ Thumbs.db
 *.tmp
 *.tmp_proj
 *.log
+*.out
+*.trx
 *.vspscc
 *.vssscc
 .builds

@@ -1217,6 +1217,52 @@ moves it to the archive.
 - **Cite:** ADR **0307** (D1/D7); the plan body's "0300" is a stale number
   (consistent with the DX04–DX32 handoffs).
 
+## DX34 — Leftovers: the tracked-artifacts gate (E12)
+
+- **Files:** **6** — the four `tests/*.out` scratch files (`coretest`,
+  `coretest2`, `webtest`, `parity`, **304 KB**) `git rm`'d (the whole
+  tracked-artifact set; `git ls-files` now shows **0** tracked
+  `*.out`/`*.log`/`*.trx`); `.gitignore` (added `*.out` / `*.trx` beside the
+  existing `*.log` — not re-added, the three extensions now sit together);
+  `tools/devx/devx-check.ps1` (**rule 14** `tracked-artifacts` appended after
+  `$ruleCount = 13`, ending `$ruleCount = 14`; counts via `git ls-files`
+  filtered to `\.out$`/`\.log$`/`\.trx$` — git-tracks, so deterministic, not
+  the filesystem; reads the baseline value, the house ratchet pattern);
+  `tools/devx/devx-baseline.json` (`tracked_out_log_trx_artifacts` **4 → 0**,
+  shrink-only, `plan: 4` and the gate note kept); this handoff note. **No**
+  ADR, **no** code change.
+- **The `is01-prompt.md` half is verified, not moved** (brief drift fact 1):
+  `docs/plans-milestones/is01-prompt.md` is **absent**;
+  `docs/archive/lanes/improve-sec/is01-prompt.md` is **present** — already
+  moved at `fe588831` ("docs(sec): archive the improve-sec IS01 prompt with
+  its lane (F6)"). Recorded, not `git mv`'d, not edited (its `tier: living`
+  archive violation is in the 50, pre-existing, not mine to fix).
+- **Exits:** `devx-check` **13 → 14 rules, PASS, exit 0** (rule 14 green:
+  **0 ≤ 0**; the prior 13 re-verified). **Probe proven:** a new
+  `tests/dx34-probe.out` staged tracked (`git add -f` — a plain `git add` is
+  blocked, because `*.out` is now gitignored; the close working) → `devx-check`
+  **FAIL**s naming `tracked-artifacts` (1 ≤ 0), exit 1 → `git rm --cached` +
+  `rm` → **PASS (14 rules)**, exit 0 (the gate catches a *new* tracked
+  artifact, not just the existing floor). `git status --short` (tracked)
+  shows exactly the 4 `D` deletions + `M` `.gitignore` / `devx-check.ps1` /
+  `devx-baseline.json` + this note — **no** `A`/`M` under `tests/` beyond the
+  four deletions.
+- **`-Only docs` reds pre-existing and unchanged** (front-matter **17**,
+  ADR >250 **1**, broken links **21**, orphans **33** — incl. the
+  `dx34-prompt.md` / `dx35-prompt.md` briefs on disk, one more than the
+  brief's post-DX33 projection of **32** because **DX35 also landed** and
+  carries its own brief; archive **50**; `improve-check` gate `b`
+  **0305**/`0306`). My deliverables are `.out` deletions and `.gitignore`/
+  `.ps1`/`.json` edits plus this already-reachable note — **no** new `.md`,
+  **zero** broken links, no change to the reds.
+- **Context (why DX35 ran first):** DX35 landed on this branch and recorded
+  DX34 as the **missing precondition / blocker** — its "tracked artifacts
+  4 → 0" row reads `pending DX34`. This unit is that clearing: rule 14 and
+  the baseline 4 → 0 are now live, so the DX35 row is unblocked. **DX37**
+  (close flip) remains the only DX36-dependent unit outstanding.
+- **Cite:** ADR **0307** (E12); the plan body's "0300" is a stale number
+  (consistent with the DX04–DX33 handoffs).
+
 ## DX35 — Run and record (Phase H close)
 
 - **Files:** **1** — this handoff note (a section appended). **No** ADR, **no**

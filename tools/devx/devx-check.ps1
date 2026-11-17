@@ -393,6 +393,24 @@ foreach ($scope in @('src', 'tests')) {
 Check "lane-codes-ratchet" "lane/unit-code hits in src/tests comments: $laneCodeHits (limit $laneCodeLimit, shrink-only — a code comment cites the ADR number or its decision, not a raw unit code; unit codes belong in the plan or handoff)" ($laneCodeHits -le $laneCodeLimit)
 $ruleCount = 13
 
+# --- rule: tracked-artifacts (DX34) ---------------------------------------------
+# E12 leftovers: no tracked *.out / *.log / *.trx build scratch. DX34 untracked
+# the four tests/*.out files (git rm) and closed the .gitignore gap (*.out /
+# *.trx beside the existing *.log). The count is the live `git ls-files` set
+# filtered to the three extensions — git tracks, so it is deterministic and
+# independent of untracked scratch on disk (the tree is clean of untracked
+# *.log / *.trx, but the gate must catch what git tracks, not the filesystem).
+# The limit is the baseline's tracked_out_log_trx_artifacts value (shrink-only:
+# it may only go down; raising it needs an adr: reason). After DX34 the floor is
+# 0, so the rule is green at 0 and FAILs on ANY new tracked *.out / *.log / *.trx.
+$trackedArtifactLimit = 0
+if ($baseline.PSObject.Properties['rules'] -and $baseline.rules.PSObject.Properties['tracked_out_log_trx_artifacts']) {
+  $trackedArtifactLimit = [int]$baseline.rules.tracked_out_log_trx_artifacts.value
+}
+$trackedArtifactCount = @(& git -C $repo ls-files | Where-Object { $_ -match '\.(out|log|trx)$' }).Count
+Check "tracked-artifacts" "tracked *.out / *.log / *.trx build scratch: $trackedArtifactCount (limit $trackedArtifactLimit, shrink-only — build scratch stays untracked; .gitignore carries *.out / *.log / *.trx)" ($trackedArtifactCount -le $trackedArtifactLimit)
+$ruleCount = 14
+
 # --- summary --------------------------------------------------------------------
 Write-Host ""
 Write-Host "devx-check — IMPROVE-DEVX gate (D7)"

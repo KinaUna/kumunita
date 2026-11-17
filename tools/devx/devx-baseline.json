@@ -57,10 +57,10 @@
       "gate": "DX22 — devx-report shows ADRs unreachable by link at 0"
     },
     "tracked_out_log_trx_artifacts": {
-      "value": 4,
+      "value": 0,
       "plan": 4,
       "shrink_only": true,
-      "source": "E12 — tests/{coretest,coretest2,webtest,parity}.out tracked (300 KB). Target 0 (DX34).",
+      "source": "E12 — tests/{coretest,coretest2,webtest,parity}.out tracked (304 KB). DX34 untracked them (git rm) and closed the .gitignore gap (*.out / *.trx beside the existing *.log); the floor is now 0. Target 0 (DX34).",
       "gate": "DX34 — devx-check, tracked *.out / *.log / *.trx baseline 0"
     },
     "ci_triggers": {
