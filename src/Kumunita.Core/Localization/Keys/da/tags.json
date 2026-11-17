@@ -5,9 +5,11 @@
   "tags.flash_translation_saved": "Overs\u00E6ttelse gemt.",
   "tags.list.heading": "Tags",
   "tags.list.lede": "Emner, jeres indl\u00E6g og blogsider er tagget med \u2014 klik p\u00E5 \u00E9t, for at se, hvad der er skrevet om det.",
+  "tags.list.empty_title": "Ingen tags endnu.",
   "tags.list.empty": "Ingen tags endnu \u2014 tags dukker op her, n\u00E5r en beboer knytter \u00E9t til et indl\u00E6g eller en blogside.",
   "tags.bytag.heading": "Indl\u00E6g og sider om",
   "tags.bytag.posts_heading": "Indl\u00E6g",
   "tags.bytag.pages_heading": "Blogsider",
+  "tags.bytag.empty_title": "Intet under dette tag.",
   "tags.bytag.empty": "Ingen l\u00E6sbare indl\u00E6g eller blogsider b\u00E6rer dette tag."
 }

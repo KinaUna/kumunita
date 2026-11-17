@@ -24,7 +24,7 @@
   "community.translations_none": "Pas encore",
   "community.translations_page_title": "Traductions",
   "community.translations_page_lede": "Nom et description de cette communaut\u00E9 dans d\u0027autres langues.",
-  "community.translations_view_only": "Vous pouvez consulter les traductions ; seuls un GlobalAdmin ou un Traducteur peuvent les ajouter, modifier ou supprimer.",
+  "community.translations_view_only": "Vous pouvez consulter les traductions ; seul un administrateur ou un Traducteur peut les ajouter, modifier ou supprimer.",
   "community.translation_add": "Ajouter",
   "community.translation_name_label": "Nom",
   "community.translation_desc_label": "Description",

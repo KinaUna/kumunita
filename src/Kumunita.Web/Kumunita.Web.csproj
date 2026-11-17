@@ -29,13 +29,13 @@
          WolverineFx 6.33.0 directly for the transactional-outbox `IMessageContext`
          enqueue. Both projects pin the same version (R4: no skew). See
          docs/archive/lanes/m1/plan-m1-step-7-outbox-email-c3.md. -->
-    <PackageReference Include="WolverineFx" Version="6.50.2" />
-    <PackageReference Include="WolverineFx.Marten" Version="6.50.2" />
+    <PackageReference Include="WolverineFx" Version="6.63.0" />
+    <PackageReference Include="WolverineFx.Marten" Version="6.63.0" />
     <!-- Wolverine 6.33 no longer ships the runtime compiler (IAssemblyGenerator/Roslyn)
          in the core package. This reference auto-registers it so TypeLoadMode.Dynamic
          handlers (OutboxEmail, Fault<>, AuditPurge) compile at startup — see
          wolverinefx.net/guide/codegen.html. -->
-    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.50.2" />
+    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.63.0" />
     <!-- F10 (OBS-02, U2) — the ONE <PackageReference> ADD the plan explicitly allows
          (pin §7). Error-tracker seam (pin §2): OFF-by-DEFAULT Sentry capture, gated
          on the owner's SENTRY_DSN (the builder-phase guard in Program.cs is the no-op

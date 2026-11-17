@@ -39,7 +39,6 @@ namespace Kumunita.Core.Tests.UserInfo;
 /// </list>
 /// </summary>
 public sealed class ProfileAvatarLaneTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     // A well-formed avatar id (lowercase-hex, the MediaObject.Id shape,
     // C-MED·4) — the lane references the catalog by id only; no hashing or

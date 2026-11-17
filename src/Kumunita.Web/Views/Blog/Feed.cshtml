@@ -30,14 +30,24 @@
 
         @if (Model.Posts.Count == 0)
         {
-            <div class="alert alert-info">
+            @* R29 (IMPROVE-UX) — the house .kmb-empty idiom; the body is the
+               existing blog.empty_own/other sentence and the action is the
+               page's New-blog-page button (the author's own feed only). *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="blog.empty_title">No blog pages yet.</kw-l></p>
                 @if (Model.IsOwner)
                 {
-                    <kw-l key="blog.empty_own">You have no blog pages yet. Create your first — it becomes the root of your blog, and you can nest more under it.</kw-l>
+                    <p class="kmb-empty-body">
+                        <kw-l key="blog.empty_own">You have no blog pages yet. Create your first — it becomes the root of your blog, and you can nest more under it.</kw-l>
+                    </p>
+                    <a class="btn btn-primary" href="/pages/new"><kw-l key="blog.new_page">New blog page</kw-l></a>
                 }
                 else
                 {
-                    <kw-l key="blog.empty_other">This resident has no blog pages yet.</kw-l>
+                    <p class="kmb-empty-body">
+                        <kw-l key="blog.empty_other">This resident has no blog pages yet.</kw-l>
+                    </p>
+                    <a class="btn btn-outline-secondary" href="/community"><kw-l key="about.cta_feed">See the feed</kw-l></a>
                 }
             </div>
         }

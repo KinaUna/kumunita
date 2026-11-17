@@ -475,17 +475,19 @@
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-3">
-                                        <label class="form-label">
+                                        <label class="form-label" for="@($"event-trans-edit-title-{existing.LanguageCode}")">
                                             @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                         </label>
-                                        <input class="form-control" type="text" name="title" value="@existing.Title" />
+                                        <input class="form-control" type="text" name="title"
+                                               id="@($"event-trans-edit-title-{existing.LanguageCode}")" value="@existing.Title" />
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">
+                                        <label class="form-label" for="@($"event-trans-edit-body-{existing.LanguageCode}")">
                                             <kw-l key="posts.translation_body_label">Body</kw-l>
                                         </label>
-                                        <textarea class="form-control" name="body" rows="4" required>@existing.Body</textarea>
+                                        <textarea class="form-control" name="body" rows="4" required
+                                                  id="@($"event-trans-edit-body-{existing.LanguageCode}")">@existing.Body</textarea>
                                     </div>
                                 </div>
                                 <div class="modal-footer">
@@ -519,14 +521,15 @@
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-3">
-                                        <label class="form-label">
+                                        <label class="form-label" for="@($"event-trans-add-title-{lang.Code}")">
                                             @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                         </label>
-                                        <input class="form-control" type="text" name="title" value="@Model.Event.Title" />
+                                        <input class="form-control" type="text" name="title"
+                                               id="@($"event-trans-add-title-{lang.Code}")" value="@Model.Event.Title" />
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">
+                                        <label class="form-label" for="@($"event-trans-add-body-{lang.Code}")">
                                             <kw-l key="posts.translation_body_label">Body</kw-l>
                                         </label>
                                         <div class="rc-editor">
@@ -542,7 +545,8 @@
                                                 <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
                                                 <partial name="_RichEditorToggle" />
                                             </div>
-                                            <textarea class="form-control" name="body" rows="4" required placeholder="…" data-rich-editor></textarea>
+                                            <textarea class="form-control" name="body" rows="4" required placeholder="…"
+                                                      id="@($"event-trans-add-body-{lang.Code}")" data-rich-editor></textarea>
                                             <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
                                         </div>
                                     </div>

@@ -1325,6 +1325,13 @@
     },
     {
       "from": "Identity",
+      "to": "Kiosk",
+      "symbol": "KioskLink",
+      "count": 2,
+      "adr": "0302"
+    },
+    {
+      "from": "Identity",
       "to": "Localization",
       "symbol": "LocaleSettings",
       "count": 1
@@ -1549,7 +1556,8 @@
       "from": "Identity",
       "to": "UserInfo",
       "symbol": "GuardianLink",
-      "count": 1
+      "count": 2,
+      "adr": "0301"
     },
     {
       "from": "Identity",
@@ -1611,13 +1619,21 @@
       "from": "Kiosk",
       "to": "Authorization",
       "symbol": "AccessAudit",
-      "count": 1
+      "count": 2,
+      "adr": "0302"
     },
     {
       "from": "Kiosk",
       "to": "Events",
       "symbol": "Event",
       "count": 1
+    },
+    {
+      "from": "Kiosk",
+      "to": "Identity",
+      "symbol": "IdentityService",
+      "count": 1,
+      "adr": "0302"
     },
     {
       "from": "Kiosk",
@@ -3078,6 +3094,13 @@
     {
       "from": "Web",
       "to": "Identity",
+      "symbol": "DeletionRequest",
+      "count": 1,
+      "adr": "0301"
+    },
+    {
+      "from": "Web",
+      "to": "Identity",
       "symbol": "DisallowedEmailDomainException",
       "count": 2
     },
@@ -3190,6 +3213,13 @@
       "to": "Kiosk",
       "symbol": "KioskEntry",
       "count": 4
+    },
+    {
+      "from": "Web",
+      "to": "Kiosk",
+      "symbol": "KioskLink",
+      "count": 4,
+      "adr": "0302"
     },
     {
       "from": "Web",
@@ -3745,6 +3775,10 @@
     {
       "file": "src/Kumunita.Web/Controllers/ErrorReportAdminController.cs",
       "reason": "CODE-HYGIENE U13 (ADR 0298/0299) - the error-report triage/escalation lane reads ErrorReports + Identity escalation tokens directly on the store. No ErrorReports read-service owns the paged triage projection; routing through one would mint a new Web->ErrorReports boundary edge for an admin view-model. Kept on the store."
+    },
+    {
+      "file": "src/Kumunita.Web/Controllers/AccountController.cs",
+      "reason": "ADR 0301 D2 (IMPROVE-UX R13) - the self-serve delete-account GET reads the signed-in resident's pending DeletionRequest row (the 'deletion scheduled for {date} - sign in to cancel' scheduled-state notice, ADR 0301 D2). The R11 IDeletionScheduler seam set has no single-resident 'read my pending row' method (Schedule/Cancel/ListDue/MarkExecuted only - ListDueAsync is the R12 due-job's all-rows scan), and R13 is scoped to the Web surface (no IDeletionScheduler change). A Web->Identity:DeletionRequest read edge is minted for the single-resident scheduled-state projection (the AdminGuestsController 'projection with no owning read-service' keep shape). Kept on the store."
     }
   ],
   "seam_test": {

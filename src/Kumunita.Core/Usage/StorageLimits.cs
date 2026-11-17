@@ -17,6 +17,20 @@ public static class StorageLimits
         long envMaxBytes) => settings.MaxFileBytes ?? envMaxBytes;
 
     /// <summary>
+    /// IMPROVE-UX A15 — the **effective** per-user quota for a resident:
+    /// <c>override ?? settings.PerUserQuotaBytes</c>. A <c>null</c> (unset)
+    /// override falls back to the global quota; an override of <c>0</c> =
+    /// unlimited **for that resident** (the C-UP·5 sentinel preserved per
+    /// resident, distinct from the unset <c>null</c>); an override <c>&gt; 0</c>
+    /// = that resident's cap, winning over the global. Pure — no DB, no session
+    /// (C-UP·3). The per-file cap (<see cref="EffectiveMaxFileBytes"/>) is
+    /// independent and untouched.
+    /// </summary>
+    public static long EffectivePerUserQuota(long? perUserQuotaOverride,
+        CommunityStorageSettings settings)
+        => perUserQuotaOverride ?? settings.PerUserQuotaBytes;
+
+    /// <summary>
     /// Size checked **first** (C-UP·2 ordering — test 10): over the effective
     /// max → <see cref="StorageDecision.Oversize"/> (F2); else over the
     /// per-user quota → <see cref="StorageDecision.OverQuota"/> (F3); else
@@ -24,12 +38,32 @@ public static class StorageLimits
     /// </summary>
     public static StorageDecision Decide(long incomingBytes, long currentUsageBytes,
         CommunityStorageSettings settings, long envMaxBytes)
+        => Decide(incomingBytes, currentUsageBytes, settings, envMaxBytes,
+            perUserQuotaOverride: null);
+
+    /// <summary>
+    /// IMPROVE-UX A15 — the same pure decision with an explicit **per-resident
+    /// quota override** (the <see cref="EffectivePerUserQuota"/> resolution):
+    /// <paramref name="perUserQuotaOverride"/> <c>null</c> ⇒ the global
+    /// <see cref="CommunityStorageSettings.PerUserQuotaBytes"/>; <c>0</c> ⇒
+    /// unlimited for that resident; <c>&gt; 0</c> ⇒ that resident's cap. The
+    /// per-file cap (<see cref="EffectiveMaxFileBytes"/>) is untouched. This is
+    /// the single place the <c>override ?? global</c> effective quota is folded
+    /// into the decision (the loop's heart, resolved once in the upload gate).
+    /// </summary>
+    public static StorageDecision Decide(long incomingBytes, long currentUsageBytes,
+        CommunityStorageSettings settings, long envMaxBytes, long? perUserQuotaOverride)
     {
         var effectiveMax = EffectiveMaxFileBytes(settings, envMaxBytes);
         if (effectiveMax > 0 && incomingBytes > effectiveMax)
             return StorageDecision.Oversize;
-        if (settings.PerUserQuotaBytes > 0
-            && currentUsageBytes + incomingBytes > settings.PerUserQuotaBytes)
+
+        // IMPROVE-UX A15 — resolve the effective per-user quota (override ??
+        // global) **before** the quota check; a 0 effective quota = unlimited
+        // (the C-UP·5 sentinel), exactly as the global quota already reads.
+        var effectiveQuota = EffectivePerUserQuota(perUserQuotaOverride, settings);
+        if (effectiveQuota > 0
+            && currentUsageBytes + incomingBytes > effectiveQuota)
             return StorageDecision.OverQuota;
         return StorageDecision.Allowed;
     }

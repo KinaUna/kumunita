@@ -14,7 +14,7 @@ namespace Kumunita.Core.Tests;
 /// a fresh scratch database per test, the M1/M3/M4 doc surfaces registered
 /// alongside <see cref="UsageDocTypes"/>, rows planted via a write session.
 /// </summary>
-public class UsageAnalyticsServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class UsageAnalyticsServiceTests(PostgresFixture fixture)
 {
     private static int _plantCounter;
 

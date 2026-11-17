@@ -6,9 +6,11 @@ namespace Kumunita.Core.Tests;
 
 /// <summary>
 /// One shared postgres:18 container (matches the repo's docker-compose dev image) per test
-/// class. Each test method is handed a connection string to a *fresh scratch database* so
-/// no test clobbers another's schema state — critical because both <c>IsPristineAsync</c>
-/// and <c>KumunitaFeature</c> read/modify the live Postgres catalog.
+/// *assembly* (one shared container; each test method still gets a fresh scratch database
+/// via <c>NewDatabaseAsync</c>). That fresh-database hand-off is what keeps parallel classes
+/// from clobbering each other's schema state — critical because both <c>IsPristineAsync</c>
+/// and <c>KumunitaFeature</c> read/modify the live Postgres catalog. <c>max_connections</c>
+/// is raised because many classes now share the one server.
 /// </summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
@@ -23,6 +25,21 @@ public sealed class PostgresFixture : IAsyncLifetime
             .WithDatabase("kumunita")
             .WithUsername("kumunita")
             .WithPassword("kumunita")
+            // Parallel classes share one server (per-assembly fixture). Every test class
+            // carries its own scratch-DB connection string, hence its own Npgsql pool, and
+            // pooled connections linger — so the ceiling must cover the *whole* assembly's
+            // pool footprint (≈154 classes), not just the classes running at once. 300
+            // (DX07, sized for its 5-class proof) is crossed as the later classes spin up
+            // pools → "53300: too many clients already". 4000 clears that demand (verified:
+            // no 53300 at 4000) — the host has 46 GB / 32 cores (ADR 0307 §D2).
+            //
+            // dynamic_shared_memory_type=sysv is the other half of the fix: at 4000 the
+            // default `posix` per-backend shared memory (~32 MB each) no longer fits in
+            // Docker's default 64 MB /dev/shm → "53100: could not resize shared memory
+            // segment … No space left on device". sysv routes it to the host kernel SHM
+            // (kernel.shmmax ≈ 18 EB here) instead. Together: a ceiling that covers the
+            // shared pool demand, backed by shared memory that isn't capped by /dev/shm.
+            .WithCommand("-c", "max_connections=4000", "-c", "dynamic_shared_memory_type=sysv")
             .Build();
 
         await _container.StartAsync();

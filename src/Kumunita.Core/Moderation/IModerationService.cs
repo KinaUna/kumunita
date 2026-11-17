@@ -1,3 +1,4 @@
+using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -48,6 +49,42 @@ public interface IModerationService
         CancellationToken ct = default);
 
     /// <summary>
+    /// The moderation queue's <b>open-report count</b> (IMPROVE-UX A06 — the
+    /// account-nav badge's read seam): the number of reports in the actor's
+    /// scoped queue whose <c>Status</c> is <c>"filed"</c>, <c>"assigned"</c>,
+    /// or <c>"unlocked"</c> (a <c>"resolved"</c> report is done — not open).
+    /// <para>
+    /// The <b>same scoped query</b> <see cref="GetQueueAsync"/> uses
+    /// (GlobalAdmin → every report; standing-moderator → reports on their
+    /// <see cref="ModeratorAssignment"/> components with
+    /// <c>Component.ModeratorAccess</c> ON; a plain resident → no reports —
+    /// the C-M3b·4 SoD display-level projection). The badge's count is
+    /// <b>provably equal</b> to
+    /// <c>GetQueueAsync(...).Rows.Where(r =&gt; r.Status is
+    /// "filed" or "assigned" or "unlocked").Count()</c> for the same actor
+    /// in the same window — a test pins this (A06-1).
+    /// </para>
+    /// <para>
+    /// A <b>read lane</b>, not a decision lane (the
+    /// <see cref="GetQueueAsync"/> / <see cref="GetDetailAsync"/> shape):
+    /// no <see cref="IAuthorizationService.CanAsync"/> call, no
+    /// <c>AccessAudit</c> row. The lean count query (two narrow
+    /// <c>Marten</c> reads — the <c>ModeratorAssignment</c> +
+    /// <c>Component.ModeratorAccess</c> reads, then a <c>Report</c> count
+    /// scoped to the result) replaces the full per-row resolution
+    /// <see cref="GetQueueAsync"/> does (the reporter / reply / target
+    /// names + the component name), so the nav badge on every
+    /// authenticated request does not pay the queue page's DB cost
+    /// (the A06 "the badge does not double the queue's DB load" pin).
+    /// </para>
+    /// </summary>
+    Task<int> CountOpenReportsAsync(
+        string actorId,
+        bool isGlobalAdmin,
+        bool isStanding,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// The <c>GET /moderation/{id}</c> detail (the controller's
     /// <c>Resolve</c> body minus the shape mapping): the report + its
     /// resolved target (post, or event / project / board / todo /
@@ -64,6 +101,45 @@ public interface IModerationService
     /// </summary>
     Task<ModerationDetailReadModel> GetDetailAsync(
         string reportId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The reporter's <c>My reports</c> read (IMPROVE-UX R05 — the D1 "My
+    /// reports" shape the <c>MyReportRow</c> record models): the content
+    /// reports <paramref name="reporterId"/> filed (where
+    /// <see cref="Kumunita.Core.Posts.Report.ReporterId"/> == the
+    /// reporter's id), newest-first (<c>At</c> desc), each row carrying the
+    /// report's context (<c>PostId</c> / <c>ComponentId</c> /
+    /// <c>Reason</c> / <c>At</c>), its status, and the R03 resolution shape
+    /// (<see cref="Kumunita.Core.Posts.Report.Outcome"/> +
+    /// <see cref="Kumunita.Core.Posts.Report.ResolutionNote"/> +
+    /// <see cref="Kumunita.Core.Posts.Report.ResolvedAt"/> /
+    /// <see cref="Kumunita.Core.Posts.Report.ResolvedBy"/> — all four
+    /// <c>null</c> until the <c>ResolveReportAsync</c> lane writes them).
+    /// <para>
+    /// The row's <c>TargetTitle</c> is the target's title (the ADR 0173
+    /// <c>TargetKind</c> switch the <c>GetDetailAsync</c> read seam uses),
+    /// resolved the same way — **but gated on the reporter's visibility**:
+    /// for a <b>post</b> target (the original M3b shape,
+    /// <c>TargetKind == null</c>) the title is shown only while the reporter
+    /// can still read the post (a <c>null</c> <c>Post</c> in the
+    /// <see cref="Kumunita.Core.Posts.PostDetailResult"/> — denied / hidden /
+    /// removed / deleted — means no title, the R05 DoD "target no longer
+    /// visible → no title" pin). For the other target kinds (event / project
+    /// / board / todo / grouppost) the title is resolved directly (their
+    /// visibility rules are out of scope for R05 — the plan is posts-first,
+    /// A02).
+    /// </para>
+    /// <para>
+    /// A **read, not a decision** (the <c>GetQueueAsync</c> /
+    /// <c>GetDetailAsync</c> precedent): the report is the reporter's own;
+    /// the read is a list, not a scoped-read gate — no
+    /// <see cref="IAuthorizationService"/> call, no <c>AccessAudit</c> row.
+    /// Returns an empty list when the reporter filed no reports.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<MyReportRow>> ListMyReportsAsync(
+        string reporterId,
         CancellationToken ct = default);
 
     /// <summary>
@@ -166,10 +242,52 @@ public interface IModerationService
     /// flag-flip inside that method is unchanged). Throws
     /// <see cref="KeyNotFoundException"/> when the report is absent
     /// (the controller maps to a 404).
+    /// <para>
+    /// IMPROVE-UX R03 — the optional <paramref name="outcome"/> /
+    /// <paramref name="resolutionNote"/> pair (both <c>null</c> by
+    /// default, so the pre-R03 two-parameter call shape — the
+    /// <c>ModerationController</c>'s <c>ResolvePost</c> action — keeps
+    /// compiling unchanged). When supplied, the lane writes them onto
+    /// the <see cref="Kumunita.Core.Posts.Report"/> row (the R03
+    /// resolution shape: <see cref="Kumunita.Core.Posts.Report.Outcome"/>
+    /// + <see cref="Kumunita.Core.Posts.Report.ResolutionNote"/>
+    /// + <see cref="Kumunita.Core.Posts.Report.ResolvedAt"/> +
+    /// <see cref="Kumunita.Core.Posts.Report.ResolvedBy"/>) in the
+    /// same transaction as the lane's existing
+    /// <c>AccessAudit</c> row — which is **unchanged** (the R03 pin:
+    /// same shape, same action/target).
+    /// </para>
     /// </summary>
     Task ResolveReportAsync(
         string reportId,
         string globalAdminId,
+        Kumunita.Core.Posts.ReportOutcome? outcome = null,
+        string? resolutionNote = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The committed <c>Unhide</c> lane (IMPROVE-UX A03 — the reversible
+    /// lever that completes the moderation loop: a moderator who hid a post
+    /// via the <c>ResolvePost</c> outcome-execution lane can reverse the
+    /// decision from the resolved report page without a fresh report).
+    /// Opens its own <see cref="Marten.IDocumentSession"/>, loads the
+    /// <see cref="Kumunita.Core.Posts.Report"/> row for the report's
+    /// <c>PostId</c>, and delegates to the Posts context's
+    /// <c>PostService.UnhidePostAsync</c> (the <c>HidePostAsync</c> inverse
+    /// — the <see cref="Kumunita.Core.Authorization.AccessAction.Moderate"/>
+    /// -gated write lane, the same-transaction C3 shape as
+    /// <see cref="ResolveReportAsync"/>) — one <c>SaveChangesAsync</c>.
+    /// Throws <see cref="KeyNotFoundException"/> when the report or the
+    /// target post is absent (the controller maps to 404). The Posts
+    /// context's <c>UnhidePostAsync</c> throws its own
+    /// <see cref="KeyNotFoundException"/> when the post id is missing;
+    /// the seam's report read runs first, so the report's
+    /// <see cref="KeyNotFoundException"/> is the controller's 404 pin
+    /// (the non-leaky shape, the <c>ResolveReportAsync</c> precedent).
+    /// </summary>
+    Task UnhidePostAsync(
+        string reportId,
+        string actorId,
         CancellationToken ct = default);
 
     /// <summary>

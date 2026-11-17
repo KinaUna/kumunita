@@ -139,7 +139,7 @@ public sealed class GroupPostService : IGroupPostService
         await using var session = _store.QuerySession();
         IQueryable<Post> q = session
             .Query<Post>()
-            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft);
+            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active);
 
         var candidates = await OrderByPostSort(q, sort)
             .Skip((page - 1) * ps)
@@ -157,7 +157,7 @@ public sealed class GroupPostService : IGroupPostService
         // post-filter), one CountAsync over the same filtered query.
         int candidateCount = await session
             .Query<Post>()
-            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft)
+            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active)
             .CountAsync()
             .ConfigureAwait(false);
 
@@ -247,6 +247,26 @@ public sealed class GroupPostService : IGroupPostService
         if (!decision.Allowed)
             // Deny ⇒ Post = null, no replies (Web 404 — G·3/G·4); the row was
             // written (C3).
+            return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+        // A01 (IMPROVE-UX, the E1/E2 leak fix) — the group-lane reads honour
+        // <see cref="PostStatus"/>. A <see cref="PostStatus.Hidden"/> /
+        // <see cref="PostStatus.Removed"/> group post is served to its **author**
+        // only (the "hidden by a moderator" placeholder); any other member gets
+        // the same <c>Post = null</c> fail-closed shape as a membership Deny
+        // (the Web 404 — the repo's "404 leaks which ids are real" pin). The
+        // group lane's membership decision has no <c>Moderator</c> branch
+        // (G·4: membership is the sole decision), so a moderator reaches a
+        // hidden group post through the report lane's independent
+        // <c>LoadAsync&lt;Post&gt;</c> (<see cref="ModerationService
+        // .LoadReportTargetResourceAsync"/>) — not through this seam. The feeds
+        // + search already exclude non-Active (the candidate filter above);
+        // this is the detail-lane half of the same rule. The method's existing
+        // return-null contract is preserved (no <see cref="KeyNotFoundException"/>
+        // — the call sites that check <c>Post is null</c> already map to the
+        // fail-closed shape).
+        if (post.Status != PostStatus.Active
+            && !string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
             return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
 
         // G·7 — the reply list is returned **as-is** under the parent's single

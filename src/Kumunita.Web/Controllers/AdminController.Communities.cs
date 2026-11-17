@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Pages;
+using Kumunita.Core.Usage;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -243,6 +244,13 @@ public partial class AdminController
             return NotFound();
 
         var mySubject = AdminSubjectId(User);
+        // IMPROVE-UX A15 — the per-resident quota override card (the admin half
+        // of the storage loop): the resident's current override, the effective
+        // quota (override ?? global), the community-wide global, and their
+        // usage. Null-tolerant (a test harness with no IStorageSettingsService
+        // renders the card with its zero/empty defaults; the app always has the
+        // seam — DI supplies it).
+        var storageCard = await BuildStorageOverrideCardAsync(subjectId);
         return View(new AdminAccountManageViewModel
         {
             Account     = account,
@@ -250,8 +258,128 @@ public partial class AdminController
             Communities = communityRows,
             IsSelf      = mySubject is not null
                           && string.Equals(mySubject, subjectId, StringComparison.Ordinal),
-            DisabledCommunityIds = communityRows.Where(c => !c.Enabled).Select(c => c.Id).ToList()
+            DisabledCommunityIds = communityRows.Where(c => !c.Enabled).Select(c => c.Id).ToList(),
+            // ── A15 override card ───────────────────────────────────────────
+            QuotaOverrideBytes    = storageCard.OverrideBytes,
+            EffectiveQuotaBytes   = storageCard.EffectiveQuotaBytes,
+            EffectiveQuotaUnlimited = storageCard.EffectiveQuotaUnlimited,
+            UsedBytes             = storageCard.UsedBytes,
+            GlobalQuotaBytes      = storageCard.GlobalQuotaBytes,
+            QuotaOverrideInput    = storageCard.OverrideInput,
+            UsedHuman             = ResidentStorageViewModel.FormatBytes(storageCard.UsedBytes),
+            EffectiveQuotaHuman   = storageCard.EffectiveQuotaUnlimited ? "Unlimited"
+                                : ResidentStorageViewModel.FormatBytes(storageCard.EffectiveQuotaBytes),
+            GlobalQuotaHuman      = storageCard.GlobalQuotaBytes == 0 ? "Unlimited"
+                                : ResidentStorageViewModel.FormatBytes(storageCard.GlobalQuotaBytes)
         });
+    }
+
+    // ── A15 — the storage override card read (the Manage detail page) ────────
+    // Composes the resident's current override (GetResidentQuotaOverrideAsync),
+    // the community settings (GetOrCreateAsync — the global per-user quota) and
+    // their usage (GetPerUserUsageBytesAsync, the C-SM·7 seam) into the
+    // effective-quota card. The effective quota is override ?? global (the
+    // C-UP·5 sentinel preserved per-resident: unset ⇒ global, 0 ⇒ unlimited for
+    // the resident). Null-tolerant: a harness with no IStorageSettingsService
+    // yields the zero/empty defaults (the card renders empty, no NRE).
+    private async Task<(
+        long? OverrideBytes, long EffectiveQuotaBytes, bool EffectiveQuotaUnlimited,
+        long UsedBytes, long GlobalQuotaBytes, string OverrideInput)>
+        BuildStorageOverrideCardAsync(string subjectId)
+    {
+        var defaults = (
+            OverrideBytes: (long?)null, EffectiveQuotaBytes: 0L,
+            EffectiveQuotaUnlimited: true, UsedBytes: 0L,
+            GlobalQuotaBytes: 0L, OverrideInput: string.Empty);
+        if (storageSettings is null)
+            return defaults;
+
+        // Three independent reads (override + settings + usage) — start both
+        // reads that don't depend on each other, then await.
+        var overrideTask = storageSettings.GetResidentQuotaOverrideAsync(subjectId, CancellationToken.None);
+        var settingsTask = storageSettings.GetOrCreateAsync(CancellationToken.None);
+        var usageTask    = storageSettings.GetPerUserUsageBytesAsync(subjectId, CancellationToken.None);
+        long? overrideBytes = await overrideTask;
+        var settings = await settingsTask;
+        long usage = await usageTask;
+
+        var globalQuota = settings.PerUserQuotaBytes;
+        // A15 effective quota: override ?? global (the loop's heart).
+        var effectiveQuota = StorageLimits.EffectivePerUserQuota(overrideBytes, settings);
+        // The form pre-fill (MiB): blank = no override (clear → global); "0" =
+        // the per-resident unlimited sentinel; else the cap in whole MiB.
+        var overrideInput = overrideBytes is null
+            ? string.Empty
+            : overrideBytes == 0
+                ? "0"
+                : (overrideBytes.Value / (1024L * 1024L)).ToString();
+        return (overrideBytes, effectiveQuota, effectiveQuota == 0,
+            usage, globalQuota, overrideInput);
+    }
+
+    // ── A15 — set / clear the per-resident quota override ────────────────────
+    // The admin write half of the storage loop (A14's "request more space"
+    // nudge points at this action). POST /admin/accounts/{subjectId}/quota.
+    // Value semantics (the AdminStorageController.Save C-UP·5 shape): a **blank**
+    // input ⇒ **clear** the override (back to the community default); <c>0</c> ⇒
+    // unlimited for this resident (the per-resident sentinel); a whole MiB
+    // number ⇒ the cap. The actor is the signed-in admin (SubjectId(User)); the
+    // target is the route subjectId. GlobalAdmin-gated at this boundary (the
+    // class-level [Authorize(Roles=GlobalAdmin)] — the ADR 0050 split: the Core
+    // lane does not re-check standing). Flash-redirect back to the detail page
+    // (the AdminStorageController.Save / SetRole shape).
+    [Route("admin/accounts/{subjectId}/quota")]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetStorageQuotaOverride(string subjectId, string? quotaMiBInput)
+    {
+        // In the app the IStorageSettingsService is always DI-supplied (the seam
+        // is registered by AddUsage); the null-tolerance below is the
+        // harness-only guard (a test constructing the controller without the
+        // seam). The write delegates to the committed lane (one in-caller-
+        // session write, the ADR 0050 split — standing is gated at this
+        // boundary, the Core lane does not re-check it).
+        var back = $"/admin/accounts/{subjectId}";
+        var actor = AdminSubjectId(User) ?? string.Empty;
+
+        // C-UP·5 value semantics (MiB input, converted to bytes): blank ⇒ clear
+        // (null); "0" ⇒ the per-resident unlimited sentinel; else the cap in
+        // whole MiB. A negative or non-numeric value is rejected (flash back).
+        long? quotaBytes;
+        if (string.IsNullOrWhiteSpace(quotaMiBInput))
+        {
+            quotaBytes = null;   // clear → back to the community default
+        }
+        else if (quotaMiBInput == "0")
+        {
+            quotaBytes = 0;      // unlimited for this resident
+        }
+        else if (long.TryParse(quotaMiBInput, out var miB) && miB > 0)
+        {
+            quotaBytes = miB * 1024L * 1024L;
+        }
+        else
+        {
+            TempData["error"] = await this.FlashAsync(
+                "admin.flash_storage_override_invalid",
+                "The quota override must be a whole number of MiB, 0 for unlimited, or left blank to use the community default.");
+            return Redirect(back);
+        }
+
+        // In the app storageSettings is always DI-supplied (registered by
+        // AddUsage); the `!` is the harness-only guard (a test without the seam).
+        await storageSettings!.SetResidentQuotaOverrideAsync(subjectId, quotaBytes, actor);
+
+        var flashKey = quotaBytes is null
+            ? "admin.flash_storage_override_cleared"
+            : "admin.flash_storage_override_saved";
+        var flashText = quotaBytes is null
+            ? "Quota override cleared — this account uses the community default."
+            : quotaBytes == 0
+                ? "This account's quota is now unlimited."
+                : "Quota override saved.";
+        TempData["info"] = await this.FlashAsync(flashKey, flashText);
+        return Redirect(back);
     }
 
     // ── Shared assembly for Index and Manage ──────────────────────────────

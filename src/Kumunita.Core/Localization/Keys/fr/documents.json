@@ -48,5 +48,7 @@
   "documents.folder_flash_created": "Dossier cr\u00E9\u00E9.",
   "documents.folder_flash_renamed": "Dossier renomm\u00E9.",
   "documents.folder_flash_moved": "Dossier d\u00E9plac\u00E9.",
-  "documents.folder_flash_deleted": "Dossier supprim\u00E9."
+  "documents.folder_flash_deleted": "Dossier supprim\u00E9.",
+  "documents.empty_title": "Aucun document pour l\u0027instant.",
+  "documents.deleted_empty_title": "Aucun document supprim\u00E9."
 }

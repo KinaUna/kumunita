@@ -246,7 +246,15 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
                 Notifications.NotificationKinds.GroupAdded,
                 $"notification:{Notifications.NotificationKinds.GroupAdded}:{groupId}:{userId}",
                 group.Name,
-                CancellationToken.None).ConfigureAwait(false);
+                // IMPROVE-UX R09 (E14): the inbox row lands the resident on the
+                // group. `targetId` enables the ADR 0084 per-target subscription
+                // gate (opt-out kind → enabled by default, so the row is still
+                // stored); `linkPath` is stored on the row + rendered as the
+                // clickable destination. `ct:` must stay **named** (a positional
+                // token here would bind to the acceptPath/declinePath slots).
+                targetId: groupId,
+                linkPath: $"/groups/{groupId}",
+                ct: CancellationToken.None).ConfigureAwait(false);
         }
 
         await session.SaveChangesAsync().ConfigureAwait(false);

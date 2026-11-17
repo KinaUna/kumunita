@@ -24,7 +24,7 @@
   "community.translations_none": "Ingen endnu",
   "community.translations_page_title": "Overs\u00E6ttelser",
   "community.translations_page_lede": "Navn og beskrivelse af dette f\u00E6llesskab p\u00E5 andre sprog.",
-  "community.translations_view_only": "Du kan se overs\u00E6ttelserne; kun en GlobalAdmin eller en Overs\u00E6tter kan tilf\u00F8je, redigere eller fjerne dem.",
+  "community.translations_view_only": "Du kan se overs\u00e6ttelserne; kun en administrator eller en Overs\u00e6tter kan tilf\u00f8je, redigere eller fjerne dem.",
   "community.translation_add": "Tilf\u00F8j",
   "community.translation_name_label": "Navn",
   "community.translation_desc_label": "Beskrivelse",

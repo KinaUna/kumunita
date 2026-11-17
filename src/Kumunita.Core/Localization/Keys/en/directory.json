@@ -2,6 +2,7 @@
   "directory.title": "Directory",
   "directory.lead": "Everyone in the neighborhood \u2014 every resident on the platform.",
   "directory.empty": "No residents on this neighborhood yet.",
+  "directory.empty_title": "No residents yet.",
   "directory.no_results": "No residents match your search.",
   "directory.search": "Search",
   "directory.verified_only": "Verified only",

@@ -38,5 +38,6 @@
   "pn.folder.new": "Nouveau dossier",
   "pn.folder.rename": "Renommer le dossier",
   "pn.folder.delete": "Supprimer le dossier",
-  "pn.folder.empty": "Aucune note dans ce dossier pour l\u0027instant."
+  "pn.folder.empty": "Aucune note dans ce dossier pour l\u0027instant.",
+  "pn.list.empty_title": "Aucune note pour l\u0027instant."
 }

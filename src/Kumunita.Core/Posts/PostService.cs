@@ -229,7 +229,7 @@ public partial class PostService
         await using var session = _store.QuerySession();
         IQueryable<Post> q = session
             .Query<Post>()
-            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft);
+            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active);
 
         var candidates = await OrderByPostSort(q, sort)
             .Skip((page - 1) * ps)
@@ -248,7 +248,7 @@ public partial class PostService
         // page's window is non-empty here, so the component has candidates).
         int candidateCount = await session
             .Query<Post>()
-            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft)
+            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active)
             .CountAsync()
             .ConfigureAwait(false);
 
@@ -310,7 +310,7 @@ public partial class PostService
         await using var session = _store.QuerySession();
         IQueryable<Post> q = session
             .Query<Post>()
-            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft);
+            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active);
 
         var candidates = await OrderByPostSort(q, sort)
             .Skip((page - 1) * ps)
@@ -328,7 +328,7 @@ public partial class PostService
         // post-filter), one CountAsync over the same filtered query.
         int candidateCount = await session
             .Query<Post>()
-            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft)
+            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft && p.Status == PostStatus.Active)
             .CountAsync()
             .ConfigureAwait(false);
 
@@ -398,6 +398,30 @@ public partial class PostService
             // C-M3·1 / F10 — a Deny short-circuits at the parent: replies not
             // evaluated, not loaded for rendering, no reply row at all.
             return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+        // A01 (IMPROVE-UX, the E1/E2 leak fix) — the reads honour
+        // <see cref="PostStatus"/>. A <see cref="PostStatus.Hidden"/> /
+        // <see cref="PostStatus.Removed"/> post is no longer served to an
+        // ordinary reader who reaches it by a direct <c>/posts/{id}</c> URL:
+        // the **author** (the "owner branch" — they see the "hidden by a
+        // moderator" placeholder, the ADR 0024 author-sees-its-own-deleted-post
+        // precedent) and a **moderator** (the report lane's hide/remove/unhide
+        // lever) / break-glass still see it; any other reader gets the same
+        // <c>Post = null</c> fail-closed shape as a Deny (the Web 403 / R01·R02
+        // status page — the repo's "403 on denied, 404 leaks which ids are real"
+        // pin). The feeds + search already exclude non-Active (the candidate
+        // filter above); this is the detail-lane half of the same rule. The
+        // method's existing return-null contract (not a
+        // <see cref="KeyNotFoundException"/>) is preserved: the ~25 call sites
+        // that check <c>Post is null</c> already map to the fail-closed shape,
+        // and a hidden post must not leak *which* id was real (a 404 would).
+        if (post.Status != PostStatus.Active)
+        {
+            var privileged = string.Equals(post.AuthorId, actorId, StringComparison.Ordinal)
+                || decision.Via is AccessVia.Moderator or AccessVia.BreakGlass;
+            if (!privileged)
+                return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+        }
 
         // C-M3·1 — the reply list is returned **as-is** under the parent's single
         // decision: no second authorization evaluation, no per-reply audit row.
@@ -1245,6 +1269,49 @@ public partial class PostService
         if (decision.Allowed)
         {
             post.Status = PostStatus.Hidden;
+            post.Modified = DateTimeOffset.UtcNow;
+            session.Store(post);
+        }
+
+        // One SaveChangesAsync — the C3 same-transaction lane (ADR 0006-E): the
+        // audit row and (if Allowed) the Status write commit atomically.
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Unhide a post (A03; the inverse of <see cref="HidePostAsync"/> —
+    /// restores a hidden post to the feed). Same
+    /// <see cref="AccessAction.Moderate"/>-gated write-lane shape as
+    /// <see cref="HidePostAsync"/> / <see cref="RemovePostAsync"/>: the
+    /// <c>CanAsync(Moderate)</c> decision runs **before** any write, in the
+    /// **same** <c>IDocumentSession</c> transaction as the <c>Status</c>
+    /// write (C3 same-transaction; ADR 0006-C: audit always on — Allow
+    /// *and* Deny); a denied call is **not executed at all** (no
+    /// <c>Status</c> write, no partial state) — the audit row still commits
+    /// in the caller's <c>SaveChangesAsync</c> (C3). Does **not** undo a
+    /// <see cref="PostStatus.Removed"/> post (the F4 hard lane is
+    /// irreversible by design — a <c>Removed</c> post stays
+    /// <c>Removed</c>; the reversible lever only reverses <c>Hidden</c>).
+    /// </summary>
+    public async Task UnhidePostAsync(string postId, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("A moderating actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to unhide.");
+
+        // C3 / ADR 0006-C — audit row always written (Allow or Deny), in the
+        // caller's transaction. The decision gate runs *before* any write.
+        var decision = await _authz.CanAsync(actorId, AccessAction.Moderate,
+                new PostToAuditableResource(post), session)
+            .ConfigureAwait(false);
+
+        if (decision.Allowed)
+        {
+            post.Status = PostStatus.Active;
             post.Modified = DateTimeOffset.UtcNow;
             session.Store(post);
         }

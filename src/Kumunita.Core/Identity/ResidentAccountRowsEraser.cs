@@ -1,5 +1,6 @@
 using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Events;
+using Kumunita.Core.Kiosk;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Sessions;
 using Kumunita.Core.Usage;
@@ -74,6 +75,9 @@ public static class ResidentAccountRowsEraser
         typeof(ErrorReport),                  // IS23 — block 10: pseudonymized (SubjectId → tombstone, ContactEmail → null)
         typeof(EscalationToken),              // IS23 — block 11: pseudonymized (CreatedBy → tombstone)
         typeof(UsageEvent),                   // IS23 — block 12: pseudonymized (ActorId → tombstone)
+        typeof(DeletionRequest),              // ADR 0301 (R11) — block 13: the pending self-delete request (never exportable; erased with the account, the GuardianLink shape)
+        typeof(KioskLink),                    // ADR 0302 (R15) — block 14: the shared kiosk link credential (owner-scoped, never exportable; erased with the owner account, the DeletionRequest shape — the R19 SEC review confirms this seam)
+        typeof(Invitation),                   // ADR 0304 (A07) — block 15: the email invitation credential (inviter-scoped, never exportable; erased with the inviter's account, the KioskLink shape — the ADR 0304 D7 erasure rule)
     };
 
     /// <summary>
@@ -119,6 +123,9 @@ public static class ResidentAccountRowsEraser
         touched += await PseudonymizeErrorReportsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
         touched += await PseudonymizeEscalationTokensAsync(session, residentSubjectId, ct).ConfigureAwait(false);
         touched += await PseudonymizeUsageEventsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseDeletionRequestAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseKioskLinksAsync(session, residentSubjectId, ct).ConfigureAwait(false);
+        touched += await EraseInvitationsAsync(session, residentSubjectId, ct).ConfigureAwait(false);
 
         if (logger is not null)
         {
@@ -346,6 +353,57 @@ public static class ResidentAccountRowsEraser
             row.ActorId = tombstone;
             session.Store(row);
         }
+        return rows.Count;
+    }
+
+    // 13. DeletionRequest — the pending self-delete request row (ADR 0301,
+    //     IMPROVE-UX R11). Owner field: SubjectId (identity). [DataClass]
+    //     Delete (R11 — never exportable, erased with the account): the
+    //     resident's own pending request must not survive the deletion
+    //     (either the due-job already ran it — the row is Executed — or the
+    //     deletion came through the admin / guardian lane and the resident
+    //     never ran it).
+    private static async Task<int> EraseDeletionRequestAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<DeletionRequest>()
+            .Where(r => r.SubjectId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 14. KioskLink — the shared kiosk link credential (ADR 0302, IMPROVE-UX R15).
+    //     Owner field: OwnerSubjectId (the resident who created it). [DataClass]
+    //     Delete (ADR 0302 — an owner credential, never exportable): the link's
+    //     token hash must not survive the owner's deletion (the R19 SEC review
+    //     confirms this eraser seam, the DeletionRequest / IdentityToken shape).
+    private static async Task<int> EraseKioskLinksAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<KioskLink>()
+            .Where(l => l.OwnerSubjectId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
+        return rows.Count;
+    }
+
+    // 15. Invitation — the email invitation credential (ADR 0304, IMPROVE-UX A07).
+    //     Owner field: InviterSubjectId (the resident/admin who created it).
+    //     [DataClass] Delete (ADR 0304 D7 — a sign-up credential, never
+    //     exportable): the token hash must not survive the inviter's deletion
+    //     (the KioskLink / IdentityToken / EscalationToken credential shape —
+    //     the ADR 0304 D1 Secret-kind row).
+    private static async Task<int> EraseInvitationsAsync(
+        IDocumentSession session, string residentSubjectId, CancellationToken ct)
+    {
+        var rows = await session.Query<Invitation>()
+            .Where(i => i.InviterSubjectId == residentSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            session.Delete(row);
         return rows.Count;
     }
 }

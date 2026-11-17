@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "generated": "2026-11-13T00:00:00Z",
+  "generated_from": "IMPROVE-DEVX DX01 — baseline from the plan's Evidence table (plan-improve-devx.md, '## Evidence / starting numbers'), live-computed where the tree drifted since the plan's 2026-11-09 measurement",
+  "notes": [
+    "shrink_only values may only go DOWN as the lane lands its units; raising one needs an adr: reason (the C00 ratchet shape, copied).",
+    "The plan's 2026-11-09 numbers are kept as 'plan' alongside the live 'value' so DX35's before→after table reads both.",
+    "CI seconds and the cold-start numbers are recorded (CI runs 2026-10-27…10-31; a measured agent session), not computed from the tree.",
+    "Drift: the plan's DX02 named 'ADR 0300' — that number is taken (0300-issue-resolved-notification.md); the ADR lands as 0307."
+  ],
+  "rules": {
+    "iclassfixture_classes": {
+      "value": 1,
+      "core": 1,
+      "web": 0,
+      "plan": 181,
+      "plan_breakdown": "147 Core + 34 Web (E2, 2026-11-09)",
+      "shrink_only": true,
+      "source": "E2 — one postgres:18 container per test class. DX07/DX08/DX09 landed: Core = 1 = the DX06 allowlist class only (F22_AppRoleCannotDropSchemaTests, server-scoped); Web = 0 = fully converted (DX09) — no Web allowlist (the DX06 triage found no server-scoped Web tests). 0 = Web fully converted (DX09); Core = 1 = the DX06 allowlist class only (DX08).",
+      "gate": "DX08+DX09 — devx-check, iclassfixture: Core files declaring IClassFixture<PostgresFixture> ⊆ the DX06 allowlist AND iclassfixture-web: the Web set is empty (rules landed 1 → 3)"
+    },
+    "test_files": {
+      "value": 413,
+      "plan": 381,
+      "shrink_only": false,
+      "source": "E9 — all *.cs under tests/Kumunita.Core.Tests + tests/Kumunita.Web.Tests (obj/ and bin/ excluded as build artifacts). Not shrink-only: new tests are expected; the layout rules (root/lane-named) are the shrink-only gates.",
+      "gate": "none (informational; see test_files_at_project_root, lane_named_test_files)"
+    },
+    "test_files_at_project_root": {
+      "value": 142,
+      "plan": 343,
+      "shrink_only": true,
+      "source": "E9 — test files at the project root (not in a context/controller subfolder). DX25–DX29 moved all 227 non-_Shared/ root files into context folders; 142 cross-cutting (_Shared/) tests remain at the root (Core 78 + Web 64) — the honest floor, not 0 (those tests reference multiple or no single context, so D5's single-folder-per-file rule correctly maps them to _Shared/).",
+      "gate": "DX30 — devx-check, test-files-at-root ≤ 142 (shrink-only from 369; the honest floor recorded with its reason per the plan's D2 DoD)"
+    },
+    "lane_named_test_files": {
+      "value": 16,
+      "plan": 17,
+      "shrink_only": true,
+      "source": "E9 — test files named by lane/unit (F22_…, LS_U04_…, ADR_0044_…). Live count is 16 (one was renamed between the plan's measurement and DX01). Target 0 (DX23).",
+      "gate": "DX23 — devx-check, lane-coded test file names baseline 0"
+    },
+    "lane_code_hits": {
+      "value": 12231,
+      "plan": 3391,
+      "shrink_only": true,
+      "source": "E11 — lane/unit codes in src/test comments. Re-baselined at DX32 (2026-11-16) to the live count under the CANONICAL regex `\\b(?:F|U|C|IS|LS|R|A|O|GP|UPL)[0-9]{1,2}[Uu]?[0-9]*(?:-[0-9]+)?\\b` (D-excluded, pinned in devx-report.ps1 E11; devx-check rule 13 uses the same). The plan's 3391 (2026-11-09) was measured with an unpinned regex and is superseded; the ~16 554 candidate count is the D-decision-ref over-count (a `D<n>` in src/tests is an ADR-decision ref like `ADR 0307, D1`, the desired form), the real lane-code count is 12231. Shrink-only: it may only go down; raising needs an adr: reason.",
+      "gate": "DX32 — devx-check rule 13, lane-codes-ratchet (live ≤ baseline)"
+    },
+    "adrs_unreachable_by_link": {
+      "value": 53,
+      "adr_total": 306,
+      "plan": 104,
+      "plan_adr_total": 299,
+      "shrink_only": true,
+      "source": "E12 — ADRs not linked from any other doc (the index row in docs/adr/README.md does not count as a reach). Live count is 53 of 306 (down from the plan's 104 of 299 as the tree grew and new ADRs cross-link). Target 0 (DX22).",
+      "gate": "DX22 — devx-report shows ADRs unreachable by link at 0"
+    },
+    "tracked_out_log_trx_artifacts": {
+      "value": 0,
+      "plan": 4,
+      "shrink_only": true,
+      "source": "E12 — tests/{coretest,coretest2,webtest,parity}.out tracked (304 KB). DX34 untracked them (git rm) and closed the .gitignore gap (*.out / *.trx beside the existing *.log); the floor is now 0. Target 0 (DX34).",
+      "gate": "DX34 — devx-check, tracked *.out / *.log / *.trx baseline 0"
+    },
+    "ci_triggers": {
+      "value": "release",
+      "shrink_only": false,
+      "source": "DX04 — traceability only: the declared CI branch. The rule (ci-triggers) reads docs/dev/branch-flow.md's 'Which branch CI watches' section at check time and compares it to ci.yml's on: push/pull_request branches; it needs no baseline value to pass.",
+      "gate": "DX04 — devx-check, ci.yml on: branches match branch-flow.md's declared CI branch"
+    },
+    "ci_seconds": {
+      "value": {
+        "build": 72,
+        "core": "391-428",
+        "web": "60-66",
+        "e2e": "127-146",
+        "test_job": "468-580"
+      },
+      "plan": "same (E2)",
+      "shrink_only": false,
+      "source": "E2 — GitHub Actions runs 2026-10-27 … 10-31 (last 11 runs). Recorded, not computed: these are CI measurements, not tree-derived. DX09's targets: core ≤ 90 s, web ≤ 20 s locally.",
+      "gate": "none (informational; the targets are DX09/DX35 DoD, not a devx-check rule)"
+    },
+    "cold_start_baseline": {
+      "value": {
+        "calls": 32,
+        "wrong_turns": 7,
+        "tokens": "123K"
+      },
+      "shrink_only": false,
+      "source": "the cold-start baseline (plan Evidence, 'Cold-start baseline' paragraph) — a fresh agent, three tasks, 2026-11-09. Recorded, not computed. DX36's comparison target: ≤ 16 calls, ≤ 2 wrong turns, ≤ 60K tokens.",
+      "gate": "DX36 — independent cold-start verification"
+    }
+  }
+}

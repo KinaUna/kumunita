@@ -24,5 +24,6 @@
   "inv.detail.checkIn": "Check in",
   "inv.edit.title": "Edit item",
   "inv.edit.submit": "Save changes",
-  "inv.item.delete_confirm": "Delete this item? This cannot be undone."
+  "inv.item.delete_confirm": "Delete this item? This cannot be undone.",
+  "inv.list.empty_title": "No items yet."
 }

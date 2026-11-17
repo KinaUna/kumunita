@@ -103,6 +103,13 @@ public partial class TodoService
                 kind: NotificationKinds.TodoAssign,
                 idempotencyKey: $"notification:todo.assign:{todo.Id}",
                 body: body,
+                // IMPROVE-UX R09 (E14): the inbox row lands the assignee on the
+                // to-do. `targetId` enables the ADR 0084 per-target subscription
+                // gate (opt-out kind → enabled by default, so the row is still
+                // stored); `linkPath` is stored on the row + rendered as the
+                // clickable destination (the email carries it BaseUrl-prefixed).
+                targetId: todo.Id,
+                linkPath: $"/projects/todos/{todo.Id}",
                 ct: ct).ConfigureAwait(false);
         }
 

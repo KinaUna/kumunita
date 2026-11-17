@@ -2,6 +2,7 @@
   "search.nav": "S\u00F8g",
   "search.title": "S\u00F8g",
   "search.placeholder": "S\u00F8g i indl\u00E6g, arrangementer, sider, meddelelser, projekter, br\u00E6tter, to-dos, inventar, dokumenter og personer\u2026",
+  "search.empty_title": "Ingen resultater.",
   "search.no-results": "Ingen resultater for",
   "search.section.posts": "Indl\u00E6g",
   "search.section.events": "Arrangementer",

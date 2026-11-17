@@ -23,7 +23,7 @@ namespace Kumunita.Core.Tests;
 /// the parser is pure (no DI, no I/O), so the three parser pins need no store.
 /// </para>
 /// </summary>
-public sealed class MentionsTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class MentionsTests(PostgresFixture fixture)
 {
     // ── Pin 1 ─────────────────────────────────────────────────────────────
     // M36-1 — the parser returns the ordered, de-duplicated candidate tokens

@@ -287,18 +287,22 @@ public class KnownTranslationKeys_ParityTests
     // a non-empty value. The M17 parity-test precedent (the about.* /
     // footer.platform.* closed-set shape re-used).
 
-    [Fact(DisplayName = "M37: the 40 pn.* keys (ADR 0167 §kw-l) are registered in all four languages with non-empty values")]
+    [Fact(DisplayName = "M37: the 41 pn.* keys (ADR 0167 §kw-l) are registered in all four languages with non-empty values")]
     public void KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages()
     {
-        // The ADR 0167 §kw-l closed contract — exactly 40 keys (the original
+        // The ADR 0167 §kw-l closed contract — exactly 41 keys (the original
         // 24 + 5 announcement/modal extension + 1 page-level inventory + 10
         // page-level kinds — the 2026-10-25 page-level notes lane, ADR 0167
-        // amendment: one note per named platform page).
+        // amendment: one note per named platform page — + IMPROVE-UX R32's
+        // pn.list.empty_title, the empty-state title line).
         var pnKeys = new[]
         {
             "pn.nav",
             "pn.list.title",
             "pn.list.empty",
+            // IMPROVE-UX R32 (2026-11-11) — the Notes empty-state title (the
+            // house .kmb-empty idiom's title line) joins the closed set.
+            "pn.list.empty_title",
             "pn.list.degraded",
             "pn.list.kind.post",
             "pn.list.kind.grouppost",
@@ -343,8 +347,9 @@ public class KnownTranslationKeys_ParityTests
             "pn.folder.empty",
         };
 
-        Assert.True(pnKeys.Length == 40,
-            "the pn.* closed set must be exactly 40 keys");
+        // IMPROVE-UX R32 (2026-11-11) — the closed set is 40 -> 41 (pn.list.empty_title).
+        Assert.True(pnKeys.Length == 41,
+            "the pn.* closed set must be exactly 41 keys");
         Assert.True(new HashSet<string>(pnKeys).Count == pnKeys.Length,
             "the pn.* closed set must have no duplicate names");
 
@@ -366,13 +371,58 @@ public class KnownTranslationKeys_ParityTests
             }
         }
 
-        // The list is closed: every pn.* key in the registry is one of the 40
+        // The list is closed: every pn.* key in the registry is one of the 41
         // contract keys (no drift in either direction — the parity pin).
+        // IMPROVE-UX R32 (2026-11-11) — 40 -> 41 (pn.list.empty_title joined).
         var registryPnKeys =
             KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("pn.")).ToList();
-        Assert.True(registryPnKeys.Count == 40,
-            "the registry's pn.* key set is not the closed 40-key §kw-l set");
+        Assert.True(registryPnKeys.Count == 41,
+            "the registry's pn.* key set is not the closed 41-key §kw-l set");
         Assert.Equal(pnKeys.OrderBy(k => k).ToList(),
             registryPnKeys.OrderBy(k => k).ToList());
+    }
+
+    // ── DX19 — the declared language set and the Keys/ folders agree (ADR 0005) ──
+    // IMPROVE-DEVX DX19 (plan E8): "what languages does this platform support"
+    // was declared nowhere — implied only by the four Keys/{en,de,fr,da}/
+    // folders plus four hard-coded Load("…") literals. Languages is now the
+    // single source of truth; this fact pins the folder set == Languages so
+    // the two can't drift apart.
+
+    [Fact(DisplayName = "Localization/Keys folders equal KnownTranslationKeys.Languages (set equality)")]
+    public void Keys_Folders_Equal_Declared_Languages_Set()
+    {
+        // Resolve src/Kumunita.Core/Localization/Keys/ relative to the running
+        // test assembly (tests/Kumunita.Core.Tests/bin/<cfg>/net10.0/ → up to
+        // src/, then the source tree), the same convention this file already
+        // implies for the embedded-resources loader. Fail closed if it can't
+        // be resolved — never silently pass.
+        var assemblyDir = System.IO.Path.GetDirectoryName(
+            System.Reflection.Assembly.GetExecutingAssembly().Location)
+            ?? throw new InvalidOperationException("cannot resolve the running test assembly's directory");
+
+        var dir = assemblyDir;
+        string? keysDir = null;
+        for (var i = 0; i < 6 && dir != null; i++)
+        {
+            var candidate = System.IO.Path.Combine(dir, "src", "Kumunita.Core", "Localization", "Keys");
+            if (System.IO.Directory.Exists(candidate)) { keysDir = candidate; break; }
+            dir = System.IO.Path.GetDirectoryName(dir);
+        }
+        Assert.True(keysDir != null,
+            "could not resolve src/Kumunita.Core/Localization/Keys/ relative to the running " +
+            $"test assembly ({assemblyDir}) — the parity pin must not pass silently");
+
+        var folderSet = System.IO.Directory
+            .GetDirectories(keysDir!)
+            .Select(p => System.IO.Path.GetFileName(p))
+            .ToHashSet(StringComparer.Ordinal);
+        var declaredSet = KnownTranslationKeys.Languages.ToHashSet(StringComparer.Ordinal);
+
+        Assert.True(declaredSet.SetEquals(folderSet),
+            "the Localization/Keys/<lang>/ folder set must equal KnownTranslationKeys.Languages " +
+            "(the closed platform UI-language set, ADR 0005): declared " +
+            string.Join(", ", declaredSet.OrderBy(x => x)) + " vs folders " +
+            string.Join(", ", folderSet.OrderBy(x => x)));
     }
 }

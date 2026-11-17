@@ -31,7 +31,7 @@ namespace Kumunita.Core.Tests.Projects;
 /// and no <c>Todo_SortPriority</c> test exists; the frozen allowlist wins.
 /// </para>
 /// </summary>
-public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class ProjectSortTests(PostgresFixture fixture)
 {
     // ── Todo_SortSpecNull_CurrentOrder (C-SORT·2 pin) ───────────────────────
     //

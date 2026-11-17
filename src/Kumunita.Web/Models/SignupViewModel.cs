@@ -79,6 +79,56 @@ public sealed class SignupViewModel
     /// challenge then fails closed on the server — a bot is not proven human).
     /// </summary>
     public string? BotChallengeSiteKey { get; set; }
+
+    /// <summary>
+    /// The invitation token (IMPROVE-UX A08, ADR 0304 D4) — the value the
+    /// <c>?invite=</c> query param (the GET) or a hidden form field (the POST)
+    /// carries, set by the <see cref="AccountController.Signup()"/> GET and
+    /// echoed by the <c>Signup.cshtml</c> hidden input. The token is a
+    /// credential (ADR 0304 D2 — the 0159 / ADR 0302 hash-at-rest shape), so it
+    /// is **not** a visible form field — only the <see cref="Email"/> is
+    /// prefilled from it (the <c>AccountController.Signup</c> GET resolves the
+    /// invitation via <c>IInvitationService.ValidatePresentedAsync</c> and
+    /// sets <see cref="Email"/> from <c>Invitation.Email</c>). The POST
+    /// verifies the signing-up email matches <c>Invitation.Email</c> (A07's
+    /// <c>IInvitationService.AcceptAsync</c> single-address pin, ADR 0304 D4)
+    /// and runs <c>IInvitationService.AcceptPresentedAsync</c> instead of
+    /// <c>IIdentityService.RegisterAsync</c>. <see cref="InvitationActive"/>
+    /// tells the view whether a valid token is attached (so the
+    /// <c>SignupClosed</c> notice is not rendered and the prefilled email is
+    /// shown).
+    /// </summary>
+    public string? InviteToken { get; set; }
+
+    /// <summary>
+    /// True when the <c>?invite=</c> token (IMPROVE-UX A08, ADR 0304 D4)
+    /// resolved to a live <c>Invitation</c> row — the signup form renders
+    /// (with <see cref="Email"/> prefilled to <c>Invitation.Email</c>)
+    /// **instead of** the <c>SignupClosed</c> notice, and the POST runs
+    /// <c>IInvitationService.AcceptPresentedAsync</c> (the
+    /// <c>RegisterAsync</c> + <c>Accepted</c> mark + the
+    /// <c>invitation.accept</c> audit row in one lane). Set by the
+    /// <see cref="AccountController.Signup()"/> GET (and the
+    /// <see cref="AccountController.Signup(SignupViewModel)"/> POST re-render
+    /// path on a mismatch refusal — the token stays live for the retry) from
+    /// a non-null <c>IInvitationService.ValidatePresentedAsync</c> result.
+    /// </summary>
+    public bool InvitationActive { get; set; }
+
+    /// <summary>
+    /// True when the <c>?invite=</c> token (IMPROVE-UX A08, ADR 0304 D4)
+    /// resolved to a live <c>Invitation</c> row **but the signing-up
+    /// <see cref="Email"/> does not match <c>Invitation.Email</c>** (A07's
+    /// single-address pin, ADR 0304 D4) — the POST re-renders the signup form
+    /// with the invited email prefilled again (so the resident can correct it)
+    /// and a friendly notice, instead of a raw exception. Set by the
+    /// <see cref="AccountController.Signup(SignupViewModel)"/> POST on the
+    /// <c>AcceptPresentedAsync</c> email-match refusal (the
+    /// <c>EmailDomainDisallowed</c> / <c>BotChallengeFailed</c> precedent —
+    /// the re-render-with-flag shape). <see cref="InvitationActive"/> stays
+    /// <c>true</c> (the token is still live — only the email was wrong).
+    /// </summary>
+    public bool InvitationMismatch { get; set; }
 }
 
 public sealed class ResendVerificationViewModel

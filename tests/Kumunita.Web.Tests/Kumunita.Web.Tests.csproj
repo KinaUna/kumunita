@@ -11,32 +11,44 @@
 
     <ItemGroup>
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
-      <PackageReference Include="Microsoft.Testing.Extensions.VSTestBridge" Version="2.5.1" />
+      <PackageReference Include="Microsoft.Testing.Extensions.VSTestBridge" Version="2.5.2" />
       <PackageReference Include="NSubstitute" Version="6.2.0" />
-      <PackageReference Include="xunit.v3" Version="4.0.2" />
-      <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.13" />      <!-- GA U06 (ADR 0038): the 5 Assign Web tests are <b>integration</b> tests —
-           the Assign action's standing gate (ActiveLinkAsync) + the happy-path
-           CreateGuardianLinkAsync seam both run real Marten SQL (Marten 9's
-           FirstOrDefaultAsync/ToListAsync cannot be NSubstituted — they cast to
-           the internal MartenLinqQueryable and execute a live query), and the
-           pinned tests assert REAL GuardianLink + guardian.create audit rows.
-           That needs a live Postgres, so this project carries its own
-           PostgresFixture (a byte-for-byte copy of the one in
-           Kumunita.Core.Tests — the repo's documented "Web.Tests is
-           NSubstitute-only, Testcontainers lives in Core.Tests" convention is
-           the seam gap U06 records as a drift pause; the 5 pinned names cannot
-           be driven against the NSubstitute-only shape). Same versions as
-           Core.Tests to keep the two containers in lockstep. -->
+      <PackageReference Include="xunit.v3" Version="4.0.3" />
+      <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.14" />      <!-- DX09 (IMPROVE-DEVX, ADR 0307 §D2): the Web integration tests (the 5 GA U06 /
+           ADR 0038 Assign tests + the ~36 Postgres-backed controller/handler
+           tests) run real Marten SQL, so they need a live Postgres. Rather than
+           carry a second PostgresFixture, this project <b>links Core.Tests'</b>
+           (one shared container per assembly, D2) — the Core fixture already
+           carries the max_connections + sysv shared-memory settings the shared
+           server needs. The global <Using Include="Kumunita.Core.Tests" /> below
+           lets every Web test file reference PostgresFixture unqualified. -->
       <PackageReference Include="Npgsql" Version="10.0.3" />
       <PackageReference Include="Testcontainers" Version="4.16.0" />
-      <PackageReference Include="Testcontainers.PostgreSql" Version="4.16.0" />    </ItemGroup>
+      <PackageReference Include="Testcontainers.PostgreSql" Version="4.16.0" />
+    </ItemGroup>
 
+  <!-- DX09 (ADR 0307 §D2): one shared container per assembly. Link Core.Tests'
+       PostgresFixture (the source of truth, one fact one place) instead of
+       keeping a byte-for-byte copy; the <Using> below resolves it unqualified
+       in the Web test files. -->
   <ItemGroup>
+    <Compile Include="..\Kumunita.Core.Tests\PostgresFixture.cs" Link="PostgresFixture.cs" />
     <Using Include="Xunit" />
+    <Using Include="Kumunita.Core.Tests" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Kumunita.Web\Kumunita.Web.csproj" />
+  </ItemGroup>
+
+  <!-- R02 (IMPROVE-UX): the status-page gate integration tests boot a minimal
+       Kestrel host via WebApplication.CreateBuilder(). The Web SDK project
+       (Kumunita.Web) uses Microsoft.NET.Sdk.Web and has the shared framework
+       as a FrameworkReference, but that does not flow transitively to a
+       non-Web SDK test project — add it here so UseUrls, ClearProviders,
+       MapGet and the hosting/Kestrel types are available in tests. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <!-- e2e-m2.spec.ts (U13) is authored but the `kumunita` Playwright

@@ -10,7 +10,7 @@ related:
   - docs/dev/README.md
   - docs/archive/lanes/improve-docs/plan-improve-docs.md
 lane: improve-docs
-updated: 2026-11-02
+updated: 2026-11-15
 ---
 
 > **Abstract:** the machine-specific quirks of running in this repo's
@@ -23,6 +23,20 @@ updated: 2026-11-02
 > broken, or "Nothing to commit" surprises you after staging.
 
 # Agent sandbox quirks
+
+## Toolchain
+
+The toolchain prerequisites for this machine — and the one-line fix for each —
+are owned by **one place**: `pwsh tools/check.ps1 -Doctor`. It checks the
+`dotnet` version against the `global.json` pin, the presence of `node` / `pwsh`
+/ `git`, Docker reachability (including the rootless socket), a real container
+start, and the shallow-clone base ref — each printing **OK** or the **one-line
+fix**. Run it on a fresh box or after any environment change, and trust its
+per-tool install line over any version list in a doc (this doc lists none).
+
+For the actual *install* steps, the owner-managed project doc
+`claude/agent-sandbox-setup.md` is the source — its **step 3** is the `pwsh`
+install. (It is not in this repo; `check.ps1 -Doctor` is the in-repo pointer.)
 
 ## Git state gotcha
 

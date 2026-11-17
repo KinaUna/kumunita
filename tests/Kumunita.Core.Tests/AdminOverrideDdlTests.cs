@@ -13,7 +13,7 @@ namespace Kumunita.Core.Tests;
 /// <c>(userId, consumedAt)</c>. A second apply must be a no-op (the idempotency claim
 /// the boot block and ADR rely on). Verified against the *live* Postgres catalog.
 /// </summary>
-public class AdminOverrideDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public class AdminOverrideDdlTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private string _connection = "";
 

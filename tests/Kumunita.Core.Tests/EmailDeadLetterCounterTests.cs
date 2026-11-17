@@ -15,7 +15,7 @@ namespace Kumunita.Core.Tests;
 /// against a real Postgres, so the operator-visible "degraded" gate (OPS.md §8)
 /// is backed by real data end-to-end, not just by a unit-test substitute.
 /// </summary>
-public sealed class EmailDeadLetterCounterTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class EmailDeadLetterCounterTests(PostgresFixture fixture)
 {
     [Fact]
     public async Task GetCountAsync_ReflectsStoredDeadLetters_AgainstRealPostgres()

@@ -39,6 +39,13 @@ public static class KnownTranslationKeys
     /// <summary>The curated <c>da</c> baseline (ADR 0042 D2/D5).</summary>
     public static IReadOnlyDictionary<string, string> DaValues { get; } = Load("da");
 
+    /// <summary>
+    /// The closed set of platform UI languages (ADR 0005). The
+    /// <c>Keys/&lt;lang&gt;/</c> folders are defined by this set — the parity
+    /// test pins folder-set == <see cref="Languages"/>.
+    /// </summary>
+    public static IReadOnlyList<string> Languages { get; } = new[] { "en", "de", "fr", "da" };
+
     /// <summary>The closed key set — <c>EnValues.Keys</c>, in a stable read order.</summary>
     public static IReadOnlyCollection<string> AllKeys => EnValues.Keys.ToList();
 

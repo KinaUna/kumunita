@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -64,18 +65,61 @@ public partial class ModerationService : IModerationService
     // (the write lanes are unaffected — they never read profiles).
     private readonly IUserInfoService? _userInfo;
 
+    // IMPROVE-UX R05 — the posts read seam (the "My reports" read's post-title
+    // visibility gate: the post target's title is shown only while the
+    // reporter can still read the post, resolved via PostService.GetPostAsync).
+    // Optional so the existing positional test call sites (the Services store,
+    // BootTargetStoreAsync) keep compiling (CS1736, the _userInfo precedent);
+    // production wiring (the DI factory) passes the DI-registered instance.
+    // The read seam throws when it is absent (the other read lanes never read
+    // a post's visibility, so they are unaffected).
+    private readonly Posts.PostService? _posts;
+
+    // IMPROVE-UX R07 — the translation seam (the ReportResolved body's
+    // localized outcome sentence; ADR 0005 the en-floor provider). Optional
+    // so the existing positional test-construction call sites keep compiling
+    // (CS1736, the _userInfo / _posts precedent); production wiring passes
+    // the DI-registered instance. When null (a test harness that omits it)
+    // the body degrades to the plain outcome word — never throws.
+    private readonly ITranslationProvider? _translationProvider;
+
+    // IMPROVE-UX A05 (ADR 0303) — the GlobalAdmin enumeration read seam (the
+    // report.queued routing's GlobalAdmin fallback recipient set: when a
+    // component has no standing moderator, the filed report still reaches the
+    // GlobalAdmins). ADR 0006-E *compatible ADD* on the Identity module
+    // (IIdentityService.ListGlobalAdminsAsync) — role enumeration is an
+    // Identity concern, not a frozen profile/community seam, so
+    // IUserInfoService is untouched. Optional (CS1736, the _userInfo / _posts
+    // / _translationProvider precedent) so the existing positional test
+    // call sites keep compiling; production wiring (the DI factory) passes
+    // the DI-registered instance. When null (a test harness that omits it)
+    // the GlobalAdmin half of the recipient set is empty — the standing-
+    // moderator half still routes (the A05 "never ship only the standing
+    // half silently" pin is enforced by a test, not by this degrade).
+    private readonly Kumunita.Core.Identity.IIdentityService? _identity;
+
     public ModerationService(
         IProfileSettingsService profileSettings,
         IAuthorizationService authz,
         IDocumentStore store,
         INotificationEmitter? notifications = null,
-        IUserInfoService? userInfo = null)
+        IUserInfoService? userInfo = null,
+        Posts.PostService? posts = null,
+        ITranslationProvider? translationProvider = null,
+        // IMPROVE-UX A05 (ADR 0303) — the GlobalAdmin enumeration read seam
+        // (the report.queued routing's fallback recipient set). Optional
+        // (CS1736) — a test harness that omits it routes the standing
+        // moderators only (the GlobalAdmin half is empty).
+        Kumunita.Core.Identity.IIdentityService? identity = null)
     {
         _profileSettings = profileSettings ?? throw new ArgumentNullException(nameof(profileSettings));
         _authz    = authz    ?? throw new ArgumentNullException(nameof(authz));
         _store    = store    ?? throw new ArgumentNullException(nameof(store));
         _notifications = notifications;
         _userInfo = userInfo;
+        _posts = posts;
+        _translationProvider = translationProvider;
+        _identity = identity;
     }
 
     private IUserInfoService UserInfo =>
@@ -94,6 +138,99 @@ public partial class ModerationService : IModerationService
         if (string.IsNullOrWhiteSpace(text)) return text;
         var trimmed = text.Trim();
         return trimmed.Length <= 200 ? trimmed : trimmed[..200] + "…";
+    }
+
+    /// <summary>
+    /// IMPROVE-UX R03 — the <see cref="Report.ResolutionNote"/>
+    /// normalization (the D1 ≤500-char pin, lane-enforced so the Web
+    /// form cannot bypass it): trim the note, normalize
+    /// whitespace-only to <c>null</c> (the "no note" shape), and
+    /// reject a note over 500 chars with an
+    /// <see cref="ArgumentException"/> (the caller-contract violation
+    /// — the R04 form's own maxlength validation is the first line,
+    /// this the lane-enforces-shape second). Unlike
+    /// <see cref="Truncate"/> (which caps at 200 + ellipsis, the
+    /// emitter-snippet shape), this **throws** on over-cap input — the
+    /// resolution note is data the reporter sees verbatim on the
+    /// "My reports" page, not an inbox snippet; truncating would
+    /// silently lose the moderator's note.
+    /// </summary>
+    private static string? ResolveReportNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note)) return null;
+        var trimmed = note.Trim();
+        if (trimmed.Length > 500)
+            throw new ArgumentException(
+                $"The resolution note is {trimmed.Length} chars; the R03 cap is 500.",
+                nameof(note));
+        return trimmed;
+    }
+
+    /// <summary>
+    /// IMPROVE-UX R07 — build the <c>ReportResolved</c> notification body
+    /// (the "the report-resolved notification is the reporter's own reason"
+    /// E4 fix): a localized outcome sentence (the <see cref="ReportOutcome"/>
+    /// closed four — the four <c>reports.body.*</c> keys; the pre-R03
+    /// <c>Outcome == null</c> shape falls back to the plain "resolved"
+    /// sentence, the <c>reports.body.resolved</c> key), with the
+    /// moderator's <see cref="Report.ResolutionNote"/> appended verbatim
+    /// when present (the free-text note is **never** translated).
+    /// Localizes to the *reporter's* <c>Profile.EmailLanguage</c> (the
+    /// <see cref="IUserInfoService"/> read seam; the
+    /// <c>EventReminderService.BuildLocalizedReminder</c> precedent).
+    /// Degrades gracefully: no <c>ITranslationProvider</c> or no
+    /// <c>IUserInfoService</c> → plain outcome word (or "Resolved"), never throws.
+    /// </summary>
+    private async Task<string> BuildReportResolvedBodyAsync(Report report)
+    {
+        // The closed-four outcome key (the R03 D1 vocabulary — the four
+        // `ReportOutcome` values each map to exactly one reports.body.*
+        // key); the pre-R03 null shape maps to reports.body.resolved.
+        var outcomeKey = report.Outcome switch
+        {
+            ReportOutcome.NoAction  => "reports.body_noaction",
+            ReportOutcome.Hidden    => "reports.body_hidden",
+            ReportOutcome.Removed   => "reports.body_removed",
+            ReportOutcome.Other     => "reports.body_other",
+            _                       => "reports.body_resolved"
+        };
+
+        string outcomeWord;
+        if (_translationProvider is null)
+        {
+            // No provider wired (a test harness that omits the seam):
+            // the plain English fallback — the outcome word the R06
+            // `reports.outcome_*` labels already carry (the en floor).
+            outcomeWord = KnownTranslationKeys.EnValues.TryGetValue(outcomeKey, out var en)
+                ? en
+                : (report.Outcome?.ToString() ?? "Resolved");
+        }
+        else
+        {
+            string? lang = null;
+            if (_userInfo is not null && !string.IsNullOrWhiteSpace(report.ReporterId))
+            {
+                try
+                {
+                    var profile = await _userInfo.GetProfileAsync(report.ReporterId).ConfigureAwait(false);
+                    lang = profile?.EmailLanguage;
+                }
+                catch
+                {
+                    // The read seam is best-effort here — the emission
+                    // itself must never be blocked by a profile lookup
+                    // failure (the reporter still gets the row).
+                }
+            }
+            outcomeWord = await _translationProvider.GetAsync(outcomeKey, lang).ConfigureAwait(false);
+        }
+
+        // The moderator's free-text note: appended verbatim (never
+        // translated), on a second sentence when present.
+        var note = report.ResolutionNote;
+        return string.IsNullOrWhiteSpace(note)
+            ? outcomeWord
+            : outcomeWord + " " + note;
     }
 
     /// <summary>
@@ -236,18 +373,78 @@ public partial class ModerationService : IModerationService
     /// flag-flip inside that method is unchanged); the controller's
     /// <c>TempData</c> / <c>Redirect</c> / <c>NotFound</c> shape is
     /// unchanged.
+    /// <para>
+    /// IMPROVE-UX R03 — the optional <paramref name="outcome"/> /
+    /// <paramref name="resolutionNote"/> pair (both <c>null</c> by
+    /// default, so the pre-R03 two-parameter call shape keeps
+    /// compiling unchanged). When supplied, the lane writes them onto
+    /// the <see cref="Report"/> row in the same transaction as the
+    /// lane's existing <c>AccessAudit</c> row — which is **unchanged**
+    /// (the R03 pin).
+    /// </para>
     /// </summary>
     public async Task ResolveReportAsync(
         string reportId,
         string globalAdminId,
+        ReportOutcome? outcome = null,
+        string? resolutionNote = null,
         CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(reportId))      throw new ArgumentException("A report id is required.",         nameof(reportId));
         if (string.IsNullOrEmpty(globalAdminId)) throw new ArgumentException("A GlobalAdmin actor id is required.", nameof(globalAdminId));
 
         await using var session = _store.LightweightSession();
-        await ResolveReportAsync(reportId, globalAdminId, session).ConfigureAwait(false);
+        await ResolveReportAsync(reportId, globalAdminId, session, outcome, resolutionNote).ConfigureAwait(false);
         await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The committed <c>Unhide</c> lane (IMPROVE-UX A03 — the reversible
+    /// lever; the <see cref="ResolveReportAsync"/> precedent's
+    /// committed-overload shape: opens its own
+    /// <see cref="Marten.IDocumentSession"/> (the C3
+    /// same-transaction lane), loads the <see cref="Report"/> row for
+    /// the <c>PostId</c>, delegates to the Posts context's
+    /// <c>PostService.UnhidePostAsync</c> (the
+    /// <see cref="Kumunita.Core.Authorization.AccessAction.Moderate"/>
+    /// -gated write lane — the <c>HidePostAsync</c> inverse), one
+    /// <c>SaveChangesAsync</c>). The <see cref="KeyNotFoundException"/>
+    /// the report read throws (an absent report) is the controller's 404
+    /// pin (the non-leaky shape — the <c>ResolveReportAsync</c> precedent).
+    /// </summary>
+    public async Task UnhidePostAsync(
+        string reportId,
+        string actorId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(reportId)) throw new ArgumentException("A report id is required.", nameof(reportId));
+        if (string.IsNullOrEmpty(actorId))  throw new ArgumentException("A moderating actor is required.", nameof(actorId));
+        if (_posts is null)
+            throw new InvalidOperationException(
+                "The posts write seam (Posts.PostService) is not wired — the " +
+                "ModerationService UnhidePostAsync seam (IMPROVE-UX A03) requires it.");
+
+        await using var session = _store.LightweightSession();
+
+        // The report read runs first: the report's KeyNotFoundException is
+        // the controller's 404 pin (non-leaky, the ResolveReportAsync
+        // precedent); the PostId is resolved here so the Posts seam does not
+        // have to re-derive it (the C-M3b·4 "no fabricated component" shape
+        // — the report is the source of the target's identity, not the
+        // caller).
+        var report = await session.LoadAsync<Report>(reportId).ConfigureAwait(false);
+        if (report is null)
+            throw new KeyNotFoundException($"Report '{reportId}' was not found.");
+
+        // Delegate to the Posts context's UnhidePostAsync (the
+        // HidePostAsync inverse — the Moderate-gated write lane, the same
+        // C3 same-transaction shape as HidePostAsync / RemovePostAsync).
+        // PostService.UnhidePostAsync commits in this session (the C3
+        // same-transaction lane, ADR 0006-E) — the audit row + the
+        // post.Status write commit atomically. The session is disposed
+        // by the await using (a second SaveChangesAsync here would be a
+        // no-op at best, a second round-trip at worst).
+        await _posts.UnhidePostAsync(report.PostId, actorId, session).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -424,6 +621,78 @@ public partial class ModerationService : IModerationService
         };
     }
 
+    /// <summary>
+    /// The scoped-component-id set for <paramref name="actorId"/> when they
+    /// are a standing-moderator (the <see cref="GetQueueAsync"/> scoped-read
+    /// filter, extracted verbatim): the intersection of the actor's
+    /// <see cref="ModeratorAssignment"/> component ids and the set of
+    /// components whose <see cref="Kumunita.Core.UserInfo.Component.ModeratorAccess"/>
+    /// flag is ON (the U6 handoff's flag-ON gate). An empty set when the
+    /// actor has no <see cref="ModeratorAssignment"/> row on any
+    /// <c>ModeratorAccess</c>-ON component — the badge's count is then 0.
+    /// </summary>
+    private async Task<HashSet<string>> ScopedComponentIdsAsync(
+        string actorId,
+        IDocumentSession session)
+    {
+        var myComponents = (await _profileSettings
+            .GetAssignmentsAsync(actorId).ConfigureAwait(false))
+            .Where(a => a.ComponentId is not null)
+            .Select(a => a.ComponentId)
+            .ToHashSet();
+        var components = (await session.Query<Kumunita.Core.UserInfo.Component>()
+            .ToListAsync().ConfigureAwait(false)).ToDictionary(c => c.Id);
+        var scoped = new HashSet<string>();
+        foreach (var componentName in components.Keys)
+        {
+            if (!myComponents.Contains(componentName))
+                continue;
+            if (components[componentName].ModeratorAccess == true)
+                scoped.Add(componentName);
+        }
+        return scoped;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountOpenReportsAsync(
+        string actorId,
+        bool isGlobalAdmin,
+        bool isStanding,
+        CancellationToken ct = default)
+    {
+        // SEC-READ: report-gated (ADR 0003) — the badge self-filters the same
+        // way the queue does (C-M3b·4 SoD): a standing-moderator sees only
+        // reports on their assigned components with ModeratorAccess ON; a
+        // plain resident sees none; a GlobalAdmin sees all.
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+        if (!isGlobalAdmin && isStanding)
+        {
+            var scopedComponentIds = await ScopedComponentIdsAsync(actorId, session).ConfigureAwait(false);
+            if (scopedComponentIds.Count == 0)
+                return 0;
+            return await session.Query<Report>()
+                .CountAsync(r => (r.Status == "filed" || r.Status == "assigned"
+                                 || r.Status == "unlocked" || r.Status == null)
+                    && r.ComponentId != null
+                    && scopedComponentIds.Contains(r.ComponentId))
+                .ConfigureAwait(false);
+        }
+
+        if (!isGlobalAdmin)
+        {
+            // A plain resident (Member, no standing-moderator row) sees NO
+            // reports (the C-M3b·4 SoD pin projects at the display level on
+            // the read lanes) — the badge's count is 0 by construction.
+            return 0;
+        }
+
+        return await session.Query<Report>()
+            .CountAsync(r => r.Status == "filed" || r.Status == "assigned"
+                || r.Status == "unlocked" || r.Status == null)
+            .ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public async Task<ModerationDetailReadModel> GetDetailAsync(
         string reportId,
@@ -535,6 +804,7 @@ public partial class ModerationService : IModerationService
             ComponentName    = report.ComponentId is not null ? componentNames.GetValueOrDefault(report.ComponentId) : null,
             Reason           = report.Reason,
             Status           = statusKey,
+            Outcome          = report.Outcome,   // IMPROVE-UX A03 — the R03 resolution outcome (the Web layer's Unhide-form predicate)
             At               = report.At,
             ReporterName     = reporter?.DisplayName,
             PostTitle        = postTitle,
@@ -551,6 +821,95 @@ public partial class ModerationService : IModerationService
                 : (await UserInfo.GetProfileAsync(targetAuthorId).ConfigureAwait(false))?.DisplayName,
             Moderators       = moderators,
         };
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<MyReportRow>> ListMyReportsAsync(
+        string reporterId,
+        CancellationToken ct = default)
+    {
+        // SEC-READ: owner-only — the reporter's own reports (a read, not a
+        // decision — the GetQueueAsync / GetDetailAsync precedent: no
+        // IAuthorizationService call, no AccessAudit row; the report is the
+        // reporter's own, the read is a list, not a scoped-read gate).
+        if (string.IsNullOrEmpty(reporterId))
+            throw new ArgumentException("A reporter id is required.", nameof(reporterId));
+        if (_posts is null)
+            throw new InvalidOperationException(
+                "The posts read seam (Posts.PostService) is not wired — the " +
+                "ModerationService ListMyReportsAsync read seam (IMPROVE-UX R05) requires it.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var reports = await session
+            .Query<Report>()
+            .Where(r => r.ReporterId == reporterId)
+            .OrderByDescending(r => r.At)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var rows = new List<MyReportRow>(reports.Count);
+        foreach (var r in reports)
+        {
+            string? targetKind = r.TargetKind;
+            string? targetTitle = null;
+
+            if (targetKind is not null && r.TargetId is not null)
+            {
+                // The other target kinds (ADR 0173) — resolved directly (the
+                // GetDetailAsync target switch); their visibility rules are out
+                // of scope for R05 (the plan is posts-first, A02).
+                string? title = null;
+                switch (targetKind)
+                {
+                    case "event":
+                        title = (await session.LoadAsync<Kumunita.Core.Events.Event>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                    case "project":
+                        title = (await session.LoadAsync<Project>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                    case "board":
+                        title = (await session.LoadAsync<KanbanBoard>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                    case "todo":
+                        title = (await session.LoadAsync<TodoItem>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                    case "grouppost":
+                        title = (await session.LoadAsync<Post>(r.TargetId).ConfigureAwait(false))?.Title;
+                        break;
+                }
+                targetTitle = title;
+            }
+            else
+            {
+                // The original M3b shape (a post target): the title is gated on
+                // the reporter's visibility — a null Post in the
+                // PostDetailResult (denied / hidden / removed / deleted) means
+                // the reporter can no longer read it → no title (the R05 DoD
+                // "target no longer visible → no title" pin).
+                if (r.PostId.Length > 0)
+                {
+                    var detail = await _posts.GetPostAsync(r.PostId, reporterId).ConfigureAwait(false);
+                    targetTitle = detail.Post?.Title;
+                }
+            }
+
+            rows.Add(new MyReportRow
+            {
+                ReportId        = r.Id,
+                PostId          = r.PostId,
+                ComponentId     = r.ComponentId,
+                Reason          = r.Reason,
+                Status          = r.Status ?? "filed",
+                At              = r.At,
+                TargetKind      = targetKind,
+                TargetTitle     = targetTitle,
+                Outcome         = r.Outcome,
+                ResolutionNote  = r.ResolutionNote,
+                ResolvedAt      = r.ResolvedAt,
+                ResolvedBy      = r.ResolvedBy,
+            });
+        }
+        return rows;
     }
 
     /// <inheritdoc />

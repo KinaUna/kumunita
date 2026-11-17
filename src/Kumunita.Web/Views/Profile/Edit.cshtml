@@ -99,12 +99,12 @@
             <div class="row g-2">
                 <div class="col-sm-6">
                     <label for="DisplayName" class="form-label"><kw-l key="profile.display_name_label">Display name</kw-l></label>
-                    <input asp-for="DisplayName" class="form-control" required maxlength="100" />
+                    <input asp-for="DisplayName" id="DisplayName" class="form-control" required maxlength="100" />
                     <span asp-validation-for="DisplayName" class="text-danger"></span>
                 </div>
                 <div class="col-sm-6">
-                    <label asp-for="Email" class="form-label"><kw-l key="common.email">Email</kw-l></label>
-                    <input asp-for="Email" class="form-control" required type="email" />
+                    <label for="Email" class="form-label"><kw-l key="common.email">Email</kw-l></label>
+                    <input asp-for="Email" id="Email" class="form-control" required type="email" />
                     <span asp-validation-for="Email" class="text-danger"></span>
                 </div>
             </div>
@@ -167,7 +167,7 @@
             <div class="row g-2">
                 <div class="col-sm-6">
                     <label for="Address" class="form-label"><kw-l key="profile.address_label">Address (the street you live at)</kw-l></label>
-                    <input asp-for="Address" class="form-control" maxlength="200"
+                    <input asp-for="Address" id="Address" class="form-control" maxlength="200"
                            placeholder="@addressPlaceholder" />
                     <span asp-validation-for="Address" class="text-danger"></span>
                     <div class="form-text small">
@@ -176,7 +176,7 @@
                 </div>
                 <div class="col-sm-6">
                     <label for="Phone" class="form-label"><kw-l key="profile.phone_label">Phone number</kw-l></label>
-                    <input asp-for="Phone" class="form-control" maxlength="32"
+                    <input asp-for="Phone" id="Phone" class="form-control" maxlength="32"
                            placeholder="@phonePlaceholder" />
                     <span asp-for="Phone" class="text-danger"></span>
                     <div class="form-text small">

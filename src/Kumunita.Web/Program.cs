@@ -12,6 +12,7 @@ using Kumunita.Web.Security;
 using Kumunita.Web.SideEffects;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
@@ -530,9 +531,19 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<Kumunita.Web.Services.IEscalationForwarder, Kumunita.Web.Services.EscalationForwarder>();
 // ADR 0175 — the cached platform-default palette read by _Layout.
 builder.Services.AddSingleton<Kumunita.Web.Services.PlatformPaletteProvider>();
+// IMPROVE-UX A06 — the moderation nav badge's count cache (the 60 s sliding
+// window per (actor, standing) the _AccountNav partial reads; the Web layer
+// owns the cache — ADR 0006-D holds: the Core IModerationService.CountOpenReportsAsync
+// seam stays pure, HTTP-free).
+builder.Services.AddMemoryCache();
 // ADR 0285 — the kiosk playlist editor's item picker (composes the M8 search
 // surfaces + the component list; no access logic of its own).
 builder.Services.AddScoped<Kumunita.Web.Services.IKioskItemCatalog, Kumunita.Web.Services.KioskItemCatalog>();
+// ADR 0302 (IMPROVE-UX R18) — the /settings/kiosk shared-link list read seam
+// (the owner's active KioskLink rows; the Core IKioskLinkService seam is the
+// frozen create/revoke/validate trio with no owner-scoped list — the
+// KioskItemCatalog "Web layer owns the read" precedent).
+builder.Services.AddScoped<Kumunita.Web.Services.IKioskLinkListReader, Kumunita.Web.Services.KioskLinkListReader>();
 
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
@@ -693,6 +704,16 @@ builder.Services.AddRateLimiter(opts =>
     // of stale sessions is fine; an automated revocation loop is not). The
     // same fixed-window-per-IP shape as the F8 upload policy above.
     AddWindow(opts, "sessions", limit: 10, window: TimeSpan.FromMinutes(15));
+
+    // ADR 0302 (IMPROVE-UX R16) — the shared kiosk link's token-presenting
+    // surface (GET /kiosk?link=<token> + its /kiosk/slide refresh): a leaked
+    // or brute-forced token is throttled per resolved client IP. The token is
+    // 256-bit (ADR 0302 D2) so online brute-force is infeasible — this bounds
+    // the flood on the validate path (the "rate-limited" line of the R16
+    // card). Attached to KioskController.Index/Slide via
+    // [EnableRateLimiting("kiosk-link")]; the tokenless personal-kiosk path
+    // also passes through but at this ceiling is harmless.
+    AddWindow(opts, "kiosk-link", limit: 30, window: TimeSpan.FromMinutes(15));
 });
 
 // ASP.NET Core Identity automatically wires a SecurityStampValidator into the
@@ -787,6 +808,19 @@ builder.Services.Configure<SeedAdminOptions>(
 // never carry it, so the seeder is unreachable by construction.
 builder.Services.Configure<SampleDataOptions>(
     builder.Configuration.GetSection(SampleDataOptions.SectionName));
+
+// IMPROVE-UX O01 (D8) — the two host-posture facts Core cannot read itself
+// (IWebHostEnvironment and the DataProtection__KeysDirectory wiring are Web-side):
+// IsProduction (builder.Environment.IsProduction()) and
+// DataProtectionKeysPersisted (the dataProtectionKeysDir local, defined above).
+// The InstanceStatusOptions POCO (Kumunita.Core.InstanceStatus) carries them as
+// boolean postures only — the O01 seam never echoes a value, path, or secret.
+builder.Services.Configure<Kumunita.Core.InstanceStatus.InstanceStatusOptions>(o =>
+{
+    o.IsProduction = builder.Environment.IsProduction();
+    o.DataProtectionKeysPersisted = !string.IsNullOrWhiteSpace(dataProtectionKeysDir);
+});
+
 // ADR 0078 — sample-account notification suppression: in Development the flag
 // stays false (Mailpit collects the mail, sample accounts behave like real
 // residents); in Production / Staging it is true and the
@@ -1030,6 +1064,22 @@ builder.UseWolverine(opts =>
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Notifications.NotificationService>();
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Usage.IStorageMetricsService>();
     opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.UserInfo.IUserInfoService>();
+    // ADR 0301 (IMPROVE-UX R12) — the DeletionDueTick handler injects two
+    // Core services (IDeletionScheduler for ListDueAsync / MarkExecutedAsync
+    // and IIdentityService for the DeleteAccountAsync lane). Both are
+    // transient direct interface→impl registrations (DependencyInjection.cs),
+    // but IIdentityService's constructor depends on IUserInfoService and
+    // IMailerStage — both opaque lambda factories already opted in above.
+    // Under ServiceLocationPolicy.NotAllowed the generated handler code
+    // cannot inline-construct IIdentityService without those transitive
+    // opt-ins, and even IDeletionScheduler's simple constructor crosses the
+    // opaque-land boundary via its IDocumentStore → IUserInfoService dep.
+    // Opting both in — the M33 IStorageMetricsService opt-in precedent
+    // (added when that handler's signature gained the param; without the
+    // opt-in the first dispatch throws InvalidServiceLocationException …
+    // NotAllowed and the envelopes go to the error queue).
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Identity.IIdentityService>();
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Identity.IDeletionScheduler>();
 });
 
 var app = builder.Build();
@@ -1122,6 +1172,16 @@ app.Use(async (context, next) =>
     await next();
 });
 
+// R02 (IMPROVE-UX, D2) — bare HTML status returns land on the R01 status page.
+// UseStatusCodePagesWithReExecute("/status/{0}") has no per-request gate (it
+// re-executes on every failing response, and its StatusCodePagesOptions has no
+// ShouldTransformResponse — confirmed against the .NET 10 source), so we pass
+// the HTML-only handler instead: the same re-execute, but fetch/JSON, /health,
+// *.ics, /media/, /kiosk/slide, /settings/kiosk/items and /api/ keep their bare
+// status responses. Registered BEFORE UseRouting so the re-executed
+// /status/{code} reaches routing -> auth -> MVC (the R01 StatusController).
+app.UseStatusCodePages(StatusPageGate.ReExecuteHtmlOnly);
+
 app.UseRouting();
 
 // Rate limiting (H1) — must run AFTER UseRouting so per-endpoint policies
@@ -1132,6 +1192,22 @@ app.UseRouting();
 app.UseRateLimiter();
 
 app.UseAuthentication();
+
+// ADR 0302 (IMPROVE-UX R16) — the shared kiosk link's authentication seam:
+// on /kiosk + /kiosk/slide, a presented ?link=<token> (R18's carrier) is
+// validated through the Core IKioskLinkService (the hash-at-rest seam) and,
+// on a hit, a restricted owner principal is minted (Kumunita.Sub = owner,
+// kiosk-link role, read-only — the ClaimShaping admissible set, no new claim
+// type). On any other path the token is inert (the surface's own gate denies
+// it). Registered immediately after UseAuthentication and BEFORE
+// BlockedAccountMiddleware — the principal is a signed-in owner, so the
+// downstream block / time-limit gates apply to the minted owner (a blocked
+// owner's link stops working) while the session / stamp revocation gates pass
+// through on the token principal's absence of a kumunita.stamp / kumunita.sid
+// cookie item (their backward-compat shape). The rate-limit gate
+// ([EnableRateLimiting("kiosk-link")] on KioskController.Index/Slide) runs
+// before this (UseRateLimiter, above UseAuthentication).
+app.UseMiddleware<KioskLinkMiddleware>();
 
 app.UseMiddleware<BlockedAccountMiddleware>();
 
@@ -1362,6 +1438,14 @@ await bus.PublishAsync(new Kumunita.Core.Privacy.RetentionTick());
 // T4 cross-check never runs — the F15 UsagePurgeTick/MediaLifecycleTick seed
 // precedent, re-using F12's IAlertSink seam + F17's SuppressedAddress list).
 await bus.PublishAsync(new MailAlarmsTick());
+// ADR 0301 (IMPROVE-UX R12) — the scheduled-account-deletion due-job (the
+// DeletionDueHandler self-reschedules hourly after each run; this seed is the
+// first-boot scheduling. Without this line the handler never fires and a
+// resident's scheduled deletion is never executed — the M13 UsagePurgeTick /
+// F15 MediaLifecycleTick seed precedent). A no-op when no DeletionRequest row
+// is past its DueAt, so a double-schedule across two consecutive boots is
+// harmless (the idempotent-sweep shape).
+await bus.PublishAsync(new Kumunita.Core.Identity.DeletionDueTick());
 // M20 (ADR 0121) — the deferred-notification email flush tick (the
 // NotificationFlushHandler self-reschedules at the resolved admin cadence
 // QuietCheckMinutes after each run; this seed is the first-boot scheduling).

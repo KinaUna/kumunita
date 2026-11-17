@@ -16,6 +16,7 @@
   "home.feed_announcements": "Annonces",
   "home.feed_pages": "Pages",
   "home.feed_view_all": "Tout voir",
+  "home.feed_empty_title": "Rien de post\u00E9 pour l\u0027instant.",
   "home.feed_empty": "Rien de post\u00E9 pour l\u0027instant \u2014 soyez le premier \u00E0 lancer la conversation dans le flux.",
   "home.feed_badge_pinned": "\u00C9pingl\u00E9",
   "home.upcoming_title": "\u00C0 venir",

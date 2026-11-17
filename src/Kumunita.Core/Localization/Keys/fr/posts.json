@@ -11,7 +11,7 @@
   "posts.flash_reply_updated": "R\u00E9ponse mise \u00E0 jour.",
   "posts.flash_reply_deleted": "R\u00E9ponse supprim\u00E9e.",
   "posts.mandatory_title": "Tout le voisinage est membre de cette communaut\u00E9 \u2014 personne ne peut en \u00EAtre retir\u00E9 ni la quitter.",
-  "posts.no_feeds": "Aucun fil de communaut\u00E9 n\u2019est actuellement disponible pour publier. Demandez \u00E0 un habitant (ou \u00E0 un administrateur global, s\u2019il y en a un) d\u2019en activer un \u2014 les plus courants sont safety, maintenance, social et governance.",
+  "posts.no_feeds": "Aucun fil de communaut\u00e9 n\u2019est actuellement disponible pour publier. Demandez \u00e0 un habitant (ou \u00e0 l\u2019administrateur, s\u2019il y en a un) d\u2019en activer un \u2014 les plus courants sont safety, maintenance, social et governance.",
   "posts.feed_all_sections": "Communaut\u00E9",
   "posts.write": "\u00C9crire une publication",
   "posts.new_title": "\u00C9crire une publication",
@@ -43,6 +43,7 @@
   "posts.audience_restrict_hint": "Ces s\u00E9lections sont masqu\u00E9es tant que \u00AB Tout le monde dans cette communaut\u00E9 \u00BB est actif \u2014 la publication est visible par toute la communaut\u00E9. D\u00E9sactive-le pour restreindre l\u0027acc\u00E8s avec les s\u00E9lections ci-dessous.",
   "posts.audience_only_picks": "Ce que tu s\u00E9lectionnes ici devient l\u0027audience de la publication \u2014 rien au-dessus ou en dessous de ce formulaire n\u0027y est ajout\u00E9. Une s\u00E9lection vide (avec \u00AB Tout le monde dans cette communaut\u00E9 \u00BB d\u00E9sactiv\u00E9) signifie que seul tu peux voir la publication.",
   "posts.empty_can_post": "Pas encore de publications ici. \u00C9cris la premi\u00E8re \u2014 elle sera visible uniquement par l\u0027audience que tu choisis dans le composeur sous le titre.",
+  "posts.empty_title": "Pas encore de publications ici.",
   "posts.empty": "Pas encore de publications ici.",
   "posts.reply_count_none": "Aucune r\u00E9ponse pour l\u0027instant",
   "posts.reply_count_one": "{0} r\u00E9ponse",
@@ -56,7 +57,7 @@
   "posts.reply_report_button": "Signaler cette r\u00E9ponse",
   "posts.report_reason_label": "Quel est le probl\u00E8me ?",
   "posts.report_optional": "optionnel",
-  "posts.report_note": "Signaler est une action d\u0027intake \u2014 cela ne change pas ce que tu peux voir, et un mod\u00E9rateur peut suivre.",
+  "posts.report_note": "Signaler est le premier pas \u2014 cela ne change pas ce que tu peux voir, et un mod\u00e9rateur peut suivre.",
   "posts.report_submit": "Signaler",
   "posts.replies_heading": "R\u00E9ponses",
   "posts.replies_empty": "Pas encore de r\u00E9ponses. Si tu peux voir cette publication, tu peux y r\u00E9pondre.",
@@ -74,6 +75,7 @@
   "posts.delete": "Supprimer",
   "posts.reply_delete": "Supprimer",
   "posts.deleted_placeholder": "Cette publication a \u00E9t\u00E9 supprim\u00E9e par son auteur.",
+  "posts.moderator_hidden_placeholder": "Cette publication a \u00E9t\u00E9 masqu\u00E9e par un mod\u00E9rateur.",
   "posts.reply_deleted_placeholder": "Cette r\u00E9ponse a \u00E9t\u00E9 supprim\u00E9e par son auteur.",
   "posts.translations_label": "Traductions",
   "posts.translations_none": "pas encore",
@@ -90,5 +92,6 @@
   "posts.project_report_button": "Signaler ce projet",
   "posts.board_report_button": "Signaler ce tableau",
   "posts.todo_report_button": "Signaler cette t\u00E2che",
-  "posts.grouppost_report_button": "Signaler ce message"
+  "posts.grouppost_report_button": "Signaler ce message",
+  "posts.replies_empty_title": "Pas encore de r\u00E9ponses."
 }

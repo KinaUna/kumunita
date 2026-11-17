@@ -3,5 +3,7 @@
   "email.verify_subject": "Bekr\u00E6ft din Kumunita-konto",
   "email.verify_body": "Hej {0},\n\nDin Kumunita-konto skal bekr\u00E6ftes ved din f\u00F8rste login. \u00C5bn dette engangsklink for at bekr\u00E6fte kontoen (den logger dig ogs\u00E5 ind):\n\n{1}\n\nHvis du ikke har oprettet denne konto, kan du ignorere denne besked.",
   "email.reminder_subject": "P\u00E5mindelse: {0}",
-  "email.reminder_body": "**{0}** er p\u00E5 vej: {1}{2}."
+  "email.reminder_body": "**{0}** er p\u00E5 vej: {1}{2}.",
+  "email.invitation_subject": "Du er inviteret til {2}",
+  "email.invitation_body": "Hej {0},\n\n{0} har inviteret dig til at deltage i {2} p\u00e5 Kumunita. \u00c5bn det engangsgyldige link nedenfor for at oprette din konto \u2014 invitationen gyldig frem til {3}:\n\n{1}\n\nHvis du ikke forventede det, kan du ignorere denne besked: den \u00e5bner kun oprettelse for din e-mailadresse og udl\u00f8ber s\u00e5."
 }

@@ -5,9 +5,11 @@
   "tags.flash_translation_saved": "Traduction enregistr\u00E9e.",
   "tags.list.heading": "\u00C9tiquettes",
   "tags.list.lede": "Les sujets dont vos publications et pages de blog sont \u00E9tiquet\u00E9es \u2014 clique sur l\u0027une d\u0027elles pour parcourir ce qui en a \u00E9t\u00E9 publi\u00E9.",
+  "tags.list.empty_title": "Pas encore d\u0027\u00E9tiquettes.",
   "tags.list.empty": "Pas encore d\u0027\u00E9tiquettes \u2014 elles apparaissent ici d\u00E8s qu\u0027un habitant en ajoute une \u00E0 une publication ou \u00E0 une page de blog.",
   "tags.bytag.heading": "Publications et pages \u00E0 propos de",
   "tags.bytag.posts_heading": "Publications",
   "tags.bytag.pages_heading": "Pages de blog",
+  "tags.bytag.empty_title": "Rien sous cette \u00E9tiquette.",
   "tags.bytag.empty": "Aucune publication ni page de blog lisible ne porte cette \u00E9tiquette."
 }

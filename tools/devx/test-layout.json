@@ -1,0 +1,2532 @@
+{
+  "version": 1,
+  "generated": "2026-11-16",
+  "generated_by": "tools/devx/test-layout.ps1 -Plan (DX24)",
+  "attribution_rule": "context with the most word-boundary seam-name hits in the file's text; ties or zero → _Shared/",
+  "contexts": 30,
+  "total_test_files": 413,
+  "mapping": [
+    {
+      "file": "tests/Kumunita.Core.Tests/AccessAuditFactoryTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/AdminOnboardingSeederTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/AdminOnboardingServiceTests.cs",
+      "context": "AdminOnboarding",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/AdminOverrideDdlTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/AnnouncementCommentCountTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/AnnouncementServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/AppRoleSchemaPrivilegeTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/AssemblyFixtures.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/AttachmentOwnershipTests.cs",
+      "context": "Posts",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/AuthorizationServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/BoardLaneServiceSeamTests.cs",
+      "context": "Projects",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/BoardStandingPolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/BookmarkBatchReadTests.cs",
+      "context": "Projects",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/BookmarkDocTypesDdlTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/BookmarkServiceTests.cs",
+      "context": "Identity",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/BounceSuppressionGateTests.cs",
+      "context": "Notifications",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/BreakGlassProbeTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/BundledBaselineLanguageTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ChildAccountPasswordTests.cs",
+      "context": "Identity",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ClaimShapingInvariantBTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/CommunityOptionsTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ContentImageOwnershipTests.cs",
+      "context": "Posts",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ContentTargetKindsTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DataClassCatalogTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DataClassCoverageTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DbBootstrapIsPristineTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DeleteAccountRowsTests.cs",
+      "context": "_Shared/",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DeleteAccountThreadTests.cs",
+      "context": "_Shared/",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DeletionSchedulerTests.cs",
+      "context": "Identity",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DirectoryServiceTests_U6.cs",
+      "context": "UserInfo",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DirectoryServiceTests.cs",
+      "context": "UserInfo",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DisposableEmailBlocklistCoreTests.cs",
+      "context": "Identity",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/DocumentDocTypesDdlTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Documents/DocumentServiceTests.cs",
+      "context": "Documents",
+      "hits": 14,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Documents"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Documents/DocumentsOrganizationTests.cs",
+      "context": "Documents",
+      "hits": 19,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Documents"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EmailDeadLetterCounterTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EmbeddedResourceParityTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ErrorReportResolveTests.cs",
+      "context": "Notifications",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ErrorReportServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EscalationInboundTests.cs",
+      "context": "ErrorReports",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EscalationTokenTests.cs",
+      "context": "ErrorReports",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EventCalendarSeamTests.cs",
+      "context": "Events",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EventRecurrenceExpanderTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EventReminderServiceTests.cs",
+      "context": "Localization",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Events/EventSortTests.cs",
+      "context": "Events",
+      "hits": 2,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Events"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EventServiceCascadeTests.cs",
+      "context": "Events",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EventServiceCreateRecurrenceTests.cs",
+      "context": "Events",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EventServiceSkipUndeleteTests.cs",
+      "context": "Events",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EventServiceTests.cs",
+      "context": "Events",
+      "hits": 10,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/EventStandingPolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GoalStandingPolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GroupCommunityTranslationTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GroupEventServiceTests.cs",
+      "context": "Authorization",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GroupIsPrivateUpgradePathTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GroupMessagingServiceTests.cs",
+      "context": "GroupMessaging",
+      "hits": 19,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GroupPostServiceSeamTests.cs",
+      "context": "Posts",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GroupPostServiceTests.cs",
+      "context": "Posts",
+      "hits": 12,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GuardianApprovalLaneTests.cs",
+      "context": "Notifications",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GuardianAssignmentTests.cs",
+      "context": "Identity",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GuardianControlsTests.cs",
+      "context": "_Shared/",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GuardianEventRsvpGateTests.cs",
+      "context": "Notifications",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GuardianTimeLimitEvaluatorTests.cs",
+      "context": "UserInfo",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GuardianTimeLimitStandingTests.cs",
+      "context": "_Shared/",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/GuestAccessSeamTests.cs",
+      "context": "_Shared/",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IcsFeedTests.cs",
+      "context": "Events",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IcsFormatTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IcsWriterTests.cs",
+      "context": "Tags",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityPlatformGateServiceSeamTests.cs",
+      "context": "Identity",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityServiceAccountNotificationTests.cs",
+      "context": "_Shared/",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityServiceDeleteAccountTests.cs",
+      "context": "Identity",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityServiceDeleteChildAccountTests.cs",
+      "context": "Identity",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityServiceDeleteLaneGdprTests.cs",
+      "context": "_Shared/",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityServiceSampleMfaLockTests.cs",
+      "context": "Identity",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityServiceSamplePasswordLockTests.cs",
+      "context": "Identity",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityServiceSignupPolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityServiceStorageRequestTests.cs",
+      "context": "Notifications",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/IdentityServiceTokenHashTests.cs",
+      "context": "Identity",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ImportOwnershipGuardServiceSeamTests.cs",
+      "context": "Portability",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ImportOwnershipGuardTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/InstanceStatus/ConfigWarningsPolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "InstanceStatus"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/InstanceStatus/InstanceStatusServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 7,
+      "already_in_subfolder": true,
+      "existing_subfolder": "InstanceStatus"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/InstanceStatus/MailAlarmStateReaderTests.cs",
+      "context": "Identity",
+      "hits": 4,
+      "already_in_subfolder": true,
+      "existing_subfolder": "InstanceStatus"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/InventoryDocTypesDdlTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/InventoryServiceTests.cs",
+      "context": "Authorization",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/InvitationServiceTests.cs",
+      "context": "Identity",
+      "hits": 18,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Kiosk/KioskLinkServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Kiosk"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Kiosk/KioskServiceTests.cs",
+      "context": "Authorization",
+      "hits": 3,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Kiosk"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/KnownTranslationKeys_ParityTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/KnownTranslationKeysClosureTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/KumunitaArchiveLimitsTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/KumunitaFeatureDdlTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/LocalizationServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/LoggingTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/LogRedactTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/LS_U04_SeederTests.cs",
+      "context": "Pages",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/M28AcceptanceGateTests.cs",
+      "context": "Authorization",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/M7PaginationSeamTests.cs",
+      "context": "Posts",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/MailAlarmsServiceTests.cs",
+      "context": "Identity",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/MailAlarmThresholdPolicyTests.cs",
+      "context": "Identity",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Media/DocumentAllowListTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Media"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Media/LocalVolumeFileStoreTests.cs",
+      "context": "Media",
+      "hits": 3,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Media"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Media/LocalVolumeMediaStoreTests.cs",
+      "context": "Media",
+      "hits": 2,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Media"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Media/MediaLifecycleTests.cs",
+      "context": "Media",
+      "hits": 2,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Media"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Media/MediaOptionsPreviewableTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Media"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Mentions/MentionEmitters.cs",
+      "context": "Notifications",
+      "hits": 5,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Mentions"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Mentions/MentionsTests.cs",
+      "context": "UserInfo",
+      "hits": 3,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Mentions"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/MessagingPerActorGateTests.cs",
+      "context": "UserInfo",
+      "hits": 9,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/MessagingServiceTests.cs",
+      "context": "Messaging",
+      "hits": 12,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/MiscList/MiscListSortTests.cs",
+      "context": "Documents",
+      "hits": 6,
+      "already_in_subfolder": true,
+      "existing_subfolder": "MiscList"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/MLUI_FacesTests.cs",
+      "context": "Localization",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ModerationServiceTests.cs",
+      "context": "Notifications",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/NotificationEmitterContractTests.cs",
+      "context": "Notifications",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/NotificationFlushServiceTests.cs",
+      "context": "Identity",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/NotificationServiceTests.cs",
+      "context": "Localization",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PageServiceTests.cs",
+      "context": "Authorization",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PageStandingPolicyTests.cs",
+      "context": "Posts",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PersonalNotesDocTypesDdlTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PersonalNoteServiceTests.cs",
+      "context": "Identity",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PortabilityApplyDocumentsTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PortabilityExportScopeTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PortabilityRoundTripTests.cs",
+      "context": "Media",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PortabilityValidateTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PostDraftModeTests.cs",
+      "context": "Posts",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PostgresFixture.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PostReplyCountTests.cs",
+      "context": "Posts",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Posts/PostSortTests.cs",
+      "context": "Posts",
+      "hits": 3,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Posts"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PostServiceTests.cs",
+      "context": "Posts",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PostTranslationPolicyTests.cs",
+      "context": "Posts",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/PostTranslationTests.cs",
+      "context": "Posts",
+      "hits": 16,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ProfileToAuditableResourceTests.cs",
+      "context": "Authorization",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ProjectDocShapeTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Projects/ProjectSortTests.cs",
+      "context": "Projects",
+      "hits": 4,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Projects"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Projects/ProjectsTagLaneTests.cs",
+      "context": "Tags",
+      "hits": 2,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Projects"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Projects/ProjectsTranslationLaneTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Projects"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ProjectServiceTests.cs",
+      "context": "Projects",
+      "hits": 18,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ProjectStandingPolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Query/SortSpecTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Query"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/ResidentInviteSettingTests.cs",
+      "context": "Identity",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/RetentionPolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/RetentionServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SampleDataCorpusBackfillTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SampleDataEventTranslationBackfillTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Search/SearchSortTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Search"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SearchServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SessionServiceTests.cs",
+      "context": "Sessions",
+      "hits": 22,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SideEffectHarnessTests.cs",
+      "context": "Identity",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SiteContentSeederTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SiteContentServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SmtpHealthCheckTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SmtpProbeTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/StandingMatrixTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SuppressionServiceTests.cs",
+      "context": "Notifications",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SurfaceKeyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SurfaceLabelsSeederTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/SurfaceLabelsServiceTests.cs",
+      "context": "Localization",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TagPeople/TagPeopleSortTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "TagPeople"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TagServiceTests.cs",
+      "context": "Authorization",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TodoCommentServiceSeamTests.cs",
+      "context": "Projects",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TodoIcsWriterTests.cs",
+      "context": "Authorization",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TodoStandingPolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TranslationBulkExporterTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TranslationBulkImporterTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TranslationBulkSaveAllTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TranslationDescriptorTests.cs",
+      "context": "Posts",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/TranslationPolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UG_GuideRegistryTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Usage/StorageLimitsAcceptanceTests.cs",
+      "context": "Media",
+      "hits": 2,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Usage"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Usage/StorageLimitsTests.cs",
+      "context": "Media",
+      "hits": 2,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Usage"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Usage/StorageMetricsHistoryTests.cs",
+      "context": "Media",
+      "hits": 2,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Usage"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Usage/StorageMetricsTests.cs",
+      "context": "Media",
+      "hits": 5,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Usage"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/Usage/UsageHistoryTests.cs",
+      "context": "Usage",
+      "hits": 2,
+      "already_in_subfolder": true,
+      "existing_subfolder": "Usage"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UsageAnalyticsServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UsageCapturePolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UsagePurgePolicyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UsagePurgeServiceTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfo/OnboardingCompletionLaneTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "UserInfo"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfo/ProfileAvatarLaneTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "UserInfo"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfo/ProfileBioTagsShapeTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "UserInfo"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfo/ProfileBioTagsWriteLaneTests.cs",
+      "context": "UserInfo",
+      "hits": 1,
+      "already_in_subfolder": true,
+      "existing_subfolder": "UserInfo"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfo/ProfileDateFormatLaneTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "UserInfo"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfo/ProfileFindServiceTests.cs",
+      "context": "UserInfo",
+      "hits": 5,
+      "already_in_subfolder": true,
+      "existing_subfolder": "UserInfo"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfo/ProfileFirstDayOfWeekLaneTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "UserInfo"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfo/ProfileHomeShowUpcomingLaneTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "UserInfo"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfo/ProfileTimezoneLaneTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "UserInfo"
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfoServiceGroupDeleteTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfoServiceGroupDescriptionTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfoServiceGroupInvitationsM2bTests.cs",
+      "context": "UserInfo",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfoServiceGroupJoinRequestTests.cs",
+      "context": "UserInfo",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfoServiceGroupNotificationTests.cs",
+      "context": "Notifications",
+      "hits": 10,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfoServiceGroupPrivacyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfoServiceGroupsU9Tests.cs",
+      "context": "UserInfo",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserInfoServiceTests.cs",
+      "context": "UserInfo",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityAcceptanceTests.cs",
+      "context": "UserInfo",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityClassifyTests.cs",
+      "context": "UserInfo",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityExportTests.cs",
+      "context": "UserInfo",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityGroupMessagingExportTests.cs",
+      "context": "UserInfo",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityHostileClassifyTests.cs",
+      "context": "UserInfo",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityHostileResolveTests.cs",
+      "context": "UserInfo",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityMediaGateTests.cs",
+      "context": "Usage",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityNotesExportTests.cs",
+      "context": "UserInfo",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityResolveModelTests.cs",
+      "context": "Authorization",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/UserPortabilityResolveTests.cs",
+      "context": "UserInfo",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Core.Tests/WeekAnchorTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AccountControllerChangePasswordTests.cs",
+      "context": "Identity",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AccountControllerInvitationSignupTests.cs",
+      "context": "Identity",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AccountControllerInviteSurfaceTests.cs",
+      "context": "Identity",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AccountControllerSignupGateTests.cs",
+      "context": "Identity",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AccountControllerStorageRequestTests.cs",
+      "context": "Identity",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminAnalyticsControllerTests.cs",
+      "context": "Usage",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminAnalyticsHistoryTests.cs",
+      "context": "Usage",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminAnnouncementCommentsControllerTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminControllerBlockTests.cs",
+      "context": "Identity",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminControllerCommunityUserTests.cs",
+      "context": "UserInfo",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminControllerDeleteAccountTests.cs",
+      "context": "Identity",
+      "hits": 18,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminControllerMandatoryTests.cs",
+      "context": "UserInfo",
+      "hits": 16,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminControllerPlatformPagesTests.cs",
+      "context": "Pages",
+      "hits": 9,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminControllerSetRoleTests.cs",
+      "context": "Identity",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminDateFormatControllerTests.cs",
+      "context": "Localization",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminErrorReportDetailTests.cs",
+      "context": "ErrorReports",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminErrorReportTests.cs",
+      "context": "ErrorReports",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminGuestsControllerTests.cs",
+      "context": "Identity",
+      "hits": 9,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminHelpControllerTests.cs",
+      "context": "Pages",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminInvitationsControllerTests.cs",
+      "context": "Identity",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminOnboardingBannerTests.cs",
+      "context": "AdminOnboarding",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminOnboardingControllerTests.cs",
+      "context": "AdminOnboarding",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminPortabilityControllerTests.cs",
+      "context": "Portability",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminPortabilityScopeTests.cs",
+      "context": "Portability",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminQuietControllerTests.cs",
+      "context": "Localization",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminReadAuditTests.cs",
+      "context": "UserInfo",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminSampleDataControllerTests.cs",
+      "context": "Identity",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminSetupControllerTests.cs",
+      "context": "Identity",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminSignupControllerTests.cs",
+      "context": "Identity",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminSiteControllerTests.cs",
+      "context": "SiteContent",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminStatusControllerTests.cs",
+      "context": "InstanceStatus",
+      "hits": 9,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminStorageControllerTests.cs",
+      "context": "Usage",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminStorageMetricsControllerTests.cs",
+      "context": "Usage",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminStorageMetricsHistoryTests.cs",
+      "context": "Usage",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminStorageQuotaOverrideTests.cs",
+      "context": "Usage",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminSurfaceLabelsControllerTests.cs",
+      "context": "SurfaceLabels",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminTimezoneControllerTests.cs",
+      "context": "Localization",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AdminTwoFactorMiddlewareTests.cs",
+      "context": "Identity",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AlertSinkRoutingTests.cs",
+      "context": "Identity",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AnnouncementControllerTests.cs",
+      "context": "UserInfo",
+      "hits": 51,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AnonymousWriteLimitsTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AntiforgeryCoverageTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AssemblyFixtures.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AttachmentLinkTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AttachmentServingTests.cs",
+      "context": "Posts",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AttachmentUploadTests.cs",
+      "context": "Posts",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AudienceEditorModelCommunityTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/AvatarTagHelperTests.cs",
+      "context": "_Shared/",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/BlockedAccountMiddlewareTests.cs",
+      "context": "UserInfo",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/BlogControllerTests.cs",
+      "context": "_Shared/",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/BookmarkButtonTests.cs",
+      "context": "Bookmarks",
+      "hits": 14,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/BookmarksControllerTests.cs",
+      "context": "Bookmarks",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/BulkTranslationBatchEditorTests.cs",
+      "context": "Localization",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/BulkTranslationRouteTests.cs",
+      "context": "Localization",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/CommunityControllerTests.cs",
+      "context": "UserInfo",
+      "hits": 43,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/CommunityControllerTranslationTests.cs",
+      "context": "UserInfo",
+      "hits": 43,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ContentImageServingTests.cs",
+      "context": "Posts",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ContentImageUploadTests.cs",
+      "context": "Posts",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ControllerFlashExtensionsTests.cs",
+      "context": "Localization",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/DateTimeTagHelperTests.cs",
+      "context": "UserInfo",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/DeadLetterExhaustionAlertTests.cs",
+      "context": "Identity",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/DeletionDueHandlerTests.cs",
+      "context": "Identity",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/DirectoryDetailViewModelTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/DirectoryIndexViewModelTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/DirectoryMessageButtonTests.cs",
+      "context": "UserInfo",
+      "hits": 14,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/DisposableEmailSignupWebTests.cs",
+      "context": "Identity",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/DocumentControllerTests.cs",
+      "context": "Media",
+      "hits": 24,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/DocumentFolderControllerTests.cs",
+      "context": "Documents",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ErrorReportPageTests.cs",
+      "context": "ErrorReports",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/EscalationInboundEndpointTests.cs",
+      "context": "ErrorReports",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/EscalationTokenPageTests.cs",
+      "context": "ErrorReports",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/EventComposerRecurrenceTests.cs",
+      "context": "Events",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/EventControllerTests.cs",
+      "context": "Events",
+      "hits": 94,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/EventDetailRecurrenceTests.cs",
+      "context": "Events",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/F7F8_HardeningGateTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ForwardedHeadersSetupTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GlobalAdminMfaLoginTests.cs",
+      "context": "Identity",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GroupMessagesControllerTests.cs",
+      "context": "GroupMessaging",
+      "hits": 16,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GroupsControllerDeleteTests.cs",
+      "context": "UserInfo",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GroupsControllerGroupEventTests.cs",
+      "context": "Events",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GroupsControllerInvitationLinkTests.cs",
+      "context": "UserInfo",
+      "hits": 22,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GroupsControllerTranslationTests.cs",
+      "context": "UserInfo",
+      "hits": 23,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GroupsDetailViewModelTests.cs",
+      "context": "UserInfo",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GroupsViewModelTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuardianAssignmentTests.cs",
+      "context": "Identity",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuardianCommunityBlockTests.cs",
+      "context": "UserInfo",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuardianDeleteChildTests.cs",
+      "context": "_Shared/",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuardianEventRsvpGateTests.cs",
+      "context": "_Shared/",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuardianMessagingRestrictionTests.cs",
+      "context": "UserInfo",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuardianRemoveMyselfSteeringTests.cs",
+      "context": "_Shared/",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuardianTimeLimitKwLParityTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuardianTimeLimitSurfaceTests.cs",
+      "context": "UserInfo",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuardianViewModelsTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuestClaimMintTests.cs",
+      "context": "_Shared/",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/GuestNoticeR20Tests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/HealthControllerTests.cs",
+      "context": "Identity",
+      "hits": 12,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/HomeControllerSiteContentTests.cs",
+      "context": "SiteContent",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/HomeControllerTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/HomeControllerUpcomingTests.cs",
+      "context": "Projects",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/IconSpriteTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ImageEditorTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/InfectedUploadServingTests.cs",
+      "context": "_Shared/",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/InlineEditorTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/InventoryControllerTests.cs",
+      "context": "Inventory",
+      "hits": 35,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/IssuePageTests.cs",
+      "context": "ErrorReports",
+      "hits": 9,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/KioskControllerTests.cs",
+      "context": "Kiosk",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/KioskItemCatalogTests.cs",
+      "context": "UserInfo",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/KioskLinkCommunityFilterTests.cs",
+      "context": "Projects",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/KioskLinkMiddlewareTests.cs",
+      "context": "Kiosk",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/KwLRegistryConsistencyTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/LocaleControllerQuietSectionTests.cs",
+      "context": "Notifications",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/LoginErrorCodeMappingTests.cs",
+      "context": "Identity",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/LoginLimiterPartitionTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/M14InterlockTests.cs",
+      "context": "Projects",
+      "hits": 91,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/M15AcceptanceTests.cs",
+      "context": "Localization",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/M16AcceptanceGateTests.cs",
+      "context": "Inventory",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/M17AcceptanceGateTests.cs",
+      "context": "Bookmarks",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/M23FindPeopleTests.cs",
+      "context": "UserInfo",
+      "hits": 9,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/M23ProfileExtendedTests.cs",
+      "context": "UserInfo",
+      "hits": 19,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/M37AcceptanceGateTests.cs",
+      "context": "PersonalNotes",
+      "hits": 9,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/M7NewlyPagedTests.cs",
+      "context": "UserInfo",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/M7PagerWiringTests.cs",
+      "context": "UserInfo",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/MarkdownRendererTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/MentionRendererTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/MessagesControllerTests.cs",
+      "context": "Messaging",
+      "hits": 29,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/MessagingSettingsControllerTests.cs",
+      "context": "UserInfo",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/MfaQrTests.cs",
+      "context": "_Shared/",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/MilestonesTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/MiscListSortWebTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/MLUI_FacesTests.cs",
+      "context": "Localization",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ModerationControllerTests.cs",
+      "context": "Moderation",
+      "hits": 14,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/MyDraftsControllerTests.cs",
+      "context": "UserInfo",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/NavLayoutControllerTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/NavMoreFoldTests.cs",
+      "context": "SurfaceLabels",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/NotesControllerTests.cs",
+      "context": "PersonalNotes",
+      "hits": 23,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/NotificationFlushHandlerTests.cs",
+      "context": "Localization",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/NotificationsControllerTests.cs",
+      "context": "Notifications",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/O03AdminStatusNoticeTests.cs",
+      "context": "InstanceStatus",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/O04MailAlarmInboxTests.cs",
+      "context": "_Shared/",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/Onboarding_KwL_Set_Is_Parity_Pinned_In_Four_Languages.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/OnboardingControllerTests.cs",
+      "context": "UserInfo",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PageControllerTests.cs",
+      "context": "Pages",
+      "hits": 56,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PageControllerTranslationTests.cs",
+      "context": "Pages",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PagedViewModelTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PageMountResolverTests.cs",
+      "context": "Pages",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PageTitleKeysTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PaletteTests.cs",
+      "context": "SiteContent",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PostEventSortWebTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PostReadDecisionTests.cs",
+      "context": "Authorization",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PrivilegedStampMiddlewareTests.cs",
+      "context": "UserInfo",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ProfileAvatarServingTests.cs",
+      "context": "UserInfo",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ProfileAvatarUploadTests.cs",
+      "context": "UserInfo",
+      "hits": 28,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ProfileEditViewModelTests.cs",
+      "context": "UserInfo",
+      "hits": 1,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ProjectsBaseControllerTests.cs",
+      "context": "UserInfo",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ProjectsControllerTests.cs",
+      "context": "Projects",
+      "hits": 613,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ProjectSortWebTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ProjectsRouteTableTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PublicLocaleAndAboutTests.cs",
+      "context": "Localization",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/PwaManifestTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ReportsMineControllerTests.cs",
+      "context": "_Shared/",
+      "hits": 8,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ReportTargetsControllerTests.cs",
+      "context": "Projects",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/RepositoryInfoTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/RequestLanguageBrowserFallbackTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ResidentUsageViewTests.cs",
+      "context": "Usage",
+      "hits": 9,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/RetentionTickHandlerTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/RevocationStampFailClosedTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/RichEditorTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SearchControllerTests.cs",
+      "context": "Search",
+      "hits": 13,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SearchSortWebTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SecGate/AccessViaDenyMatrixTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "SecGate"
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SecGate/ControlMapTraceabilityTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "SecGate"
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SecGate/CspInlineDisciplineGateTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "SecGate"
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SecGate/DataClassCoverageTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "SecGate"
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SecGate/DecisionFreeReadGateTests.cs",
+      "context": "Authorization",
+      "hits": 2,
+      "already_in_subfolder": true,
+      "existing_subfolder": "SecGate"
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SecGate/LogTemplatePiiGateTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "SecGate"
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SecGate/SecGateSource.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": true,
+      "existing_subfolder": "SecGate"
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SecuritySettingsMfaLockTests.cs",
+      "context": "Identity",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SecurityTxtResponseTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SentryBreadcrumbPiiTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SentryRegistrationTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SessionRevocationKillAllTests.cs",
+      "context": "Sessions",
+      "hits": 4,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SessionRevocationMiddlewareTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SessionsKillAllExtTests.cs",
+      "context": "Sessions",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SettingsSectionSplitTests.cs",
+      "context": "UserInfo",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SortControlTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SortKwL_Resolves_En_De_Fr_Da.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/StaticPagesControllerHarness.cs",
+      "context": "Localization",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/StaticPagesControllerPgTests.cs",
+      "context": "Pages",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/StaticPagesSP_U04Tests.cs",
+      "context": "UserInfo",
+      "hits": 5,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/StatusControllerTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/StatusPageGateTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/SurfaceLabelResolutionTests.cs",
+      "context": "Localization",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/TagControllerTests.cs",
+      "context": "Tags",
+      "hits": 15,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/TagPeopleSortWebTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/ThemeControllerTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/TimeLimitMiddlewareTests.cs",
+      "context": "UserInfo",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/TodoDetailBoardVisibilityTests.cs",
+      "context": "Projects",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/TokenStoreApiSurfaceCompileTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/TranslationDisplayTests.cs",
+      "context": "Posts",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/UploadGateHandlerTests.cs",
+      "context": "Usage",
+      "hits": 2,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/UploadGateTests.cs",
+      "context": "Usage",
+      "hits": 11,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/UploadGateTestSupport.cs",
+      "context": "Usage",
+      "hits": 10,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/UploadSignatureSnifferTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/UploadSniffAttachmentImageTests.cs",
+      "context": "Media",
+      "hits": 6,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/UsageCaptureMiddlewareTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/UserPortabilityControllerTests.cs",
+      "context": "Portability",
+      "hits": 7,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/VerifyConfirmStepTests.cs",
+      "context": "UserInfo",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/VerifySignInStampTests.cs",
+      "context": "_Shared/",
+      "hits": 3,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/WhatsNewTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    },
+    {
+      "file": "tests/Kumunita.Web.Tests/WysiwygEditorTests.cs",
+      "context": "_Shared/",
+      "hits": 0,
+      "already_in_subfolder": false
+    }
+  ]
+}

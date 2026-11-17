@@ -37,10 +37,47 @@ public sealed class AccountController(
     SignInManager<User> signInManager,
     UserManager<User> userManager,
     IIdentityService identity,
-    IUserInfoService userInfo) : Controller
+    IUserInfoService userInfo,
+    // ADR 0301 D2 (IMPROVE-UX R13) — the self-service deletion SCHEDULING seam
+    // (R11's IDeletionScheduler, DI-registered in the Identity module): the
+    // self-serve lane now SCHEDULES the deletion (the R12 due-job executes it
+    // after the grace period) — it no longer calls
+    // IIdentityService.DeleteAccountAsync directly (ADR 0301 D4: that seam's
+    // contract stands, the grace period lives above it). An OPTIONAL param
+    // (the `EffectiveTimezoneResolver? = null` / `IUserInfoService` harness
+    // idiom used across this repo's controllers) so the existing test harnesses
+    // that construct this controller with the four original args keep compiling;
+    // DI always supplies the live scheduler in the app, and the R13 Delete
+    // tests pass an NSubstitute explicitly.
+    IDeletionScheduler? scheduler = null,
+    // ADR 0304 (IMPROVE-UX A08) — the email invitation seam (A07's Core
+    // service, DI-registered in the Identity module): the `?invite=` gate
+    // opens the self-service surface while the ADR 0050 gate is closed and
+    // runs the AcceptPresentedAsync write (RegisterAsync + the Accepted mark
+    // + the invitation.accept audit row). OPTIONAL (the `IDeletionScheduler?`
+    // harness idiom) so the existing direct-construction harnesses keep
+    // compiling; DI always supplies it, and the A08 tests pass an
+    // NSubstitute. When null AND a token is presented, the gate decides
+    // (fail-closed — no account is created on an unresolvable seam; the
+    // SignupClosed floor holds, which is the ADR 0050 invariant).
+    IInvitationService? invitationService = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
+
+    // ── IMPROVE-UX A12 — the resident "Invite a neighbour" surface ────────
+    // A11 settled the mode (Off / On / OnWithApproval) + the rule
+    // (GetResidentInvitePostureAsync); A12 settles the *resident surface*
+    // (the GET /account/invite + the POST /account/invite that creates the
+    // row in the mode's initialStatus: Pending when the mode is On,
+    // PendingApproval when the mode is OnWithApproval — the ADR 0304 D6 c
+    // row state). The invitation seam (IInvitationService, A07's Core
+    // service) is the same one the A08 sign-up gate uses (the
+    // AccountController ctor already carries it for the A08 ?invite= gate)
+    // — the A12 Invite actions read the A11 rule + the A12 CreateAsync
+    // initialStatus param. The admin approval queue (the /admin/invitations
+    // Approve button) is a separate surface (the
+    // AdminInvitationsController.Approve POST — the A12 admin lane).
 
     // ADR 0215 — the MFA challenge's model errors are localized from the registry
     // (account.mfa.error.*), resolved from the request scope like LocalizeValidationAsync;
@@ -139,20 +176,290 @@ public sealed class AccountController(
         var quota      = await quotaTask;
         long usage      = await usageTask;
 
-        bool unlimited = quota.PerUserQuotaBytes == 0;      // C-UP·5 sentinel
+        // IMPROVE-UX A15 — the **effective** per-user quota for this resident
+        // (override ?? global, the loop's feedback coming back to the resident):
+        // the admin may have raised just this account's cap on the account
+        // detail page, so the resident now sees their own number instead of the
+        // community-wide one. Null-tolerant (a harness with no override read
+        // seam degrades to the global quota — the read is a nudge, not a hard
+        // dependency). The C-UP·5 sentinel is preserved: a 0 effective quota =
+        // unlimited (shown as "Unlimited", not 0 remaining).
+        long? overrideQuota = null;
+        try
+        {
+            overrideQuota = await settings.GetResidentQuotaOverrideAsync(subject, CancellationToken.None);
+        }
+        catch
+        {
+            overrideQuota = null;   // fall back to the global quota
+        }
+        var effectiveQuota = Kumunita.Core.Usage.StorageLimits.EffectivePerUserQuota(overrideQuota, quota);
+
+        bool unlimited = effectiveQuota == 0;               // C-UP·5 sentinel
         var remaining  = unlimited ? (long?)null
-                                   : Math.Max(0, quota.PerUserQuotaBytes - usage);
+                                   : Math.Max(0, effectiveQuota - usage);
 
         return View(new ResidentStorageViewModel
         {
             MyUsageBytes      = usage,
-            PerUserQuotaBytes = quota.PerUserQuotaBytes,
+            PerUserQuotaBytes = effectiveQuota,
             RemainingBytes    = remaining,                  // null ⇒ unlimited
             QuotaUnlimited    = unlimited,
             MyUsageHuman      = ResidentStorageViewModel.FormatBytes(usage),
-            QuotaHuman        = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(quota.PerUserQuotaBytes),
+            QuotaHuman        = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(effectiveQuota),
             RemainingHuman    = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(remaining!.Value)
         });
+    }
+
+    // ── IMPROVE-UX A14 — the resident "request more space" loop ────────────
+    // The "My storage" page (Storage()) shows the
+    // account.storage_remaining_note text — "…Ask an administrator to raise the
+    // quota if you need more." — with no seam to actually ask (E20, the
+    // "promise without seam" anti-pattern). A14 closes the loop: a
+    // "Request more space" button (the limited branch of Storage.cshtml) POSTs
+    // here, which calls the Core notify lane (IIdentityService.
+    // RequestStorageQuotaIncreaseAsync) that fans out to every GlobalAdmin with
+    // a link to this resident's account-detail page. The *quota override*
+    // (the admin raising the limit) is A15's separate unit; A14 only sends the
+    // nudge. The subject is the signed-in principal (self-only — never a path
+    // param, the Storage() C-UP·4/F7 shape). Best-effort (the ADR 0077 D5
+    // posture — the Core lane swallows a notify failure): the button always
+    // "succeeds" + flashes the account.storage_request_sent confirmation.
+
+    /// <summary>
+    /// <c>POST /account/storage/request</c> (IMPROVE-UX A14) — the resident's
+    /// "Request more space" action. Calls the Core notify lane
+    /// (<see cref="IIdentityService.RequestStorageQuotaIncreaseAsync"/>) on
+    /// behalf of the signed-in principal (self-only — <see
+    /// cref="SubjectId(System.Security.Claims.ClaimsPrincipal)"/>, never a path
+    /// param) and redirects back to <see cref="Storage"/> with the localized
+    /// <c>TempData["info"]</c> confirmation (the
+    /// <see cref="Kumunita.Web.Security.ControllerFlashExtensions.FlashAsync"/>
+    /// ADR 0261 seam — <c>account.storage_request_sent</c>). The lane is
+    /// best-effort (a fresh instance with no GlobalAdmin is a no-op; a
+    /// notify-lane failure is swallowed + logged in Core) — the request
+    /// "was made" is the durable fact, so the redirect always succeeds (the
+    /// <see cref="AdminGuestsController"/>.Save flash-redirect shape).
+    /// </summary>
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Route("account/storage/request")]
+    public async Task<IActionResult> RequestMoreSpace()
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // The Core notify lane (best-effort — the ADR 0077 D5 posture swallows
+        // a notify failure in Core; a null seam is a no-op, not an error — the
+        // direct-construction harnesses omit it).
+        await identity.RequestStorageQuotaIncreaseAsync(subject);
+
+        // Flash the localized confirmation (the ADR 0261 FlashAsync seam — the
+        // en value is the floor when no provider is resolvable), then redirect
+        // back to the storage page (the AdminGuestsController.Save shape).
+        TempData["info"] = await this.FlashAsync(
+            "account.storage_request_sent", "Your request was sent to the admins.");
+        return RedirectToAction(nameof(Storage));
+    }
+
+    // ── IMPROVE-UX A12 — the resident "Invite a neighbour" surface ────────
+    // The A11 rule (GetResidentInvitePostureAsync) decides whether the
+    // surface is visible (MayInvite = true) or hidden (MayInvite = false —
+    // the Off floor). When visible, the POST creates the invitation row in
+    // the mode's initialStatus: Pending when RequiresApproval = false
+    // (the On mode), PendingApproval when RequiresApproval = true (the
+    // OnWithApproval mode — the ADR 0304 D6 c row state). The ADR 0304
+    // D4 invariants (single-use, expiring, revocable) are unchanged.
+
+    /// <summary>
+    /// <c>GET /account/invite</c> (IMPROVE-UX A12, ADR 0304 D6 c) — the
+    /// resident's "Invite a neighbour" form. The A11 rule
+    /// (<see cref="IInvitationService.GetResidentInvitePostureAsync"/>)
+    /// decides whether the surface is **visible**
+    /// (<see cref="ResidentInvitePosture.MayInvite"/> = <c>true</c> — the
+    /// <c>On</c> / <c>OnWithApproval</c> modes) or **hidden**
+    /// (<see cref="ResidentInvitePosture.MayInvite"/> = <c>false</c> —
+    /// the <c>Off</c> floor, the surface is absent, not a 403). The
+    /// subject is the signed-in principal (self-only, never a path
+    /// param). The <see cref="ResidentInvitePosture.RequiresApproval"/>
+    /// flag is carried on the view model (the view renders the
+    /// "pending approval" notice when <c>true</c> — the A12
+    /// <c>OnWithApproval</c> mode's "your invitation is pending
+    /// approval" text, the ADR 0304 D6 c shape). The ADR 0304 D6(a)
+    /// expiry default (7 days) is the A09 call-site's default
+    /// (<see cref="AdminInvitationsController.DefaultExpiryDays"/>).
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    public async Task<IActionResult> Invite([FromQuery] string? email = null)
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // Fail-closed (the A08 "null AND a token is presented, the gate
+        // decides" idiom): the invitation seam is the A12 surface's whole
+        // contract (the A11 rule + the CreateAsync initialStatus lane). A
+        // null seam (the A09 harness shape) is a refusal, not a silent
+        // create (the C3 no-silent-missing-email floor).
+        if (invitationService is null)
+            return Challenge();
+        var invites = invitationService;   // the non-null local (the null guard above)
+
+        // The A11 rule (the A12 surface's gate — the MayInvite /
+        // RequiresApproval posture). The service does not re-check User
+        // (the ADR 0050 split — the [Authorize] boundary is the access
+        // decision; the rule is the resident-invite-mode read).
+        var posture = await invites.GetResidentInvitePostureAsync(subject);
+
+        return View(new InviteViewModel
+        {
+            MayInvite          = posture.MayInvite,
+            RequiresApproval   = posture.RequiresApproval,
+            Email              = email ?? string.Empty,
+        });
+    }
+
+    /// <summary>
+    /// <c>POST /account/invite</c> (IMPROVE-UX A12, ADR 0304 D6 c) —
+    /// create the invitation for <paramref name="email"/>. The A11 rule
+    /// is re-read (the gate — <see cref
+    /// "ResidentInvitePosture.MayInvite"/> must be <c>true</c> for the
+    /// create to proceed; a <c>false</c> posture is a refusal flash, not
+    /// a 403). The row's initial status is
+    /// <see cref="EmailInvitationStatus.PendingApproval"/> when
+    /// <see cref="ResidentInvitePosture.RequiresApproval"/> is
+    /// <c>true</c> (the <c>OnWithApproval</c> mode — the row is gated
+    /// behind the admin approval queue) or
+    /// <see cref="EmailInvitationStatus.Pending"/> when
+    /// <see cref="ResidentInvitePosture.RequiresApproval"/> is
+    /// <c>false</c> (the <c>On</c> mode — the row is immediately usable).
+    /// The ADR 0304 D4 invariants are unchanged (the
+    /// <see cref="IInvitationService.CreateAsync"/> seam owns the
+    /// token-hash-at-rest, the single-use pin, the expiring contract).
+    /// The <c>invitation.create</c> audit row is the service's
+    /// (<c>Via = Owner</c>, <c>TargetKind = "invitation"</c> — the
+    /// ADR 0304 D3 shape, the A07 contract). The A12
+    /// <c>invitation.approved</c> nudge (the
+    /// <see cref="IInvitationService.ApproveAsync"/> seam) is the
+    /// admin-lane's — this surface does not emit it.
+    /// </summary>
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Invite(InviteViewModel model)
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // Fail-closed (the A08 "null AND a token is presented, the gate
+        // decides" idiom): the invitation seam is the A12 surface's whole
+        // contract (the A11 rule + the InviteAsync initialStatus lane). A
+        // null seam (the A09 harness shape) is a refusal, not a silent
+        // create (the C3 no-silent-missing-email floor).
+        if (invitationService is null)
+            return Challenge();
+        var invites = invitationService;   // the non-null local (the null guard above)
+
+        // The A11 rule (the gate — re-read on the POST, not just the GET;
+        // the mode may have changed between the GET and the POST).
+        var posture = await invites.GetResidentInvitePostureAsync(subject);
+        if (!posture.MayInvite)
+        {
+            TempData["error"] = await this.FlashAsync(
+                "account.invite_off",
+                "Resident invitations are not enabled for this community. Please contact a GlobalAdmin.");
+            return RedirectToAction(nameof(Invite));
+        }
+
+        // The email shape check (the A09 IsPlausibleEmail shape — a
+        // local@domain with a dot in the domain; no regex dependency).
+        var email = (model.Email ?? string.Empty).Trim().ToLowerInvariant();
+        if (!IsPlausibleEmail(email))
+        {
+            TempData["error"] = await this.FlashAsync(
+                "account.invite_invalid_email",
+                "Not a valid email address.");
+            return RedirectToAction(nameof(Invite), new { Email = model.Email });
+        }
+
+        // The ADR 0304 D6(a) expiry default (7 days) — the A09 call-site's
+        // default (the ADR "ships no default — the A09/A12 surfaces will
+        // set it; the proposed default is 7 days"; this call site settles
+        // it for the resident surface, the A09 AdminInvitationsController
+        // shape).
+        var expiresAt = DateTimeOffset.UtcNow.AddDays(7);
+
+        // The initialStatus (the A12 mode's row state — the ADR 0304 D6 c
+        // "approval state"): PendingApproval when the mode is
+        // OnWithApproval (the RequiresApproval = true flag, the A11 rule's
+        // output), Pending when the mode is On (the RequiresApproval =
+        // false flag). The ADR 0304 D4 invariants are unchanged.
+        var initialStatus = posture.RequiresApproval
+            ? EmailInvitationStatus.PendingApproval
+            : EmailInvitationStatus.Pending;
+
+        // The resident's display name (the email's {0}) — the service
+        // floors to "there" when null/blank (the
+        // BuildVerificationEmailAsync shape). Read through the request
+        // services (no ctor change, the AdminInvitationsController
+        // ActorDisplayNameAsync shape).
+        string inviterDisplayName;
+        try
+        {
+            inviterDisplayName = (await userInfo.GetProfileAsync(subject))?.DisplayName ?? string.Empty;
+        }
+        catch
+        {
+            inviterDisplayName = string.Empty;   // fail-open (the email lane is best-effort on the name)
+        }
+
+        // The A09 InviteAsync delivery seam (create + stage the invitation
+        // email in one transaction — the C3 no-silent-missing-email
+        // guarantee). The initialStatus param (the A12 mode's row state)
+        // is the last named argument (the A07/A08/A09 contract is
+        // unchanged — the A09 call sites use the default Pending).
+        await invites.InviteAsync(
+            email, subject, inviterDisplayName, expiresAt,
+            initialStatus: initialStatus);
+
+        // The flash names the mode (the A12 "your invitation is pending
+        // approval" notice when OnWithApproval; the simple "sent" when On).
+        if (posture.RequiresApproval)
+        {
+            TempData["info"] = await this.FlashAsync(
+                "account.invite_pending_approval",
+                "Your invitation for {0} is pending approval. A GlobalAdmin will review it.",
+                email);
+        }
+        else
+        {
+            TempData["info"] = await this.FlashAsync(
+                "account.invite_success",
+                "Invitation sent to {0}.",
+                email);
+        }
+        return RedirectToAction(nameof(Invite));
+    }
+
+    /// <summary>A shape check for an invited address (the A09
+    /// <see cref="AdminInvitationsController.IsPlausibleEmail"/> shape — a
+    /// <c>local@domain</c> with a dot in the domain; no regex dependency,
+    /// the house "no new package" rule).</summary>
+    private static bool IsPlausibleEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        var at = email.LastIndexOf('@');
+        if (at <= 0 || at == email.Length - 1) return false;
+        var local = email[..at];
+        var domain = email[(at + 1)..];
+        if (local.Length == 0 || local.Contains(" ")) return false;
+        if (domain.Length < 3 || !domain.Contains('.')) return false;
+        if (domain.StartsWith('.') || domain.EndsWith('.')) return false;
+        return !domain.Contains("..");
     }
 
     // ── Change password (self-serve; ADR 0138) ───────────────────────────────
@@ -164,28 +471,84 @@ public sealed class AccountController(
     // the Mfa / MfaLocked views. The former /account/password GET + POST
     // actions and their Views/Account/ChangePassword*.cshtml views are removed.
 
-    // ── Delete account (self-serve; ADR 0142) ─────────────────────────────
+    // ── Delete account (self-serve; ADR 0301 grace period, amending ADR 0142 D5) ──
+
+    /// <summary>
+    /// ADR 0301 D2 (IMPROVE-UX R13) — the pending <see cref="DeletionRequest"/>
+    /// read for the signed-in resident, resolved from the request scope (the
+    /// <see cref="Storage()"/> <c>GetRequiredService</c> idiom — this controller
+    /// keeps the C3-05 "no IDocumentStore ctor param" invariant). A
+    /// <see cref="DeletionRequestStatus.Pending"/> row is the scheduled state
+    /// (the view renders the "deletion scheduled for {date}" notice + a Cancel
+    /// button); a missing row, or a <see cref="DeletionRequestStatus
+    /// .Cancelled"/> / <see cref="DeletionRequestStatus.Executed"/> row, is
+    /// <c>null</c> (the schedule form renders — a re-schedule is a fresh act,
+    /// ADR 0301 D2). The read is unaudited (the <c>QuerySession</c>
+    /// convention); the request is the signed-in principal (self-only, never a
+    /// path param).
+    /// </summary>
+    private async Task<DeletionRequest?> LoadPendingDeletionAsync(string subjectId)
+    {
+        var services = HttpContext?.RequestServices;
+        if (services is null)
+            return null;
+        var store = services.GetService<Marten.IDocumentStore>();
+        if (store is null)
+            return null; // harness shape — the C3-05 "no store" idiom
+        await using var session = store.QuerySession();
+        var row = await session.LoadAsync<DeletionRequest>(subjectId);
+        return row is { Status: DeletionRequestStatus.Pending } ? row : null;
+    }
+
+    /// <summary>
+    /// ADR 0019 (IMPROVE-UX R13) — render the scheduled <see cref
+    /// "DeletionRequest.DueAt"/> in the resident's effective time zone (their
+    /// zone when the resolver is available — the app shape — the <c>UTC</c>
+    /// floor in the harness shape, where <c>EffectiveTimezoneResolver</c> is
+    /// not registered). The format follows the current culture (the
+    /// resident's effective language drives the UI strings; the date glyph
+    /// set is the platform's, the ADR 0020 floor).
+    /// </summary>
+    private async Task<string> FormatDueAtAsync(DateTimeOffset dueAt)
+    {
+        var services = HttpContext?.RequestServices;
+        var timezone = services?.GetService<Kumunita.Web.Localization.EffectiveTimezoneResolver>();
+        var zone = timezone is not null ? await timezone.GetAsync()
+                                        : System.TimeZoneInfo.Utc;
+        return TimeZoneInfo.ConvertTime(dueAt, zone).ToString(
+            System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.LongDatePattern);
+    }
 
     /// <summary>
     /// <c>GET /account/delete</c> — the resident's self-serve delete-account
-    /// form (ADR 0142). The subject is the signed-in principal (never a path
-    /// param). The form asks for the resident's current password (verified
-    /// server-side on the POST) and an explicit acknowledgment checkbox (the
-    /// dangerous-action guard). The lede text explains the consequences:
-    /// the account is removed, the resident's audit trail is pseudonymized
-    /// (their identity replaced by a tombstone), and their group/community
-    /// memberships are removed — the privacy lane OPS.md §9 / ARCHITECTURE.md
-    /// §5 prescribe.
+    /// form (ADR 0142 D7, now ADR 0301 D1: **every** resident — the ADR 0142
+    /// D5 GlobalAdmin gate is removed by ADR 0301 D1). The subject is the
+    /// signed-in principal (never a path param). The form asks for the
+    /// resident's current password (verified server-side on the POST) and an
+    /// explicit acknowledgment checkbox (the dangerous-action guard). The lede
+    /// text explains the consequences: the account is removed, the resident's
+    /// audit trail is pseudonymized (their identity replaced by a tombstone),
+    /// and their group/community memberships are removed — the privacy lane
+    /// OPS.md §9 / ARCHITECTURE.md §5 prescribe.
     /// <para>
-    /// **ADR 0142 D5 gate (the ADR 0138 "surface-replaced-by-notice"
-    /// shape, generalized):** the self-serve lane is reachable only by a
-    /// <c>GlobalAdmin</c>. A non-GlobalAdmin resident sees the same form
-    /// with the <see cref="DeleteAccountViewModel.SelfDeletionRefused"/>
-    /// flag set, so the view renders a notice that the self-serve lane is
-    /// unavailable for them and that they should contact an administrator
-    /// instead — rather than letting the resident discover the gate only
-    /// on submit. A crafted POST is refused server-side with the same
-    /// message (defense in depth).
+    /// **ADR 0301 D2 — the grace period:** when the resident already has a
+    /// pending <see cref="DeletionRequest"/> row, the form is replaced by the
+    /// "deletion scheduled for {date} — sign in to cancel" notice + a Cancel
+    /// button (the ADR 0301 D2 "no extra button, no extra form" — the Cancel
+    /// button is the explicit lane the R13 prompt calls for; the ADR defines
+    /// the *rule*, this surface renders it). The <see cref
+    /// "DeleteAccountViewModel.IsScheduled"/> / <see cref
+    /// "DeleteAccountViewModel.ScheduledFor"/> flags carry the state.
+    /// <para>
+    /// **ADR 0301 D3 — the child rule:** a resident under an active
+    /// <c>GuardianLink</c> cannot self-delete (the R11 seam enforces this at
+    /// scheduling time — the <see cref="ScheduleDeletionAsync"/> seam throws
+    /// <see cref="UnauthorizedAccessException"/>). The GET does not pre-check
+    /// (the read shape keeps this surface a single seam); the POST surfaces
+    /// the distinct "contact a parent/guardian" notice (the
+    /// <see cref="DeleteAccountViewModel.IsChildRefused"/> flag) — the ADR
+    /// 0301 D3 "the same shape as 0142 D5's old <c>SelfDeletionRefused</c>,
+    /// with a different reason".
     /// </para>
     /// </summary>
     [Authorize]
@@ -202,37 +565,63 @@ public sealed class AccountController(
         if (subject is null)
             return Challenge();
 
-        // ADR 0142 D5 gate — read the standing (a read, no audit row) and
-        // set the notice flag when the resident is not a GlobalAdmin.
-        // The form is still rendered (so the surface is discoverable), but
-        // the page makes the gate visible (the ADR 0138
-        // ChangePasswordLockedViewModel "notice" shape, generalized).
-        var user = await userManager.FindByIdAsync(subject);
-        var roles = user is null
-            ? new List<string>()
-            : (await userManager.GetRolesAsync(user)).ToList();
-        var refused = !roles.Contains(Kumunita.Core.Identity.Roles.GlobalAdmin);
+        // ADR 0301 D2 — the pending DeletionRequest read (self-only; the
+        // QuerySession convention). A Pending row renders the scheduled
+        // state; otherwise the schedule form renders (the ADR 0142 D5
+        // GlobalAdmin gate is gone — every resident sees the form, ADR
+        // 0301 D1).
+        var pending = await LoadPendingDeletionAsync(subject);
+        var vm = new DeleteAccountViewModel
+        {
+            IsScheduled   = pending is not null,
+            ScheduledFor  = pending is null ? null : await FormatDueAtAsync(pending.DueAt)
+        };
 
-        return View(new DeleteAccountViewModel { SelfDeletionRefused = refused });
+        return View(vm);
     }
 
     /// <summary>
-    /// <c>POST /account/delete</c> — the self-serve write lane (ADR 0142).
-    /// <b>The guard is authoritative on the write path too</b> (the ADR 0138
-    /// shape): the resident must have checked the acknowledgment box AND
-    /// provided the correct current password — otherwise the form re-renders
-    /// with the error (the account is untouched). When both pass, the Core
-    /// lane (<see cref="Kumunita.Core.Identity.IIdentityService
-    /// .DeleteAccountAsync"/>) is invoked with the resident as the actor —
-    /// the Core lane still enforces the GlobalAdmin gate (the fail-closed
-    /// pin), so a non-admin self-deletion is refused server-side.
+    /// <c>POST /account/delete</c> — the self-serve SCHEDULE lane (ADR 0301
+    /// D2 — the ADR 0142 D7 surface shape, now scheduling rather than
+    /// executing). <b>The guard is authoritative on the write path too</b>
+    /// (the ADR 0138 shape): the resident must have checked the acknowledgment
+    /// box AND provided the correct current password — otherwise the form
+    /// re-renders with the error (the account is untouched). When both pass,
+    /// the <see cref="IDeletionScheduler.ScheduleDeletionAsync"/> seam (R11)
+    /// writes the pending <see cref="DeletionRequest"/> row + one
+    /// <c>"account.delete.scheduled"</c> audit row (ADR 0301 D1's "one
+    /// summary" shape, <c>Via: Owner</c>); the R12 due-job executes the
+    /// existing <see cref="IIdentityService.DeleteAccountAsync"/> lane after
+    /// the grace period (ADR 0301 D4 — the seam's contract stands, the grace
+    /// period lives above it).
     /// <para>
-    /// On success the resident is signed out (their credential is gone) and
-    /// redirected to the login page with a confirmation message. The
-    /// login page's "account-removed" error code is NOT used here — that
-    /// code is for the PrivilegedStampMiddleware's "user deleted while
-    /// signed in" path; this is the *intentional* self-deletion lane, so
-    /// the message is the positive "your account was deleted" form.
+    /// **The two up-front refusals (both before any write — the ADR 0301
+    /// D2/D3 fail-closed shape, the R11 seam's guard ordering):**
+    /// <list type="bullet">
+    /// <item><see cref="InvalidOperationException"/> — the account does not
+    /// exist, or the resident is the last <c>GlobalAdmin</c> (the ADR 0142 D3
+    /// lockout pin — the R11 seam reuses the guard the
+    /// <c>DeleteCoreAsync</c> lane already ran, above the seam).</item>
+    /// <item><see cref="UnauthorizedAccessException"/> — the resident is a
+    /// child under an active <c>GuardianLink</c> (the ADR 0301 D3 child rule).
+    /// The ADR 0142 D5 GlobalAdmin gate that used to throw this exception is
+    /// removed (ADR 0301 D1); the catch is now the *distinct* "contact a
+    /// parent/guardian" notice (the <see cref
+    /// "DeleteAccountViewModel.IsChildRefused"/> flag — the ADR 0301 D3 "the
+    /// same shape as 0142 D5's old <c>SelfDeletionRefused</c>, with a
+    /// different reason").
+    /// </item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// On success the resident stays signed in (their credential is intact —
+    /// the account is only *scheduled*); the GET now renders the scheduled
+    /// state (the "deletion scheduled for {date} — sign in to cancel" notice
+    /// + the Cancel button). The R14 SEC review (the ADR 0301 D2/D3 surface)
+    /// may add a re-auth step here; R13 keeps the existing
+    /// <c>CheckPasswordAsync</c> guard as the re-auth (the ADR 0301 D2 "the
+    /// act of returning invalidates the pending request" is the cancel — the
+    /// re-auth on the POST is the schedule's own proof-of-possession).
     /// </para>
     /// </summary>
     [Authorize]
@@ -245,6 +634,15 @@ public sealed class AccountController(
         var subject = SubjectId(User);
         if (subject is null)
             return Challenge();
+
+        // ADR 0301 D2 — a re-schedule (a pending row already exists) is a
+        // fresh act that resets the row (the R11 seam's "one row per
+        // resident" invariant, ADR 0301 D2); the GET renders the scheduled
+        // state + the Cancel button, so this POST need not pre-read the
+        // row (the R11 seam's ScheduleDeletionAsync overwrites the existing
+        // row on a re-schedule — the ADR 0301 D2 "a re-schedule is a fresh
+        // act" rule). The GET's LoadPendingDeletionAsync read is the single
+        // store surface for the scheduled-state notice.
 
         // The dangerous-action guard: the resident must have checked the
         // acknowledgment box. A bare [Required] on a bool would accept
@@ -274,66 +672,260 @@ public sealed class AccountController(
 
         if (!ModelState.IsValid)
         {
+            // ADR 0301 D2 — preserve the scheduled state (if any) on the
+            // re-render: a validation error does not invalidate the pending
+            // row, so the resident still sees the "deletion scheduled for
+            // {date}" notice (the ADR 0301 D2 "the resident sees the date
+            // they already committed to" shape — a re-schedule resets the
+            // row, but a validation error does not reach the schedule seam).
+            var pendingOnReRender = await LoadPendingDeletionAsync(subject);
+            model.IsScheduled   = pendingOnReRender is not null;
+            model.ScheduledFor  = pendingOnReRender is null ? null : await FormatDueAtAsync(pendingOnReRender.DueAt);
             await LocalizeValidationAsync(model);
             return View(model);
         }
 
+        // ADR 0301 D2 — the R13 prompt: "add IDeletionScheduler scheduler to
+        // the controller ctor" — the DI-registered seam (the app shape). A
+        // harness that does not supply one reaches this null-ref (the C3-05
+        // "no store" idiom — the harness passes a Substitute explicitly, the
+        // R13 test shape). The `!` is the ADR 0301 D2 "the seam is
+        // registered" invariant, not a defensive swallow.
+        // ADR 0301 D2 — the R13 prompt: "add IDeletionScheduler scheduler to
+        // the controller ctor". The promoted ctor param is the primary source
+        // (the harness passes a Substitute explicitly — the C3-05 "no store"
+        // idiom); a fallback to the request scope covers the DI-registered
+        // app shape (a harness that constructs the controller with 4 args
+        // and the app has the seam registered).
+        var schedulerRef = scheduler
+            ?? HttpContext?.RequestServices?.GetService<IDeletionScheduler>()
+            ?? throw new InvalidOperationException(
+                "The self-service deletion scheduler (IDeletionScheduler) is not registered — " +
+                "the ADR 0301 D2 (IMPROVE-UX R13) DI binding is missing.");
+
         try
         {
-            // The single audited write lane (via: Owner on the self-serve
-            // branch — actor == target). ADR 0142 D5 gate: the Core seam
-            // enforces the GlobalAdmin standing on this branch (a
-            // non-GlobalAdmin's crafted POST is refused server-side, the
-            // fail-closed pin). Pseudonymizes the resident's audit rows,
-            // removes their memberships + profile, and deletes the Identity
-            // account.
-            await identity.DeleteAccountAsync(subject, adminSubjectId: subject);
+            // The single audited write lane (the R11 seam — the ADR 0301 D1
+            // "one summary" shape, Via: Owner — actor == target on the
+            // self-serve branch). Writes the pending DeletionRequest row +
+            // the "account.delete.scheduled" audit row in one session; the
+            // R12 due-job executes the existing DeleteAccountAsync lane
+            // (pseudonymize + remove memberships/profile/Identity — the ADR
+            // 0142 D2/D4 invariants) after the grace period (the ADR 0301
+            // D2 N=14 days proposed; the R14 SEC review may adjust the
+            // IDeletionScheduler.GracePeriodDays constant).
+            await schedulerRef.ScheduleDeletionAsync(subject);
         }
         catch (UnauthorizedAccessException)
         {
-            // ADR 0142 D5 gate (defense in depth — the GET's
-            // SelfDeletionRefused notice is the primary surface, but a
-            // crafted POST reaches the Core seam directly). The resident is
-            // not a GlobalAdmin, so the self-serve lane is unavailable for
-            // them. Surface the notice (the ADR 0138 "locked" shape).
-            ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.delete_admin_only", "The self-serve delete-account lane is only available to a GlobalAdmin. A non-GlobalAdmin resident cannot delete their own account — contact an administrator to remove the account."));
-            return View(new DeleteAccountViewModel { SelfDeletionRefused = true });
+            // ADR 0301 D3 (the child rule) — the resident is a child under
+            // an active GuardianLink. The ADR 0142 D5 GlobalAdmin gate that
+            // used to throw this exception is removed (ADR 0301 D1); this
+            // catch is now the *distinct* "contact a parent/guardian" notice
+            // (the DeleteAccountViewModel.IsChildRefused flag — the ADR
+            // 0301 D3 "the same shape as 0142 D5's old SelfDeletionRefused,
+            // with a different reason"). The ADR 0301 D3 "Also the
+            // GlobalAdmin-removal path" clarification (a GlobalAdmin must
+            // dissolve the link before removing a child) is the admin lane's
+            // surface, not this one — this lane is self-serve only.
+            //
+            // // TODO ❓ (the R13 prompt's one design call — flag, don't
+            // silently pick): the ADR 0301 D3 child rule fires at
+            // SCHEDULING time (the R11 seam enforces it). The R12 handler's
+            // `catch (UnauthorizedAccessException)` is *defensive* (at HEAD
+            // the self-serve branch does not throw it, so it is unreachable
+            // for the child rule at execution). The open question (for R14's
+            // SEC review) is whether the child rule should also be
+            // *re-checked* at execution time — i.e. a child whose
+            // GuardianLink is dissolved mid-grace-window, then re-created,
+            // would still be deleted at execution (the R11 seam's check is
+            // scheduling-only). R13 does not touch the R12 handler.
+            ModelState.AddModelError(string.Empty, await this.FlashAsync(
+                "account.delete_child_refused",
+                "This account is under a guardian's supervision. Contact a parent or guardian to manage the deletion (ADR 0301 D3)."));
+            return View(new DeleteAccountViewModel { IsChildRefused = true });
         }
         catch (InvalidOperationException ex)
         {
-            // The Core lane refused the write (the last-GlobalAdmin guard —
-            // a lone GlobalAdmin cannot self-delete — or the account no
-            // longer exists, the idempotency pin). Surface the message.
+            // ADR 0142 D3 (the last-GlobalAdmin lockout pin — the R11 seam
+            // reuses the guard the DeleteCoreAsync lane already ran, above
+            // the seam) or the account no longer exists (the ADR 0142
+            // "the id is an error, not a silent no-op" shape). The message
+            // is the R11 seam's own (English — the ADR 0301 D1 "the message
+            // is the R11 seam's" floor; a localized version is the R14
+            // SEC-review surface).
             ModelState.AddModelError(string.Empty, ex.Message);
             return View(model);
         }
 
-        // The account is gone: sign this session out (their credential is
-        // deleted — the cookie is now stale) and redirect to the login page
-        // with a positive confirmation.
-        await signInManager.SignOutAsync();
-        TempData["info"] = await this.FlashAsync("account.flash_deleted", "Your account has been deleted. Your audit trail is preserved (pseudonymized) per the platform's privacy policy.");
-        return RedirectToAction(nameof(Login));
+        // The account is *scheduled*, not deleted: the resident stays signed
+        // in (their credential is intact — the ADR 0301 D2 "the act of
+        // returning invalidates the pending request" is the cancel, so the
+        // session must outlive the schedule). Redirect to the GET (the
+        // scheduled state renders: the "deletion scheduled for {date} — sign
+        // in to cancel" notice + the Cancel button). A positive flash tells
+        // the resident the schedule took effect (the ADR 0142 D7 "the
+        // message is the positive 'your account was deleted' form" — now
+        // "your deletion is scheduled").
+        TempData["info"] = await this.FlashAsync(
+            "account.flash_scheduled",
+            "Your account deletion is scheduled. Sign in and cancel any time before the date to keep your account.");
+        return RedirectToAction(nameof(Delete));
+    }
+
+    /// <summary>
+    /// <c>POST /account/delete/cancel</c> — the Cancel button (ADR 0301 D2 —
+    /// "cancel = signing in": the resident signs back in, the R13 surface
+    /// calls this). The guard shape matches the POST /account/delete (the
+    /// dangerous-action lane — the resident proves possession with the
+    /// current password + the acknowledgment checkbox); a wrong password or
+    /// unchecked box re-renders the schedule form (the account is untouched
+    /// — the row stays Pending). On success the
+    /// <see cref="IDeletionScheduler.CancelDeletionAsync"/> seam (R11) moves
+    /// the row <see cref="DeletionRequestStatus.Pending"/> →
+    /// <see cref="DeletionRequestStatus.Cancelled"/> (idempotent — the
+    /// ADR 0301 D2 "no extra button, no extra form"; the <c>CancelledAt</c>
+    /// timestamp is the record, no audit row). Redirects to the GET (the
+    /// schedule form renders again).
+    /// <para>
+    /// The ADR 0301 D3 child rule does not apply here (the child already
+    /// cannot schedule — the R11 seam refused at scheduling time — so a
+    /// child has no Pending row to cancel; the idempotent no-op covers the
+    /// crafted-POST case). The ADR 0142 D3 last-GlobalAdmin pin does not
+    /// apply either (the pin fires at scheduling + at execution, not at
+    /// cancel — the resident may still cancel a schedule they made before
+    /// becoming the last GlobalAdmin, and the R12 due-job's execution-time
+    /// re-check is the ADR 0301 D2 "the guard re-checks at the scheduled
+    /// execution instant" surface, not this lane's).
+    /// </para>
+    /// </summary>
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    // ADR 0301 D2 (IMPROVE-UX R13) — the Cancel button's URL. The R13
+    // prompt specifies `POST /account/delete/cancel` (a sub-path, not the
+    // convention route's `/Account/DeleteCancel`); the `[Route]` attribute
+    // overrides the controller's `{controller=Home}/{action=Index}/{id?}`
+    // convention (the repo's `AdminSignupController` / `AdminPortabilityController`
+    // pattern — the controller-level `[Route]` is absent on AccountController,
+    // so this is the action-level `[Route]` shape used by the admin-surface
+    // controllers). The Cancel form (Views/Account/Delete.cshtml) targets
+    // this URL via `asp-action="DeleteCancel"` (the action name stays
+    // `DeleteCancel` for the view-to-action binding; the `[Route]` sets the
+    // URL).
+    [Route("account/delete/cancel")]
+    public async Task<IActionResult> DeleteCancel(DeleteAccountViewModel model)
+    {
+        // Self-only (the C-UP·4/F7 shape from Storage()): the subject is
+        // the signed-in principal — never a path param.
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // The dangerous-action guard (the ADR 0142 D7 shape, generalized —
+        // cancel is also a write lane, so the same two guards apply): the
+        // resident must have checked the acknowledgment box AND provided
+        // the correct current password. A bare [Required] on a bool would
+        // accept false (the bound value is non-null), so the check is
+        // explicit.
+        if (!model.Confirmed)
+        {
+            ModelState.AddModelError(
+                nameof(model.Confirmed), await this.FlashAsync("validation.confirm_deletion", "You must confirm that you understand your account will be permanently deleted."));
+        }
+
+        var user = await userManager.FindByIdAsync(subject);
+        if (user is null)
+        {
+            ModelState.AddModelError(nameof(model.Password), await this.FlashAsync("validation.account_not_found", "We could not find that account — sign in again."));
+        }
+        else
+        {
+            var currentOk = await userManager.CheckPasswordAsync(user, model.Password);
+            if (!currentOk)
+            {
+                ModelState.AddModelError(nameof(model.Password), await this.FlashAsync("validation.password_wrong", "Your password is incorrect."));
+            }
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
+            return RedirectToAction(nameof(Delete));
+        }
+
+        // ADR 0301 D2 — the Cancel seam (R11; idempotent — the ADR 0301 D2
+        // "no extra button, no extra form"). The DI-registered seam (the app
+        // shape); a harness that does not supply one reaches this null-ref
+        // (the C3-05 "no store" idiom — the harness passes a Substitute
+        // explicitly, the R13 test shape).
+        // ADR 0301 D2 — the Cancel seam (the R13 prompt: "add
+        // IDeletionScheduler scheduler to the controller ctor"). The
+        // promoted ctor param is the primary source (the harness passes a
+        // Substitute explicitly); the request-scope fallback covers the
+        // DI-registered app shape.
+        var schedulerRef = scheduler
+            ?? HttpContext?.RequestServices?.GetService<IDeletionScheduler>()
+            ?? throw new InvalidOperationException(
+                "The self-service deletion scheduler (IDeletionScheduler) is not registered — " +
+                "the ADR 0301 D2 (IMPROVE-UX R13) DI binding is missing.");
+
+        // Cancel writes no audit row (the ADR 0301 D2 "no extra form — the
+        // cancel is the act of returning; the CancelledAt timestamp on the
+        // row is the record"). A Pending row → Cancelled; a missing /
+        // already-Cancelled / already-Executed row is a no-op (the idempotent
+        // shape — the ADR 0301 D2 "a re-schedule is a fresh act" inverse).
+        await schedulerRef.CancelDeletionAsync(subject);
+
+        // Positive flash + redirect to the GET (the schedule form renders
+        // again — the ADR 0301 D2 "the resident may still cancel a schedule
+        // they made" shape; the Cancel button is the explicit lane).
+        TempData["info"] = await this.FlashAsync(
+            "account.flash_cancelled",
+            "Your account deletion has been cancelled. Your account is still active.");
+        return RedirectToAction(nameof(Delete));
     }
 
     // ── Signup ──────────────────────────────────────────────────────────────────────────
 
     [AllowAnonymous]
     [HttpGet]
-    public async Task<IActionResult> Signup()
+    public async Task<IActionResult> Signup([FromQuery] string? invite = null)
     {
         if (User.Identity?.IsAuthenticated == true)
             return Redirect("/");   // ADR 0238 — already signed in: Home, not the new-resident profile step
 
-        // ADR 0050 — the sign-up gate (the admin-settled instance value, the
-        // `false` floor — a fresh instance ships invitation-only). Closed → the
-        // invitation-only notice instead of the form;
-        // the gate is authoritative (an authenticated admin still creates accounts
-        // through the Guardian / admin lanes, not this self-service surface).
-        if (!await identity.IsSignupOpenAsync())
-            return View("SignupClosed", new SignupClosedViewModel());
-
         var model = new SignupViewModel();
+
+        // ADR 0304 (IMPROVE-UX A08) — resolve the presented invitation token
+        // (the `?invite=` query param) via the Core presented-token seam (Trap A:
+        // the hashing lives in one place, in Core — the Web host cannot hash).
+        // A live token prefills the invited email (Invitation.Email) and marks
+        // InvitationActive — the form then renders EVEN WHEN the ADR 0050 gate is
+        // closed (the ADR 0304 D4 "works while sign-up is closed" invariant).
+        // The token is a credential (ADR 0304 D2) — carried into the POST via a
+        // hidden field (model.InviteToken), never a visible form control.
+        var token = NormalizeToken(invite);
+        if (token is not null && invitationService is not null)
+        {
+            var invitation = await invitationService.ValidatePresentedAsync(token);
+            if (invitation is not null)
+            {
+                model.InvitationActive = true;
+                model.Email         = invitation.Email;   // prefill the invited address
+                model.InviteToken   = token;               // the hidden field's value
+            }
+        }
+
+        // ADR 0050 — the sign-up gate (the admin-settled instance value, the
+        // `false` floor — a fresh instance ships invitation-only). Closed + no
+        // valid token → the invitation-only notice instead of the form. The gate
+        // is authoritative (an authenticated admin still creates accounts through
+        // the Guardian / admin lanes, not this self-service surface); a valid
+        // invitation is the ADR 0304 exception that opens the surface — the gate
+        // is not bypassed.
+        if (!await identity.IsSignupOpenAsync() && !model.InvitationActive)
+            return View("SignupClosed", new SignupClosedViewModel());
 
         // F9 (AUTH-15, U3) — surface the flag + site key to the view (pin §4b): the
         // challenge widget + the hidden BotChallengeToken input render ONLY when the
@@ -362,11 +954,25 @@ public sealed class AccountController(
     [EnableRateLimiting("signup")]
     public async Task<IActionResult> Signup(SignupViewModel model)
     {
+        // ADR 0304 (IMPROVE-UX A08) — resolve the presented invitation token
+        // (the hidden `InviteToken` form field, echoed from the GET's
+        // `?invite=` query param) via the Core presented-token seam. The token
+        // is a credential (ADR 0304 D2) — never compared raw here; the hashing
+        // + email-match pin live in Core (Trap A). A live token lets the
+        // write path through EVEN WHEN the ADR 0050 gate is closed (the
+        // ADR 0304 D4 "works while sign-up is closed" invariant).
+        var token = NormalizeToken(model.InviteToken);
+        Invitation? invitation = null;
+        if (token is not null && invitationService is not null)
+            invitation = await invitationService.ValidatePresentedAsync(token);
+
         // ADR 0050 — the gate is authoritative on the write path too (the GET hides
         // the form, but the POST is the actual account-creation surface): a closed
-        // gate denies the self-service write. A resident who is *invited* is added
-        // by an administrator, not through this endpoint.
-        if (!await identity.IsSignupOpenAsync())
+        // gate denies the self-service write — UNLESS a live invitation is
+        // presented (the ADR 0304 exception that opens the surface; the gate is
+        // not bypassed, the invitation IS the exception). Closed + no live token
+        // (absent / invalid / expired / revoked) → the ADR 0050 floor holds.
+        if (!await identity.IsSignupOpenAsync() && invitation is null)
             return View("SignupClosed", new SignupClosedViewModel());
 
         if (!ModelState.IsValid)
@@ -398,6 +1004,66 @@ public sealed class AccountController(
             return View(model);
         }
 
+        // ADR 0304 (IMPROVE-UX A08) — a live invitation (regardless of the gate
+        // state) takes the invitation write seam: the single-address pin + the
+        // RegisterAsync lane + the Accepted mark + the invitation.accept audit
+        // row, in one Core lane (A07's AcceptAsync contract — the
+        // AcceptPresentedAsync overload delegates to it, Trap A). The invited
+        // person lands on the same "check your inbox" flash as the open-gate path.
+        if (invitation is not null && token is not null)
+        {
+            // ADR 0304 D4 (IMPROVE-UX A08) — the single-address pin: the signing-up
+            // email must match the invitation's (the token is only good for the
+            // invited address). A07's AcceptAsync enforces this in Core (step 2,
+            // before the RegisterAsync lane); the Web surface checks it FIRST so a
+            // mismatch re-renders with a friendly notice + the invited email
+            // refilled (the EmailDomainDisallowed / BotChallengeFailed
+            // re-render-with-flag precedent), instead of surfacing a raw exception.
+            // The Core check remains the source of truth (this is a UX shortcut,
+            // not a security gate).
+            if (!string.Equals(
+                    model.Email.Trim().ToLowerInvariant(), invitation.Email,
+                    StringComparison.Ordinal))
+            {
+                model.InvitationActive = true;   // the token is still live — only the email was wrong
+                model.InvitationMismatch = true;
+                model.Email = invitation.Email;   // refill the invited address for the retry
+                ModelState.AddModelError(string.Empty, await this.FlashAsync(
+                    "account.signup_invite_email_mismatch",
+                    "This invitation is for a different email address. Please sign up with the invited address."));
+                return View(model);
+            }
+
+            try
+            {
+                await invitationService!.AcceptPresentedAsync(
+                    token, model.Email, model.DisplayName, model.Password);
+            }
+            catch (DisallowedEmailDomainException ex)
+            {
+                // F9 (AUTH-15) — the disposable-email blocklist rejection (caught
+                // BEFORE the InvalidOperationException catch — pin §3b).
+                model.EmailDomainDisallowed = true;
+                ModelState.AddModelError(string.Empty, await this.FlashAsync("validation.domain_not_accepted", "The email domain '{0}' is not accepted for new accounts.", ex.Domain));
+                return View(model);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // A07's AcceptAsync refusal (the row is no longer Pending — e.g. a
+                // second accept, a revoked/expired token) or a RegisterAsync failure
+                // (e.g. the invited email already has an account). Friendly
+                // re-render, not a crash (the EmailAlreadyExists precedent).
+                if (ex.Message.StartsWith("An account with email", StringComparison.OrdinalIgnoreCase))
+                    model.EmailAlreadyExists = true;
+                ModelState.AddModelError(string.Empty, ex.Message);
+                return View(model);
+            }
+
+            TempData["info"] = await this.FlashAsync("account.flash_created", "Account created. Check your inbox for the verification link.");
+            return RedirectToAction(nameof(Login));
+        }
+
+        // ── open-gate path (no live invitation) ─────────────────────────────
         try
         {
             // RegisterAsync: creates the unverified account, bootstraps the Profile
@@ -426,6 +1092,16 @@ public sealed class AccountController(
         TempData["info"] = await this.FlashAsync("account.flash_created", "Account created. Check your inbox for the verification link.");
         return RedirectToAction(nameof(Login));
     }
+
+    /// <summary>
+    /// The A08 (IMPROVE-UX A08) token normalizer: trims a presented
+    /// <c>?invite=</c> / hidden-field value and returns <c>null</c> for a blank
+    /// one (the ESC·5 guard — the seam then refuses it and opens no session).
+    /// The raw value is passed through unchanged otherwise (the hashing is Core's
+    /// job — Trap A).
+    /// </summary>
+    private static string? NormalizeToken(string? presented) =>
+        string.IsNullOrWhiteSpace(presented) ? null : presented.Trim();
 
     // ── Resend confirmation email (an unactivated account already exists for the email) ──
 

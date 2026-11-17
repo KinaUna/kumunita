@@ -3,6 +3,7 @@
   "message.title": "Beskeder",
   "message.new": "Nyt samtale",
   "message.thread.empty": "Ingen beskeder endnu \u2014 sig hej.",
+  "message.thread.empty_title": "Ingen beskeder endnu.",
   "message.compose.placeholder": "Skriv en besked\u2026",
   "message.compose.send": "Send",
   "message.unread": "ul\u00E6st",

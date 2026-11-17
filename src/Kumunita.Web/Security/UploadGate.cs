@@ -108,9 +108,28 @@ public sealed class UploadGate(
         var usage = await _storageSettings.GetPerUserUsageBytesAsync(
             subjectId, CancellationToken.None);
 
+        // IMPROVE-UX A15 — the subject's per-resident quota override (a nudge on
+        // top of the global, the admin half of the storage loop). **Best-effort:**
+        // the override is optional, so a read failure (a test harness with a null
+        // / un-stubbed seam) falls back to the global quota — the decision still
+        // runs; the override is not a hard dependency. null = unset ⇒ global.
+        long? overrideQuota = null;
+        try
+        {
+            overrideQuota = await _storageSettings.GetResidentQuotaOverrideAsync(
+                subjectId, CancellationToken.None);
+        }
+        catch
+        {
+            overrideQuota = null;   // fall back to the global quota
+        }
+
         // The **pure** Core decision (size-first, C-UP·2 ordering) — Core stays
-        // HTTP-free (C-UP·3); only the mapping below is Web.
-        var decision = StorageLimits.Decide(incomingBytes, usage, settings, envMaxBytes);
+        // HTTP-free (C-UP·3); only the mapping below is Web. The 5-arg overload
+        // folds in the <c>override ?? global</c> effective per-user quota (A15);
+        // the per-file cap is untouched.
+        var decision = StorageLimits.Decide(incomingBytes, usage, settings,
+            envMaxBytes, overrideQuota);
 
         return decision switch
         {

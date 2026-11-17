@@ -10,7 +10,7 @@ related:
   - docs/ops/demo-site.md
   - docs/adr/0005-multilingual-support.md
   - docs/adr/0055-development-sample-data-lane.md
-updated: 2026-11-02
+updated: 2026-11-12
 ---
 
 > **Abstract:** what happens automatically on first run (schema, seeded
@@ -60,10 +60,10 @@ Operator steps:
    `Community__Name`.
 3. Log in as the seeded admin **using the token** — first login is "set your password";
    the token is invalidated by the app on this first use.
-4. **Remove `SeedAdmin__*` from env** in Coolify (nothing reusable remains to leak).
-   First M1 deploy, on a live instance: confirm the log shows schema-init ran once
-   (subsequent boots are a no-op), a **new** Postgres addon: schema-init happens on the
-   first M1 deploy (it is the first boot that creates it).
+4. **Remove `SeedAdmin__*` from env** in Coolify (nothing reusable remains to leak),
+   then open `/admin/status` and confirm the `SeedAdmin__*`-still-set config warning is
+   **gone** — the status page is the check, not the logs. (On a **new** Postgres addon
+   schema-init happens on the first M1 deploy; subsequent boots are a no-op.)
 5. Verify: `/health` returns OK, the seeded admin exists, a test email arrives
    (check the provider's inbox, not just "sent"), and the default components (incl.
    the language catalog) appear in-app.

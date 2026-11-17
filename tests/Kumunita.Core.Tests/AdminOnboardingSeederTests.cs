@@ -45,7 +45,7 @@ namespace Kumunita.Core.Tests;
 /// <para>
 /// No new Core or Web code beyond the U03 seeder change; no new seams.
 /// </para>
-public class AdminOnboardingSeederTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class AdminOnboardingSeederTests(PostgresFixture fixture)
 {
     // ── 1 — a fresh boot stores exactly one AdminOnboarding row ────────────
     // (the SiteContent / LocaleSettings "one row per instance" shape,

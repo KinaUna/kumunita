@@ -23,7 +23,7 @@ namespace Kumunita.Web.Tests;
 /// gate).
 /// </para>
 /// </summary>
-public sealed class RetentionTickHandlerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class RetentionTickHandlerTests(PostgresFixture fixture)
 {
     [Fact(DisplayName = "Handler_CallsService_AndReschedules")]
     public async Task Handler_CallsService_AndReschedules()

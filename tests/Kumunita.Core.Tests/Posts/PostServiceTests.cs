@@ -1,0 +1,2529 @@
+using Kumunita.Core;
+using Kumunita.Core.Authorization;
+using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
+using Kumunita.Core.Posts;
+using Kumunita.Core.UserInfo;
+using Marten;
+using Xunit;
+
+namespace Kumunita.Core.Tests;
+
+/// <summary>
+/// M3, plan U9 — the 18 <see cref="PostService"/> seam tests (design doc
+/// <c>m3-posts-design.md</c> §2.4). The M3 analog of M2's 22-name seam list
+/// (this assembly's <c>DirectoryServiceTests</c> / <c>DirectoryServiceTests_U6</c>
+/// are the shape template — same <see cref="PostgresFixture"/>, same
+/// <c>BootStoreAsync</c>, same service-composition pattern, fresh scratch
+/// Postgres per test method).
+/// <para>
+/// Each test name is pinned verbatim by §2.4 (the §2.6 drift-guard makes
+/// renaming them a drift event) and carries its FACES row (F1–F10, Part 1)
+/// and invariant anchors (C-M3·1/2/3, ADR 0006 C1–C6, ADR 0001-B, C5).
+/// The tests compose U6's <see cref="PostService"/> over the two frozen
+/// seams (<c>IUserInfoService</c> + <c>IAuthorizationService</c>) through
+/// U5's <see cref="PostToAuditableResource"/> — no new Core surface.
+/// </para>
+/// <para>
+/// This unit **does not** run the §2.5 acceptance gate (U10) and authors no
+/// e2e (U11). The pass/red status of these 18 is the data U10 consumes.
+/// </para>
+/// </summary>
+public class PostServiceTests(PostgresFixture fixture)
+{
+    private const string ComponentId = "c-u9-comp";
+
+    // ── 1 — F1_FeedVisibleToAudienceMember (F1, C-M3·3 aggregate row) ─────
+    //
+    // An audience member reads the community feed: the post is in
+    // `Visible`, the visit's **aggregate** audit row is present with
+    // `VisibleCount >= 1`, `Action = "read"`, `TargetKind = "post"`,
+    // `TargetId = null` (the C-M3·3 feed shape — an aggregate, not a
+    // decision row), the per-item row carries the post's id and the
+    // audience-lane `Via`.
+
+    [Fact]
+    public async Task F1_FeedVisibleToAudienceMember()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-u9-f1-owner";
+        const string member = "u-u9-f1-member";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f1-post", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f1", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        var feed = await svc.ListFeedAsync(ComponentId, member, page: 1);
+        var post = Assert.Single(feed.Visible);
+        Assert.Equal("f1-post", post.Id);
+        Assert.Equal(0, feed.HiddenCount);
+        Assert.Equal(1, feed.Total);
+
+        var rows = await PostAudits(store, actor: member);
+        var aggregate = Assert.Single(rows, a => a.TargetId is null);
+        Assert.Equal(AccessAction.Read.Id, aggregate.Action);
+        Assert.Equal("post", aggregate.TargetKind);
+        Assert.Equal(1, aggregate.VisibleCount);
+        Assert.Equal(0, aggregate.HiddenCount);
+        Assert.Equal(AccessOutcome.Allow, aggregate.Outcome);
+
+        var perItem = Assert.Single(rows, a => a.TargetId == "f1-post");
+        Assert.Equal(AccessVia.Audience, perItem.Via);
+        Assert.Equal(AccessOutcome.Allow, perItem.Outcome);
+    }
+
+    // ── 2 — F2_FeedHiddenFromNonMember (F2, C-M3·3, C1) ───────────────────
+    //
+    // A stranger reads the feed: the post is neither in `Visible` nor
+    // rendered anywhere — and leaves **no trace** (F2): the member id and
+    // the post id appear in the audit lane (the hidden count + the per-item
+    // Deny), but the post's *author* never appears as actor nor effective
+    // principal in any row (the audience's membership data is never logged).
+
+    [Fact]
+    public async Task F2_FeedHiddenFromNonMember()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-u9-f2-owner";
+        const string member = "u-u9-f2-member";
+        const string stranger = "u-u9-f2-stranger";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f2-post", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f2", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        var feed = await svc.ListFeedAsync(ComponentId, stranger, page: 1);
+        Assert.Empty(feed.Visible);
+        Assert.Equal(1, feed.HiddenCount);
+
+        var rows = await PostAudits(store, actor: stranger);
+        var aggregate = Assert.Single(rows, a => a.TargetId is null);
+        Assert.Equal(0, aggregate.VisibleCount);
+        Assert.Equal(1, aggregate.HiddenCount);
+        Assert.Equal(AccessOutcome.Deny, aggregate.Outcome);
+
+        var perItem = Assert.Single(rows, a => a.TargetId == "f2-post");
+        Assert.Equal(AccessOutcome.Deny, perItem.Outcome);
+
+        // The post's author (and the audience member) appear nowhere in
+        // the stranger's decision rows — C-M2·2's "never logged as an
+        // access decision" pin, at the DB level (the M2 U5 precedent).
+        Assert.All(rows, r =>
+        {
+            Assert.NotEqual(owner, r.ActorId);
+            Assert.NotEqual(owner, r.EffectivePrincipalId);
+            Assert.NotEqual(member, r.ActorId);
+            Assert.NotEqual(member, r.EffectivePrincipalId);
+        });
+    }
+
+    // ── 3 — F3_FeedDeniesModeratorOnAudiencePost (F3, C5 absence, C1) ─────
+    //
+    // C5's default posture pinned at the service level: the component's
+    // <c>ModeratorAccess</c> flag is OFF (the C5 default — M3's product
+    // surface never turns it ON), so M1's moderation branch ('branch #2'
+    // in §4.4) does not fire. A moderator with an assignment row for this
+    // component still reads the post's *audience* — and is outside it ⇒
+    // Deny. The `Via = Moderator` lane is unavailable (the flag is OFF) and
+    // the `Action` column in the M3 post lane always carries
+    // <c>read</c> (the reserved <c>moderate</c> action id is never invoked
+    // by M3's post surface — that is the F3/F8 *absence* pin, not a
+    // moderation-branch deny pin: the branch is M1's, and if the flag were
+    // ON the branch would §4.4-Allow the moderator regardless of
+    // the action id they invoked — that path is M3b's lane, exercised by
+    // the M3b "moderator peek" spec rather than by these names).
+
+    [Fact]
+    public async Task F3_FeedDeniesModeratorOnAudiencePost()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-u9-f3-member";
+        const string moderator = "u-u9-f3-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = false }); // C5 default-OFF
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "f3-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u9-admin", At = DateTimeOffset.UtcNow
+        });
+
+        await Plant(store, new Post
+        {
+            Id = "f3-post", ComponentId = ComponentId, AuthorId = member,
+            Body = "body f3", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        var feed = await svc.ListFeedAsync(ComponentId, moderator, page: 1);
+        Assert.Empty(feed.Visible);
+        Assert.Equal(1, feed.HiddenCount);
+
+        var rows = await PostAudits(store, actor: moderator);
+        var perItem = Assert.Single(rows, a => a.TargetId == "f3-post");
+        Assert.Equal(AccessOutcome.Deny, perItem.Outcome);
+        Assert.Equal(AccessVia.Audience, perItem.Via); // actor's own standing
+
+        // C5 absence in M3's post lane — the reserved `moderate` action id
+        // is never invoked by M3's post service; every M3-post-lane row
+        // carries `Action = "read"`.
+        Assert.All(rows, r => Assert.Equal(AccessAction.Read.Id, r.Action));
+    }
+
+    // ── 4a — F4_EmptyAudiencePostAuthorSeesOwnDraft (F4, C1 owner branch) ─
+    //
+    // C1's owner-branch exception: an empty-audience post (the author's
+    // bootstrap default) still allows its *author* — the feed visit is
+    // `VisibleCount = 1`, `HiddenCount = 0`, and the per-item decision
+    // row is `Allow / Via = Owner`.
+
+    [Fact]
+    public async Task F4_EmptyAudiencePostAuthorSeesOwnDraft()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u9-f4-author";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f4-own", ComponentId = ComponentId, AuthorId = author,
+            Body = "body f4", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(), // C1 — the author's bootstrap default
+        });
+
+        var feed = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        var post = Assert.Single(feed.Visible);
+        Assert.Equal("f4-own", post.Id);
+        Assert.Equal(0, feed.HiddenCount);
+
+        var rows = await PostAudits(store, actor: author);
+        var aggregate = Assert.Single(rows, a => a.TargetId is null);
+        Assert.Equal(1, aggregate.VisibleCount);
+        Assert.Equal(0, aggregate.HiddenCount);
+        var perItem = Assert.Single(rows, a => a.TargetId == "f4-own");
+        Assert.Equal(AccessOutcome.Allow, perItem.Outcome);
+        Assert.Equal(AccessVia.Owner, perItem.Via);
+    }
+
+    // ── 4b — F4_EmptyAudiencePostDeniesNonAuthor (F4, C1) ─────────────────
+    //
+    // The other half of the C1 exception: the *same* empty-audience post
+    // denies everyone else. A second post in the feed (the member's own)
+    // keeps the visit's aggregate `Allow`; only the empty author's post
+    // lands on the aggregate's `HiddenCount` + a per-item `Deny`.
+
+    [Fact]
+    public async Task F4_EmptyAudiencePostDeniesNonAuthor()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u9-f4b-author";
+        const string member = "u-u9-f4b-member";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f4b-post", ComponentId = ComponentId, AuthorId = author,
+            Body = "body f4b", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(), // empty — C1
+        });
+        // A visible post of the member keeps the visit's aggregate Allow.
+        await Plant(store, new Post
+        {
+            Id = "f4b-own", ComponentId = ComponentId, AuthorId = member,
+            Body = "body f4b own", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        var feed = await svc.ListFeedAsync(ComponentId, member, page: 1);
+        var visibleIds = feed.Visible.Select(p => p.Id).ToHashSet();
+        Assert.Contains("f4b-own", visibleIds);
+        Assert.DoesNotContain("f4b-post", visibleIds); // C1 — empty audience denies
+        Assert.Equal(1, feed.HiddenCount); // exactly the other's empty post
+
+        var rows = await PostAudits(store, actor: member);
+        Assert.Single(rows, a => a.TargetId == "f4b-post" && a.Outcome == AccessOutcome.Deny);
+        Assert.Single(rows, a => a.TargetId == "f4b-own"  && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── 5 — F5_MembershipChangeReScopesNextRequest (F5, C4) ───────────────
+    //
+    // Strong consistency (C4) on the post lane: a group member is added
+    // **after** the post exists; the *very next* feed render surfaces the
+    // post. The membership add goes through the frozen
+    // <c>IUserInfoService</c> write seam (the authorization path reads the
+    // live <c>GroupMembership</c> row — no projection, no cache).
+
+    [Fact]
+    public async Task F5_MembershipChangeReScopesNextRequest()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string owner = "u-u9-f5-owner";
+        const string member = "u-u9-f5-member";
+        const string groupId = "g-u9-f5";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        // A real group under the exact id the post's audience names (the
+        // post's audience references the group id literally; the
+        // membership row is what MatchGroups reads — C4's live-row lane).
+        await Plant(store, new Group
+        {
+            Id = groupId, Name = "F5 group", OwnerId = owner,
+            Created = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "f5-post", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f5", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.Group, groupId),
+        });
+
+        // No membership yet — the group grant is in the audience but no
+        // one is in the group ⇒ the feed visit denies (Deny-by-default).
+        var before = await svc.ListFeedAsync(ComponentId, member, page: 1);
+        Assert.Empty(before.Visible);
+        Assert.Equal(1, before.HiddenCount);
+
+        // Membership lands through the frozen write seam; the *very next*
+        // render must reflect it (live row, C4).
+        await userInfo.AddGroupMemberAsync(groupId, member, addedBy: owner);
+
+        var after = await svc.ListFeedAsync(ComponentId, member, page: 1);
+        Assert.Contains(after.Visible, p => p.Id == "f5-post");
+        Assert.Equal(0, after.HiddenCount);
+    }
+
+    // ── 6 — F6_DelegateWithReadInScopeSeesAuthorPost (F6, C2) ─────────────
+    //
+    // C2 in-scope: the delegate borrows the owner's standing for a `read`
+    // grant — the detail decision is `Allow` with `Via = Delegation` and
+    // `EffectivePrincipalId = owner` (the owner branch fired; the delegate
+    // is acting in the owner's shoes).
+
+    [Fact]
+    public async Task F6_DelegateWithReadInScopeSeesAuthorPost()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string owner = "u-u9-f6-owner";
+        const string delegatee = "u-u9-f6-dev";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f6-post", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f6", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, owner), // owner-only audience
+        });
+
+        var grant = await userInfo.GrantDelegationAsync(
+            ownerId: owner, delegateId: delegatee,
+            scope: [AccessAction.Read.Id],
+            from: DateTimeOffset.UtcNow.AddHours(-1), to: null);
+        Assert.Contains(AccessAction.Read.Id, grant.Scope);
+
+        var detail = await svc.GetPostAsync("f6-post", delegatee);
+        Assert.NotNull(detail.Post);
+        Assert.Equal("f6-post", detail.Post!.Id);
+
+        var rows = await PostAudits(store, actor: delegatee);
+        var row = Assert.Single(rows, a => a.TargetId == "f6-post");
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.Equal(AccessVia.Delegation, row.Via);
+        Assert.Equal(owner, row.EffectivePrincipalId);
+        Assert.Equal(delegatee, row.ActorId);
+    }
+
+    // ── 7 — F7_DelegateWithoutReadDenies (F7, C2) ─────────────────────────
+    //
+    // C2 out-of-scope: the delegate has a grant that does **not** include
+    // `read` (scoped to the reserved M3b `moderate` action id). The
+    // owner's standing is NOT borrowed for this action — the delegate acts
+    // as self, is not in the owner-only audience ⇒ Deny, and the row
+    // carries the acting identity (`Via = Delegation`,
+    // `EffectivePrincipalId = delegatee`).
+
+    [Fact]
+    public async Task F7_DelegateWithoutReadDenies()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string owner = "u-u9-f7-owner";
+        const string delegatee = "u-u9-f7-dev";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f7-post", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f7", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, owner),
+        });
+
+        var grant = await userInfo.GrantDelegationAsync(
+            ownerId: owner, delegateId: delegatee,
+            scope: [AccessAction.Moderate.Id], // `read` is out of scope
+            from: DateTimeOffset.UtcNow.AddHours(-1), to: null);
+        Assert.DoesNotContain(AccessAction.Read.Id, grant.Scope);
+
+        var detail = await svc.GetPostAsync("f7-post", delegatee);
+        Assert.Null(detail.Post);
+        Assert.Empty(detail.Replies);
+
+        var rows = await PostAudits(store, actor: delegatee);
+        var row = Assert.Single(rows, a => a.TargetId == "f7-post");
+        Assert.Equal(AccessOutcome.Deny, row.Outcome);
+        Assert.Equal(AccessVia.Delegation, row.Via);   // acting identity carried (C2)
+        Assert.Equal(delegatee, row.EffectivePrincipalId);
+    }
+
+    // ── 8 — F8_ComponentIsFilterNotAccessGate (F8, C-M3·2, C5 absence) ────
+    //
+    // C-M3·2 + C5's default posture at the service level: the component
+    // the moderator governs is still a *feed organizer* and nothing more —
+    // the moderator reads through the post's *audience*, not the
+    // component's standing (C-M3·2's "not an access decision" pin), and
+    // since the component's `ModeratorAccess` flag is OFF by default (C5)
+    // the M1 branch (§4.4 branch #2) is not even entered for a `read`
+    // invocation. A moderator who is not in the audience cannot see the
+    // post — the pin is that the component is a *candidate filter* (the
+    // product query), never a *gate* (an access decision), and the M3
+    // post lane never calls the reserved `moderate` action id (the F3/F8
+    // C5 absence pin).
+
+    [Fact]
+    public async Task F8_ComponentIsFilterNotAccessGate()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-u9-f8-member";
+        const string moderator = "u-u9-f8-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = false }); // C5 default-OFF
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "f8-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u9-admin", At = DateTimeOffset.UtcNow
+        });
+
+        await Plant(store, new Post
+        {
+            Id = "f8-post", ComponentId = ComponentId, AuthorId = member,
+            Body = "body f8", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        var feed = await svc.ListFeedAsync(ComponentId, moderator, page: 1);
+        Assert.Empty(feed.Visible);
+        Assert.Equal(1, feed.HiddenCount);
+
+        var rows = await PostAudits(store, actor: moderator);
+        var perItem = Assert.Single(rows, a => a.TargetId == "f8-post");
+        Assert.Equal(AccessOutcome.Deny, perItem.Outcome);
+        // C-M3·2's "not an access decision" + C5's default-OFF branch:
+        // the denial is on the audience lane, not on the component's
+        // standing lane (the component never gates a post's visibility).
+        Assert.Equal(AccessVia.Audience, perItem.Via);
+        Assert.All(rows, r => Assert.NotEqual(AccessVia.Moderator, r.Via));
+    }
+
+    // ── 9 — F9_CandidateFilterEmitsNoAuditRow (F9, C-M3·2) ────────────────
+    //
+    // C-M3·2 pin at the service — the candidate query (the
+    // `componentId → candidate posts` filter) is **not** an `AccessAudit`
+    // subject. Two probes in one fresh scratch DB:
+    //   (a) a present component with **zero** posts — the candidate set
+    //       surfaces as empty, no decision runs, and the entire
+    //       `AccessAudit` table stays empty;
+    //   (b) the read-side of the same pin — `GetComponentsAsync(bool)` —
+    //       whose `enabledOnly` filter is a *read*, not a decision;
+    //       neither call appends an `AccessAudit` row (U4's F9 unit test
+    //       anchors this seam at the `UserInfoService` level; this is the
+    //       service-level re-anchor).
+
+    [Fact]
+    public async Task F9_CandidateFilterEmitsNoAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Component { Id = "c-u9-off", Name = "Safety-off", Enabled = false });
+
+        // (a) Present component, zero candidate posts: the product query
+        //     runs, the candidate set is empty, the decision lane is
+        //     skipped — `AccessAudit` is empty in the fresh scratch DB.
+        var feed = await svc.ListFeedAsync(ComponentId, "u-u9-f9", page: 1);
+        Assert.Empty(feed.Visible);
+        Assert.Equal(0, feed.HiddenCount);
+
+        Assert.Empty(await AllAudits(store));
+
+        // (b) `GetComponentsAsync` — the candidate read is not a decision.
+        var enabledOnly = await profileSettings.GetComponentsAsync(enabledOnly: true);
+        var all = await profileSettings.GetComponentsAsync(enabledOnly: false);
+        Assert.Contains(enabledOnly, c => c.Id == ComponentId);
+        Assert.DoesNotContain(enabledOnly, c => c.Id == "c-u9-off");
+        Assert.Contains(all, c => c.Id == "c-u9-off");
+
+        Assert.Empty(await AllAudits(store));
+    }
+
+    // ── 10a — F10_ReplyVisibleIffParentVisible (F10, C-M3·1) ──────────────
+    //
+    // C-M3·1 row 1: parent `Allow` ⇒ the reply is rendered. Crucially,
+    // **no reply produces its own audit row** (C-M3·3: the row for the
+    // visit is the *parent's* single decision; a reply has **no**
+    // `Audience` of its own — `PostReply` has no `Audience` field at
+    // all — so there is nothing to evaluate).
+
+    [Fact]
+    public async Task F10_ReplyVisibleIffParentVisible()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-u9-f10a-owner";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f10a-post", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f10a", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, owner),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = "f10a-reply", PostId = "f10a-post", AuthorId = "u-u9-f10a-repl1",
+            Body = "reply f10a", Created = DateTimeOffset.UtcNow,
+        });
+
+        var detail = await svc.GetPostAsync("f10a-post", owner);
+        Assert.NotNull(detail.Post);
+        Assert.Equal("f10a-post", detail.Post!.Id);
+        var reply = Assert.Single(detail.Replies);
+        Assert.Equal("f10a-reply", reply.Id);
+
+        var rows = await PostAudits(store, actor: owner);
+        var decisionRow = Assert.Single(rows, a => a.TargetId == "f10a-post");
+        Assert.Equal(AccessOutcome.Allow, decisionRow.Outcome);
+        Assert.Equal(AccessVia.Owner, decisionRow.Via);
+        Assert.DoesNotContain(rows, a => a.TargetId == "f10a-reply");
+    }
+
+    // ── 10b — F10_ReplyNotEvaluatedOnParentDeny (F10, C-M3·1, C3) ─────────
+    //
+    // C-M3·1 row 2: parent `Deny` ⇒ the reply is **not evaluated**
+    // (short-circuits at the parent). No *reply* audit row at all; the
+    // parent's row is `Deny`. The result surfaces `Post = null` (U6's
+    // fail-closed shape) and `Replies = []`.
+
+    [Fact]
+    public async Task F10_ReplyNotEvaluatedOnParentDeny()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-u9-f10b-owner";
+        const string member = "u-u9-f10b-member";
+        const string stranger = "u-u9-f10b-stranger";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f10b-post", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f10b", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member), // stranger not in
+        });
+        await Plant(store, new PostReply
+        {
+            Id = "f10b-reply", PostId = "f10b-post", AuthorId = member,
+            Body = "reply f10b", Created = DateTimeOffset.UtcNow,
+        });
+
+        var detail = await svc.GetPostAsync("f10b-post", stranger);
+        Assert.Null(detail.Post);
+        Assert.Empty(detail.Replies);
+
+        var rows = await PostAudits(store, actor: stranger);
+        var perItem = Assert.Single(rows, a => a.TargetId == "f10b-post");
+        Assert.Equal(AccessOutcome.Deny, perItem.Outcome);
+        Assert.DoesNotContain(rows, a => a.TargetId == "f10b-reply");
+    }
+
+    // ── 11 — Feed_AggregateAuditRowShape (C-M3·3, F1) ─────────────────────
+    //
+    // The C-M3·3 feed shape pinned: **one aggregate** `AccessAudit` row for
+    // the visit — `TargetId = null`, `TargetKind = "post"`, `Action =
+    // "read"`, `VisibleCount = 1`, `HiddenCount = 1`, `Outcome = Allow`,
+    // and the aggregate `Via` is the first visible candidate's `Via`
+    // (Owner here). The hidden post is its **own** per-item `Deny` row —
+    // the aggregate does not double-count it as a second row.
+
+    [Fact]
+    public async Task Feed_AggregateAuditRowShape()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-u9-f11-member";
+        const string hiddenOwner = "u-u9-f11-hidden-owner";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f11-own", ComponentId = ComponentId, AuthorId = member,
+            Body = "body f11 own", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+        await Plant(store, new Post
+        {
+            Id = "f11-hidden", ComponentId = ComponentId, AuthorId = hiddenOwner,
+            Body = "body f11 hidden", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, hiddenOwner),
+        });
+
+        var feed = await svc.ListFeedAsync(ComponentId, member, page: 1);
+        Assert.Contains(feed.Visible, p => p.Id == "f11-own");
+        Assert.DoesNotContain(feed.Visible, p => p.Id == "f11-hidden");
+        Assert.Equal(1, feed.HiddenCount);
+
+        var rows = await PostAudits(store, actor: member);
+        var aggregate = Assert.Single(rows, a => a.TargetId is null);
+        Assert.Equal("post", aggregate.TargetKind);
+        Assert.Equal(AccessAction.Read.Id, aggregate.Action);
+        Assert.Equal(1, aggregate.VisibleCount);
+        Assert.Equal(1, aggregate.HiddenCount);
+        Assert.Equal(AccessOutcome.Allow, aggregate.Outcome);
+        Assert.Equal(AccessVia.Owner, aggregate.Via); // first visible is the member's own
+
+        var hidden = Assert.Single(rows, a => a.TargetId == "f11-hidden");
+        Assert.Equal(AccessOutcome.Deny, hidden.Outcome);
+        // C2 / M1 §4.4 branch 6 — the Deny row carries the *denied
+        // actor's* standing (the acting identity, not the post author's):
+        // the member was denied; they are the actor in the row.
+        Assert.Equal(member, hidden.EffectivePrincipalId);
+    }
+
+    // ── 12 — Detail_DecisionAuditRowShape_ViaOwner (C-M3·3, C1) ───────────
+    //
+    // The C-M3·3 detail shape pinned for the `Via = Owner` case — the
+    // visitor **is** the author, so the owner branch fires (before
+    // MatchGroups). The single decision row is `Allow / Via = Owner` with
+    // `EffectivePrincipalId = owner` (= actor).
+
+    [Fact]
+    public async Task Detail_DecisionAuditRowShape_ViaOwner()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-u9-f12-owner";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f12-owner", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f12", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, owner),
+        });
+
+        var detail = await svc.GetPostAsync("f12-owner", owner);
+        Assert.NotNull(detail.Post);
+
+        var rows = await PostAudits(store, actor: owner);
+        var row = Assert.Single(rows);
+        Assert.Equal("f12-owner", row.TargetId);
+        Assert.Equal("post", row.TargetKind);
+        Assert.Equal(AccessAction.Read.Id, row.Action);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.Equal(AccessVia.Owner, row.Via);
+        Assert.Equal(owner, row.EffectivePrincipalId);
+    }
+
+    // ── 13 — Detail_DecisionAuditRowShape_ViaAudience (C-M3·3) ────────────
+    //
+    // The C-M3·3 detail row pinned for the `Via = Audience` case — the
+    // visitor is **not** the owner (the owner branch does not fire), is
+    // in the audience, and no delegation is planted in this test, so the
+    // decision records the audience-lane match.
+
+    [Fact]
+    public async Task Detail_DecisionAuditRowShape_ViaAudience()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-u9-f13-owner";
+        const string member = "u-u9-f13-member";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f13-aud", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f13", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        var detail = await svc.GetPostAsync("f13-aud", member);
+        Assert.NotNull(detail.Post);
+
+        var rows = await PostAudits(store, actor: member);
+        var row = Assert.Single(rows);
+        Assert.Equal("f13-aud", row.TargetId);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.Equal(AccessVia.Audience, row.Via);
+        Assert.Equal(member, row.EffectivePrincipalId);
+    }
+
+    // ── 14 — Detail_DecisionAuditRowShape_ViaDelegation (C-M3·3, C2) ──────
+    //
+    // The C-M3·3 detail row pinned for the `Via = Delegation` case — the
+    // delegate borrows the owner's standing for `read` (C2), the owner
+    // branch fires and the decision is Allowed; the row carries the acting
+    // identity (`ActorId = delegatee`, `Via = Delegation`) and the
+    // borrowed standing's principal id (`EffectivePrincipalId = owner`).
+
+    [Fact]
+    public async Task Detail_DecisionAuditRowShape_ViaDelegation()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string owner = "u-u9-f14-owner";
+        const string delegatee = "u-u9-f14-dev";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "f14-deleg", ComponentId = ComponentId, AuthorId = owner,
+            Body = "body f14", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, owner),
+        });
+
+        var grant = await userInfo.GrantDelegationAsync(
+            ownerId: owner, delegateId: delegatee,
+            scope: [AccessAction.Read.Id],
+            from: DateTimeOffset.UtcNow.AddHours(-1), to: null);
+        Assert.Contains(AccessAction.Read.Id, grant.Scope);
+
+        var detail = await svc.GetPostAsync("f14-deleg", delegatee);
+        Assert.NotNull(detail.Post);
+
+        var rows = await PostAudits(store, actor: delegatee);
+        var row = Assert.Single(rows);
+        Assert.Equal("f14-deleg", row.TargetId);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.Equal(AccessVia.Delegation, row.Via);
+        Assert.Equal(delegatee, row.ActorId);
+        Assert.Equal(owner, row.EffectivePrincipalId);
+    }
+
+    // ── 15 — AuthorAudienceWrittenVerbatim (ADR 0001-B) ───────────────────
+    //
+    // ADR 0001-B pin: the author's chosen `Audience` is written **verbatim**
+    // into the `Post` row (the `PostDraft.Audience → Post.Audience` map
+    // never mutates the shape). We pick a non-default audience (an
+    // `All` mode with a mixed user + group grant) and assert the
+    // round-tripped `Post.Audience` equals the input, both on the returned
+    // entity and on the DB row.
+
+    [Fact]
+    public async Task AuthorAudienceWrittenVerbatim()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u9-f15-author";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+
+        // A non-default shape: `All` mode + two grant kinds (a user and a
+        // group) so the round-trip proves the nested Audience document is
+        // stored readably and its grants are bit-identical.
+        var authorAudience = new Audience(
+            AudienceMode.All,
+            [
+                new AudienceGrant(GrantKind.User, author),
+                new AudienceGrant(GrantKind.Group, "g-u9-f15"),
+            ]);
+
+        var draft = new PostDraft(ComponentId, "F15", "body f15", authorAudience);
+        // The posting gate consults <c>ComponentMembership</c> rows (see
+        // ComponentMembership doc); the "verbatim audience" assertion is
+        // orthogonal, so the test grants the author as a GlobalAdmin to
+        // bypass the gate (the bypass pin is covered separately in the
+        // membership-gate tests below).
+        var post = await RunInSession(store, async session =>
+            await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.GlobalAdmin }, session));
+
+        // The returned entity carries the shape verbatim.
+        Assert.Equal(author, post.AuthorId);
+        Assert.Equal(ComponentId, post.ComponentId);
+        Assert.Equal(authorAudience.Mode, post.Audience.Mode);
+        Assert.Equal(GrantsOf(authorAudience), GrantsOf(post.Audience));
+
+        // And the DB row carries the same shape.
+        await using var r = store.QuerySession();
+        var loaded = await r.LoadAsync<Post>(post.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(loaded);
+        Assert.Equal(authorAudience.Mode, loaded!.Audience.Mode);
+        Assert.Equal(GrantsOf(authorAudience), GrantsOf(loaded.Audience));
+    }
+
+    // ── 16 — PostService_MakesNoModerateCall (C5 absence, M3) ────────────
+    //
+    // C5 absence pinned at the service level: the M3 post lane never
+    // invokes the reserved `AccessAction.Moderate` action id. Two
+    // actors — the audience member (allowed) and a moderator who is not
+    // in the audience (denied, on audience grounds — the `ModeratorAccess`
+    // flag is OFF by default, so M1's branch #2 does not fire for a
+    // `read` invocation) — drive the feed + detail visits. The M3
+    // post lane's `Action` column always carries `read` and never the
+    // reserved `moderate` action id (the pin is the absence of the
+    // reserved action id in this lane, not the moderation branch itself —
+    // that branch is M1's, and when its flag is ON it §4.4-Allows
+    // regardless of action id, which is M3b's lane and out of these
+    // names' pin).
+
+    [Fact]
+    public async Task PostService_MakesNoModerateCall()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-u9-f16-member";
+        const string moderator = "u-u9-f16-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = false }); // C5 default-OFF
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "f16-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u9-admin", At = DateTimeOffset.UtcNow
+        });
+
+        await Plant(store, new Post
+        {
+            Id = "f16-post", ComponentId = ComponentId, AuthorId = member,
+            Body = "body f16", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        // Drive the M3 service lane (feed + detail) for both the member
+        // (allowed by the audience) and the moderator (denied on audience
+        // grounds — they're not in the audience, and the C5 default-OFF
+        // branch is not entered for a `read` invocation, so no `moderate`
+        // action id is reachable through M3's post lane).
+        await svc.ListFeedAsync(ComponentId, member, page: 1);
+        await svc.GetPostAsync("f16-post", member);
+        await svc.ListFeedAsync(ComponentId, moderator, page: 1);
+        await svc.GetPostAsync("f16-post", moderator);
+
+        var allRows = await AllAudits(store);
+        Assert.NotEmpty(allRows); // the visits did run
+        Assert.All(allRows, r =>
+        {
+            Assert.NotEqual(AccessVia.Moderator, r.Via);
+            Assert.NotEqual(AccessAction.Moderate.Id, r.Action);
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M3b, plan U9 — the 5 ADDs (design doc m3b-moderation.md §2.5,
+    // rows 9–13). These tests exercise U3's C-M3b·3 lanes (the
+    // Moderate-gated write lanes F3/F4 — HidePostAsync /
+    // RemovePostAsync) over the two frozen M1/M2 seams + the PostStatus
+    // shape (§2.2.1). Pinned verbatim per §2.5 — the §2.7 drift-guard
+    // makes renaming them a drift event. Do not reorder the M3 lanes
+    // above (M3's own §2.6 drift-guard pins them).
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ── M3b·9 — HidePostAsync_Moderator_WritesStatusHidden_ViaTagIsAdmin ─
+    //
+    // C-M3b·3 (F3) — the Moderate-gated write lane succeeds for a caller
+    // with a standing moderator in this component (the ADR 0003 §SoD
+    // split: Core trusts the caller's standing, the Web layer verifies
+    // the role): post.Status flips to PostStatus.Hidden. The M1-seam's
+    // audit record (Action = "moderate", TargetId = the post id,
+    // Outcome = Allow) is the canonical write audit — same TargetKind
+    // "post" as the M3 lane.
+
+    [Fact]
+    public async Task HidePostAsync_Moderator_WritesStatusHidden_ViaTagIsAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string moderator = "u-m3b-m-svc-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "m9-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-m3b-m-svc-admin", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "m9-post", ComponentId = ComponentId, AuthorId = "u-m3b-m-svc-author",
+            Body = "body m9", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-m3b-m-svc-member"),
+            Status = PostStatus.Active,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.HidePostAsync("m9-post", moderator, session));
+
+        // The post's Status flipped to the exact PostStatus.Hidden literal
+        // (the C-M3b·3 F3 pin).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("m9-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Hidden, post!.Status);
+
+        // The canonical write record from the M1-frozen seam: the audit
+        // row for Action = AccessAction.Moderate.Id, TargetId = the
+        // post id, ActorId = the acting caller, Outcome = Allow.
+        var rows = await PostAudits(store, actor: moderator);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "m9-post"
+                                   && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── M3b·10 — HidePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState ─
+    //
+    // C-M3b·3 (F3, SoD) — a caller without a standing moderator in this
+    // component is denied (M1-seam branch #2 does not fire): the post's
+    // Status is NOT updated (it remains PostStatus.Active — the POCO
+    // default), and the Deny audit row (Action = "moderate",
+    // TargetId = the post id, Outcome = Deny) is committed. C3 — no
+    // partial write; the audit row is the only trace.
+
+    [Fact]
+    public async Task HidePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string caller = "u-m3b-m-svc-callernon";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new Post
+        {
+            Id = "m10-post", ComponentId = ComponentId, AuthorId = "u-m3b-m-svc-author",
+            Body = "body m10", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-m3b-m-svc-member"),
+            Status = PostStatus.Active,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.HidePostAsync("m10-post", caller, session));
+
+        // The post's Status must remain PostStatus.Active (no partial
+        // write — the lane's "if (decision.Allowed)" gate did not fire).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("m10-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Active, post!.Status);
+
+        // The Deny audit row for the write attempt is committed.
+        var rows = await PostAudits(store, actor: caller);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "m10-post"
+                                   && a.Outcome == AccessOutcome.Deny);
+    }
+
+    // ── M3b·11 — RemovePostAsync_Moderator_WritesStatusRemoved_ViaTagIsAdmin ─
+    //
+    // C-M3b·3 (F4) — same shape as the hide lane (M3b·9) but the
+    // domain write is hard-remove: post.Status flips to
+    // PostStatus.Removed (the §2.2.1 pin + the C-M3b·3 F4 anchor).
+
+    [Fact]
+    public async Task RemovePostAsync_Moderator_WritesStatusRemoved_ViaTagIsAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string moderator = "u-m3b-m-svc-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "m11-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-m3b-m-svc-admin", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "m11-post", ComponentId = ComponentId, AuthorId = "u-m3b-m-svc-author",
+            Body = "body m11", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-m3b-m-svc-member"),
+            Status = PostStatus.Active,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.RemovePostAsync("m11-post", moderator, session));
+
+        // The post's Status flipped to the exact PostStatus.Removed
+        // literal (the C-M3b·3 F4 pin — hard-remove).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("m11-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Removed, post!.Status);
+
+        var rows = await PostAudits(store, actor: moderator);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "m11-post"
+                                   && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── M3b·12 — RemovePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState ─
+    //
+    // C-M3b·3 (F4, SoD) — same shape as M3b·10: a caller without a
+    // standing moderator in this component is denied; the post's
+    // Status remains unchanged (PostStatus.Active) and the Deny audit
+    // row is the only trace.
+
+    [Fact]
+    public async Task RemovePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string caller = "u-m3b-m-svc-callernon";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new Post
+        {
+            Id = "m12-post", ComponentId = ComponentId, AuthorId = "u-m3b-m-svc-author",
+            Body = "body m12", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-m3b-m-svc-member"),
+            Status = PostStatus.Active,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.RemovePostAsync("m12-post", caller, session));
+
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("m12-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Active, post!.Status);
+
+        var rows = await PostAudits(store, actor: caller);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "m12-post"
+                                   && a.Outcome == AccessOutcome.Deny);
+    }
+
+    // ── IMPROVE-UX A03 — UnhidePostAsync (the reversible lever) ─────────
+    //
+    // Same Moderate-gated write-lane shape as M3b·9 / M3b·11 (the F3 / F4
+    // pins) but the domain write is the inverse of HidePostAsync: a
+    // hidden post flips back to PostStatus.Active. The F4 "Removed" hard
+    // lane is irreversible by design — UnhidePostAsync does not undo a
+    // Removed post (the reversible lever only reverses Hidden).
+
+    // ── A03·1 — UnhidePostAsync_Moderator_WritesStatusActive_ViaTagIsAdmin ─
+    //
+    // A03 — a caller with a standing moderator in this component flips
+    // a hidden post back to PostStatus.Active. The M1-seam's audit
+    // record (Action = AccessAction.Moderate.Id, TargetId = the post
+    // id, Outcome = Allow) is the canonical write audit — same shape as
+    // the M3b·9 hide-lane audit (A03 is the inverse, not a new lane).
+
+    [Fact]
+    public async Task UnhidePostAsync_Moderator_WritesStatusActive_ViaTagIsAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string moderator = "u-a03-m-svc-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a03-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-a03-m-svc-admin", At = DateTimeOffset.UtcNow
+        });
+        // Plant the post in its hidden state (the A03 pin: a post that
+        // was hidden by a prior HidePostAsync call — the A03 Unhide is
+        // the inverse of that write).
+        await Plant(store, new Post
+        {
+            Id = "a03-post", ComponentId = ComponentId, AuthorId = "u-a03-m-svc-author",
+            Body = "body a03", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a03-m-svc-member"),
+            Status = PostStatus.Hidden,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.UnhidePostAsync("a03-post", moderator, session));
+
+        // The post's Status flipped back to PostStatus.Active (the A03
+        // "hidden → active round trip" pin).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a03-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Active, post!.Status);
+
+        // The canonical write record from the M1-frozen seam: the audit
+        // row for Action = AccessAction.Moderate.Id, TargetId = the
+        // post id, ActorId = the acting caller, Outcome = Allow (the
+        // M3b·9 hide-lane shape — A03 is the inverse of that write).
+        var rows = await PostAudits(store, actor: moderator);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "a03-post"
+                                   && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── A03·2 — UnhidePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState ─
+    //
+    // A03, SoD — a caller without a standing moderator in this
+    // component is denied (the M1-seam's Deny branch does not fire the
+    // domain write): the post's Status is NOT updated (it remains
+    // PostStatus.Hidden — the A03 pin: the unhide is denied, not a
+    // "do nothing" no-op), and the Deny audit row is committed. C3 — no
+    // partial write; the audit row is the only trace.
+
+    [Fact]
+    public async Task UnhidePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string caller = "u-a03-m-svc-callernon";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new Post
+        {
+            Id = "a03-denied-post", ComponentId = ComponentId, AuthorId = "u-a03-m-svc-author",
+            Body = "body a03 denied", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a03-m-svc-member"),
+            Status = PostStatus.Hidden,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.UnhidePostAsync("a03-denied-post", caller, session));
+
+        // The post's Status must remain PostStatus.Hidden (no partial
+        // write — the lane's "if (decision.Allowed)" gate did not fire).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a03-denied-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Hidden, post!.Status);
+
+        // The Deny audit row for the write attempt is committed.
+        var rows = await PostAudits(store, actor: caller);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "a03-denied-post"
+                                   && a.Outcome == AccessOutcome.Deny);
+    }
+
+    // ── A03·3 — UnhidePostAsync_AfterHide_HiddenToActive (round-trip pin) ─
+    //
+    // The A03 DoD "hidden → active round trip" pin: HidePostAsync
+    // (M3b·9) then UnhidePostAsync (A03) in sequence — the post ends
+    // at PostStatus.Active. Both audit rows commit (one Allow for
+    // hide, one Allow for unhide). The round trip is the "reversible
+    // lever" the moderation-loop close requires — the A03 DoD line.
+
+    [Fact]
+    public async Task UnhidePostAsync_AfterHide_HiddenToActive()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string moderator = "u-a03-rt-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a03-rt-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-a03-rt-admin", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a03-rt-post", ComponentId = ComponentId, AuthorId = "u-a03-rt-author",
+            Body = "body a03 rt", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-a03-rt-member"),
+            Status = PostStatus.Active,
+        });
+
+        // Step 1 — the M3b·9 hide lane (Active → Hidden).
+        await RunInSession(store, async session =>
+            await svc.HidePostAsync("a03-rt-post", moderator, session));
+        await using (var mid = store.QuerySession())
+        {
+            var p = await mid.LoadAsync<Post>("a03-rt-post", TestContext.Current.CancellationToken);
+            Assert.Equal(PostStatus.Hidden, p!.Status);
+        }
+
+        // Step 2 — the A03 unhide lane (Hidden → Active).
+        await RunInSession(store, async session =>
+            await svc.UnhidePostAsync("a03-rt-post", moderator, session));
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("a03-rt-post", TestContext.Current.CancellationToken);
+        Assert.Equal(PostStatus.Active, post!.Status);
+
+        // Both Allow audit rows committed (the hide + the unhide).
+        var rows = await PostAudits(store, actor: moderator);
+        Assert.Equal(2, rows.Count(a => a.Action == AccessAction.Moderate.Id
+                                        && a.TargetId == "a03-rt-post"
+                                        && a.Outcome == AccessOutcome.Allow));
+    }
+
+    // ── M3b·13 — PostStatus_EnumHasExactlyThreeLiterals_ActiveHiddenRemoved ─
+    //
+    // Shape test for §2.2.1's pin: the PostStatus enum literal set is
+    // exactly { Active, Hidden, Removed }. Set-equality (not order —
+    // the pin is the **set** of literals, not their ordinal). No plant,
+    // no drive — the test only reads the enum type.
+
+    [Fact]
+    public void PostStatus_EnumHasExactlyThreeLiterals_ActiveHiddenRemoved()
+    {
+        var actual = Enum.GetNames(typeof(PostStatus)).ToHashSet(StringComparer.Ordinal);
+        var expected = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(PostStatus.Active),
+            nameof(PostStatus.Hidden),
+            nameof(PostStatus.Removed),
+        };
+        Assert.Equal(expected, actual);
+    }
+
+
+    // ── All-sections feed: ListAllFeedAsync (M3b "feed organizer" ext) ────
+    //
+    // The all-sections lane mirrors the single-section F1/F2/F3 invariants:
+    // exactly one CanSeeAsync pass over the union candidate set → one
+    // aggregate AccessAudit row (C-M3·3, not one component-per-row; a
+    // per-component call would leak "which components hold content" via
+    // the audit lane). The candidate filter is a feed organizer, never a
+    // gate (C-M3·2): a post in a disabled/missing component is not a
+    // candidate, so it is not in the audit row's VisibleCount/HiddenCount.
+
+    [Fact]
+    public async Task ListAllFeed_VisiblePostsAcrossMultipleComponents_IncludesAll()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-all1-member";
+        const string compA = "c-all1-a";
+        const string compB = "c-all1-b";
+
+        await Plant(store, new Component { Id = compA, Name = "Safety", Enabled = true });
+        await Plant(store, new Component { Id = compB, Name = "Maintenance", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "all1-a-post", ComponentId = compA, AuthorId = "u-all1-owner-a",
+            Body = "body all1 a", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+        await Plant(store, new Post
+        {
+            Id = "all1-b-post", ComponentId = compB, AuthorId = "u-all1-owner-b",
+            Body = "body all1 b", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        var ids = new[] { compA, compB };
+        var feed = await svc.ListAllFeedAsync(ids, member, page: 1);
+
+        var visibleIds = feed.Visible.Select(p => p.Id).ToHashSet();
+        Assert.Contains("all1-a-post", visibleIds);
+        Assert.Contains("all1-b-post", visibleIds);
+        Assert.Equal(2, feed.Total);
+        Assert.Equal(0, feed.HiddenCount);
+
+        var rows = await PostAudits(store, actor: member);
+        var aggregate = Assert.Single(rows, a => a.TargetId is null);
+        Assert.Equal(2, aggregate.VisibleCount);
+        Assert.Equal(0, aggregate.HiddenCount);
+        Assert.Equal(AccessOutcome.Allow, aggregate.Outcome);
+        Assert.Equal("post", aggregate.TargetKind);
+    }
+
+    [Fact]
+    public async Task ListAllFeed_HiddenInOneComponent_CountsInAggregate_NoAuthorLeak()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-all2-member";
+        const string hiddenOwner = "u-all2-hidden-owner";
+        const string compA = "c-all2-a";
+        const string compB = "c-all2-b";
+
+        await Plant(store, new Component { Id = compA, Name = "Safety", Enabled = true });
+        await Plant(store, new Component { Id = compB, Name = "Maintenance", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "all2-visible", ComponentId = compA, AuthorId = "u-all2-owner-a",
+            Body = "body all2 visible", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+        await Plant(store, new Post
+        {
+            Id = "all2-hidden", ComponentId = compB, AuthorId = hiddenOwner,
+            Body = "body all2 hidden", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, hiddenOwner), // member is not in audience
+        });
+
+        var ids = new[] { compA, compB };
+        var feed = await svc.ListAllFeedAsync(ids, member, page: 1);
+        Assert.Single(feed.Visible);
+        Assert.Equal(1, feed.HiddenCount);
+
+        // C-M3·3 — exactly ONE aggregate row across the whole visit (not two,
+        // one per component). The per-item Deny row still names the hidden post.
+        var rows = await PostAudits(store, actor: member);
+        var aggregates = rows.Where(a => a.TargetId is null).ToList();
+        var agg = Assert.Single(aggregates);
+        Assert.Equal(1, agg.VisibleCount);
+        Assert.Equal(1, agg.HiddenCount);
+
+        // F2 shape — the hidden post's author never appears in the member's
+        // rows (audience membership is never logged).
+        Assert.All(rows, r =>
+        {
+            Assert.NotEqual(hiddenOwner, r.ActorId);
+            Assert.NotEqual(hiddenOwner, r.EffectivePrincipalId);
+        });
+    }
+
+    [Fact]
+    public async Task ListAllFeed_PostsOfComponentNotInCandidateSet_NotEvaluated()
+    {
+        // C-M3·2 — a post in a component that is NOT in the Web-resolved
+        // enabled set is not part of the candidate set: even if the actor
+        // has standing, the post's author is never named, and the aggregate
+        // row's counts do not include it.
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-all3-member";
+        const string compA = "c-all3-a";
+        const string compExcluded = "c-all3-excluded";
+
+        await Plant(store, new Component { Id = compA, Name = "Safety", Enabled = true });
+        await Plant(store, new Component { Id = compExcluded, Name = "Disabled", Enabled = false });
+        await Plant(store, new Post
+        {
+            Id = "all3-in-set", ComponentId = compA, AuthorId = "u-all3-owner-a",
+            Body = "body all3 in-set", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+        await Plant(store, new Post
+        {
+            Id = "all3-excluded", ComponentId = compExcluded, AuthorId = "u-all3-excl-owner",
+            Body = "body all3 excluded", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        // The Web layer would only pass the enabled component's id.
+        var feed = await svc.ListAllFeedAsync(new[] { compA }, member, page: 1);
+        var ids = feed.Visible.Select(p => p.Id).ToHashSet();
+        Assert.Contains("all3-in-set", ids);
+        Assert.DoesNotContain("all3-excluded", ids);
+        Assert.Equal(0, feed.HiddenCount); // the excluded post is not a candidate
+
+        var rows = await PostAudits(store, actor: member);
+        var aggregate = Assert.Single(rows, a => a.TargetId is null);
+        Assert.Equal(1, aggregate.VisibleCount);
+        Assert.Equal(0, aggregate.HiddenCount);
+        Assert.DoesNotContain(rows, r => r.TargetId == "all3-excluded");
+    }
+
+    [Fact]
+    public async Task ListAllFeed_EmptyComponentIds_ReturnsEmpty_NoAuditRow()
+    {
+        // §2.3 precondition shape — the Web layer returns the "no posts yet"
+        // view (not a 404); the Core seam short-circuits with no audit row.
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-all4-member";
+
+        var feed = await svc.ListAllFeedAsync(Array.Empty<string>(), member, page: 1);
+        Assert.Empty(feed.Visible);
+        Assert.Equal(0, feed.HiddenCount);
+        Assert.Equal(0, feed.Total);
+
+        var rows = await PostAudits(store, actor: member);
+        Assert.Empty(rows);
+    }
+
+    // ── Shared helpers ─────────────────────────────────────────────────────
+
+    private async Task<IDocumentStore> BootStoreAsync()
+    {
+        var conn = await fixture.NewDatabaseAsync(TestContext.Current.CancellationToken);
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
+            null, null, TestContext.Current.CancellationToken);
+        return store;
+    }
+
+    /// <summary>Compose the M3 service trio: <see cref="UserInfoService"/> +
+    /// <see cref="AuthorizationService"/> + <see cref="PostService"/> (the
+    /// same three-constructor shape U6's <c>AddTransient</c> registration
+    /// uses, mirrored here directly against the scratch store — the M2
+    /// <c>DirectoryServiceTests</c> precedent).</summary>
+    private static (UserInfoService User, AuthorizationService Authz, PostService Posts)
+        Services(IDocumentStore store)
+    {
+        var userInfo = new UserInfoService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        var authz = new AuthorizationService(store, userInfo);
+        var posts = new PostService(userInfo, authz, store);
+        return (userInfo, authz, posts);
+    }
+
+    private static Audience Audience(GrantKind kind, string id)
+        => new(AudienceMode.Any, [new AudienceGrant(kind, id)]);
+
+    /// <summary>Plant a document row directly (test fixture seeding, not a
+    /// service write seam — <c>AuthorAudienceWrittenVerbatim</c> is the
+    /// one test that drives the service's own <c>CreatePostAsync</c>
+    /// write lane).</summary>
+    private static async Task Plant(IDocumentStore store, object document)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var w = store.OpenSession(new Marten.Services.SessionOptions());
+        w.Store(document);
+        await w.SaveChangesAsync(ct);
+    }
+
+    private static async Task<T> RunInSession<T>(IDocumentStore store, Func<IDocumentSession, Task<T>> action)
+    {
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        return await action(session);
+    }
+
+    private static async Task RunInSession(IDocumentStore store, Func<IDocumentSession, Task> action)
+    {
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        await action(session);
+    }
+
+    private static List<(GrantKind Kind, string Id)> GrantsOf(Audience a)
+        => a.Grants.OrderBy(g => (g.Kind, g.Id)).Select(g => (g.Kind, g.Id)).ToList();
+
+    private static async Task<IReadOnlyList<AccessAudit>> PostAudits(IDocumentStore store, string? actor = null)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        var q = s.Query<AccessAudit>().Where(a => a.TargetKind == "post");
+        if (actor is not null) q = q.Where(a => a.ActorId == actor);
+        return await q.ToListAsync(ct);
+    }
+
+    private static async Task<IReadOnlyList<AccessAudit>> AllAudits(IDocumentStore store)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await s.Query<AccessAudit>().ToListAsync(ct);
+    }
+
+    // ── Posting-right gate (the new ComponentMembership gate; see the
+    // doc-comment on PostService.CreatePostAsync / UserInfoService
+    // (Set/Clear/Get CommunityMembershipAsync)). Distinct from the
+    // read-side audience tests above (which already pin ADR 0001-B):
+    // here, the *author* needs either a ComponentMembership row for the
+    // target component or a GlobalAdmin role claim to create a post.
+
+    [Fact]
+    public async Task CreatePost_MemberOfCommunity_Allows()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string author = "u-gate-member";
+        const string comp   = "c-gate-a";
+
+        await Plant(store, new Component { Id = comp, Name = "X", Enabled = true });
+        await userInfo.SetCommunityMembershipAsync(comp, author, actorId: "u-gate-admin");
+
+        var draft = new PostDraft(comp, "T1", "body 1", Audience(GrantKind.User, author));
+        var post  = await RunInSession(store, async s =>
+            await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.Member }, s));
+
+        Assert.NotNull(post);
+        Assert.Equal(author, post.AuthorId);
+    }
+
+    [Fact]
+    public async Task CreatePost_NotMemberOfCommunity_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-stranger";
+        const string comp   = "c-gate-b";
+
+        await Plant(store, new Component { Id = comp, Name = "Y", Enabled = true });
+        // No membership row planted; the gate is the only thing to catch this.
+
+        var draft = new PostDraft(comp, "T2", "body 2", Audience(GrantKind.User, author));
+        var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.Member }, s)));
+
+        Assert.Contains("not a member", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreatePost_ModeratorAssignedToComponent_BypassesMembershipGate()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-moderator";
+        const string comp   = "c-gate-e";
+
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true });
+        // No membership row planted; the admin-set ModeratorAssignment on the
+        // component (Roles.ModeratorComponent(comp) claim) is the bypass.
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "ma-gate",
+            UserId = author,
+            ComponentId = comp,
+            GrantedBy = "u-gate-admin",
+            At = DateTimeOffset.UtcNow
+        });
+
+        var draft = new PostDraft(comp, "T4", "body 4", Audience(GrantKind.User, author));
+        var post  = await RunInSession(store, async s =>
+            await svc.CreatePostAsync(
+                draft, author,
+                new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent(comp) },
+                s));
+
+        Assert.NotNull(post);
+    }
+
+    [Fact]
+    public async Task CreatePost_ModeratorAssignedElsewhere_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-moderator-2";
+        const string comp   = "c-gate-f";
+
+        await Plant(store, new Component { Id = comp, Name = "N", Enabled = true });
+        // A Moderator assigned to a *different* component — the assignment
+        // does not extend posting rights to this one.
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "ma-gate-2",
+            UserId = author,
+            ComponentId = "c-other",
+            GrantedBy = "u-gate-admin",
+            At = DateTimeOffset.UtcNow
+        });
+
+        var draft = new PostDraft(comp, "T5", "body 5", Audience(GrantKind.User, author));
+        // The role claim set only contains moderator:{c-other}, so the gate
+        // falls through to the membership row lookup — which is empty — and
+        // denies.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.CreatePostAsync(
+                    draft, author,
+                    new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("c-other") },
+                    s)));
+    }
+
+    [Fact]
+    public async Task CreatePost_GlobalAdmin_BypassesMembershipGate()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-global-admin";
+        const string comp   = "c-gate-c";
+
+        await Plant(store, new Component { Id = comp, Name = "Z", Enabled = true });
+        // No membership row; the role grant (GlobalAdmin) is the bypass.
+
+        var draft = new PostDraft(comp, "T3", "body 3", Audience(GrantKind.User, author));
+        var post  = await RunInSession(store, async s =>
+            await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.GlobalAdmin }, s));
+
+        Assert.NotNull(post);
+    }
+
+    [Fact]
+    public async Task CreatePost_StrangerWithMemberRoleOnly_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-nobody";
+        const string comp   = "c-gate-d";
+
+        await Plant(store, new Component { Id = comp, Name = "W", Enabled = true });
+        // A member with no membership row on this component — must deny
+        // (this is the "the role is Member, not GlobalAdmin, so the
+        // membership row decides" path).
+
+        var draft = new PostDraft(comp, null, "body x", Audience(GrantKind.User, author));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.Member }, s)));
+    }
+
+    // ── Post-edit lane (UpdatePostAsync) ──────────────────────────────
+    //
+    // The M3 post lane is author-only for edits: the author may re-write
+    // Title/Body/Audience (the audience is written verbatim, ADR 0001-B),
+    // a non-author is denied even at GlobalAdmin (a moderator's lever over
+    // a post is Hide/Remove, not re-writing text), and the immutable
+    // identity fields (ComponentId/AuthorId/Created/Status/GroupId) are
+    // never touched. A missing id fails closed with KeyNotFoundException
+    // (the Web layer maps that to a 403, not a 404, to stay non-leaky).
+
+    [Fact]
+    public async Task UpdatePost_Author_Allows_FieldsUpdated_ModifiedStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-author";
+        const string postId = "edit-post-1";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Title = "old title", Body = "old body", Created = created,
+            Modified = created,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var newAudience = Audience(GrantKind.User, "u-edit-newmember");
+        var loadedBefore = await LoadPostAsync(store, postId);
+        var beforeModified = loadedBefore.Modified;
+
+        var updated = await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "new title", "new body", newAudience, null, s));
+
+        Assert.Equal("new title", updated.Title);
+        Assert.Equal("new body", updated.Body);
+        Assert.Equal(newAudience.Mode, updated.Audience.Mode);
+        Assert.Equal(GrantsOf(newAudience), GrantsOf(updated.Audience));
+
+        // The DB row carries the same shape.
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Equal("new title", persisted.Title);
+        Assert.Equal("new body", persisted.Body);
+        Assert.Equal(GrantsOf(newAudience), GrantsOf(persisted.Audience));
+        // Modified was stamped forward from its prior value.
+        Assert.True(persisted.Modified >= beforeModified);
+    }
+
+    [Fact]
+    public async Task UpdatePost_AuthorAudienceWrittenVerbatim()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-verbatim";
+        const string postId = "edit-post-2";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "old body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        // A non-default shape: `All` mode + two grant kinds (user + group),
+        // proving the nested Audience document round-trips bit-identically.
+        var newAudience = new Audience(
+            AudienceMode.All,
+            [
+                new AudienceGrant(GrantKind.User, author),
+                new AudienceGrant(GrantKind.Group, "g-edit-verbatim"),
+            ]);
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "t", "b", newAudience, null, s));
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Equal(AudienceMode.All, persisted.Audience.Mode);
+        Assert.Equal(GrantsOf(newAudience), GrantsOf(persisted.Audience));
+    }
+
+    [Fact]
+    public async Task UpdatePost_DoesNotTouchImmutableFields()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-immutable";
+        const string postId = "edit-post-3";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+        var groupId = "g-edit-immutable";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "old body", Created = created, Modified = created,
+            GroupId = groupId, Status = PostStatus.Active,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "new title", "new body",
+                Audience(GrantKind.User, author), null, s));
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Equal(ComponentId, persisted.ComponentId);
+        Assert.Equal(author, persisted.AuthorId);
+        Assert.Equal(created, persisted.Created);
+        Assert.Equal(groupId, persisted.GroupId);
+        Assert.Equal(PostStatus.Active, persisted.Status);
+    }
+
+    [Fact]
+    public async Task UpdatePost_Author_ChangesLanguageTag_PersistsNewCode()
+    {
+        // ADR 0018 (amended 2026-09-13, ADR 0014) — the authored-in language
+        // tag is editable on this lane: a non-empty code is written verbatim
+        // (the author can correct the language the post was written in).
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-lang";
+        const string postId = "edit-post-lang";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "t", "b",
+                Audience(GrantKind.User, author), "pl", s));
+
+        Assert.Equal("pl", (await LoadPostAsync(store, postId)).LanguageCode);
+    }
+
+    [Fact]
+    public async Task UpdatePost_Author_BlankLanguage_ResolvesInstanceDefault()
+    {
+        // ADR 0018 (amended) — a blank submission on the edit lane is
+        // re-materialized through the shared resolver: it never blanks a
+        // stored tag, it falls back to the instance default (here "pl",
+        // planted as the LocaleSettings singleton).
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-lang-blank";
+        const string postId = "edit-post-lang-blank";
+
+        await Plant(store, new LocaleSettings { Id = LocaleSettings.SingletonId, DefaultLanguageCode = "pl" });
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "t", "b",
+                Audience(GrantKind.User, author), null, s));
+
+        Assert.Equal("pl", (await LoadPostAsync(store, postId)).LanguageCode);
+    }
+
+    [Fact]
+    public async Task UpdatePost_NonAuthor_Member_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-owner";
+        const string stranger = "u-edit-stranger";
+        const string postId = "edit-post-4";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.UpdatePostAsync(postId, stranger, "t", "b",
+                    Audience(GrantKind.User, stranger), null, s)));
+        Assert.Contains("Only the author", ex.Message);
+
+        // The post is unchanged.
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Equal("body", persisted.Body);
+    }
+
+    [Fact]
+    public async Task UpdatePost_NonAuthor_GlobalAdmin_Denies()
+    {
+        // Author-only gate: even a GlobalAdmin who is not the author cannot
+        // re-write the post's text. (A moderator's lever over a post is
+        // Hide/Remove, not edit — see PostService.UpdatePostAsync.)
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-owner-admin";
+        const string admin = "u-edit-admin";
+        const string postId = "edit-post-5";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.UpdatePostAsync(postId, admin, "t", "b",
+                    Audience(GrantKind.User, admin), null, s)));
+    }
+
+    [Fact]
+    public async Task UpdatePost_NonAuthor_ModeratorAssignedToComponent_Denies()
+    {
+        // A component moderator who is NOT the author is still denied — the
+        // edit lane has no moderator branch at all.
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-owner-mod";
+        const string moderator = "u-edit-moderator";
+        const string postId = "edit-post-6";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "ma-edit",
+            UserId = moderator,
+            ComponentId = ComponentId,
+            GrantedBy = "u-edit-admin",
+            At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.UpdatePostAsync(postId, moderator, "t", "b",
+                    Audience(GrantKind.User, moderator), null, s)));
+    }
+
+    [Fact]
+    public async Task UpdatePost_MissingPostKey_MissingOrUnknownKey()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-anyone";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, async s =>
+                await svc.UpdatePostAsync("no-such-post", author, "t", "b",
+                    Audience(GrantKind.User, author), null, s)));
+    }
+
+    // ── ADR 0024 — author soft-delete lanes (component lane) ──────────────
+    //
+    // A sibling of the ADR 0014 edit-lane tests above, adapted to soft-delete:
+    // only the post's / reply's own author may delete; a non-author is denied
+    // even at GlobalAdmin (no moderator / break-glass branch — the M3b
+    // Hide/Remove surface is a separate concern); a missing id is
+    // KeyNotFoundException. The record is **kept** (DeletedAt stamped,
+    // Modified moved forward, never hard-deleted), and the feeds now exclude
+    // the deleted post while GetPostAsync still returns it (the placeholder
+    // shape — replies remain visible).
+
+    [Fact]
+    public async Task DeletePost_Author_Allows_DeletedAtStamped_ModifiedStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-author";
+        const string postId = "del-post-1";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "old body", Created = created, Modified = created,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var loadedBefore = await LoadPostAsync(store, postId);
+        var beforeModified = loadedBefore.Modified;
+
+        var deleted = await RunInSession(store, async s =>
+            await svc.DeletePostAsync(postId, author, s));
+
+        Assert.NotNull(deleted.DeletedAt);
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.NotNull(persisted.DeletedAt);
+        Assert.True(persisted.Modified >= beforeModified);
+        // The record is kept (soft-delete — never hard-deleted).
+        Assert.Equal("old body", persisted.Body);
+        Assert.Equal(author, persisted.AuthorId);
+    }
+
+    [Fact]
+    public async Task DeletePost_NonAuthor_Denies_EvenAtGlobalAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-owner";
+        const string admin = "u-del-admin";
+        const string postId = "del-post-2";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.DeletePostAsync(postId, admin, s)));
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Null(persisted.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeletePost_MissingPostKey_MissingOrUnknownKey()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-anyone";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, async s =>
+                await svc.DeletePostAsync("no-such-post", author, s)));
+    }
+
+    [Fact]
+    public async Task DeletePost_ThenFeed_ExcludesPost_ButDetailStillReturnsIt()
+    {
+        // ADR 0024 — the two-halves shape on the component lane: the feed
+        // hides a deleted post, but the detail lane still returns it (the
+        // placeholder shape — replies remain visible).
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string author = "u-del-feed";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "del-live", ComponentId = ComponentId, AuthorId = author,
+            Body = "live", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+        await Plant(store, new Post
+        {
+            Id = "del-gone", ComponentId = ComponentId, AuthorId = author,
+            Body = "gone", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var before = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.Equal(2, before.Visible.Count(p => p.Id is "del-live" or "del-gone"));
+
+        await RunInSession(store, async s =>
+            await svc.DeletePostAsync("del-gone", author, s));
+
+        var after = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.DoesNotContain(after.Visible, p => p.Id == "del-gone");
+        Assert.Contains(after.Visible, p => p.Id == "del-live");
+
+        // … but the detail lane still returns it (the placeholder shape).
+        var detail = await svc.GetPostAsync("del-gone", author);
+        Assert.NotNull(detail.Post);
+        Assert.NotNull(detail.Post.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeleteReply_Author_Allows_DeletedAtStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-reply-author";
+        const string replyId = "del-reply-1";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "del-reply-post", ComponentId = ComponentId, AuthorId = author,
+            Body = "parent", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = replyId, PostId = "del-reply-post", AuthorId = author,
+            Body = "old reply", Created = DateTimeOffset.UtcNow,
+        });
+
+        var deleted = await RunInSession(store, async s =>
+            await svc.DeleteReplyAsync(replyId, author, s));
+
+        Assert.NotNull(deleted.DeletedAt);
+
+        var persisted = await LoadReplyAsync(store, replyId);
+        Assert.NotNull(persisted.DeletedAt);
+        // The record is kept (soft-delete — never hard-deleted).
+        Assert.Equal("old reply", persisted.Body);
+        Assert.Equal(author, persisted.AuthorId);
+    }
+
+    [Fact]
+    public async Task DeleteReply_NonAuthor_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-reply-owner";
+        const string stranger = "u-del-reply-stranger";
+        const string replyId = "del-reply-2";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "del-reply-post2", ComponentId = ComponentId, AuthorId = author,
+            Body = "parent", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = replyId, PostId = "del-reply-post2", AuthorId = author,
+            Body = "old", Created = DateTimeOffset.UtcNow,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.DeleteReplyAsync(replyId, stranger, s)));
+
+        var persisted = await LoadReplyAsync(store, replyId);
+        Assert.Null(persisted.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeleteReply_MissingReplyKey_MissingOrUnknownKey()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-reply-anyone";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, async s =>
+                await svc.DeleteReplyAsync("no-such-reply", author, s)));
+    }
+
+    // ── Post-edit shared helpers ───────────────────────────────────────
+
+    private static async Task<Post> LoadPostAsync(IDocumentStore store, string id)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var r = store.QuerySession();
+        var loaded = await r.LoadAsync<Post>(id, ct);
+        Assert.NotNull(loaded);
+        return loaded!;
+    }
+
+    private static async Task<PostReply> LoadReplyAsync(IDocumentStore store, string id)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var r = store.QuerySession();
+        var loaded = await r.LoadAsync<PostReply>(id, ct);
+        Assert.NotNull(loaded);
+        return loaded!;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pins.
+    // Lane 1 (community post) + lane 2 (community reply): a resolved `@`-token
+    // stores ONE <c>post.mention</c> row for the recipient (the per-recipient
+    // key <c>notification:post.mention:{contentId}:{recipientId}</c>, M36·4) +
+    // a staged best-effort email (M6 D7); an inert token (unknown — M36-5)
+    // stores none; a draft save (M36·8) stores none. The <c>PostService</c> is
+    // built with the frozen <see cref="NotificationService"/> +
+    // <see cref="Mentions.MentionService"/> seams (the shared
+    // <see cref="MentionEmitters"/> harness).
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Lane 1 (M36·4) — a community post whose body mentions a
+    /// resolved resident stores exactly one <c>post.mention</c> row for the
+    /// recipient (the per-recipient key + the <c>/posts/{id}</c> linkPath) and
+    /// stages one best-effort email (the M6 D7 gate — the recipient has an
+    /// email).</summary>
+    [Fact]
+    public async Task M36_Post_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string comp = "c-m36-post";
+        await Plant(boot.Store, new Component { Id = comp, Name = "Safety", Enabled = true });
+
+        var draft = new PostDraft(comp, "Title", "@Ada can you bring the projector?", new Audience());
+        var post = await RunInSession(boot.Store, s =>
+            svc.CreatePostAsync(draft, "u-m36-author", new HashSet<string> { Roles.GlobalAdmin }, s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PostMention}:{post.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/posts/{post.Id}", row.LinkPath);
+        var email = Assert.Single(boot.Staged);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PostMention}:{post.Id}:ada", email.Key);
+    }
+
+    /// <summary>Lane 1 (M36-5 inert) — a community post whose body mentions an
+    /// unknown resident stores **no** <c>post.mention</c> row (a mention is
+    /// never a guess) and stages no email.</summary>
+    [Fact]
+    public async Task M36_Post_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string comp = "c-m36-inert";
+        await Plant(boot.Store, new Component { Id = comp, Name = "Safety", Enabled = true });
+
+        var draft = new PostDraft(comp, "Title", "@Ghost ping", new Audience());
+        await RunInSession(boot.Store, s =>
+            svc.CreatePostAsync(draft, "u-m36-inert-author", new HashSet<string> { Roles.GlobalAdmin }, s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
+        Assert.Empty(boot.Staged);
+    }
+
+    /// <summary>Lane 1 (M36·8 draft gate) — a **draft** community post whose
+    /// body mentions a resolved resident stores **no** <c>post.mention</c> row
+    /// (the mention emitter runs only on the publishing lane, ADR 0037).</summary>
+    [Fact]
+    public async Task M36_Post_Draft_Mention_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string comp = "c-m36-draft";
+        await Plant(boot.Store, new Component { Id = comp, Name = "Safety", Enabled = true });
+
+        var draft = new PostDraft(comp, "Title", "@Ada can you help", new Audience(), IsDraft: true);
+        await RunInSession(boot.Store, s =>
+            svc.CreatePostAsync(draft, "u-m36-draft-author", new HashSet<string> { Roles.GlobalAdmin }, s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
+    }
+
+    /// <summary>Lane 2 (M36·4) — a community reply (a parent post with an empty
+    /// <c>GroupId</c>) whose body mentions a resolved resident stores exactly
+    /// one <c>post.mention</c> row for the recipient (the
+    /// <c>/posts/{postId}#reply-{replyId}</c> linkPath) and stages one email.</summary>
+    [Fact]
+    public async Task M36_Reply_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string comp = "c-m36-reply";
+        const string parent = "m36-reply-parent";
+        await Plant(boot.Store, new Component { Id = comp, Name = "Safety", Enabled = true });
+        await Plant(boot.Store, new Post
+        {
+            Id = parent, ComponentId = comp, AuthorId = "u-m36-parent-author",
+            Body = "parent", Created = DateTimeOffset.UtcNow, Audience = new Audience(),
+        });
+
+        var reply = await RunInSession(boot.Store, s =>
+            svc.CreateReplyAsync(parent, "u-m36-replier", "@Ada thanks", s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PostMention}:{reply.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/posts/{parent}#reply-{reply.Id}", row.LinkPath);
+        var email = Assert.Single(boot.Staged);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PostMention}:{reply.Id}:ada", email.Key);
+    }
+
+    /// <summary>Lane 2 (M36-5 inert) — a community reply whose body mentions the
+    /// **replier's** own name stores **no** <c>post.mention</c> row (the author
+    /// is never notified of their own mention — M36-5 self pin).</summary>
+    [Fact]
+    public async Task M36_Reply_MentionSelf_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
+        // The replier's own display name — the token matches the replier, who
+        // is excluded by SubjectId (the M36-5 self pin).
+        await MentionEmitters.PlantResidents(boot.Store, ("u-m36-self-replier", "Replier"));
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string parent = "m36-self-parent";
+        await Plant(boot.Store, new Post
+        {
+            Id = parent, ComponentId = "c-m36-self", AuthorId = "u-m36-self-pauthor",
+            Body = "parent", Created = DateTimeOffset.UtcNow, Audience = new Audience(),
+        });
+
+        await RunInSession(boot.Store, s =>
+            svc.CreateReplyAsync(parent, "u-m36-self-replier", "@Replier oops", s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.DoesNotContain(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // A01 (IMPROVE-UX, the E1/E2 leak fix) — the reads honour PostStatus.
+    // The feeds + search exclude Hidden/Removed posts (the candidate filter);
+    // the detail lane serves a non-Active post to its author (placeholder)
+    // and to a standing moderator / break-glass (the report lane's lever) but
+    // returns `Post = null` to any other reader (the Web 403 / R01·R02 status
+    // page — the "403 on denied, 404 leaks which ids are real" pin). This is
+    // the "filter the feed, forget the URL" fix: the feed is clean *and* the
+    // direct /posts/{id} link no longer serves a hidden post to a stranger.
+    // ═════════════════════════════════════════════════════════════════════
+
+    // ── A01·1 — Hidden_ExcludedFromFeed_ForAuthorAndStranger ────────────────
+    //
+    // A post a moderator has Hidden (Status = PostStatus.Hidden) is absent
+    // from the community feed — for the author *and* for another resident.
+    // The feed's candidate filter (Status == PostStatus.Active) is the
+    // enforcement; the author does not see their own hidden post in the
+    // feed (the ADR 0024 author-sees-it-in-the-detail-only precedent —
+    // "kept but hidden from the author's working surfaces").
+
+    [Fact]
+    public async Task A01_Hidden_ExcludedFromFeed_ForAuthorAndStranger()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a01-feed-author";
+        const string stranger = "u-a01-feed-stranger";
+        const string postId = "a01-feed-post";
+
+        // The post is community-scoped so both the author and a stranger
+        // would normally see it (audience allow — not the audience Deny).
+        var communityAudience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]);
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 feed", Created = DateTimeOffset.UtcNow,
+            Audience = communityAudience, Status = PostStatus.Hidden,
+        });
+
+        // The author's own feed — a hidden post is not in their working set.
+        var authorFeed = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.DoesNotContain(authorFeed.Visible, p => p.Id == postId);
+
+        // The stranger's feed — the hidden post is not served to them either
+        // (the leak fix — the direct URL is the author/mod-only surface, not
+        // the feed or a stranger's detail view).
+        var strangerFeed = await svc.ListFeedAsync(ComponentId, stranger, page: 1);
+        Assert.DoesNotContain(strangerFeed.Visible, p => p.Id == postId);
+    }
+
+    // ── A01·2 — Removed_ExcludedFromFeed (the .Removed lane) ───────────────
+    //
+    // A post a moderator has Removed (Status = PostStatus.Removed) is absent
+    // from the community feed for everyone. The candidate filter is the same
+    // single conjunct (Status == PostStatus.Active) — the Hidden and Removed
+    // lanes share it (no separate filter per status).
+
+    [Fact]
+    public async Task A01_Removed_ExcludedFromFeed_ForEveryone()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a01-rm-author";
+        const string stranger = "u-a01-rm-stranger";
+        const string postId = "a01-rm-post";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 removed", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+            Status = PostStatus.Removed,
+        });
+
+        Assert.DoesNotContain(
+            (await svc.ListFeedAsync(ComponentId, author, page: 1)).Visible,
+            p => p.Id == postId);
+        Assert.DoesNotContain(
+            (await svc.ListFeedAsync(ComponentId, stranger, page: 1)).Visible,
+            p => p.Id == postId);
+    }
+
+    // ── A01·3 — Hidden_DetailAuthor_ReturnsPost (the placeholder case) ─────
+    //
+    // The **author** of a Hidden post reaches the detail lane and gets the
+    // post back (the Web view renders the "hidden by a moderator"
+    // placeholder, the ADR 0024 author-sees-its-own-deleted-post precedent).
+    // The post's Status is carried on the returned Post so the view can
+    // branch on it.
+
+    [Fact]
+    public async Task A01_Hidden_DetailAuthor_ReturnsPost()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a01-det-author";
+        const string postId = "a01-det-post";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 detail", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+            Status = PostStatus.Hidden,
+        });
+
+        var detail = await svc.GetPostAsync(postId, author);
+        Assert.NotNull(detail.Post);
+        Assert.Equal(PostStatus.Hidden, detail.Post.Status);
+        Assert.Equal(postId, detail.Post.Id);
+    }
+
+    // ── A01·4 — Hidden_DetailOtherReader_PostIsNull (the leak fix) ─────────
+    //
+    // A **stranger** (not the author, no moderator standing, no break-glass)
+    // reads a Hidden post by direct URL: the detail lane returns
+    // <c>Post = null</c> — the same fail-closed shape as a Deny (the Web
+    // maps it to the 403 / R01·R02 status page; a 404 would leak which ids
+    // are real, the repo's "403 on denied, 404 leaks which ids are real"
+    // pin). This is the direct-URL leak fix (E1/E2): before A01 the feed
+    // was clean but /posts/{id} still served a hidden post to any
+    // signed-in resident with a standing that matches the audience (or the
+    // post's audience was Community-scoped, which is the common case).
+
+    [Fact]
+    public async Task A01_Hidden_DetailOtherReader_PostIsNull()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a01-det-author";
+        const string stranger = "u-a01-det-stranger";
+        const string postId = "a01-det-post";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 detail", Created = DateTimeOffset.UtcNow,
+            // Community-scoped audience — any community member (the
+            // stranger) would normally be allowed the post's Read decision
+            // (the "audience branch" allow). The A01 Status branch on top
+            // of the decision is what refuses the hidden post.
+            Audience = new Audience { Community = true },
+            Status = PostStatus.Hidden,
+        });
+
+        // The author's component membership — the stranger is a member too
+        // (both are in the community, the audience's Community flag is the
+        // allow). We only need to plant a ComponentMembership for the
+        // actor's standing read (the audience decision's communityIds).
+        await userInfo.SetCommunityMembershipAsync(ComponentId, author, actorId: "u-a01-det-admin");
+        await userInfo.SetCommunityMembershipAsync(ComponentId, stranger, actorId: "u-a01-det-admin");
+
+        // The author sees their hidden post (placeholder case — A01·3).
+        var authorDetail = await svc.GetPostAsync(postId, author);
+        Assert.NotNull(authorDetail.Post);
+
+        // The stranger gets the fail-closed shape (the leak fix — before
+        // A01, the stranger's community membership let them see the hidden
+        // post by direct URL).
+        var strangerDetail = await svc.GetPostAsync(postId, stranger);
+        Assert.Null(strangerDetail.Post);
+        Assert.Empty(strangerDetail.Replies);
+    }
+
+    // ── A01·5 — Hidden_DetailStandingModerator_ReturnsPost ─────────────────
+    //
+    // A **standing moderator** (a <c>ModeratorAssignment</c> on the post's
+    // component, the M3b F3/F4 write-lane standing) reaches the detail lane
+    // of a Hidden post and gets the post back — the report lane's
+    // hide/remove/unhide lever reads the target through this seam (the
+    // decision's <c>Via</c> is <see cref="AccessVia.Moderator"/>, the
+    // A01 branch's privileged check). The moderator is **not** the author
+    // and **not** in the audience — the only lane that allows is the
+    // moderator branch (the decision's Via tag is the signal).
+
+    [Fact]
+    public async Task A01_Hidden_DetailStandingModerator_ReturnsPost()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a01-m-mod-author";
+        const string moderator = "u-a01-m-mod-moderator";
+        const string postId = "a01-m-mod-post";
+
+        // The component's ModeratorAccess flag is ON + a standing moderator
+        // assignment — the same setup M3b·9's HidePostAsync test uses.
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a01-m-mod-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-a01-m-mod-admin", At = DateTimeOffset.UtcNow
+        });
+
+        // The post's audience grants only `author` — the moderator is NOT in
+        // it, so the only lane that lets the moderator Read it is the
+        // moderator branch (Via = Moderator, the A01 privileged check).
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 mod detail", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+            Status = PostStatus.Hidden,
+        });
+
+        // The author's component membership (the standing read's
+        // communityIds — the moderator branch short-circuits before the
+        // audience branch, so the moderator does not need to be in the
+        // audience or a member).
+        var (userInfo, _, _) = Services(store);
+        await userInfo.SetCommunityMembershipAsync(ComponentId, author, actorId: "u-a01-m-mod-admin");
+
+        // The author sees it (placeholder case — A01·3).
+        var authorDetail = await svc.GetPostAsync(postId, author);
+        Assert.NotNull(authorDetail.Post);
+
+        // The standing moderator sees it too (the report lane's lever —
+        // the A01 privileged check via decision.Via == Moderator).
+        var moderatorDetail = await svc.GetPostAsync(postId, moderator);
+        Assert.NotNull(moderatorDetail.Post);
+        Assert.Equal(PostStatus.Hidden, moderatorDetail.Post.Status);
+    }
+
+    // ── A01·6 — Removed_DetailOtherReader_PostIsNull (the .Removed lane) ──
+    //
+    // A **stranger** reads a Removed post by direct URL: the detail lane
+    // returns <c>Post = null</c> (the same fail-closed shape as a Hidden
+    // post — the read branches are identical for the two non-Active
+    // statuses; only the write lanes differ, Hidden being reversible and
+    // Removed not). The author still sees the placeholder.
+
+    [Fact]
+    public async Task A01_Removed_DetailOtherReader_PostIsNull()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a01-rm-author";
+        const string stranger = "u-a01-rm-stranger";
+        const string postId = "a01-rm-post";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body a01 removed detail", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience { Community = true },
+            Status = PostStatus.Removed,
+        });
+        await userInfo.SetCommunityMembershipAsync(ComponentId, author, actorId: "u-a01-rm-admin");
+        await userInfo.SetCommunityMembershipAsync(ComponentId, stranger, actorId: "u-a01-rm-admin");
+
+        Assert.NotNull((await svc.GetPostAsync(postId, author)).Post);
+        Assert.Null((await svc.GetPostAsync(postId, stranger)).Post);
+    }
+
+    // ── A01·7 — Hidden_ThenFeed_ExcludesPost_ButDetailStillReturnsIt_Author ─
+    //
+    // The ADR 0024 two-halves shape, for the A01 Status lane: the feed
+    // hides a hidden post, but the **author's** detail lane still returns it
+    // (the placeholder shape). Mirrors the M3b write lane (HidePostAsync is
+    // the Moderate-gated write; A01's read branch is the read-side half).
+
+    [Fact]
+    public async Task A01_Hidden_ThenFeed_ExcludesPost_ButDetailStillReturnsIt_Author()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a01-feed-author";
+        const string moderator = "u-a01-feed-moderator";
+        const string postId = "a01-feed-post";
+
+        // The component's ModeratorAccess flag ON + a standing moderator
+        // assignment — the M3b F3 write-lane setup (the HidePostAsync lane
+        // requires a standing moderator, not the post's author).
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "a01-feed-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-a01-feed-admin", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "a01-live", ComponentId = ComponentId, AuthorId = author,
+            Body = "live", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience { Community = true },
+        });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "to-be-hidden", Created = DateTimeOffset.UtcNow,
+            Audience = new Audience { Community = true },
+        });
+        await userInfo.SetCommunityMembershipAsync(ComponentId, author, actorId: "u-a01-feed-admin");
+
+        var before = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.Equal(2, before.Visible.Count(p => p.Id is "a01-live" or "a01-feed-post"));
+
+        // The M3b write lane (a standing moderator runs it — the author has
+        // no Moderate standing, so the write-lane decision denies and the
+        // status would not flip; the write lane is the lane's own concern,
+        // A01's read branch reads the status back).
+        await RunInSession(store, async s =>
+            await svc.HidePostAsync(postId, moderator, s));
+
+        var after = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.DoesNotContain(after.Visible, p => p.Id == postId);
+        Assert.Contains(after.Visible, p => p.Id == "a01-live");
+
+        // … but the author's detail lane still returns it (the placeholder).
+        var detail = await svc.GetPostAsync(postId, author);
+        Assert.NotNull(detail.Post);
+        Assert.Equal(PostStatus.Hidden, detail.Post.Status);
+    }
+}

@@ -11,7 +11,7 @@
   "posts.flash_reply_updated": "Antwort aktualisiert.",
   "posts.flash_reply_deleted": "Antwort gel\u00F6scht.",
   "posts.mandatory_title": "Alle in der Nachbarschaft sind Mitglied dieser Gemeinschaft \u2013 niemand kann entfernt werden oder sie verlassen.",
-  "posts.no_feeds": "Derzeit steht kein Gemeinschafts-Feed zum Posten zur Verf\u00FCgung. Bitte einen Bewohner (oder einen globalen Admin, falls vorhanden), einen zu aktivieren \u2013 \u00FCblich sind safety, maintenance, social und governance.",
+  "posts.no_feeds": "Derzeit steht kein Gemeinschafts-Feed zum Posten zur Verf\u00fcgung. Bitte einen Bewohner (oder den Administrator, falls vorhanden), einen zu aktivieren \u2013 \u00fcblich sind safety, maintenance, social und governance.",
   "posts.feed_all_sections": "Gemeinschaft",
   "posts.write": "Beitrag schreiben",
   "posts.new_title": "Beitrag schreiben",
@@ -43,6 +43,7 @@
   "posts.audience_restrict_hint": "Diese Auswahl ist ausgeblendet, solange \u201EAlle in dieser Gemeinschaft\u201C an ist \u2014 der Beitrag ist f\u00FCr alle in der Gemeinschaft sichtbar. Schalte sie ab, um mit den Auswahl hier zu bestimmen, wer ihn sehen kann.",
   "posts.audience_only_picks": "Was du hier w\u00E4hlst, wird das Publikum des Beitrags \u2014 es wird nichts dar\u00FCber oder darunter hinzugef\u00FCgt. Eine leere Auswahl (mit \u201EAlle in dieser Gemeinschaft\u201C aus) bedeutet, dass nur du den Beitrag sehen kannst.",
   "posts.empty_can_post": "Noch keine Beitr\u00E4ge hier. Schreibe den ersten \u2014 er ist nur f\u00FCr das Publikum sichtbar, das du im Editor unterhalb der \u00DCberschrift w\u00E4hlst.",
+  "posts.empty_title": "Noch keine Beitr\u00E4ge hier.",
   "posts.empty": "Noch keine Beitr\u00E4ge hier.",
   "posts.reply_count_none": "Noch keine Antworten",
   "posts.reply_count_one": "{0} Antwort",
@@ -56,7 +57,7 @@
   "posts.reply_report_button": "Diese Antwort melden",
   "posts.report_reason_label": "Was ist schiefgelaufen?",
   "posts.report_optional": "optional",
-  "posts.report_note": "Eine Meldung ist nur eine Eingangsaktion \u2014 sie \u00E4ndert nichts daran, was du sehen kannst, und ein Moderator kann nachfassen.",
+  "posts.report_note": "Eine Meldung ist nur der erste Schritt \u2014 sie \u00e4ndert nichts daran, was du sehen kannst, und ein Moderator kann nachfassen.",
   "posts.report_submit": "Melden",
   "posts.replies_heading": "Antworten",
   "posts.replies_empty": "Noch keine Antworten. Wenn du diesen Beitrag sehen kannst, kannst du auch darauf antworten.",
@@ -74,6 +75,7 @@
   "posts.delete": "L\u00F6schen",
   "posts.reply_delete": "L\u00F6schen",
   "posts.deleted_placeholder": "Dieser Beitrag wurde von dessen Autor:in gel\u00F6scht.",
+  "posts.moderator_hidden_placeholder": "Dieser Beitrag wurde von einer Moderationsperson ausgeblendet.",
   "posts.reply_deleted_placeholder": "Diese Antwort wurde von dessen Autor:in gel\u00F6scht.",
   "posts.translations_label": "\u00DCbersetzungen",
   "posts.translations_none": "noch keine",
@@ -90,5 +92,6 @@
   "posts.project_report_button": "Dieses Projekt melden",
   "posts.board_report_button": "Dieses Board melden",
   "posts.todo_report_button": "Diese Aufgabe melden",
-  "posts.grouppost_report_button": "Diesen Beitrag melden"
+  "posts.grouppost_report_button": "Diesen Beitrag melden",
+  "posts.replies_empty_title": "Noch keine Antworten."
 }

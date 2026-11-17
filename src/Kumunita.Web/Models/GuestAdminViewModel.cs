@@ -18,8 +18,24 @@ namespace Kumunita.Web.Models;
 public sealed class GuestAdminViewModel
 {
     /// <summary>The guest's subject id (the <see cref="GuestAccess"/> document
-    /// id — one allowance per guest account).</summary>
+    /// id — one allowance per guest account). The selected value of the
+    /// account picker (IMPROVE-UX A13); it stays the write seam's input —
+    /// <see cref="IIdentityService.SetGuestAccessAsync"/> still receives this
+    /// <c>subjectId</c> string, now guaranteed by construction to be a real
+    /// account id (a picker value, not free text).</summary>
     public string SubjectId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The guest account picker options (IMPROVE-UX A13) — the accounts the
+    /// admin can already see on <c>/admin/accounts</c>, now offered as a
+    /// <c>&lt;select&gt;</c> instead of a free-text subject id. Reuses the
+    /// <see cref="AdminIndexViewModel.AccountRow"/> row type (the same shape
+    /// the <c>/admin</c> surfaces render) rather than a parallel projection.
+    /// Empty when the account-listing seam is absent (a test harness that does
+    /// not supply it) — the view renders an empty picker, not an error (the
+    /// C-M19·4 floor).
+    /// </summary>
+    public IReadOnlyList<AdminIndexViewModel.AccountRow> AccountOptions { get; set; } = [];
 
     /// <summary>
     /// The bounded window start (D3, "when"), inclusive. Bound to the form's

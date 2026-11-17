@@ -37,7 +37,7 @@ namespace Kumunita.Core.Tests;
 /// <para>
 /// No new Core or Web code beyond the U04 seeder change; no new seams.
 /// </para>
-public class SiteContentSeederTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class SiteContentSeederTests(PostgresFixture fixture)
 {
     // ── 1 — a fresh boot stores exactly one SiteContent row ────────────────
     // (the LocaleSettings "one row per instance" shape, ADR 0005 B / SITE·6).

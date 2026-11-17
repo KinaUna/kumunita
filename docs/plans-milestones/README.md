@@ -39,6 +39,12 @@ to live here are in
   milestone that is *actively* being built, one folder per in-flight unit,
   empty when the current milestone is between units or just closed.
 
+## Current in-progress lane
+
+**IMPROVE-DEVX** — closed on 2026-11-17 — shipped and closed; the register, the `dx*-prompt` unit prompts, and the handoff notes moved to the archive at [`archive/lanes/improve-devx/`](../archive/lanes/improve-devx/) (register [plan-improve-devx](../archive/lanes/improve-devx/plan-improve-devx.md), closing log [improve-devx-handoff-notes](../archive/lanes/improve-devx/improve-devx-handoff-notes.md)).
+
+**IMPROVE-UX** — closed on 2026-11-13 — shipped and closed; the register, the `x`/`r`/`a`/`o`-prompt unit prompts, and the handoff notes moved to the archive at [`archive/lanes/improve-ux/`](../archive/lanes/improve-ux/) (register [plan-improve-ux](../archive/lanes/improve-ux/plan-improve-ux.md), closing log [improve-ux-handoff-notes](../archive/lanes/improve-ux/improve-ux-handoff-notes.md)).
+
 **Latest lane: `CODE-HYGIENE`** — the code-hygiene lane (units `U00`–`U14`,
 proposed 2026-11-06) **shipped and closed on 2026-11-09** — the close unit
 `CH14` verified the six close criteria green and moved the register, the

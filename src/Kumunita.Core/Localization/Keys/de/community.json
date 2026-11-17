@@ -24,7 +24,7 @@
   "community.translations_none": "Noch keine",
   "community.translations_page_title": "\u00DCbersetzungen",
   "community.translations_page_lede": "Name und Beschreibung dieser Gemeinschaft in weiteren Sprachen.",
-  "community.translations_view_only": "Sie k\u00F6nnen die \u00DCbersetzungen einsehen; nur ein GlobalAdmin oder ein \u00DCbersetzer kann sie hinzuf\u00FCgen, bearbeiten oder entfernen.",
+  "community.translations_view_only": "Sie k\u00f6nnen die \u00dcbersetzungen einsehen; nur ein Administrator oder ein \u00dcbersetzer kann sie hinzuf\u00fcgen, bearbeiten oder entfernen.",
   "community.translation_add": "Hinzuf\u00FCgen",
   "community.translation_name_label": "Name",
   "community.translation_desc_label": "Beschreibung",

@@ -52,7 +52,9 @@ namespace Kumunita.Web.Tests.SecGate;
 /// </summary>
 public class DataClassCoverageTests
 {
-    /// <summary>The 81 <c>[DataClass]</c> rows (the spec) in <c>Kumunita.Core</c>.</summary>
+    /// <summary>The 84 <c>[DataClass]</c> rows (the spec) in <c>Kumunita.Core</c>
+    /// (81 base; +1 for ADR 0301 <c>DeletionRequest</c>, +1 for ADR 0302
+    /// <c>KioskLink</c>, +1 for ADR 0304 <c>Invitation</c>).</summary>
     private static IReadOnlyList<DataClassEntry> Spec()
         => DataClassCatalog.All(typeof(DataClassAttribute).Assembly);
 

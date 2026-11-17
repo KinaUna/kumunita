@@ -40,7 +40,7 @@ namespace Kumunita.Core.Tests;
 /// </item>
 /// </list>
 /// </summary>
-public class UserInfoServiceGroupDescriptionTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class UserInfoServiceGroupDescriptionTests(PostgresFixture fixture)
 {
     // ── Test 1 — the write is strong-consistency (C4) on both read lanes ──
     //

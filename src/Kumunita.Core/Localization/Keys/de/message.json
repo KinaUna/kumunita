@@ -3,6 +3,7 @@
   "message.title": "Nachrichten",
   "message.new": "Neue Unterhaltung",
   "message.thread.empty": "Noch keine Nachrichten \u2014 melde dich einfach.",
+  "message.thread.empty_title": "Noch keine Nachrichten.",
   "message.compose.placeholder": "Nachricht schreiben\u2026",
   "message.compose.send": "Senden",
   "message.unread": "ungelesen",

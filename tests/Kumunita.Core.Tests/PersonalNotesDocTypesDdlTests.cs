@@ -26,7 +26,7 @@ namespace Kumunita.Core.Tests;
 /// The test names are doc-registration shape pins (outside the design doc's
 /// §2.5 seam list — the M17/U01 precedent; the U01 handoff records it).
 /// </summary>
-public class PersonalNotesDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public class PersonalNotesDocTypesDdlTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private string _connection = "";
 

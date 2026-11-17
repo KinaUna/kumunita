@@ -62,4 +62,21 @@ else
     <p class="text-muted small">
         @remainingNote
     </p>
+
+    @* IMPROVE-UX A14 — the "request more space" loop: the
+       account.storage_remaining_note text used to end with "Ask an
+       administrator to raise the quota" and offer no seam to actually ask
+       (E20, the "promise without seam" anti-pattern). The button IS that
+       ask — a POST to /account/storage/request that notifies the
+       GlobalAdmins with a link to this resident's account. Rendered only in
+       the limited branch: an unlimited resident (the C-UP·5 quota-0
+       sentinel, the branch above) has no cap to ask about. The
+       admin raising the limit is A15's surface (the per-resident quota
+       override); A14 only sends the nudge. *@
+    <form method="post" action="/account/storage/request" class="mt-2">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-outline-secondary">
+            <kw-l key="account.storage_request">Request more space</kw-l>
+        </button>
+    </form>
 }

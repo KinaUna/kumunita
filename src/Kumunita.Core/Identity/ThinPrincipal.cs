@@ -54,6 +54,14 @@ public static class Roles
     public const string Translator = "Translator";
 
     /// <summary>
+    /// ADR 0302 — the shared kiosk link role value. The restricted principal
+    /// minted by R16's middleware carries this single role and no other; the
+    /// kiosk item catalog uses it to apply the community-visible filter
+    /// (IMPROVE-UX R17).
+    /// </summary>
+    public const string KioskLink = "kiosk-link";
+
+    /// <summary>
     /// M19 (ADR 0120, D5) — the guest standing: a limited-privilege,
     /// time-bounded account **outside** the resident circle (a
     /// consultant/coach/teacher/speaker/entertainer). A guest **never** holds

@@ -29,7 +29,7 @@ using Xunit;
 
 namespace Kumunita.Core.Tests;
 
-public sealed class IdentityServiceAccountNotificationTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class IdentityServiceAccountNotificationTests(PostgresFixture fixture)
 {
     private const string Admin1 = "admin-001";
     private const string Admin2 = "admin-002";

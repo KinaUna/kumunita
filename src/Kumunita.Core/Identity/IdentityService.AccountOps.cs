@@ -104,6 +104,23 @@ public partial class IdentityService
     public async Task SetNotifyAdminsOnSignupAsync(bool notify, string adminSubjectId)
         => await _gates.SetNotifyAdminsOnSignupAsync(notify, adminSubjectId);
 
+    // ── Resident-invite mode (ADR 0304, amended 2026-11-11 for IMPROVE-UX A11) ──
+    // The 3-state resident-invite posture (the EventRsvpMode 3-state shape,
+    // the NotifyAdminsOnSignup / IsSignupOpen singleton-toggle lane). A11
+    // settles the setting + the rule; A12's resident "Invite a neighbour"
+    // surface will consume the posture via IInvitationService
+    // .GetResidentInvitePostureAsync (the A12 seam reads MayInvite /
+    // RequiresApproval before calling CreateAsync / InviteAsync). The
+    // C08 thin-forwarder shape — IdentityService delegates to the
+    // IdentityPlatformGateService (the C3-03 / ADR 0293 part-vs-whole
+    // surface).
+
+    public async Task<ResidentInviteSetting> GetResidentInviteSettingAsync()
+        => await _gates.GetResidentInviteSettingAsync();
+
+    public async Task SetResidentInviteSettingAsync(ResidentInviteSetting mode, string adminSubjectId)
+        => await _gates.SetResidentInviteSettingAsync(mode, adminSubjectId);
+
     // ── M19 guest standing (ADR 0120, D2 — the single audited write lane) ──
 
     /// <inheritdoc />
@@ -183,20 +200,17 @@ public partial class IdentityService
         if (isSelfDeletion)
         {
             // Self-deletion — the resident acts on their own account.
-            // ADR 0142 D5 gate: the self-serve lane is reachable only by a
-            // GlobalAdmin (a non-GlobalAdmin's crafted POST is refused
-            // server-side, the fail-closed pin). The resident's current
-            // password was already verified by the Web controller before
-            // reaching here, so the lane itself only checks the standing.
+            // ADR 0301 D1 (amends 0142 D5): the self-serve lane is open to
+            // EVERY resident — the 0142 D5 GlobalAdmin gate is removed, so a
+            // non-GlobalAdmin resident may self-delete (the IMPROVE-UX E7
+            // dead-end is closed; the R12 due-job runs exactly this branch
+            // for a due DeletionRequest). The only standing refusal that
+            // survives is the last-GlobalAdmin lockout pin (0142 D3), which
+            // DeleteCoreAsync re-checks. The resident's current password was
+            // already verified by the Web controller (R13) before reaching
+            // here, so the lane itself performs no standing check.
             var self = await userManager.FindByIdAsync(targetSubjectId).ConfigureAwait(false)
                 ?? throw new InvalidOperationException($"No account '{targetSubjectId}'.");
-            var selfRoles = (await userManager.GetRolesAsync(self).ConfigureAwait(false)).ToList();
-            if (!selfRoles.Contains(Roles.GlobalAdmin))
-                throw new UnauthorizedAccessException(
-                    "The self-serve delete-account lane is only available to a " +
-                    "GlobalAdmin. A non-GlobalAdmin resident cannot delete " +
-                    "their own account — contact an administrator to remove " +
-                    "the account.");
             await DeleteCoreAsync(
                 targetSubjectId, self,
                 actorId: targetSubjectId,

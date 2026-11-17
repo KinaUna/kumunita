@@ -5,7 +5,7 @@ tier: reference
 kind: adr
 status: accepted
 audiences: [developer, agent, platform-maintainer]
-related: [docs/design/m16-inventory-design.md]
+related: [docs/design/m16-inventory-design.md, docs/adr/0191-inventory.md]
 supersedes: []
 superseded_by: []
 updated: 2026-11-02

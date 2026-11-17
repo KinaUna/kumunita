@@ -62,12 +62,20 @@
            and /pages/{resident}/… both resolve exactly as before). *@
         @if (Model.Roots.Count == 0 && Model.SystemRoots.Count == 0)
         {
-            <div class="alert alert-info">
-                @* Plain text — the kw-l TagHelper auto-escapes (SetContent),
-                   so the registered pages.none value carries no <b> markup and
-                   this inner text matches it (the "renders identically whether
-                   or not the TagHelper is in play" invariant). *@
-                <kw-l key="pages.none">No pages yet. Global admins can create the first system page — an About page is the common starting point — and any resident can start their own blog (a page of their own).</kw-l>
+            @* R32 (IMPROVE-UX) — the house .kmb-empty idiom (title + body + one
+               next action). The body is the existing pages.none sentence (plain
+               text — the kw-l TagHelper auto-escapes, so the inner text matches
+               the registered value); the action is the page's New-page button,
+               shown to a signed-in resident. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="pages.none_title">No pages yet.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="pages.none">No pages yet. Global admins can create the first system page — an About page is the common starting point — and any resident can start their own blog (a page of their own).</kw-l>
+                </p>
+                @if (User?.Identity?.IsAuthenticated == true)
+                {
+                    <a class="btn btn-primary" href="/pages/new"><kw-l key="pages.new_button">New page</kw-l></a>
+                }
             </div>
         }
         else

@@ -306,6 +306,92 @@
     </div>
 </form>
 
+@*
+  ADR 0302 (IMPROVE-UX R18) — the shared kiosk link lifecycle. A new section
+  on the same page; the personal-kiosk settings above are untouched (ADR 0302
+  D5). The resident creates a link (the raw token is shown once in a read-only
+  input — the row stores only the SHA-256 hash, so there is no "show again"),
+  sees their active links with "last used", and revokes them (terminal, no
+  undo — the R15 state machine). The revoke uses the data-confirm idiom
+  (confirm.ts). The /kiosk?link=<token> URL is assembled client-side by
+  kiosk-settings.ts (the R16 middleware parses it) so the token never rides a
+  server-rendered URL.
+*@
+<div class="card mb-4 kmb-form-section" id="kiosk-shared-links">
+<div class="card-body">
+<h2 class="kmb-form-section-title"><kw-l key="kiosk.settings.shared_heading">Shared link</kw-l></h2>
+<p class="text-muted">
+    <kw-l key="kiosk.settings.shared_intro">A shared link lets anyone who has it watch your kiosk display without signing in. Only items visible to the whole community are shown (private items are skipped). The link is revocable; once revoked it cannot be restored.</kw-l>
+</p>
+
+@* ── Copy-once reveal (shown exactly once, right after creation — ADR 0302 D2) ── *@
+@if (Model.SharedLinkToken is not null)
+{
+    <div class="alert alert-info d-flex flex-wrap align-items-center gap-2" id="kiosk-link-token-reveal" data-kiosk-link-token="@Model.SharedLinkToken">
+        <div class="me-2 flex-grow-1">
+            <kw-l key="kiosk.settings.link_created">Your shared link is ready. Copy it now — it will not be shown again.</kw-l>
+        </div>
+        <input type="text" class="form-control form-control-sm w-auto" id="kiosk-link-token" readonly
+               value="@Model.SharedLinkToken" aria-label="@await Tr("kiosk.settings.token_label", "Shared link")" />
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-kiosk-copy-token id="kiosk-link-copy">
+            <kw-l key="kiosk.settings.copy">Copy</kw-l>
+        </button>
+    </div>
+}
+
+@* ── Create link button ── *@
+<form method="post" action="/settings/kiosk/link" class="d-inline" id="kiosk-link-create-form">
+    @Html.AntiForgeryToken()
+    <button type="submit" class="btn btn-outline-primary">
+        + <kw-l key="kiosk.settings.create_link">Create link</kw-l>
+    </button>
+</form>
+
+@* ── Active links list ── *@
+@if (Model.SharedLinks.Count > 0)
+{
+    <table class="table table-sm mt-3 mb-0">
+        <thead>
+            <tr>
+                <th scope="col"><kw-l key="kiosk.settings.col_created">Created</kw-l></th>
+                <th scope="col"><kw-l key="kiosk.settings.col_last_used">Last used</kw-l></th>
+                <th scope="col" class="text-end"><kw-l key="kiosk.settings.col_actions">Actions</kw-l></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var link in Model.SharedLinks)
+        {
+            var createdFmt = link.CreatedAt.ToLocalTime().ToString("MMM d, yyyy", System.Globalization.CultureInfo.CurrentCulture);
+            var lastUsedFmt = link.LastUsedAt is null
+                ? await Tr("kiosk.settings.never_used", "Never")
+                : link.LastUsedAt.Value.ToLocalTime().ToString("MMM d, yyyy HH:mm", System.Globalization.CultureInfo.CurrentCulture);
+            var shortId = link.Id.Length > 8 ? link.Id[^8..] : link.Id;
+            <tr id="kiosk-link-@link.Id" data-link-id="@link.Id">
+                <td>@createdFmt <span class="text-muted small">(#@shortId)</span></td>
+                <td>@lastUsedFmt</td>
+                <td class="text-end">
+                    <form method="post" action="/settings/kiosk/link/revoke" class="d-inline"
+                          data-confirm="@await Tr("kiosk.settings.revoke_confirm", "Revoke this shared link? It will stop working immediately and cannot be undone.")">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="linkId" value="@link.Id" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger" data-kiosk-revoke>
+                            <kw-l key="kiosk.settings.revoke">Revoke</kw-l>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </table>
+}
+else
+{
+    <p class="text-muted mt-3 mb-0">
+        <kw-l key="kiosk.settings.shared_empty">No shared links yet. Use "Create link" to make one for a wall screen or shared display.</kw-l>
+    </p>
+}
+</div>
+</div>
+
 @section Scripts {
     <script type="module" src="~/js/lib/kiosk-settings.js"></script>
 }

@@ -31,7 +31,7 @@ namespace Kumunita.Core.Tests;
 /// real one.
 /// </para>
 /// </summary>
-public class IdentityServiceSignupPolicyTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class IdentityServiceSignupPolicyTests(PostgresFixture fixture)
 {
     // ── The `false` floor — a fresh instance ships invitation-only ─────────
     // (Amended 2026-10-05, ADR 0050 §Amendments: the floor flipped from the

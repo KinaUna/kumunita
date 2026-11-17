@@ -24,5 +24,6 @@
   "inv.detail.checkIn": "Return\u00E9r",
   "inv.edit.title": "Redig\u00E9r emne",
   "inv.edit.submit": "Gem \u00E6ndringer",
-  "inv.item.delete_confirm": "Slet dette element? Det kan ikke fortrydes."
+  "inv.item.delete_confirm": "Slet dette element? Det kan ikke fortrydes.",
+  "inv.list.empty_title": "Ingen emner endnu."
 }

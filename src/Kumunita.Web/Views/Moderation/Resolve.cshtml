@@ -1,7 +1,18 @@
 @using Kumunita.Web.Models
-@model ModerationResolveViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = $"Moderation: report {Model.ReportId[..Math.Min(8, Model.ReportId.Length)]}…";
+
+    // IMPROVE-UX R04 — the resolve-note placeholder (the Document/Index.cshtml
+    // idiom: resolved via the effective language, the en registry floor is
+    // the backstop; <kw-l> cannot be placed inside a quoted attribute —
+    // the Razor trap the ADR 0285 comment in Admin/Escalation names).
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var notePlaceholder = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["moderation.resolve_note_placeholder"]
+        : await Translation.GetAsync("moderation.resolve_note_placeholder", _kwL);
 }
 
 <h1><kw-l key="moderation.resolve_title">Moderation — Review report</kw-l></h1>
@@ -187,7 +198,79 @@
                 <kw-l key="moderation.resolve_desc">This closes the report — it is marked as resolved, which is its final state. Everything you do here is written to the audit log.</kw-l></p>
             <form method="post" action="/moderation/@Model.ReportId/resolve">
                 @Html.AntiForgeryToken()
+
+                @* IMPROVE-UX R04 — the optional outcome radio group + note
+                   textarea (the R03 seam's (outcome, resolutionNote) pair,
+                   wired through the controller to ResolveReportAsync).
+                   The <fieldset> wraps the radio group so screen readers
+                   announce the group label once (the E15 a11y pin — a
+                   programmatic label, not a per-input aria-label); the
+                   textarea uses a <label for> with a matching id (the
+                   assign form's programmatic-label idiom, ADR 0015 D1).
+                   Both are optional — an empty form is the pre-R04 "no
+                   outcome recorded" call shape (the controller maps the
+                   blank / unrecognized outcome to null, the note to null). *@
+                <div class="mb-3">
+                    <fieldset>
+                        <legend class="col-form-label pt-0">
+                            <kw-l key="moderation.resolve_outcome_label">Outcome</kw-l>
+                        </legend>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="outcome" id="outcome-NoAction" value="NoAction">
+                            <label class="form-check-label" for="outcome-NoAction"><kw-l key="moderation.resolve_outcome_noaction">No action</kw-l></label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="outcome" id="outcome-Hidden" value="Hidden">
+                            <label class="form-check-label" for="outcome-Hidden"><kw-l key="moderation.resolve_outcome_hidden">Hide the post</kw-l></label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="outcome" id="outcome-Removed" value="Removed">
+                            <label class="form-check-label" for="outcome-Removed"><kw-l key="moderation.resolve_outcome_removed">Remove the post</kw-l></label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="outcome" id="outcome-Other" value="Other">
+                            <label class="form-check-label" for="outcome-Other"><kw-l key="moderation.resolve_outcome_other">Other (see note)</kw-l></label>
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="resolutionNote">
+                        <kw-l key="moderation.resolve_note_label">Note to the reporter (optional)</kw-l>
+                    </label>
+                    <textarea class="form-control" id="resolutionNote" name="resolutionNote" rows="3" maxlength="500"
+                              placeholder="@notePlaceholder"></textarea>
+                </div>
                 <button class="btn btn-success" type="submit"><kw-l key="moderation.resolve_submit">Resolve</kw-l></button>
+                <a href="/moderation" class="btn btn-link ms-2"><kw-l key="moderation.cancel">Cancel</kw-l></a>
+            </form>
+        </div>
+    </div>
+}
+
+@* ── The A03 "Unhide" form block (the reversible lever) ─────────────
+   Shown only when the report is <c>resolved</c> AND the moderator's
+   chosen outcome was <c>Hidden</c> (the R03 shape — the
+   <c>ModerationResolveViewModel.Outcome</c> field). The "Hidden"
+   outcome's execution was <c>HidePostAsync</c> (the reversible F3 lane);
+   the "Unhide" button is its inverse (the A03 <c>UnhidePostAsync</c>
+   seam). A <c>Removed</c> outcome is the F4 hard lane — irreversible
+   by design (the moderator's free-text note is the record; the only
+   way back is a fresh post or a DB restore). A <c>NoAction</c> /
+   <c>Other</c> outcome has nothing to reverse. The display-level
+   predicate (<c>Model.Outcome == Hidden</c>) is the guard — the
+   <c>UnhidePostAsync</c> seam's <c>CanAsync(Moderate)</c> decision
+   gate is the real authorization (C-M3b·4 SoD shape, ADR 0006-C
+   "audit-row always written"). *@
+@if (Model.Status == "resolved" && Model.Outcome == Kumunita.Core.Posts.ReportOutcome.Hidden)
+{
+    <div class="card mb-4">
+        <div class="card-header"><kw-l key="moderation.unhide_header">Unhide the post</kw-l></div>
+        <div class="card-body">
+            <p class="text-muted">
+                <kw-l key="moderation.unhide_desc">This restores the post to the feed — it was hidden by a moderator when the report was resolved. The action is written to the audit log.</kw-l></p>
+            <form method="post" action="/moderation/@Model.ReportId/unhide">
+                @Html.AntiForgeryToken()
+                <button class="btn btn-secondary" type="submit"><kw-l key="moderation.unhide_submit">Unhide</kw-l></button>
                 <a href="/moderation" class="btn btn-link ms-2"><kw-l key="moderation.cancel">Cancel</kw-l></a>
             </form>
         </div>

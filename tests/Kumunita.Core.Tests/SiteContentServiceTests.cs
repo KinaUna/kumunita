@@ -20,7 +20,7 @@ namespace Kumunita.Core.Tests;
 /// wired in the test's own <c>DocumentStore.For</c> lambda (the same
 /// idiom as every other <c>*DocTypes</c> test harness).
 /// </para>
-public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class SiteContentServiceTests(PostgresFixture fixture)
 {
     // ── 1 — a missing row degrades to the in-code fallback (SITE·1) ──────
     // A fresh store (no SiteContent row) + GetAsync returns a SiteContent

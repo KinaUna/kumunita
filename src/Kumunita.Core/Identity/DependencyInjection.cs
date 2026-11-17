@@ -29,6 +29,22 @@ public static class IdentityModule
     public static IServiceCollection AddIdentity(this IServiceCollection services)
     {
         services.AddTransient<IIdentityService, IdentityService>();
+        // ADR 0301 (IMPROVE-UX R11) — the self-service deletion SCHEDULING
+        // lane (the grace period above the IIdentityService.DeleteAccountAsync
+        // seam — ADR 0301 D4 keeps that contract unchanged; the scheduler is a
+        // sibling service, not a change to IIdentityService). The R12 due-job
+        // resolves IDeletionScheduler for the ListDueAsync / MarkExecutedAsync
+        // seams.
+        services.AddTransient<IDeletionScheduler, DeletionScheduler>();
+        // ADR 0304 (IMPROVE-UX A07) — the email invitation's Core seam
+        // (create / revoke / validate / accept). Pure Core — the A08
+        // ?invite= sign-up gate, the A09 /admin/invitations surface, and the
+        // A12 resident "Invite a neighbour" all resolve this (the
+        // IKioskLinkService precedent in the Kiosk module — the
+        // InvitationService carries IIdentityService for the AcceptAsync
+        // RegisterAsync lane, not a circular dependency: IIdentityService
+        // does not depend on IInvitationService).
+        services.AddTransient<IInvitationService, InvitationService>();
         // C3-07 (ADR 0297, D5 contract extraction) — the IInstanceBaseUrlReader
         // read contract over the host-bound VerificationOptions.BaseUrl value.
         // The Identity module owns both the source options and the contract, so

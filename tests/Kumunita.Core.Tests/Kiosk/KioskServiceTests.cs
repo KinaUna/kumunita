@@ -27,7 +27,7 @@ namespace Kumunita.Core.Tests;
 /// ctor's non-null guard.
 /// </para>
 /// </summary>
-public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class KioskServiceTests(PostgresFixture fixture)
 {
     private const string Admin = "m35-admin-001";
 

@@ -38,5 +38,6 @@
   "pn.folder.new": "New folder",
   "pn.folder.rename": "Rename folder",
   "pn.folder.delete": "Delete folder",
-  "pn.folder.empty": "No notes in this folder yet."
+  "pn.folder.empty": "No notes in this folder yet.",
+  "pn.list.empty_title": "No notes yet."
 }

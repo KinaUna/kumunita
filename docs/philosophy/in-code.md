@@ -102,7 +102,9 @@ here rather than restating it.
 - **The ratchet (shrink-only).** The code-size baseline
   (`tools/code/code-baseline.json`) only ever goes **down**. A new item over
   its ceiling, a baselined item growing past its recorded max, a stale entry
-  left behind, or a max raised above `origin/main` — each fails the close.
+  left behind, or a max raised above the base ref — `origin/development`
+  locally, or `CODE_BASELINE_BASE` (`origin/<base_ref or release>`) in CI
+  ([branch flow](../dev/branch-flow.md)) — each fails the close.
   Lowering an item re-tightens the baseline (`code-check.ps1 --tighten`).
   Raising a number is only ever legitimate with an `adr:` reason on that entry
   — the baseline is the point: a ceiling that can drift up protects nothing.
@@ -113,9 +115,13 @@ here rather than restating it.
   views were the example: 12 properties, zero consumers outside tests.)
 - **The comment rule (D4: contract + link, applied on touch).** A doc-comment
   states **what, when, and throws**, plus the ADR number. History stays in the
-  ADR or the handoff note — not in a running change-log above the method. The
-  comment ratio is *reported* by the gate, not gated; the rule is about
-  *what* a comment says, not how many there are.
+  ADR or the handoff note — not in a running change-log above the method. A code
+  comment cites the **ADR number** (or the ADR's decision, e.g. `D1`); a raw
+  **unit code** (`F14.U2`, `C3-06`, `IS21`) belongs only in the **plan** or the
+  **handoff** doc, not in a code comment (the prefix → lane map is in
+  [lane-codes](../dev/lane-codes.md); the count is ratcheted shrink-only by
+  `devx-check`). The comment ratio is *reported* by the gate, not gated; the
+  rule is about *what* a comment says, not how many there are.
 
 ## Judge the whole
 

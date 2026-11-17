@@ -38,5 +38,6 @@
   "pn.folder.new": "Neuer Ordner",
   "pn.folder.rename": "Ordner umbenennen",
   "pn.folder.delete": "Ordner l\u00F6schen",
-  "pn.folder.empty": "Noch keine Notizen in diesem Ordner."
+  "pn.folder.empty": "Noch keine Notizen in diesem Ordner.",
+  "pn.list.empty_title": "Noch keine Notizen."
 }

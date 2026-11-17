@@ -121,5 +121,7 @@
   "groups.edit_language_hint": "The language you\u0027re writing this post in. This is only a tag \u2014 it is not translated \u2014 and it keeps the text findable later and lets a reader add their own language version if they want.",
   "groups.edit_submit": "Save changes",
   "groups.edit_cancel": "Cancel",
-  "groups.confirm_delete": "Delete this group? This removes the group, its members, and its pending invitations, and cannot be undone."
+  "groups.confirm_delete": "Delete this group? This removes the group, its members, and its pending invitations, and cannot be undone.",
+  "groups.posts_empty_title": "No posts yet.",
+  "groups.events_empty_title": "No events yet."
 }

@@ -29,6 +29,40 @@
 
 <hr />
 
+<h2 class="h5 mt-4"><kw-l key="admin.signup_resident_invite_title">Residents inviting neighbours</kw-l></h2>
+<p class="text-muted">
+    <kw-l key="admin.signup_resident_invite_lede">Whether signed-in residents may create invitations for neighbours (the "Invite a neighbour" surface). A fresh instance ships with this **off** — resident invite is opt-in, set here by a GlobalAdmin. The admin invitation surface is always available to GlobalAdmins, regardless of this setting.</kw-l>
+</p>
+
+<form method="post" action="/admin/signup/resident-invite">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <span class="form-label" id="residentInviteLabel"><kw-l key="admin.signup_resident_invite_title">Residents inviting neighbours</kw-l></span>
+            <div class="form-check" style="margin-bottom: 0.25rem;">
+                <input class="form-check-input" type="radio" name="residentInvite" id="residentInviteOff"
+                       value="Off" @(Model.ResidentInvite == Kumunita.Core.Identity.ResidentInviteSetting.Off ? "checked" : "")>
+                <label class="form-check-label" for="residentInviteOff"><kw-l key="admin.signup_resident_invite_off">Off — residents cannot invite neighbours</kw-l></label>
+            </div>
+            <div class="form-check" style="margin-bottom: 0.25rem;">
+                <input class="form-check-input" type="radio" name="residentInvite" id="residentInviteOn"
+                       value="On" @(Model.ResidentInvite == Kumunita.Core.Identity.ResidentInviteSetting.On ? "checked" : "")>
+                <label class="form-check-label" for="residentInviteOn"><kw-l key="admin.signup_resident_invite_on">On — residents can invite neighbours (immediately usable)</kw-l></label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="residentInvite" id="residentInviteOnWithApproval"
+                       value="OnWithApproval" @(Model.ResidentInvite == Kumunita.Core.Identity.ResidentInviteSetting.OnWithApproval ? "checked" : "")>
+                <label class="form-check-label" for="residentInviteOnWithApproval"><kw-l key="admin.signup_resident_invite_on_approval">On with admin approval — a GlobalAdmin must approve each resident invitation before it becomes usable</kw-l></label>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="admin.signup_save">Save</kw-l></button>
+        </div>
+    </div>
+</form>
+
+<hr />
+
 <h2 class="h5 mt-4"><kw-l key="admin.signup_notify_title">Notify admins</kw-l></h2>
 <p class="text-muted">
     <kw-l key="admin.signup_notify_lede">When a new resident signs up and when a resident verifies their account, the GlobalAdmins get an inbox notification and a best-effort email. Turning it off silences that — the account lane itself is unaffected.</kw-l>

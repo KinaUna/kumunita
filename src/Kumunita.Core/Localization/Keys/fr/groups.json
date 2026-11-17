@@ -121,5 +121,7 @@
   "groups.edit_language_hint": "La langue dans laquelle tu \u00E9cris cette publication. C\u0027est seulement un tag \u2014 elle n\u0027est pas traduite \u2014 et elle garde le texte trouvable plus tard et permet \u00E0 un lecteur d\u0027ajouter sa propre version dans sa langue s\u0027il le veut.",
   "groups.edit_submit": "Enregistrer les modifications",
   "groups.edit_cancel": "Annuler",
-  "groups.confirm_delete": "Supprimer ce groupe ? Cela supprime le groupe, ses membres et ses invitations en attente, et cela ne peut pas \u00EAtre annul\u00E9."
+  "groups.confirm_delete": "Supprimer ce groupe ? Cela supprime le groupe, ses membres et ses invitations en attente, et cela ne peut pas \u00EAtre annul\u00E9.",
+  "groups.posts_empty_title": "Pas encore de messages.",
+  "groups.events_empty_title": "Pas encore d\u0027\u00E9v\u00E9nements."
 }

@@ -56,7 +56,7 @@ namespace Kumunita.Core.Tests;
 ///       lifetime.</item>
 /// </list>
 /// </summary>
-public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class AnnouncementServiceTests(PostgresFixture fixture)
 {
     // ── List (read lane — the flat public/community split) ────────────────
 

@@ -24,5 +24,6 @@
   "nav.projects": "Projekter",
   "nav.change_password": "Skift adgangskode",
   "nav.my_data": "Mine data",
-  "nav.delete_account": "Slet konto"
+  "nav.delete_account": "Slet konto",
+  "nav.invite": "Inviter en nabo"
 }

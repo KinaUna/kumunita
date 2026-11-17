@@ -59,4 +59,49 @@ public interface IStorageSettingsService
     /// </summary>
     StorageDecision Decide(long incomingBytes, long currentUsageBytes,
         CommunityStorageSettings settings, long envMaxBytes);
+
+    // ── IMPROVE-UX A15 — the per-resident quota override (admin half) ────────
+    // A14's "request more space" nudge points at an override the admin sets;
+    // this pair is that seam. The override lives on the **single** settings
+    // row (<see cref="CommunityStorageSettings.ResidentQuotaOverrides"/>, keyed
+    // by subjectId) — a map, not a new doc type (a new registered type would
+    // break the IS20h registered-doc-type count pin). Sentinel (C-UP·5) is
+    // preserved per-resident: <b>null</b> (unset) is distinct from <b>0</b>
+    // (unlimited for that resident) — the <c>override ?? global</c> fallback
+    // signal is the unset null.
+
+    /// <summary>
+    /// A15 read: the resident's per-user-quota override in bytes, or <c>null</c>
+    /// when no override is set (the <c>override ?? global</c> fallback signal).
+    /// <c>0</c> = unlimited for that resident (the C-UP·5 sentinel); <c>&gt;0</c>
+    /// = that resident's cap. Read-only; a resident may read their own effective
+    /// quota but never writes here (the admin write lane is
+    /// <see cref="SetResidentQuotaOverrideAsync"/>).
+    /// </summary>
+    Task<long?> GetResidentQuotaOverrideAsync(string subjectId, CancellationToken ct);
+
+    /// <summary>
+    /// A15 **admin** write lane: set (or clear) the resident's per-user-quota
+    /// override, stamped with the actor, in the **caller's** session (the C-UP·1
+    /// single in-caller-session write — the <see cref="SetAsync(long?, long,
+    /// string, Marten.IDocumentSession)"/> precedent). <paramref
+    /// name="quotaBytes"/> <c>null</c> = **clear** the override (back to the
+    /// global); <c>0</c> = unlimited for that resident; <c>&gt; 0</c> = the cap.
+    /// Standing is gated at the Web boundary (ADR 0050 split — Core does not
+    /// re-check it); <paramref name="actorId"/> is the signed-in admin.
+    /// </summary>
+    Task SetResidentQuotaOverrideAsync(string subjectId, long? quotaBytes,
+        string actorId, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// A15 committed write lane (the <see cref="SetAsync(long?, long, string)"/>
+    /// C09 precedent): the <see
+    /// cref="SetResidentQuotaOverrideAsync(string, long?, string,
+    /// Marten.IDocumentSession)"/> semantics on a fresh <c>LightweightSession</c>
+    /// (the session-based form commits on its own, so this wrapper opens the
+    /// session and delegates). Lets the admin controller drop the
+    /// <c>IDocumentStore</c> dependency.
+    /// </summary>
+    Task SetResidentQuotaOverrideAsync(string subjectId, long? quotaBytes,
+        string actorId);
 }

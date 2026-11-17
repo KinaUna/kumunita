@@ -29,7 +29,7 @@ namespace Kumunita.Core.Tests.SearchSort;
 /// non-decision): the allowlist is exactly <c>created</c> + <c>title</c>.
 /// </para>
 /// </summary>
-public class SearchSortTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class SearchSortTests(PostgresFixture fixture)
 {
     private const string Actor = "u-u9-search-actor";
 

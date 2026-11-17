@@ -39,7 +39,7 @@ using static Marten.QueryableExtensions;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class PortabilityApplyDocumentsTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class PortabilityApplyDocumentsTests(PostgresFixture fixture)
 {
     /// <summary>
     /// A minimal fresh instance: a scratch Postgres DB (the

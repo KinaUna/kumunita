@@ -1,0 +1,19 @@
+{
+  "status.400.title": "That request didn't work",
+  "status.400.message": "The address or information may be incomplete. Check it and try again.",
+  "status.403.title": "This page isn't available to you",
+  "status.403.message": "You don't have permission to view this page.",
+  "status.404.title": "Page not found",
+  "status.404.message": "This page may have moved or is no longer available.",
+  "status.413.title": "This file is too large",
+  "status.413.message": "Choose a smaller file and try again.",
+  "status.415.title": "This file type isn't supported",
+  "status.415.message": "Choose a different file format and try again.",
+  "status.429.title": "Please wait a moment",
+  "status.429.message": "Too many requests were made in a short time. Try again shortly.",
+  "status.500.title": "Something went wrong",
+  "status.500.message": "We couldn't complete your request. Please try again.",
+  "status.back": "Back",
+  "status.home": "Home",
+  "status.search": "Search"
+}

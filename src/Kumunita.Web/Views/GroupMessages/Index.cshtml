@@ -48,8 +48,14 @@
             <div class="col-lg-8">
                 @if (Model.Groups.Count == 0)
                 {
-                    <div class="alert alert-secondary" role="status">
-                        <kw-l key="group_message.thread.empty">No messages yet — start the conversation.</kw-l>
+                    @* R30 (IMPROVE-UX) — the house .kmb-empty idiom (title +
+                       body + one next action): browse groups. The inner
+                       New-group picker (the Candidates branch) is left
+                       untouched. *@
+                    <div class="kmb-empty">
+                        <p class="kmb-empty-title"><kw-l key="group_message.thread.empty_title">No group messages yet.</kw-l></p>
+                        <p class="kmb-empty-body"><kw-l key="group_message.thread.empty">No messages yet — start the conversation.</kw-l></p>
+                        <a class="btn btn-outline-secondary" href="/groups"><kw-l key="groups.title">Browse groups</kw-l></a>
                     </div>
                 }
                 else

@@ -49,7 +49,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="PostgresFixture"/> shape + <c>BootAsync</c>). Core stays
 /// HTTP-free — the seam is constructed directly, no Web types.
 /// </para>
-public sealed class IdentityServiceDeleteLaneGdprTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class IdentityServiceDeleteLaneGdprTests(PostgresFixture fixture)
 {
     // ── F1.U5 pinned tests (design §6, verbatim names) ─────────────────────
 

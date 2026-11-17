@@ -2,6 +2,7 @@
   "search.nav": "Suche",
   "search.title": "Suche",
   "search.placeholder": "Beitr\u00E4ge, Events, Seiten, Ank\u00FCndigungen, Projekte, Boards, To-dos, Inventar, Dokumente und Personen durchsuchen\u2026",
+  "search.empty_title": "Keine Ergebnisse.",
   "search.no-results": "Keine Ergebnisse f\u00FCr",
   "search.section.posts": "Beitr\u00E4ge",
   "search.section.events": "Events",

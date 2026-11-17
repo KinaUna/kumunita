@@ -3,5 +3,7 @@
   "email.verify_body": "Bonjour {0},\n\nTon compte Kumunita est \u00E0 v\u00E9rifier lors de ta premi\u00E8re connexion. Ouvre ce lien \u00E0 usage unique pour confirmer le compte (il te connecte aussi) :\n\n{1}\n\nSi tu n\u0027as pas cr\u00E9\u00E9 ce compte, tu peux ignorer ce message.",
   "email.verify_child_body": "Bonjour {0},\n\nTon compte Kumunita est pr\u00EAt. Ouvre ce lien \u00E0 usage unique pour confirmer le compte et d\u00E9finir ton mot de passe (il te connecte aussi) :\n\n{1}\n\nSi tu n\u0027as pas cr\u00E9\u00E9 ce compte, tu peux ignorer ce message.",
   "email.reminder_subject": "Rappel : {0}",
-  "email.reminder_body": "**{0}** arrive : {1}{2}."
+  "email.reminder_body": "**{0}** arrive : {1}{2}.",
+  "email.invitation_subject": "Tu es invit\u00e9 \u00e0 {2}",
+  "email.invitation_body": "Bonjour {0},\n\n{0} t\u2019a invit\u00e9 \u00e0 rejoindre {2} sur Kumunita. Ouvre le lien \u00e0 usage unique ci-dessous pour cr\u00e9er ton compte \u2014 l\u2019invitation reste valide jusqu\u2019\u00e0 {3} :\n\n{1}\n\nSi tu ne l\u2019attendais pas, tu peux ignorer ce message : il ne d\u00e9bloque que l\u2019inscription pour ton adresse, puis il expire."
 }

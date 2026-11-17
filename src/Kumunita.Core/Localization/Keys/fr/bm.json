@@ -21,5 +21,6 @@
   "bm.folder.rename": "Renommer le dossier",
   "bm.folder.delete": "Supprimer le dossier",
   "bm.folder.empty": "Aucun signet dans ce dossier pour l\u0027instant.",
-  "bm.bookmark.move": "D\u00E9placer"
+  "bm.bookmark.move": "D\u00E9placer",
+  "bm.list.empty_title": "Aucun marque-page pour l\u0027instant."
 }

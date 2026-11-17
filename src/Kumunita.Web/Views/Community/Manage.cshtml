@@ -95,7 +95,14 @@
         }
         @if (Model.Members.Count == 0)
         {
-            <p class="text-muted"><kw-l key="community.manage_no_members">No explicit members yet — add some below.</kw-l></p>
+            @* R33 (IMPROVE-UX) — the house .kmb-empty idiom, anchored to the
+               inline "Add a member" picker below (#addUser, the honest action —
+               "add some below" in the sentence). The existing sentence is
+               complete, so no separate body is added. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="community.manage_no_members">No explicit members yet — add some below.</kw-l></p>
+                <a class="btn btn-primary" href="#addUser"><kw-l key="community.manage_add_member">Add a member</kw-l></a>
+            </div>
         }
         @if (Model.Members.Count > 0)
         {
@@ -143,6 +150,7 @@
             <form method="post" action="@Url.Action("AddMember", "Community", new { componentId = Model.ComponentId })">
                 @Html.AntiForgeryToken()
                 <div class="input-group">
+                    <label class="visually-hidden" for="addUser"><kw-l key="community.manage_add_member">Add a member</kw-l></label>
                     <select class="form-select" id="addUser" name="UserId" required>
                         <option value="" disabled selected><kw-l key="community.manage_pick_resident">Pick a resident to add…</kw-l></option>
                         @foreach (var c in Model.Candidates)

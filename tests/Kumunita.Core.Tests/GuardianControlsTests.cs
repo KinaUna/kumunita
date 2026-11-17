@@ -31,7 +31,7 @@ namespace Kumunita.Core.Tests;
 /// M2b group-invitation tests established in this assembly.
 /// </para>
 /// </summary>
-public class GuardianControlsTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GuardianControlsTests(PostgresFixture fixture)
 {
     // ── G·1 (load-bearing) — the lane's honesty ─────────────────────────────
     // A guardian with an ACTIVE link over the child is DENIED a post the child authored

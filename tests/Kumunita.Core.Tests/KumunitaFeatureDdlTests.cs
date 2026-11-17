@@ -10,7 +10,7 @@ namespace Kumunita.Core.Tests;
 /// apply must be a no-op (the idempotency claim the boot block and ADR rely on).
 /// Verified against the *live* Postgres catalog, not the in-memory object graph.
 /// </summary>
-public class KumunitaFeatureDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public class KumunitaFeatureDdlTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private string _connection = "";
 

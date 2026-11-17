@@ -11,7 +11,7 @@
   "posts.flash_reply_updated": "Reply updated.",
   "posts.flash_reply_deleted": "Reply deleted.",
   "posts.mandatory_title": "Everyone in the neighborhood is a member of this community \u2014 no one can be removed or leave it.",
-  "posts.no_feeds": "No community feed is currently available to post to. Ask a resident (or a global admin, if you have one) to enable one \u2014 the common ones are safety, maintenance, social, and governance.",
+  "posts.no_feeds": "No community feed is currently available to post to. Ask a resident (or the administrator, if you have one) to enable one \u2014 the common ones are safety, maintenance, social, and governance.",
   "posts.feed_all_sections": "Community",
   "posts.write": "Write a post",
   "posts.new_title": "Write a post",
@@ -43,6 +43,7 @@
   "posts.audience_restrict_hint": "These picks are hidden while \u201CEveryone in this community\u201D is on \u2014 the post is visible to everyone in the community. Turn that off to narrow who can see it with the picks here.",
   "posts.audience_only_picks": "Whatever you pick here becomes the post\u0027s audience \u2014 nothing above or below this form is added to it. An empty pick (with \u201CEveryone in this community\u201D off) means only you can see the post.",
   "posts.empty_can_post": "No posts yet here. Write the first one \u2014 it will be visible only to the audience you choose in the composer below the title.",
+  "posts.empty_title": "No posts here yet.",
   "posts.empty": "No posts here yet.",
   "posts.reply_count_none": "No replies yet",
   "posts.reply_count_one": "{0} reply",
@@ -61,7 +62,7 @@
   "posts.grouppost_report_button": "Report this post",
   "posts.report_reason_label": "What\u0027s wrong?",
   "posts.report_optional": "optional",
-  "posts.report_note": "Filing a report is an intake action \u2014 it doesn\u0027t change what you can see, and a moderator may follow up.",
+  "posts.report_note": "Filing a report is the first step \u2014 it doesn't change what you can see, and a moderator may follow up.",
   "posts.report_submit": "Report",
   "posts.replies_heading": "Replies",
   "posts.replies_empty": "No replies yet. If you can see this post, you can reply to it.",
@@ -79,6 +80,7 @@
   "posts.delete": "Delete",
   "posts.reply_delete": "Delete",
   "posts.deleted_placeholder": "This post has been deleted by its author.",
+  "posts.moderator_hidden_placeholder": "This post has been hidden by a moderator.",
   "posts.reply_deleted_placeholder": "This reply has been deleted by its author.",
   "posts.translations_label": "Translations",
   "posts.translations_none": "none yet",
@@ -90,5 +92,6 @@
   "posts.translation_edit": "Edit",
   "posts.translation_remove": "Remove",
   "posts.delete_confirm": "Delete this post? Your replies will remain visible.",
-  "posts.reply_delete_confirm": "Delete this reply? It will be replaced by a note. The record is kept."
+  "posts.reply_delete_confirm": "Delete this reply? It will be replaced by a note. The record is kept.",
+  "posts.replies_empty_title": "No replies yet."
 }

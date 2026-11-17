@@ -11,8 +11,20 @@
     {
       "label": "test",
       "type": "shell",
-      "command": "dotnet test",
+      "command": "pwsh tools/check.ps1 -Only build,web,core",
       "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "check",
+      "type": "shell",
+      "command": "pwsh tools/check.ps1",
+      "problemMatcher": []
+    },
+    {
+      "label": "check:fast",
+      "type": "shell",
+      "command": "pwsh tools/check.ps1 -Fast",
       "problemMatcher": []
     },
     {

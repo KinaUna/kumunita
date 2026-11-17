@@ -37,8 +37,14 @@
 
         @if (Model.Tags.Count == 0)
         {
-            <div class="alert alert-info">
-                <kw-l key="tags.list.empty">No tags yet — tags appear here once a resident attaches one to a post or a blog page.</kw-l>
+            @* R29 (IMPROVE-UX) — the house .kmb-empty idiom; the next action
+               is the feed (tags are born when a resident tags a post/page). *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="tags.list.empty_title">No tags yet.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="tags.list.empty">No tags yet — tags appear here once a resident attaches one to a post or a blog page.</kw-l>
+                </p>
+                <a class="btn btn-outline-secondary" href="/community"><kw-l key="about.cta_feed">See the feed</kw-l></a>
             </div>
         }
         else

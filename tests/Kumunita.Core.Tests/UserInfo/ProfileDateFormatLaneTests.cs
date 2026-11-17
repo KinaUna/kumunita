@@ -27,7 +27,6 @@ namespace Kumunita.Core.Tests.UserInfo;
 /// </list>
 /// </summary>
 public sealed class ProfileDateFormatLaneTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     // ── Test 1 — set: the format string is live on the very next read ─────
     [Fact]

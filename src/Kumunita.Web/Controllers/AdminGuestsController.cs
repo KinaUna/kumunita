@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Marten;
@@ -46,7 +47,20 @@ public sealed class AdminGuestsController(
     // written (TargetKind "guests", Action "guests.view"). No new AccessVia,
     // no new IAuthorizationService method (the AccessAuditFactory "no new
     // seam" shape).
-    IDocumentStore? store = null) : Controller
+    IDocumentStore? store = null,
+    // IMPROVE-UX A13 — the account-listing read for the guest form's picker.
+    // The same profile-list seam the /admin add-picker uses
+    // (AdminController.Communities' community panels seed their candidates
+    // from GetProfilesAsync(false) — the ADR 0062 add-picker shape): the guest
+    // form now offers the accounts the admin already sees on /admin/accounts
+    // as a <select> instead of a free-text subject id. Optional (default null)
+    // so the two pinned test-construction sites (AdminGuestsControllerTests
+    // `new AdminGuestsController(identity)`, AdminReadAuditTests
+    // `new AdminGuestsController(identity, store: store)`) keep compiling
+    // without a profile seam; DI always supplies the live IProfileSettingsService
+    // in the app. When null (a harness that does not supply it), the picker is
+    // left empty (the C-M19·4 floor) — the write seam is unaffected.
+    IProfileSettingsService? profiles = null) : Controller
 {
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -64,6 +78,33 @@ public sealed class AdminGuestsController(
         var model = new GuestAdminViewModel { SubjectId = subjectId ?? string.Empty };
         if (subjectId is not null)
             model.Seed(await identity.GetGuestAccessAsync(subjectId));
+
+        // IMPROVE-UX A13 — seed the guest account picker from the SAME
+        // profile-list read the /admin add-picker uses (the ADR 0062 shape).
+        // The picker offers the accounts an admin can already see on
+        // /admin/accounts, so they *pick* the guest account instead of typing
+        // an opaque subject id (the E19 "re-key" handoff). Reuses the
+        // AdminIndexViewModel.AccountRow row type (no parallel projection).
+        // Order the options by display name (then email) so the picker is
+        // scannable, mirroring the /admin/accounts row sort. When the profile
+        // seam is absent (a test harness) the picker stays empty (the C-M19·4
+        // floor) — the Save contract is byte-for-byte unchanged.
+        if (profiles is not null)
+        {
+            var candidates = await profiles.GetProfilesAsync(verifiedOnly: false);
+            model.AccountOptions = candidates
+                .OrderBy(p => p.DisplayName, StringComparer.Ordinal)
+                .ThenBy(p => p.Email ?? string.Empty, StringComparer.Ordinal)
+                .Select(p => new AdminIndexViewModel.AccountRow
+                {
+                    SubjectId   = p.SubjectId,
+                    Email       = p.Email,
+                    DisplayName = p.DisplayName,
+                    Verified    = p.Verified,
+                    Blocked     = p.Blocked
+                })
+                .ToList();
+        }
 
         // IS36 (D9) — the guest standing list is a disclosure surface (class
         // (c) — the PII-bearing GuestAccess rows). A GlobalAdmin reading it

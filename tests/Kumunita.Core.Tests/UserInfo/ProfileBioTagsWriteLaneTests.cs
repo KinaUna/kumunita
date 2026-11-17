@@ -48,7 +48,6 @@ namespace Kumunita.Core.Tests.UserInfo;
 /// </para>
 /// </summary>
 public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
-    : IClassFixture<PostgresFixture>
 {
     // ── Test 1 — bio written byte-for-byte verbatim (no Core Markdown) ───
     [Fact]

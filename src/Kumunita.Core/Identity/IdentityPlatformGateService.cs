@@ -434,4 +434,84 @@ public sealed class IdentityPlatformGateService : IIdentityPlatformGateService
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
+
+    // ── Resident-invite mode (ADR 0304, amended 2026-11-11 for IMPROVE-UX A11) ──
+    // The 3-state resident-invite posture (the EventRsvpMode 3-state shape,
+    // the NotifyAdminsOnSignup / IsSignupOpen singleton-toggle lane). A11
+    // settles the setting + the rule; A12's resident "Invite a neighbour"
+    // surface will consume the posture via IInvitationService
+    // .GetResidentInvitePostureAsync (the A12 seam reads MayInvite /
+    // RequiresApproval before calling CreateAsync / InviteAsync).
+
+    /// <inheritdoc />
+    public async Task<ResidentInviteSetting> GetResidentInviteSettingAsync()
+    {
+        // ADR 0304 (A11) read seam: the instance resident-invite mode
+        // (LocaleSettings.ResidentInviteSetting) with the `Off` floor — a
+        // missing singleton or an unset value both yield `Off`, so a fresh
+        // instance ships with resident self-invite **off** (the opt-in
+        // posture, ADR 0304 §Amendments A11; the deliberate inverse of the
+        // codebase `true`-floor convention, like MessagingEnabled). A read
+        // (no audit row), the same shape as IsSignupOpenAsync /
+        // IsNotifyAdminsOnSignupAsync.
+        using var session = documentStore.QuerySession();
+        var settings = await session.LoadAsync<Localization.LocaleSettings>(
+            Localization.LocaleSettings.SingletonId, CancellationToken.None);
+
+        // `Off` floor: a null settings row (defensively) keeps the mode off;
+        // an explicit value wins. The read floor is resolved here (the
+        // MessagingEnabled shape — the field's default is `Off`, so a
+        // missing row is read as `Off` either way).
+        return settings?.ResidentInviteSetting ?? ResidentInviteSetting.Off;
+    }
+
+    /// <inheritdoc />
+    public async Task SetResidentInviteSettingAsync(ResidentInviteSetting mode, string adminSubjectId)
+    {
+        // ADR 0304 (A11) write seam: the admin-settled instance resident-invite
+        // mode (LocaleSettings singleton, the same doc the signup / notify /
+        // timezone / date-format lanes read and write) + exactly one audit row
+        // (via: Admin, action "signup.set-resident-invite", target "signup") in
+        // the same session (C3 — no silent, unaudited access). The same
+        // single-target singleton-toggle shape as SetSignupOpenAsync /
+        // SetNotifyAdminsOnSignupAsync (the timezone.set-default /
+        // dateformat.set-default precedent). `mode` is the authoritative new
+        // value.
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Load-or-create the singleton (the SetSignupOpenAsync shape) and set
+        // the mode; the other singleton fields are untouched — this is the
+        // resident-invite mode only.
+        var settings = await session
+            .LoadAsync<Localization.LocaleSettings>(
+                Localization.LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new Localization.LocaleSettings { ResidentInviteSetting = mode };
+        }
+        else
+        {
+            settings.ResidentInviteSetting = mode;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = adminSubjectId,
+            EffectivePrincipalId = adminSubjectId,
+            Action = "signup.set-resident-invite",
+            TargetKind = "signup",
+            TargetId = "signup",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
 }

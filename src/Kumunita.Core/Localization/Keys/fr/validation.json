@@ -51,7 +51,6 @@
   "validation.current_password_wrong": "Votre mot de passe actuel est incorrect.",
   "validation.confirm_deletion": "Vous devez confirmer que vous comprenez que votre compte sera d\u00E9finitivement supprim\u00E9.",
   "validation.password_wrong": "Votre mot de passe est incorrect.",
-  "validation.delete_admin_only": "La suppression en libre-service du compte n\u2019est disponible que pour un GlobalAdmin. Un r\u00E9sident sans ce r\u00F4le ne peut pas supprimer son propre compte \u2014 contactez un administrateur pour le faire supprimer.",
   "validation.domain_not_accepted": "Le domaine e-mail \u00AB {0} \u00BB n\u2019est pas accept\u00E9 pour les nouveaux comptes.",
   "validation.domain_not_accepted_permanent": "Le domaine e-mail \u00AB {0} \u00BB n\u2019est pas accept\u00E9 pour les nouveaux comptes. Veuillez utiliser une adresse e-mail permanente.",
   "validation.pick_one_end": "Choisissez exactement une fin : \u00AB Se termine apr\u00E8s \u00BB un nombre d\u2019occurrences, ou \u00AB Se termine le \u00BB une date.",

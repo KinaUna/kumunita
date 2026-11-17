@@ -1,13 +1,18 @@
 @using Kumunita.Core.Localization
 @using Kumunita.Core.Identity
 @using Kumunita.Core.UserInfo
+@using Kumunita.Core.Moderation
 @using Kumunita.Web.Security
 @inject ILocalizationService Localization
 @inject ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject IIdentityService Identity
 @inject IUserInfoService UserInfo
+@inject IInvitationService Invitations
 @inject Kumunita.Core.Messaging.IMessagingService Messaging
+@inject IModerationService Moderation
+@inject Microsoft.Extensions.Caching.Memory.IMemoryCache MemoryCache
+@using Microsoft.Extensions.Caching.Memory
 @{
     var _aL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var _navBellAria = Translation is null ? "Notifications" : await Translation.GetAsync("notifications.bell", _aL);
@@ -38,6 +43,47 @@
     // avatar set) avatar.js hides the <img> and shows the monogram sibling).
     // A read of the signed-in resident's own row — never another resident's.
     string? navAvatarSubject = isAuthenticated ? KumunitaPrincipal.SubjectId(User) : null;
+    // IMPROVE-UX A06 — the moderation queue's open-report count for the nav
+    // badge (the account-nav Moderation menu item's count pill, shown only
+    // when > 0). The scoped count (the same scoped query the /moderation queue
+    // uses — IModerationService.CountOpenReportsAsync, the C-M3b·4 SoD shape:
+    // GlobalAdmin → every open report; standing-moderator → their scoped
+    // components with ModeratorAccess ON; a plain resident → 0, the badge is
+    // unreachably scoped by construction — the plain-resident nav has no
+    // Moderation row at all). Cached in the instance-level IMemoryCache keyed
+    // by (actorId, isGlobalAdmin, isStanding) with a 60 s sliding window so the
+    // nav's per-request render does not pay the queue's DB cost (the A06
+    // "the badge does not double the queue's DB load" pin). A failure (the
+    // seam throws, e.g. the store is unavailable) degrades to 0 — the badge is
+    // display-only, never a hard dependency on the nav render.
+    int navModerationOpenCount = 0;
+    if (isAuthenticated && navAvatarSubject is not null
+        && (isGlobalAdmin || KumunitaPrincipal.IsModerator(User)))
+    {
+        var badgeCacheKey = $"moderation.open-badge:{navAvatarSubject}:{isGlobalAdmin}:{KumunitaPrincipal.IsModerator(User)}";
+        if (!MemoryCache.TryGetValue(badgeCacheKey, out object? badgeObj)
+            || badgeObj is null)
+        {
+            badgeObj = 0;
+            try
+            {
+                badgeObj = await Moderation.CountOpenReportsAsync(
+                    navAvatarSubject,
+                    isGlobalAdmin,
+                    KumunitaPrincipal.IsModerator(User));
+            }
+            catch
+            {
+                badgeObj = 0;   // the badge is display-only — never block the nav
+            }
+            MemoryCache.Set(badgeCacheKey, badgeObj,
+                new Microsoft.Extensions.Caching.Memory.MemoryCacheEntryOptions
+                {
+                    SlidingExpiration = TimeSpan.FromSeconds(60),   // the A06 ≤60 s pin
+                });
+        }
+        if (badgeObj is int i) navModerationOpenCount = i;
+    }
     string navAvatarInitial = string.Empty;
     // The dropdown toggle's label: the resident's display name, falling back to
     // their email when no name is set. Capped at 15 characters so the navbar
@@ -154,6 +200,52 @@
                 <li class="nav-item">
                     <a class="dropdown-item text-dark" href="/my/drafts"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-drafts"/></svg><kw-l key="nav.my_drafts">My drafts</kw-l></a>
                 </li>
+                @* IMPROVE-UX R06 — the signed-in resident's "My reports"
+                   surface (the D1 shape): the reporter's content reports +
+                   the filer's platform issues, with status and outcome. A
+                   resident's own surface (never in the GlobalAdmin /
+                   moderator "Management" section), always rendered when
+                   signed in (unlike the messaging gates). Reuses the
+                   existing #kmb-i-error-reports glyph (no new icon). *@
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" href="/reports/mine"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-error-reports"/></svg><kw-l key="reports.nav">My reports</kw-l></a>
+                </li>
+                @* IMPROVE-UX A12 (ADR 0304 D6 c) — the resident's "Invite a
+                   neighbour" surface: rendered only when signed in AND the
+                   A11 rule (GetResidentInvitePostureAsync) returns
+                   MayInvite = true (the On / OnWithApproval modes — the
+                   resident may create an invitation). Hidden when the A11
+                   rule returns MayInvite = false (the Off floor — a fresh
+                   instance ships with resident self-invite off, the ADR
+                   0304 §Amendments A11 rule; the surface is simply absent,
+                   no explanation — the M9 messaging gate's non-leaky
+                   shape). One <li> in the existing dropdown — no navbar
+                   reflow. The A11 rule is a read (zero audit rows, the
+                   M35·5 "the read is not an access decision" floor — the
+                   write decision is the /account/invite POST's job). A
+                   null Invitations (the harness shape) or a null
+                   navAvatarSubject (signed out) floors the entry to
+                   hidden (the fail-closed Off-floor shape — the A09
+                   contract, unchanged). *@
+                @if (navAvatarSubject is not null
+                     && Invitations is not null)
+                {
+                    bool canInvite = false;
+                    try
+                    {
+                        canInvite = (await Invitations.GetResidentInvitePostureAsync(navAvatarSubject)).MayInvite;
+                    }
+                    catch
+                    {
+                        canInvite = false;   // fail-closed (the seam throws, e.g. the store is unavailable)
+                    }
+                    if (canInvite)
+                    {
+                        <li class="nav-item">
+                            <a class="dropdown-item text-dark" href="/account/invite"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-messages"/></svg><kw-l key="nav.invite">Invite a neighbour</kw-l></a>
+                        </li>
+                    }
+                }
                 <li class="nav-item">
                     <a class="dropdown-item text-dark" href="/settings/language"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-settings"/></svg><kw-l key="settings.settings">Settings</kw-l></a>
                 </li>
@@ -212,7 +304,7 @@
                         <a class="dropdown-item text-dark" href="/admin/error-reports"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-error-reports"/></svg><kw-l key="nav.error_reports">Error reports</kw-l></a>
                     </li>
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg><kw-l key="nav.moderation">Moderation</kw-l></a>
+                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg>@if (navModerationOpenCount > 0) { <span class="kmb-nav-badge" data-nav-badge="moderation">@navModerationOpenCount</span> }<kw-l key="nav.moderation">Moderation</kw-l></a>
                     </li>
                 }
                 else if (KumunitaPrincipal.IsModerator(User))
@@ -225,7 +317,7 @@
                        the /moderation queue — scoped to their assigned components
                        at the read lane; no error-report surface. *@
                     <li class="nav-item">
-                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg><kw-l key="nav.moderation">Moderation</kw-l></a>
+                        <a class="dropdown-item text-dark" href="/moderation"><svg class="kmb-nav-icon kmb-icon" width="18" height="18" aria-hidden="true"><use href="#kmb-i-moderation"/></svg>@if (navModerationOpenCount > 0) { <span class="kmb-nav-badge" data-nav-badge="moderation">@navModerationOpenCount</span> }<kw-l key="nav.moderation">Moderation</kw-l></a>
                     </li>
                 }
                 @* ADR 0021 — the Translator's home: the language catalog + translation editors.

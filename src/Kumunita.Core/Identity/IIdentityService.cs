@@ -419,6 +419,35 @@ public interface IIdentityService
     Task<bool> IsNotifyAdminsOnSignupAsync();
 
     /// <summary>
+    /// ADR 0303 (IMPROVE-UX A05) — the **GlobalAdmin enumeration** read
+    /// seam: the <c>SubjectId</c> of every account holding the
+    /// <see cref="Roles.GlobalAdmin"/> role (the
+    /// <see cref="Microsoft.AspNetCore.Identity.UserManager{TUser}.GetUsersInRoleAsync"/>
+    /// shape, the <c>IdentityService.EmitAccountNotificationAsync</c>
+    /// precedent, ADR 0077). A **read** (no audit row — the
+    /// <see cref="IsSignupOpenAsync"/> plain-read shape). <c>userId</c>
+    /// projection only — **no PII** (no email, no display name); the
+    /// recipient is addressed by <c>SubjectId</c> in the notification
+    /// emitter, which is the ADR 0077 admin-fan-out shape.
+    /// <para>
+    /// The <b>Identity</b> concern (role enumeration lives with the module
+    /// that owns the role source of truth — the ADR 0006-E *compatible
+    /// ADD*: a new method on the owning module's public surface, named
+    /// here). It is the seam the <c>Moderation</c> bounded context
+    /// (<see cref="Kumunita.Core.Moderation.ModerationService"/>'s three
+    /// report-filing lanes, A05) resolves the **GlobalAdmin fallback
+    /// recipient set** through, so a filed report reaches a GlobalAdmin
+    /// when a component has no standing moderator (the A05 / E3 loop
+    /// closer — the standing-moderator half is the
+    /// <see cref="Kumunita.Core.Moderation.ModerationService
+    /// .GetStandingModeratorsAsync"/> seam, this the GlobalAdmin half).
+    /// <c>IUserInfoService</c> is deliberately untouched (ADR 0006 frozen
+    /// profile/community seam; role enumeration is not a profile concern).
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<string>> ListGlobalAdminsAsync();
+
+    /// <summary>
     /// Set whether the account lane notifies the GlobalAdmins on sign-up and
     /// verification (ADR 0077): a GlobalAdmin flips the instance-wide gate —
     /// <c>true</c> enables the <c>account.signup</c> / <c>account.verified</c>
@@ -430,7 +459,41 @@ public interface IIdentityService
     /// may call this; the Web's <c>AdminSignupController</c> enforces the gate.
     /// </summary>
     Task SetNotifyAdminsOnSignupAsync(bool notify, string adminSubjectId);
+    // ── Resident-invite mode (ADR 0304, amended 2026-11-11 for IMPROVE-UX A11) ──
 
+    /// <summary>
+    /// The **resident-invite mode** (ADR 0304, amended 2026-11-11 for
+    /// IMPROVE-UX A11): the admin-settled posture for whether *residents* may
+    /// invite neighbours (the A12 "Invite a neighbour" surface). A 3-state
+    /// <see cref="ResidentInviteSetting"/> (the
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode"/> 3-state posture shape
+    /// — a code-owned closed set, not a stored string). A read (no audit
+    /// row); the <c>Off</c> floor — a missing singleton or an unset value both
+    /// yield <c>Off</c>, so a fresh instance ships with resident self-invite
+    /// **off** (the opt-in posture a GlobalAdmin sets — the ADR 0304
+    /// §Amendments A11 rule, the deliberate inverse of the codebase
+    /// <c>true</c>-floor convention, like
+    /// <see cref="IsSignupOpenAsync"/>'s <c>false</c> floor).
+    /// </summary>
+    Task<ResidentInviteSetting> GetResidentInviteSettingAsync();
+
+    /// <summary>
+    /// Set the resident-invite mode (ADR 0304, amended 2026-11-11 for
+    /// IMPROVE-UX A11): a GlobalAdmin flips the instance-wide posture —
+    /// <see cref="ResidentInviteSetting.Off"/> (the floor; a fresh instance
+    /// ships here) disables the A12 "Invite a neighbour" surface,
+    /// <see cref="ResidentInviteSetting.On"/> enables it (immediately
+    /// usable), and <see cref="ResidentInviteSetting.OnWithApproval"/>
+    /// enables it with the admin approval queue (A12 ships the row state
+    /// + the approve lane — ADR 0304 D6 c). Writes the
+    /// <see cref="Kumunita.Core.Localization.LocaleSettings
+    /// .ResidentInviteSetting"/> singleton and appends exactly one
+    /// <c>AccessAudit</c> row (<c>via: Admin</c>, action
+    /// <c>"signup.set-resident-invite"</c>, target "signup") in the same
+    /// session (C3 — no silent, unaudited access). Only a GlobalAdmin may
+    /// call this; the Web's <c>AdminSignupController</c> enforces the gate.
+    /// </summary>
+    Task SetResidentInviteSettingAsync(ResidentInviteSetting mode, string adminSubjectId);
     // ── M19 guest standing (ADR 0120, D2 — the single audited write lane) ────
 
     /// <summary>
@@ -486,13 +549,12 @@ public interface IIdentityService
     /// equals <paramref name="targetSubjectId"/>: the resident is deleting
     /// *their own* account (the Web self-serve surface
     /// <c>POST /account/delete</c> invokes this shape, after verifying the
-    /// resident's current password). **ADR 0142 D5 gate:** the self-serve
-    /// lane is reachable only by a <c>GlobalAdmin</c> — a non-GlobalAdmin
-    /// invoking this branch throws <c>UnauthorizedAccessException</c>
-    /// (the fail-closed pin, mirroring the admin-initiated branch). The
-    /// Web surface renders the ADR 0138 "surface-replaced-by-notice" shape
-    /// for a non-GlobalAdmin, so the resident sees the gate before
-    /// submitting. The audit row is <c>Via: Owner</c>.</item>
+    /// resident's current password). **ADR 0301 D1 (amends 0142 D5):** the
+    /// self-serve lane is open to <i>every</i> resident — the 0142 D5
+    /// GlobalAdmin gate is removed, so a non-GlobalAdmin may self-delete;
+    /// the only standing refusal that survives is the last-GlobalAdmin
+    /// lockout pin (0142 D3), re-checked inside the shared body
+    /// (<see cref="IdentityService"/>). The audit row is <c>Via: Owner</c>.</item>
     /// <item><b>Admin-initiated</b> — <paramref name="adminSubjectId"/>
     /// differs from <paramref name="targetSubjectId"/>: a GlobalAdmin is
     /// removing *another* resident (the Web admin surface
@@ -530,9 +592,13 @@ public interface IIdentityService
     /// Identity row is gone) — the lane is not a silent no-op.
     /// </para>
     /// </summary>
-    /// <exception cref="UnauthorizedAccessException">Either branch was
-    /// invoked by a non-<c>GlobalAdmin</c> (the self-serve lane's ADR 0142
-    /// D5 gate, or the admin-initiated branch's fail-closed pin).</exception>
+    /// <exception cref="UnauthorizedAccessException">The admin-initiated
+    /// branch was invoked by a non-<c>GlobalAdmin</c> (the
+    /// <see cref="BlockAsync"/> / <see cref="UnblockAsync"/> fail-closed
+    /// pin). The self-serve branch is open to every resident (ADR 0301 D1
+    /// amends 0142 D5 — the GlobalAdmin gate is removed); its surviving
+    /// refusal is the last-GlobalAdmin lockout pin (0142 D3), which throws
+    /// <see cref="InvalidOperationException"/>).</exception>
     /// <exception cref="InvalidOperationException">The target account does
     /// not exist, or the target is the last <c>GlobalAdmin</c> on the
     /// instance (the lockout pin — applies to <i>both</i> branches: a lone
@@ -585,4 +651,35 @@ public interface IIdentityService
     /// the last <c>GlobalAdmin</c> on the instance (the lockout pin — a child
     /// is never a GlobalAdmin, so this is a no-op in practice).</exception>
     Task DeleteChildAccountAsync(string childId, string guardianId);
+
+    // ── IMPROVE-UX A14 — the resident "request more space" notify lane ──────
+
+    /// <summary>
+    /// IMPROVE-UX A14 — a resident's "request more space" (the
+    /// <c>account.storage_remaining_note</c> promise now has a seam): the
+    /// <c>POST /account/storage/request</c> surface calls this lane, which
+    /// notifies **every <c>GlobalAdmin</c>** that a resident asked for a
+    /// higher per-user storage quota, with a <c>linkPath</c> of
+    /// <c>/admin/accounts/{subjectId}</c> (the account-detail surface the
+    /// A15 per-resident quota override will extend).
+    /// <para>
+    /// <b>Best-effort, notify-only (the ADR 0077
+    /// <see cref="IdentityService"/> <c>EmitAccountNotificationAsync</c> D5
+    /// posture):</b> the request "was made" is the durable fact (the
+    /// resident's confirmed action); a missing emitter, a fresh instance
+    /// with no GlobalAdmin (a no-op — nothing to notify), or an emit error
+    /// is swallowed and logged — the request never fails because the
+    /// notification lane is unavailable. <b>No audit row</b> (a notify is
+    /// not an access decision — the A12 <see cref="IInvitationService
+    /// .ApproveAsync"/> notify precedent). One inbox row per GlobalAdmin
+    /// (the ADR 0077 F10 per-recipient idempotency key
+    /// <c>notification:storage.request:{subjectId}:{adminId} — a repeat
+    /// click does not re-flood the admins); the body carries the requesting
+    /// resident's display name / email (the admin knows *who* is asking),
+    /// resolved via <see cref="IUserInfoService.GetProfileAsync"/>.
+    /// <c>Kind = <see cref="Kumunita.Core.Notifications.NotificationKinds
+    /// .StorageRequest"/></c>.
+    /// </para>
+    /// </summary>
+    Task RequestStorageQuotaIncreaseAsync(string subjectId, CancellationToken ct = default);
 }

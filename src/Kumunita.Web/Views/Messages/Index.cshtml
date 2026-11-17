@@ -47,8 +47,14 @@
             <div class="col-lg-8">
                 @if (Model.Conversations.Count == 0)
                 {
-                    <div class="alert alert-secondary" role="status">
-                        <kw-l key="message.thread.empty">No messages yet — say hello.</kw-l>
+                    @* R30 (IMPROVE-UX) — the house .kmb-empty idiom (title +
+                       body + one next action): find people to message. The inner
+                       New-conversation picker (the Candidates branch) is left
+                       untouched. *@
+                    <div class="kmb-empty">
+                        <p class="kmb-empty-title"><kw-l key="message.thread.empty_title">No messages yet.</kw-l></p>
+                        <p class="kmb-empty-body"><kw-l key="message.thread.empty">No messages yet — say hello.</kw-l></p>
+                        <a class="btn btn-outline-secondary" href="/people"><kw-l key="profile.find.title">Find people</kw-l></a>
                     </div>
                 }
                 else

@@ -1,30 +1,5 @@
-# F14.U2 — DEP-03: CI test gate on `release`.
-#
-# This workflow makes a red test a HARD STOP for the `release` branch:
-#   - the job is green IF AND ONLY IF build == 0 AND Web.Tests == 0 AND Core.Tests == 0;
-#   - a non-zero exit from the build OR either test dll fails the job (pin §4);
-#   - a green Web.Tests does NOT offset a red Core.Tests (no partial credit).
-#
-# The three `dotnet` gate commands below are transcribed VERBATIM from the
-# F14.U1 Part-0 design pin (§2 of docs/design/prod-hardening-f14-ci.md):
-#   - the reliable in-process `dotnet exec` path (NOT the broken xunit.v3
-#     discovery runner — see AGENTS.md § "Running the tests");
-#   - each `dotnet exec` is its OWN step with its OWN exit code.
-#
-# `runs-on: ubuntu-latest` — Docker is pre-installed on GitHub-hosted runners,
-# which `Kumunita.Core.Tests` needs (Testcontainers starts `postgres:18`).
-# NO container-prune cleanup step here (pin §5): the "prune orphan containers"
-# advice is a LOCAL concern (a killed local runner); a CI runner is ephemeral
-# and recycled after each run, so a prune would be a no-op — noise, not a step.
-#
-# The `checkout` + `setup-dotnet` steps are CI plumbing (action setup), NOT
-# one of the three pinned gate commands and NOT a <PackageReference> — they
-# do not change the gate (pin §2 "CI runner pre-requisite").
-#
-# F14.U3 (owner-ops, recorded — NOT assumed done): wire the Coolify deploy to
-# REQUIRE the green CI check on `release` (required status check / branch
-# protection) so this green/red signal actually blocks a deploy. Until U3
-# runs, the check EXISTS (a push shows green/red) but does NOT block a deploy.
+# CI — a red test is a hard stop for `release` (the three pinned F14 gate commands, verbatim; F14 gate docs/design/prod-hardening-f14-ci.md).
+# Rationale: ADR 0307 §D1 (branch flow, CI-on-release); xunit.v3 runner quirk: docs/dev/testing-and-ci.md.
 
 name: CI
 
@@ -35,11 +10,14 @@ on:
   pull_request:
     branches:
       - release
+  # Manual dispatch: the CI signal for a feature branch (branch-flow.md; ADR 0307 §D1).
+  workflow_dispatch:
 
-# SEC L5 (U25): least-privilege workflow token. This workflow only reads the
-# checked-out source (build + test + e2e); it never pushes, creates a PR, or
-# writes a check run, so `contents: read` is the full scope it needs. The
-# default token (broad) is scoped down to the minimum.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege token (SEC lane, U25): read-only — this workflow never pushes or writes.
 permissions:
   contents: read
 
@@ -47,51 +25,27 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # SEC L5 (U25): tag + commit-SHA pin. The SHA is the tag's resolved commit
-      # (GitHub API, 2026-10-31); the `# v5` suffix keeps the tag human-readable
-      # while the SHA is what actually pins the action code.
+      # tag + commit-SHA pin (SEC L5 U25).
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      # CI plumbing (NOT a pinned gate command): install the .NET 10 SDK.
-      # @v5 runs on Node 24 (the v4 major targets deprecated Node 20).
-      # dotnet-version is the correct input name (the old 'version' +
-      # 'roll-forward' inputs are not valid inputs for setup-dotnet and were
-      # being ignored). 10.0.400 matches global.json's sdk.version.
+      # 10.0.400 matches global.json's sdk.version (xunit.v3 runner quirk: docs/dev/testing-and-ci.md).
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: '10.0.400'
 
-      # --- The three pinned gate commands (pin §2, VERBATIM, in order) ---
-      # Each is a separate step with its own exit code. A non-zero exit from
-      # ANY of them (build, Web.Tests, or Core.Tests) fails the job (pin §4).
-
-      # 1. Build the .slnx solution in Debug — emits the two test dlls.
+      # --- The three pinned gate commands (F14 pin §2, verbatim, in order) ---
       - name: Build
         run: dotnet build Kumunita.slnx -c Debug
 
-      # 2. Run the Web test assembly in-process (xunit.v3 runner).
       - name: Test Web
         run: dotnet exec tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll
 
-      # 3. Run the Core test assembly in-process (xunit.v3 runner, Docker/Testcontainers).
       - name: Test Core
         run: dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll
 
-  # ---------------------------------------------------------------------------
-  # IMPROVE-DOCS D14 — the docs gate (front-matter, abstract, ADR cap, broken
-  # links, living orphans, archive frozen). Baselines retired, not grandfathered.
-  #
-  # A separate job (not a step in `test`): the docs gate reads the repo's
-  # Markdown layer and exits 0/1 — it has no .NET build, no Docker, and no
-  # test discovery. It is the CI-able close gate for the IMPROVE-DOCS lane;
-  # the human-facing report is `docs-report.ps1` (same scope, never exits
-  # non-zero).
-  #
-  # ubuntu-latest runners ship PowerShell 7 (`pwsh`) pre-installed, so no
-  # setup step is needed.
-  # ---------------------------------------------------------------------------
+  # IMPROVE-DOCS D14 — docs gate (Markdown layer only; no .NET build, no Docker).
   docs:
     runs-on: ubuntu-latest
     steps:
@@ -101,129 +55,80 @@ jobs:
       - name: Run docs gate
         run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/docs-check.ps1
 
-  # ---------------------------------------------------------------------------
-  # IMPROVE-CODE C00 — the code-size ratchet gate.
-  #
-  # A separate job (like `docs`, not a step in `test`): the gate reads the
-  # repo's source and the shrink-only baseline in
-  # `tools/code/code-baseline.json`, measuring with a Roslyn console tool
-  # (`tools/code/CodeMetrics`). It covers .cs/.ts/.cshtml (gates a/e/f of the
-  # docs script were retired into this finer gate by C00) and exits 0/1.
-  #
-  # The gate's `dotnet run` builds the CodeMetrics tool, so this job needs the
-  # .NET SDK (installed below). The ts-metrics pass shells out to Node, which
-  # `actions/setup-node` provides (ubuntu-latest also ships Node, but we pin
-  # the version for reproducibility — the tool only needs `node` on PATH, not
-  # a specific project).
-  #
-  # The `max raised without an `adr:`` ratchet compares the working tree's
-  # baseline against the PR's *base* branch (the branch this repo integrates
-  # into — `release`, per the `on:` triggers above). That needs the base ref
-  # present in the checkout, so this job uses `fetch-depth: 0`. The gate
-  # *fails closed* if the base is unreadable (it does not silently skip), so
-  # a broken base can no longer turn the ratchet off. A base that simply never
-  # had the file (first introduction of the baseline) is skipped — that is the
-  # legitimate case. Locally the same check defaults to `origin/development`
-  # (where this repo develops); CI overrides it with `CODE_BASELINE_BASE`.
-  # ---------------------------------------------------------------------------
-  code:
+      # DX13 (ADR 0307 D9): improve-check.ps1 was previously run from ImproveHarnessTests.cs;
+      # the test is deleted — this step is now the CI home for the gate.
+      - name: Run improve gate
+        run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/docs/improve-check.ps1
+
+  # IMPROVE-DEVX D7 — devx gate (pwsh only; no .NET, no Docker). ADR 0307 §D7; DX33.
+  devx:
     runs-on: ubuntu-latest
     steps:
-      # SEC L5 (U25): tag + commit-SHA pin (same `# v5` convention as the test job).
-      # fetch-depth 0: the ratchet reads the baseline file off the base ref, so
-      # the base branch's history must be in the checkout (default is single-branch).
+      # fetch-depth: 0 — parity with the plan's wording (none of the 13 rules reads a base ref).
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
-      # CI plumbing (NOT a pinned gate command): install the .NET 10 SDK the
-      # Roslyn tool needs (matches global.json's sdk.version, like the test job).
+      - name: Run devx gate
+        run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/devx/devx-check.ps1
+
+  # IMPROVE-UX X01 — report-only; prints the measurements table without gating PRs.
+  ux-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Report UX measurements
+        run: python3 tools/ux/ux-measure.py
+
+  # IMPROVE-CODE C00 — code-size ratchet (Roslyn CodeMetrics tool + Node for ts metrics).
+  code:
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 — the ratchet reads the baseline off the PR's base ref.
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: '10.0.400'
 
-      # CI plumbing: Node for the ts-metrics.js pass (the CodeMetrics tool
-      # shells out to `node`; it needs no npm project).
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '20'
 
-      # The gate: runs code-check.ps1 (exit 0/1). Its Roslyn `--check`
-      # compares against tools/code/code-baseline.json and — via
-      # CODE_BASELINE_BASE (the PR's base branch; `release` for both the push
-      # and pull_request triggers) — against that branch's baseline. An
-      # unreadable base fails the gate under CI rather than being skipped.
+      # Unreadable base fails the gate under CI rather than being skipped (C00 ratchet).
       - name: Run code gate
         env:
           CODE_BASELINE_BASE: origin/${{ github.base_ref || 'release' }}
         run: pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tools/code/code-check.ps1
 
-  # ---------------------------------------------------------------------------
-  # F19.U4 — the E2E job (TEST-03, `code`).
-  #
-  # This job is ADDED by F19.U4 on top of F14.U2's landed "test" job; the two
-  # `dotnet exec` dll steps above are UNCHANGED (the F14 "two dlls" gate shape
-  # is preserved — the E2E job is a SEPARATE concern, never folded into the
-  # xunit path, per pin §1 + §5 invariant #2).
-  #
-  # The E2E suite is the FOURTH test tier (pin §1): Playwright driving a real
-  # browser against the docker-compose stack (`:5080` app, `:8025` Mailpit),
-  # outside `Kumunita.slnx` / `dotnet test` (no `src/**`, no `<PackageReference>`,
-  # no `.slnx` change — pin §5 #1/#2).
-  #
-  # SIGNUP-GATE PRECONDITION (recorded, NOT assumed done — pin §6 #1, ADR 0050):
-  #   Flow A (`signup_verify_login.e2e.ts`) requires the ADR 0050 signup gate to
-  #   be OPEN. The suite ASSERTS the gate state and fails fast with a named
-  #   message if it is closed — it does NOT mutate platform config (pin §5 #5,
-  #   the invariant held by U2/U3). Opening the gate is a write-lane action
-  #   through the admin surface (`SetSignupOpenAsync`); no deterministic CI-only
-  #   seam exists in this repo to flip it without a C# client + GlobalAdmin
-  #   credential, and the pin §5 #5 invariant forbids the suite from doing that
-  #   itself. So CI records the precondition here (a documented setup step, not
-  #   a silent assumption) and the operator opens the gate on the live box
-  #   before the job can run Flow A green. A 503 lockout in the suite is a
-  #   precondition/environment failure, never retried in a loop (pin §5 #6).
-  #
-  # Runs only on the same triggers as F14's `test` job (`release` push / PR).
-  # ---------------------------------------------------------------------------
+  # F19.U4 — E2E (Playwright vs the compose stack; precondition docs/design/prod-hardening-f19-e2e.md).
   e2e:
     runs-on: ubuntu-latest
-    # The two env vars the E2E suite reads (pin §1). Defaults are already the
-    # compose stack's published ports; set them explicitly so the job is
-    # self-documenting and does not depend on the helper's in-code defaults.
+    # The two env vars the E2E suite reads (F19 pin §1); the compose stack's published ports.
     env:
       KUMUNITA_APP_URL: http://localhost:5080
       KUMUNITA_MAILPIT_URL: http://localhost:8025
     steps:
-      # SEC L5 (U25): tag + commit-SHA pin (same `# v5` convention as the test job).
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      # CI plumbing (NOT a pinned gate command): install Node for the E2E
-      # project. The e2e project does NOT use a <PackageReference>; it is a
-      # standalone npm project with its own package.json + package-lock.json
-      # (F19.U2).
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '20'
 
-      # Bring up the compose stack (the app + Mailpit + Postgres). `build`
-      # ensures the app image is current with the checked-out source. The
-      # volumes persist across runs on the same runner image — but CI runners
-      # are ephemeral, so the stack is freshly started each run.
       - name: Bring up the compose stack
         run: docker compose build app && docker compose up -d
 
-      # The F19.U1 §1 readiness gate (re-implemented in `e2e/global-setup.ts`
-      # by the suite itself, but we wait here too so a wedged boot fails
-      # FAST with a clear message rather than surfacing as a confusing spec
-      # failure). The app needs ~8 s after container start (Marten schema +
-      # Wolverine leadership, the AGENTS.md boot doctrine); Mailpit is up
-      # almost immediately.
+      # App needs ~8 s after container start (Marten schema + Wolverine leadership).
       - name: Wait for app + Mailpit readiness
         run: |
           set -euo pipefail
@@ -239,13 +144,7 @@ jobs:
           echo "Readiness gate: app or Mailpit did not answer within 90 s — wedged boot (precondition failure, not a test failure)" >&2
           exit 1
 
-      # SIGNUP-GATE PRECONDITION (see the job-level comment above; ADR 0050,
-      # pin §6 #1): the suite's Flow A spec asserts the gate state and fails
-      # fast with a named message if it is closed. The operator must open the
-      # gate on the live box (the admin settings surface — `SetSignupOpenAsync`
-      # write lane) before this job can drive Flow A green. This step is a
-      # DOCUMENTED setup note — not a silent assumption — and does NOT
-      # mutate the platform config (the suite's invariant, pin §5 #5).
+      # SIGNUP-GATE PRECONDITION (ADR 0050, F19 pin §6 #1): the suite asserts the gate is OPEN and fails fast if closed — the operator opens it; see docs/design/prod-hardening-f19-e2e.md.
       - name: Signup-gate precondition (documented)
         run: |
           echo "::notice::F19.E2E Flow A requires the ADR 0050 signup gate to be OPEN."
@@ -253,19 +152,12 @@ jobs:
           echo "::notice::Open the gate via the admin settings surface (SetSignupOpenAsync write lane) before this job can run Flow A green."
           echo "::notice::A 503 lockout in the suite is a precondition failure, never retried in a loop (pin §5 #6)."
 
-      # Resolve the E2E project's deps (its own package-lock.json — F19.U2).
       - name: Install E2E deps
         run: npm --prefix e2e ci
 
-      # Playwright's npm package does NOT ship the browser binaries: on a
-      # fresh runner `browserType.launch` fails with "Executable doesn't
-      # exist at ~/.cache/ms-playwright/...". Download the chromium the
-      # suite uses (pin §1: one chromium project) + its system deps
-      # (`--with-deps`, ubuntu-latest).
+      # The Playwright npm package does not ship browser binaries (fresh runner).
       - name: Install Playwright browser
         run: npm --prefix e2e exec playwright install --with-deps chromium
 
-      # Run the suite: both pinned specs (F19.U2 `signup_verify_login.e2e.ts`
-      # Flow A + F19.U3 `post_write.e2e.ts` Flow B).
       - name: Run E2E suite
         run: npm --prefix e2e run test

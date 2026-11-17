@@ -31,7 +31,16 @@
 
     @if (topLevel.Count == 0)
     {
-        <p class="text-body-tertiary mb-3"><kw-l key="projects.todo.comment_empty">No comments yet. If you can see this to-do, you can comment on it.</kw-l></p>
+        @* R31 (IMPROVE-UX) — the house .kmb-empty idiom: title + the existing
+           body sentence + one next action (the composer's Comment field,
+           anchored — the composer renders right below). *@
+        <div class="kmb-empty mb-3">
+            <p class="kmb-empty-title"><kw-l key="projects.todo.comment_empty_title">No comments yet.</kw-l></p>
+            <p class="kmb-empty-body">
+                <kw-l key="projects.todo.comment_empty">No comments yet. If you can see this to-do, you can comment on it.</kw-l>
+            </p>
+            <a class="btn btn-primary" href="#todo-comment-body"><kw-l key="projects.todo.comment_reply">Comment</kw-l></a>
+        </div>
     }
     else
     {

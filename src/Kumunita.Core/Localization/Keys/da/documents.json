@@ -48,5 +48,7 @@
   "documents.folder_flash_created": "Mappe oprettet.",
   "documents.folder_flash_renamed": "Mappe omd\u00F8bt.",
   "documents.folder_flash_moved": "Mappe flyttet.",
-  "documents.folder_flash_deleted": "Mappe slettet."
+  "documents.folder_flash_deleted": "Mappe slettet.",
+  "documents.empty_title": "Ingen dokumenter endnu.",
+  "documents.deleted_empty_title": "Ingen slettede dokumenter."
 }

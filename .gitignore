@@ -30,6 +30,11 @@ appsettings.*.Local.json
 # Generated front-end — rebuild with `npm run build` in src/Kumunita.Web
 src/Kumunita.Web/wwwroot/js/
 
+# Local runtime scratch (regenerated; not content)
+__pycache__/
+*.pyc
+src/Kumunita.Web/logs/
+
 # OS / editor noise
 .DS_Store
 Thumbs.db
@@ -52,6 +57,8 @@ Thumbs.db
 *.tmp
 *.tmp_proj
 *.log
+*.out
+*.trx
 *.vspscc
 *.vssscc
 .builds

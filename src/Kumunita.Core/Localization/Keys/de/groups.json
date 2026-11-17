@@ -121,5 +121,7 @@
   "groups.edit_language_hint": "Die Sprache, in der du diesen Beitrag schreibst. Das ist nur ein Tag \u2014 er wird nicht \u00FCbersetzt \u2014 und h\u00E4lt den Text sp\u00E4ter auffindbar und l\u00E4sst Leser:innen eine eigene Sprachversion hinzuf\u00FCgen, wenn sie wollen.",
   "groups.edit_submit": "\u00C4nderungen speichern",
   "groups.edit_cancel": "Abbrechen",
-  "groups.confirm_delete": "Diese Gruppe l\u00F6schen? Dadurch werden die Gruppe, ihre Mitglieder und ihre ausstehenden Einladungen entfernt, und es kann nicht r\u00FCckg\u00E4ngig gemacht werden."
+  "groups.confirm_delete": "Diese Gruppe l\u00F6schen? Dadurch werden die Gruppe, ihre Mitglieder und ihre ausstehenden Einladungen entfernt, und es kann nicht r\u00FCckg\u00E4ngig gemacht werden.",
+  "groups.posts_empty_title": "Noch keine Beitr\u00E4ge.",
+  "groups.events_empty_title": "Noch keine Veranstaltungen."
 }

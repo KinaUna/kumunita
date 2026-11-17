@@ -51,8 +51,12 @@
         {
             @* The empty state — the M3 posts-feed precedent (alert alert-info
                + a single kw-l string). *@
-            <div class="alert alert-info">
-                <kw-l key="notifications.empty">Nothing yet — things that happen to you will show up here.</kw-l>
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="notifications.empty_title">Nothing yet.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="notifications.empty">Nothing yet — things that happen to you will show up here.</kw-l>
+                </p>
+                <a class="btn btn-outline-secondary" href="/notifications/preferences"><kw-l key="notifications.preferences">Preferences</kw-l></a>
             </div>
         }
         else

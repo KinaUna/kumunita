@@ -54,7 +54,7 @@ namespace Kumunita.Core.Tests;
 /// throws on a missing component.
 /// </para>
 /// </summary>
-public sealed class SampleDataCorpusBackfillTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class SampleDataCorpusBackfillTests(PostgresFixture fixture)
 {
     // ── Pinned natural keys (stable strings from the sample corpus) ──────────
     private const string TagSlug        = "cleanup";

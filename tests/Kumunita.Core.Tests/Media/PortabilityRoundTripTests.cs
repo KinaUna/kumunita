@@ -1,0 +1,1948 @@
+using System.IO;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+using Kumunita.Core;
+using Kumunita.Core.Authorization;
+using Kumunita.Core.ErrorReports;
+using Kumunita.Core.Events;
+using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
+using Kumunita.Core.Media;
+using Kumunita.Core.Messaging;
+using Kumunita.Core.Pages;
+using Kumunita.Core.Portability;
+using Kumunita.Core.Posts;
+using Kumunita.Core.Projects;
+using Kumunita.Core.Tags;
+using Kumunita.Core.UserInfo;
+using Marten;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Npgsql;
+using Xunit;
+
+namespace Kumunita.Core.Tests;
+
+using static Marten.QueryableExtensions;
+
+/// <summary>
+/// M11 U07 — the <b>close</b> of the milestone: the three pinned Core tests
+/// from <c>docs/design/m11-portability-design.md</c> §D9 (the exact frozen
+/// names), each of which runs <see cref="PortabilityService"/> end-to-end
+/// (U02/U03's export seam + U05/U06's import seam + the C-M11·2 no-secret
+/// boundary) against the <b>real</b> Postgres-backed seams (the
+/// <see cref="PostgresFixture"/> + the same boot the GU / GA / ML lanes
+/// established in this assembly — the frozen
+/// <see cref="IDocumentStore"/> + <see cref="UserManager{TUser}"/> /
+/// <see cref="RoleManager{TRole}"/> + <see cref="LocalVolumeMediaStore"/>
+/// over a fresh scratch DB).
+/// <para>
+/// The three pins:
+/// <list type="bullet">
+/// <item><b>D9a</b> — <see
+/// cref="PortabilityRoundTrip_ExportThenImportPreservesContentGraphAndMediaAndRoles"/>:
+/// a representative instance (one of each of the 44 content doc types that
+/// participates in a non-trivial graph + one media object + one principal
+/// with the elevated standing + the config block) → <see
+/// cref="PortabilityService.ExportAsync"/> → a <em>fresh</em> instance →
+/// <see cref="PortabilityService.ImportAsync"/> → the content graph + the
+/// media bytes + the role assignments are all present on the fresh instance,
+/// byte-identical and referentially intact.</item>
+/// <item><b>D9b</b> — <see
+/// cref="PortabilityNoSecret_ArchiveContainsNoCredentialMaterial"/>: the
+/// <see cref="PortabilityPrincipal"/> POCO field shape (the C-M11·2 type
+/// boundary) + a byte-scan witness over the export (the C-M11·2 wire
+/// boundary).</item>
+/// <item><b>D9c</b> — <see
+/// cref="PortabilityFailClosed_RejectedArchiveWritesZeroRows"/>: a wrong
+/// <c>format</c> manifest, a corrupted media byte, and a dangling reference
+/// are each rejected <em>before any write</em> (C-M11·4) — the fresh
+/// instance has zero content rows, zero principals, and zero audit rows
+/// after each of the three rejections.</item>
+/// </list>
+/// A test whose exact name is not in the design doc's pinned list is a drift
+/// pause, not a silent add.
+/// </para>
+/// </summary>
+public sealed class PortabilityRoundTripTests(PostgresFixture fixture)
+{
+    // ── The shared boot — a full instance (M11 D9's "representative instance") ─
+    // The frozen seams the PortabilityService consumes, wired exactly the way
+    // the GU / GA / ML lanes wire them in this assembly: the
+    // PostgresFixture's fresh scratch DB + the same Marten / EF / Identity /
+    // LocalVolumeMediaStore shape as the GU lane's BootIdentityAsync — the
+    // M11 service's ctor consumes those seams verbatim (the C-M11·6/7
+    // "no new authorization surface" pin: the only seams it touches are the
+    // frozen IDocumentStore + UserManager + RoleManager + IMediaStore /
+    // IMediaFileStore).
+
+    private async Task<(
+        IDocumentStore store,
+        AppDbContext db,
+        UserManager<User> userManager,
+        RoleManager<IdentityRole> roleManager,
+        IMediaStore mediaStore,
+        IOptions<CommunityOptions> options,
+        PortabilityService service)>
+        BootFullInstanceAsync(CancellationToken ct)
+    {
+        var conn = await fixture.NewDatabaseAsync(ct);
+
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            // Every doc-type surface the §inventory's 44 content docs span
+            // (the M1 / M3 / M4 / M5 / M6 / M9 + Media + Tag + Page + the
+            // Localization docs — the exact set Program.cs registers).
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
+            MessagingDocTypes.Configure(opts);
+            MediaDocTypes.Configure(opts);
+            TagDocTypes.Configure(opts);
+            PageDocTypes.Configure(opts);
+            // ADR 0276 — the EscalationOutboundConfig singleton (the
+            // /admin/escalation outbound config) — ConfigExport reads it
+            // and the apply writes it back. Not in the 44-doc inventory
+            // (it travels via the config.json escalation block, not as a
+            // docs/ row), but it must be registered on the test store.
+            EscalationDocTypes.Configure(opts);
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
+
+        // The identity schema (the only EF Core in the tree, ADR 0004).
+        var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(conn)
+            .Options);
+        await db.Database.MigrateAsync(ct);
+
+        // The Identity user / role managers over the migrated `identity`
+        // schema (the same UserStore / RoleStore shape the GU lane's
+        // BootIdentityAsync uses).
+        var userStore = new UserStore<User, IdentityRole, AppDbContext, string,
+            IdentityUserClaim<string>, IdentityUserRole<string>,
+            IdentityUserLogin<string>, IdentityUserToken<string>,
+            IdentityRoleClaim<string>>(db);
+        var roleStore = new RoleStore<IdentityRole, AppDbContext, string,
+            IdentityUserRole<string>, IdentityRoleClaim<string>>(db);
+
+        // Mirror Program.cs's real Identity password policy exactly (the app
+        // relaxes RequireNonAlphanumeric — the setup-token idiom — and the
+        // shipped PortabilityApplyIdentity.RandomPassword relies on that).
+        // A harness that used the default policy would reject the re-created
+        // principals' generated credentials on import.
+        var identityOpts = Options.Create(new IdentityOptions
+        {
+            User = { RequireUniqueEmail = true },
+            Password = { RequiredLength = 8, RequireNonAlphanumeric = false },
+        });
+        var userManager = new UserManager<User>(
+            userStore,
+            identityOpts,
+            new PasswordHasher<User>(),
+            new[] { new UserValidator<User>() },
+            new[] { new PasswordValidator<User>() },
+            new UpperInvariantLookupNormalizer(),
+            new IdentityErrorDescriber(),
+            new EmptyServiceProvider(),
+            NullLogger<UserManager<User>>.Instance);
+        var roleManager = new RoleManager<IdentityRole>(
+            roleStore,
+            new[] { new RoleValidator<IdentityRole>() },
+            new UpperInvariantLookupNormalizer(),
+            new IdentityErrorDescriber(),
+            NullLogger<RoleManager<IdentityRole>>.Instance);
+
+        // The LocalVolumeMediaStore over a fresh scratch directory (the
+        // ADR 0011 byte seam — the {id[0..2]}/{id} layout the C-M11·3
+        // content-addressing pin relies on).
+        var mediaRoot = Path.Combine(
+            Path.GetTempPath(),
+            "kumunita-m11-tests-" + Guid.NewGuid().ToString("n")[..10]);
+        var fileStore = new LocalVolumeFileStore(
+            Options.Create(new MediaOptions { RootPath = mediaRoot }));
+        var mediaStore = new LocalVolumeMediaStore(fileStore, store);
+
+        var options = Options.Create(new CommunityOptions
+        {
+            Name = "Maplewood Residents",
+            SupportEmail = "admin@maplewood.example",
+        });
+
+        var service = new PortabilityService(
+            // C3-07 (ADR 0297) — the identity-principal store contract over the
+            // EF Core identity-schema context (the service codes against the
+            // interface, not the AppDbContext context type).
+            store, new IdentityPrincipalStore(db), userManager, roleManager, options, mediaStore, fileStore);
+
+        return (store, db, userManager, roleManager, mediaStore, options, service);
+    }
+
+    // ── The D9a plant — one representative row per closed inventory entry ─
+    // The design doc's §D9 "representative instance": every content doc type
+    // with a non-trivial graph + one media object + the config block + the
+    // two principals with the role standing. The plant is deliberately
+    // minimal (the U07 pin — the round-trip is about shape + referential
+    // integrity, not content volume) — one row of each of the participating
+    // types, with the reference fields pointing at the planted principals /
+    // docs so the U05 integrity loop (the C-M11·4 fail-closed gate) passes.
+
+    private sealed record Planted(
+        string principalAId,
+        string principalBId,
+        string componentId,
+        string groupId,
+        string postId,
+        string postReplyId,
+        string postTranslationId,
+        string eventId,
+        string eventRsvpId,
+        string kanbanBoardId,
+        string kanbanLaneId,
+        string todoItemId,
+        string boardItemPlacementId,
+        string conversationId,
+        string messageId,
+        string pageId,
+        string pageTranslationId,
+        string mediaObjectId,
+        string delegationGrantId,
+        string guardianLinkId);
+
+    private async Task<Planted> PlantRepresentativeInstanceAsync(
+        IDocumentStore store,
+        UserManager<User> userManager,
+        RoleManager<IdentityRole> roleManager,
+        IMediaStore mediaStore,
+        CancellationToken ct)
+    {
+        // Ensure the three roles exist before adding users to them
+        // (the EF IdentityRole row must be present for AddToRoleAsync).
+        foreach (var role in new[] { Roles.GlobalAdmin, Roles.Moderator, Roles.Member })
+        {
+            var existing = await roleManager.FindByNameAsync(role);
+            if (existing is null)
+            {
+                var result = await roleManager.CreateAsync(new IdentityRole(role));
+                if (!result.Succeeded)
+                    throw new InvalidOperationException("role create failed: " + role);
+            }
+        }
+
+        // Two principals (the M11 §principals closed field set's two rows —
+        // principal A with the elevated standing, principal B as the
+        // non-elevated counterparty the graph's AuthorId / OwnerId / UserId
+        // fields point at).
+        var principalA = await userManager.CreateAsync(
+            new User
+            {
+                Id = "pt-admin-001",
+                UserName = "pt-admin",
+                Email = "pt-admin@maplewood.example",
+                NormalizedEmail = "PT-ADMIN@MAPLEWOOD.EXAMPLE",
+            },
+            "Passw0rd!pt-admin-001");
+        if (!principalA.Succeeded)
+            throw new InvalidOperationException("principal A create failed: " +
+                string.Join(", ", principalA.Errors.Select(e => e.Description)));
+        var userA = (await userManager.FindByIdAsync("pt-admin-001"))!;
+        await userManager.AddToRoleAsync(userA, Roles.GlobalAdmin);
+        await userManager.AddToRoleAsync(userA, Roles.Moderator);
+
+        var principalB = await userManager.CreateAsync(
+            new User
+            {
+                Id = "pt-resident-001",
+                UserName = "pt-resident",
+                Email = "pt-resident@maplewood.example",
+                NormalizedEmail = "PT-RESIDENT@MAPLEWOOD.EXAMPLE",
+            },
+            "Passw0rd!pt-resident-001");
+        if (!principalB.Succeeded)
+            throw new InvalidOperationException("principal B create failed: " +
+                string.Join(", ", principalB.Errors.Select(e => e.Description)));
+        var userB = (await userManager.FindByIdAsync("pt-resident-001"))!;
+        await userManager.AddToRoleAsync(userB, Roles.Member);
+
+        // The config block — the §config field set (the U02 ConfigExport
+        // reads these + the CommunityOptions value).
+        await using (var configSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            var locale = new LocaleSettings
+            {
+                Id = LocaleSettings.SingletonId,
+                DefaultLanguageCode = "en",
+                DefaultTimezone = "UTC",
+                DefaultDateFormat = DateFormat.FloorFormat,
+                IsSignupOpen = true,
+                NotifyAdminsOnSignup = true,
+                AnnouncementCommentsEnabled = true,
+                MessagingEnabled = true,
+            };
+            configSession.Store(locale);
+
+            var en = new LanguageCatalog
+            {
+                Id = "en",
+                NativeName = "English",
+                Enabled = true,
+                SortOrder = 0,
+            };
+            configSession.Store(en);
+            var de = new LanguageCatalog
+            {
+                Id = "de",
+                NativeName = "Deutsch",
+                Enabled = true,
+                SortOrder = 1,
+            };
+            configSession.Store(de);
+            await configSession.SaveChangesAsync(ct);
+        }
+
+        // The media object — one content-addressed row (the C-M11·3 pin:
+        // the id is the lowercase-hex SHA-256 of the payload; the media
+        // manifest + the media/{Id[0..2]}/{Id} layout + the C-M11·4
+        // check (d) byte verification all key off this row's id).
+        var mediaPayload = Encoding.UTF8.GetBytes(
+            "M11 U07 representative instance media payload — 2026-10-02.");
+        var media = await mediaStore.PutAsync(
+            mediaPayload,
+            "u07-representative.png",
+            "image/png",
+            "pt-admin-001",
+            ct);
+        var mediaObjectId = media.Id;
+        Assert.Equal(
+            Convert.ToHexString(SHA256.HashData(mediaPayload)).ToLowerInvariant(),
+            mediaObjectId);
+
+        // The Profile docs (the UserInfo doc for each principal — the
+        // §inventory Profile row: the AvatarId reference field points at
+        // the media object's id (principal A's avatar — the §inventory
+        // "→ MediaObject" reference the U05 integrity loop checks)).
+        await using (var profileSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            profileSession.Store(new Profile
+            {
+                SubjectId = "pt-admin-001",
+                DisplayName = "PT Admin",
+                Verified = true,
+                Blocked = false,
+                Visibility = new Audience(),
+                AvatarId = mediaObjectId,
+            });
+            profileSession.Store(new Profile
+            {
+                SubjectId = "pt-resident-001",
+                DisplayName = "PT Resident",
+                Verified = true,
+                Blocked = false,
+                Visibility = new Audience(),
+            });
+            await profileSession.SaveChangesAsync(ct);
+        }
+
+        // The §inventory content graph — one row of each participating
+        // type with the reference fields pointing at the planted principals
+        // (the U05 integrity loop's "→ principal" target set: every
+        // AuthorId / OwnerId / UserId / GuardianId / ChildId / ParticipantA
+        // / ParticipantB / SenderId must resolve).
+        var componentId = "pt-component-001";
+        var groupId = "pt-group-001";
+        var postId = "pt-post-001";
+        var postReplyId = "pt-post-reply-001";
+        var postTranslationId = "pt-post-translation-001";
+        var eventId = "pt-event-001";
+        var eventRsvpId = "pt-event-rsvp-001";
+        var kanbanBoardId = "pt-kanban-board-001";
+        var kanbanLaneId = "pt-kanban-lane-001";
+        var todoItemId = "pt-todo-001";
+        var boardItemPlacementId = "pt-board-item-placement-001";
+        var conversationId = "pt-conversation-001";
+        var messageId = "pt-message-001";
+        var pageId = "pt-page-001";
+        var pageTranslationId = "pt-page-translation-001";
+        var delegationGrantId = "pt-delegation-001";
+        var guardianLinkId = "pt-guardian-link-001";
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+
+        // Order 1 — the base units (the parents; no doc-level parent).
+        session.Store(new Component
+        {
+            Id = componentId,
+            Name = "Maplewood",
+        });
+        session.Store(new Group
+        {
+            Id = groupId,
+            Name = "Maplewood Neighbors",
+            OwnerId = "pt-admin-001",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        // Order 2 — the M1 identity graph (the delegation + the guardian).
+        session.Store(new DelegationGrant
+        {
+            Id = delegationGrantId,
+            OwnerId = "pt-resident-001",
+            DelegateId = "pt-admin-001",
+            Scope = [],
+            From = DateTimeOffset.UtcNow,
+            To = null,
+        });
+        session.Store(new GuardianLink
+        {
+            Id = guardianLinkId,
+            GuardianId = "pt-admin-001",
+            ChildId = "pt-resident-001",
+            Status = GuardianLinkStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+
+        // Order 4 — the M3 content (the post + its reply + its translation).
+        var postCreated = DateTimeOffset.UtcNow;
+        session.Store(new Post
+        {
+            Id = postId,
+            ComponentId = componentId,
+            AuthorId = "pt-resident-001",
+            Title = "PT U07 representative post",
+            Body = "PT U07 — the round-trip representative post body (the " +
+                "§inventory Post row, order 17).",
+            Audience = new Audience(),
+            GroupId = string.Empty,
+            LanguageCode = "en",
+            Created = postCreated,
+        });
+        session.Store(new PostReply
+        {
+            Id = postReplyId,
+            PostId = postId,
+            AuthorId = "pt-admin-001",
+            Body = "PT U07 — the round-trip representative reply body " +
+                "(the §inventory PostReply row, order 18).",
+            Created = postCreated,
+            LanguageCode = "en",
+        });
+        session.Store(new PostTranslation
+        {
+            Id = postTranslationId,
+            PostId = postId,
+            LanguageCode = "de",
+            Title = "PT U07 representative post (DE)",
+            Body = "PT U07 — der repräsentative Post-Körper in Deutsch " +
+                "(die §inventory PostTranslation-Zeile, order 19).",
+            AuthorId = "pt-admin-001",
+            Created = postCreated,
+        });
+
+        // Order 5 — the M4 content (the event + the RSVP — the M4
+        // "outcome" arrow: the IsDraft=false published event + one
+        // Going RSVP from the non-author principal).
+        var eventStart = DateTimeOffset.UtcNow.AddHours(1);
+        session.Store(new Event
+        {
+            Id = eventId,
+            Title = "PT U07 representative event",
+            Body = "PT U07 — the round-trip representative event body " +
+                "(the §inventory Event row, order 25).",
+            ComponentId = componentId,
+            AuthorId = "pt-admin-001",
+            Start = eventStart,
+            End = eventStart.AddHours(2),
+            IsDraft = false,
+            Audience = new Audience(),
+        });
+        session.Store(new EventRsvp
+        {
+            Id = eventRsvpId,
+            EventId = eventId,
+            UserId = "pt-resident-001",
+            Status = RsvpStatus.Going,
+            At = DateTimeOffset.UtcNow,
+        });
+
+        // Order 6 — the M5 content (the board + the lane + the to-do + the
+        // placement — the M5 "outcome" arrow: the to-do is the work item;
+        // the placement is where it sits on the lane; the lane is on the
+        // board).
+        session.Store(new KanbanBoard
+        {
+            Id = kanbanBoardId,
+            Title = "PT U07 representative board",
+            ComponentId = componentId,
+            AuthorId = "pt-admin-001",
+            Audience = new Audience(),
+            Created = DateTimeOffset.UtcNow,
+        });
+        session.Store(new KanbanLane
+        {
+            Id = kanbanLaneId,
+            BoardId = kanbanBoardId,
+            Title = "To do",
+            Order = 0,
+            Created = DateTimeOffset.UtcNow,
+        });
+        session.Store(new TodoItem
+        {
+            Id = todoItemId,
+            Title = "PT U07 representative to-do",
+            ComponentId = componentId,
+            AuthorId = "pt-resident-001",
+            AssigneeId = "pt-admin-001",
+            Status = "open",
+            Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+        });
+        session.Store(new BoardItemPlacement
+        {
+            Id = boardItemPlacementId,
+            TodoItemId = todoItemId,
+            BoardId = kanbanBoardId,
+            LaneId = kanbanLaneId,
+            Order = 0,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        // Order 8 — the M9 content (the conversation + the message).
+        session.Store(new Conversation
+        {
+            Id = conversationId,
+            ParticipantA = "pt-admin-001",
+            ParticipantB = "pt-resident-001",
+            Created = DateTimeOffset.UtcNow,
+        });
+        session.Store(new Message
+        {
+            Id = messageId,
+            ConversationId = conversationId,
+            SenderId = "pt-resident-001",
+            Body = "PT U07 — the round-trip representative message body " +
+                "(the §inventory Message row, order 42).",
+            Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+        });
+
+        // Order 9 — the PG content (the page + its translation).
+        session.Store(new Page
+        {
+            Id = pageId,
+            Slug = "pt-u07-representative-page",
+            Title = "PT U07 representative page",
+            Body = "PT U07 — the round-trip representative page body " +
+                "(the §inventory Page row, order 43).",
+            AuthorId = "pt-admin-001",
+            Kind = PageKind.System,
+            IsDraft = false,
+            IsDeleted = false,
+            Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+        });
+        session.Store(new PageTranslation
+        {
+            Id = pageTranslationId,
+            PageId = pageId,
+            LanguageCode = "de",
+            Title = "PT U07 representative page (DE)",
+            Body = "PT U07 — die repräsentative Seite in Deutsch " +
+                "(die §inventory PageTranslation-Zeile, order 44).",
+            AuthorId = "pt-admin-001",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await session.SaveChangesAsync(ct);
+
+        return new Planted(
+            "pt-admin-001",
+            "pt-resident-001",
+            componentId,
+            groupId,
+            postId,
+            postReplyId,
+            postTranslationId,
+            eventId,
+            eventRsvpId,
+            kanbanBoardId,
+            kanbanLaneId,
+            todoItemId,
+            boardItemPlacementId,
+            conversationId,
+            messageId,
+            pageId,
+            pageTranslationId,
+            mediaObjectId,
+            delegationGrantId,
+            guardianLinkId);
+    }
+
+    // ── The D9a round-trip — the milestone's headline invariant ─────────────
+
+    [Fact]
+    public async Task PortabilityRoundTrip_ExportThenImportPreservesContentGraphAndMediaAndRoles()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Plant a representative instance (the design doc §D9a "representative
+        // instance": one of each of the participating content doc types + one
+        // media object + the two principals with the role standing + the
+        // config block).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        var planted = await PlantRepresentativeInstanceAsync(
+            storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+
+        // Export — one *.kumunita archive (the U02/U03 export seam: the docs
+        // + the no-secret principals + the config + the media bytes + the
+        // manifest).
+        var exportStream = await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct);
+        var exportBytes = await ReadAllBytesAsync(exportStream, ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Import into a fresh instance — the U05/U06 import seam (the
+        // validate phase runs to completion before any write; a clean
+        // validate applies principals → docs → media → config in the
+        // locked order).
+        var (storeB, dbB, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        var importResult = await serviceB.ImportAsync(
+            "pt-admin-001", new MemoryStream(exportBytes), ct);
+        Assert.True(importResult.Ok,
+            "the import should be clean — the failure set is: " +
+            string.Join(", ", importResult.Failures));
+
+        // ── Assert the content graph is preserved (one row per planted id) ─
+        await using (var q = storeB.QuerySession())
+        {
+            // Order 1 — the base units.
+            var component = await q.LoadAsync<Component>(planted.componentId, ct);
+            Assert.Equal("Maplewood", component!.Name);
+
+            var group = await q.LoadAsync<Group>(planted.groupId, ct);
+            Assert.Equal("pt-admin-001", group!.OwnerId);
+
+            // Order 2 — the M1 identity graph.
+            var delegation = await q.LoadAsync<DelegationGrant>(planted.delegationGrantId, ct);
+            Assert.Equal("pt-admin-001", delegation!.DelegateId);
+            Assert.Equal("pt-resident-001", delegation.OwnerId);
+
+            var guardian = await q.LoadAsync<GuardianLink>(planted.guardianLinkId, ct);
+            Assert.Equal(GuardianLinkStatus.Active, guardian!.Status);
+            Assert.Equal("pt-admin-001", guardian.GuardianId);
+            Assert.Equal("pt-resident-001", guardian.ChildId);
+
+            // Order 4 — the M3 content.
+            var post = await q.LoadAsync<Post>(planted.postId, ct);
+            Assert.Equal("PT U07 representative post", post!.Title);
+            Assert.Equal("pt-resident-001", post.AuthorId);
+            Assert.Equal("en", post.LanguageCode);
+
+            var reply = await q.LoadAsync<PostReply>(planted.postReplyId, ct);
+            Assert.Equal(planted.postId, reply!.PostId);
+            Assert.Equal("pt-admin-001", reply.AuthorId);
+
+            var translation = await q.LoadAsync<PostTranslation>(planted.postTranslationId, ct);
+            Assert.Equal("de", translation!.LanguageCode);
+            Assert.Equal(planted.postId, translation.PostId);
+
+            // Order 5 — the M4 content.
+            var evt = await q.LoadAsync<Event>(planted.eventId, ct);
+            Assert.False(evt!.IsDraft, "the published event's IsDraft=false should be preserved");
+            Assert.Equal("PT U07 representative event", evt.Title);
+            Assert.Equal("pt-admin-001", evt.AuthorId);
+
+            var rsvp = await q.LoadAsync<EventRsvp>(planted.eventRsvpId, ct);
+            Assert.Equal(RsvpStatus.Going, rsvp!.Status);
+            Assert.Equal("pt-resident-001", rsvp.UserId);
+            Assert.Equal(planted.eventId, rsvp.EventId);
+
+            // Order 6 — the M5 content.
+            var board = await q.LoadAsync<KanbanBoard>(planted.kanbanBoardId, ct);
+            Assert.Equal("PT U07 representative board", board!.Title);
+            Assert.Equal("pt-admin-001", board.AuthorId);
+
+            var lane = await q.LoadAsync<KanbanLane>(planted.kanbanLaneId, ct);
+            Assert.Equal(planted.kanbanBoardId, lane!.BoardId);
+            Assert.Equal(0, lane.Order);
+
+            var todo = await q.LoadAsync<TodoItem>(planted.todoItemId, ct);
+            Assert.Equal("PT U07 representative to-do", todo!.Title);
+            Assert.Equal("pt-admin-001", todo.AssigneeId);
+            Assert.Equal("open", todo.Status);
+
+            var placement = await q.LoadAsync<BoardItemPlacement>(planted.boardItemPlacementId, ct);
+            Assert.Equal(planted.todoItemId, placement!.TodoItemId);
+            Assert.Equal(planted.kanbanBoardId, placement.BoardId);
+            Assert.Equal(planted.kanbanLaneId, placement.LaneId);
+
+            // Order 8 — the M9 content.
+            var conversation = await q.LoadAsync<Conversation>(planted.conversationId, ct);
+            Assert.Equal("pt-admin-001", conversation!.ParticipantA);
+            Assert.Equal("pt-resident-001", conversation.ParticipantB);
+
+            var message = await q.LoadAsync<Message>(planted.messageId, ct);
+            Assert.Equal("pt-resident-001", message!.SenderId);
+            Assert.Equal(planted.conversationId, message.ConversationId);
+
+            // Order 9 — the PG content.
+            var page = await q.LoadAsync<Page>(planted.pageId, ct);
+            Assert.Equal("PT U07 representative page", page!.Title);
+            Assert.Equal("pt-admin-001", page.AuthorId);
+
+            var pageTranslation = await q.LoadAsync<PageTranslation>(planted.pageTranslationId, ct);
+            Assert.Equal("de", pageTranslation!.LanguageCode);
+            Assert.Equal(planted.pageId, pageTranslation.PageId);
+
+            // The config block (the §config field set — the U06 apply step
+            // 4's re-materialized rows).
+            var localeB = await q.Query<LocaleSettings>()
+                .Where(l => l.Id == LocaleSettings.SingletonId)
+                .FirstAsync(ct);
+            Assert.Equal("en", localeB.DefaultLanguageCode);
+            Assert.True(localeB.IsSignupOpen);
+
+            var enB = await q.LoadAsync<LanguageCatalog>("en", ct);
+            Assert.True(enB!.Enabled);
+            var deB = await q.LoadAsync<LanguageCatalog>("de", ct);
+            Assert.Equal("Deutsch", deB!.NativeName);
+        }
+
+        // ── Assert the media bytes round-trip (C-M11·3 content-addressing) ─
+        // The §validate check (d) guarantees the bytes match the id (the
+        // id IS the SHA-256 of the payload) — a round-trip that preserved
+        // the doc but corrupted the bytes would have failed validate. A
+        // fresh read of the volume bytes is the wire witness.
+        var readStream = await mediaStoreB.OpenReadAsync(planted.mediaObjectId, ct);
+        await using var readMs = new MemoryStream();
+        await readStream.CopyToAsync(readMs, ct);
+        var roundTripBytes = readMs.ToArray();
+        Assert.Equal(
+            Convert.ToHexString(SHA256.HashData(roundTripBytes)).ToLowerInvariant(),
+            planted.mediaObjectId);
+
+        // ── Assert the role assignments are preserved (the M11 D9a "roles"
+        //    half — the §principals roles[] round-trip) ─
+        var principalAB = await userManagerB.FindByIdAsync("pt-admin-001");
+        Assert.NotNull(principalAB);
+        var rolesB = await userManagerB.GetRolesAsync(principalAB);
+        Assert.Contains(Roles.GlobalAdmin, rolesB);
+        Assert.Contains(Roles.Moderator, rolesB);
+
+        var principalBB = await userManagerB.FindByIdAsync("pt-resident-001");
+        Assert.NotNull(principalBB);
+        Assert.Contains(Roles.Member, await userManagerB.GetRolesAsync(principalBB));
+
+        // ── Assert exactly one portability.import AccessAudit row (the
+        //    C-M11·6 one-audit-row pin — the service's, not the controller's) ─
+        await using (var auditSession = storeB.QuerySession())
+        {
+            var auditRows = await Marten.QueryableExtensions.ToListAsync(
+                auditSession.Query<AccessAudit>()
+                    .Where(a => a.Action == "portability.import"),
+                ct);
+            Assert.Single(auditRows);
+            Assert.Equal(AccessVia.Admin, auditRows[0].Via);
+            Assert.Equal("portability", auditRows[0].TargetKind);
+            Assert.Equal(AccessOutcome.Allow, auditRows[0].Outcome);
+        }
+    }
+
+    // ── ADR 0193 — the two import modes (the user's "import over an instance
+    //    that already has accounts/content" scenario, which was a 500) ──────
+
+    // ADR 0193 D1 — CleanSlate (the default, unchecked): the import REPLACES
+    // the instance's state. The target already holds the SAME principals +
+    // content (the user's collision), and the import still SUCCEEDS: the
+    // wipe removes the target's principals + content first, then the archive
+    // is applied onto the fresh store. Witnesses: the import is clean (not the
+    // "principal already exists" 500), the archive's content graph is present,
+    // and exactly one portability.import audit row was emitted by this import.
+    [Fact]
+    public async Task PortabilityImport_CleanSlate_OverInstanceWithSameAccounts_ReplacesAndSucceeds()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — plant the representative instance + export the archive.
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the collision: it already holds the SAME principals +
+        // content (a prior import / a demo-seeded instance). The principals
+        // have their own role standing (GlobalAdmin-only, NOT the archive's
+        // GlobalAdmin+Moderator), which lets the assertion below distinguish
+        // "re-created from the archive" from "left in place".
+        var (storeB, dbB, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-resident-001", "pt-resident", "pt-resident@maplewood.example",
+            [Roles.Member], ct);
+        // B's own content (a group the archive also carries, by id) — the
+        // wipe must remove it so the archive's copy is the one that lands.
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Group
+            {
+                Id = "pt-group-001",
+                Name = "B's local group (pre-import state)",
+                OwnerId = "pt-admin-001",
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+        // B's own history (an audit row the CleanSlate import must NOT keep).
+        await using (var ab = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            ab.Store(new AccessAudit
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                At = DateTimeOffset.UtcNow,
+                ActorId = "pt-admin-001",
+                Action = "b.local.prior.activity",
+                TargetKind = "group",
+                TargetId = "pt-group-001",
+                Via = AccessVia.Owner,
+                Outcome = AccessOutcome.Allow,
+            });
+            await ab.SaveChangesAsync(ct);
+        }
+
+        // The import (CleanSlate — the default mode). The collision that was
+        // the user's 500 now resolves to a clean replace.
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.CleanSlate, ct);
+        Assert.True(result.Ok,
+            "the CleanSlate import should succeed over the colliding instance — failure set: " +
+            string.Join(", ", result.Failures));
+
+        // The archive's content graph is the instance's state now (B's local
+        // group "B's local group (pre-import state)" is gone; A's group — the
+        // plant's "Maplewood Neighbors" — is what survives).
+        await using (var q = storeB.QuerySession())
+        {
+            var group = await q.LoadAsync<Group>("pt-group-001", ct);
+            Assert.Equal("Maplewood Neighbors", group!.Name);
+            Assert.Equal("pt-admin-001", group.OwnerId);
+        }
+
+        // The principals were re-created from the archive (fresh credentials +
+        // the archive's role standing — NOT B's prior GlobalAdmin-only standing).
+        var adminB = await userManagerB.FindByIdAsync("pt-admin-001");
+        Assert.NotNull(adminB);
+        var adminRoles = await userManagerB.GetRolesAsync(adminB);
+        Assert.Contains(Roles.GlobalAdmin, adminRoles);
+        Assert.Contains(Roles.Moderator, adminRoles); // the archive's standing, re-applied
+
+        // Exactly one portability.import audit row (the one this import
+        // emitted — B's own prior history does not count against this).
+        await using (var auditB = storeB.QuerySession())
+        {
+            var auditRows = await Marten.QueryableExtensions.ToListAsync(
+                auditB.Query<AccessAudit>().Where(a => a.Action == "portability.import"), ct);
+            Assert.Single(auditRows);
+            Assert.Equal(AccessVia.Admin, auditRows[0].Via);
+        }
+    }
+
+    // The clean-slate restore must apply the archive's LocaleSettings singleton
+    // — including the platform default time zone (ADR 0019) and the sign-up
+    // posture (ADR 0050) — when the target instance already has a seeder row.
+    //
+    // The real-app failure this pins: FirstBootSeeder always creates the
+    // LocaleSettings row on first boot (UTC / FloorFormat / the seeder's
+    // boolean floors). The config apply's old shape was "write the singleton
+    // only when it is null", so on a real instance (where the row is never
+    // null) the archive's timezone + signup values were silently dropped and
+    // the seeder's defaults stuck. The D9a round-trip test does NOT catch
+    // this, because its instance B is a raw Marten store with no seeder row —
+    // the "write if null" branch fired and applied the values, masking the bug.
+    // This test mirrors the real scenario: B pre-exists with a seeder-shaped
+    // row, and a CleanSlate import must overwrite it with the archive's state.
+    [Fact]
+    public async Task PortabilityImport_CleanSlate_AppliesArchiveLocaleSettingsOverExistingSeederRow()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance (the closed §inventory so
+        // the export's validate gate passes). The plant's config block sets
+        // IsSignupOpen = true + MessagingEnabled = true — the values the
+        // archive carries (the D9a test already pins these round-trip).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a fresh instance (raw store) that has ALREADY booted,
+        // so the FirstBootSeeder's LocaleSettings row exists (the real-app
+        // shape: sign-up CLOSED, messaging OFF — the seeder's defaults). A
+        // CleanSlate import over this instance must replace those seeder
+        // values with the archive's (sign-up OPEN, messaging ON).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        // B's seeder row — the real-app shape the apply must overwrite.
+        // The seeder's defaults: sign-up closed, messaging off.
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new LocaleSettings
+            {
+                Id = LocaleSettings.SingletonId,
+                DefaultLanguageCode = "en",
+                DefaultTimezone = "UTC",
+                DefaultDateFormat = DateFormat.FloorFormat,
+                IsSignupOpen = false,
+                MessagingEnabled = false,
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        // The import (CleanSlate — the default mode).
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.CleanSlate, ct);
+        Assert.True(result.Ok,
+            "the CleanSlate import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            var localeB = await q.Query<LocaleSettings>()
+                .Where(l => l.Id == LocaleSettings.SingletonId)
+                .FirstAsync(ct);
+            // The archive's sign-up posture (open) replaced the seeder's closed default.
+            Assert.True(localeB.IsSignupOpen,
+                "the CleanSlate restore must apply the archive's sign-up posture (ADR 0050) — " +
+                "B's seeder IsSignupOpen = false stuck (the 'write only when null' bug)");
+            // The archive's messaging flag (on) replaced the seeder's off default.
+            Assert.True(localeB.MessagingEnabled,
+                "the CleanSlate restore must apply the archive's messaging flag — " +
+                "B's seeder MessagingEnabled = false stuck");
+        }
+    }
+
+    // ADR 0276 — the escalation outbound config round-trip (CleanSlate). The
+    // archive carries the receiving endpoint + enabled switch (the non-secret
+    // fields); the plaintext token is structurally absent from the config POCO
+    // (the C-M11·2 boundary). A CleanSlate import re-materializes the singleton
+    // from the archive's endpoint + enabled; the token is blank (the admin
+    // re-enters it on /admin/escalation after the restore).
+    [Fact]
+    public async Task PortabilityImport_CleanSlate_RestoresEscalationConfigEndpointAndEnabled()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance + the escalation outbound
+        // config (endpoint + enabled + a known plaintext token).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new EscalationOutboundConfig
+            {
+                Id = ConfigExport.EscalationOutboundConfigSingletonId,
+                Endpoint = "https://other-community.example/escalations/inbound",
+                Token = "A-SECRET-TOKEN-abc123",
+                Enabled = true,
+                Updated = DateTimeOffset.UtcNow,
+                UpdatedBy = "pt-admin-001",
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a fresh instance (no escalation config row yet).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+
+        // The import (CleanSlate — the default mode).
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.CleanSlate, ct);
+        Assert.True(result.Ok,
+            "the CleanSlate import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            var row = await q.LoadAsync<EscalationOutboundConfig>(
+                ConfigExport.EscalationOutboundConfigSingletonId, ct);
+            Assert.NotNull(row);
+            // The archive's endpoint + enabled were applied.
+            Assert.Equal("https://other-community.example/escalations/inbound", row!.Endpoint);
+            Assert.True(row.Enabled);
+            // The token is blank (structurally absent from the archive — the
+            // admin re-enters it after the restore; the C-M11·2 boundary).
+            Assert.True(string.IsNullOrEmpty(row.Token),
+                "the plaintext escalation token must NOT travel in the archive (the C-M11·2 boundary) — " +
+                $"got: '{row.Token}'");
+        }
+    }
+
+    // ADR 0276 — the KeepExisting merge does NOT touch the target's escalation
+    // config (the same keep-first discipline ADR 0274 / ADR 0275 apply to the
+    // tag / principal merges). The target's existing row — endpoint, token,
+    // enabled — is kept intact.
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_KeepsTargetEscalationConfig()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance + the escalation outbound
+        // config (a DIFFERENT endpoint + token from B's).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new EscalationOutboundConfig
+            {
+                Id = ConfigExport.EscalationOutboundConfigSingletonId,
+                Endpoint = "https://a-community.example/escalations/inbound",
+                Token = "A-TOKEN-xyz789",
+                Enabled = true,
+                Updated = DateTimeOffset.UtcNow,
+                UpdatedBy = "pt-admin-001",
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the representative instance + its OWN escalation config
+        // (a different endpoint + token + disabled).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        // Plant creates pt-admin-001 (with the elevated roles) itself — do NOT
+        // pre-create it with EnsurePrincipalWithRolesAsync here, or Plant's
+        // own CreateAsync hits the EF duplicate-tracking conflict.
+        await PlantRepresentativeInstanceAsync(storeB, userManagerB, roleManagerB, mediaStoreB, ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new EscalationOutboundConfig
+            {
+                Id = ConfigExport.EscalationOutboundConfigSingletonId,
+                Endpoint = "https://b-community.example/escalations/inbound",
+                Token = "B-TOKEN-keep-me",
+                Enabled = false,
+                Updated = DateTimeOffset.UtcNow,
+                UpdatedBy = "pt-admin-001",
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        // The import (KeepExisting — merge mode).
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            var row = await q.LoadAsync<EscalationOutboundConfig>(
+                ConfigExport.EscalationOutboundConfigSingletonId, ct);
+            Assert.NotNull(row);
+            // B's own escalation config is kept intact (endpoint, token, enabled
+            // — none of it overwritten by A's archive).
+            Assert.Equal("https://b-community.example/escalations/inbound", row!.Endpoint);
+            Assert.Equal("B-TOKEN-keep-me", row.Token);
+            Assert.False(row.Enabled);
+        }
+    }
+
+    // ADR 0276 — the archive's escalation block is a no-secret set (the
+    // C-M11·2 boundary applied to the escalation surface): the config POCO's
+    // escalation block has no field that carries a credential (the same
+    // "structurally incapable of traveling" pin the PortabilityPrincipal
+    // POCO enforces on the credential columns).
+    [Fact]
+    public void PortabilityNoSecret_EscalationBlockHasNoTokenField()
+    {
+        var secretFieldNames = new[] { "token", "secret", "password", "apikey" };
+        var fieldNames = typeof(PortabilityConfigEscalation)
+            .GetProperties()
+            .Select(p => p.Name.ToLowerInvariant())
+            .ToList();
+        Assert.All(
+            secretFieldNames,
+            name => Assert.DoesNotContain(
+                name, fieldNames, StringComparer.Ordinal));
+    }
+
+    // ADR 0193 D2 — KeepExisting (checked): the import is a MERGE. The
+    // target's existing accounts + content are kept intact (never overwritten,
+    // credentials never reset), and only NEW content from the archive is
+    // added. Witnesses: the pre-existing account keeps its password (not the
+    // archive's fresh one), the pre-existing content's local mutation survives,
+    // and a NEW group from the archive (absent pre-import) is added.
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_KeepsExistingContentAndAddsOnlyNew()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — plant the representative instance + export the archive.
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        var planted = await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the same principals (the keep-existing targets) + its
+        // own content (a group, by id) that it has since mutated locally.
+        var (storeB, dbB, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        const string bPassword = "BLocalPassword123!";
+        // Create the collision principals with a KNOWN password (BPassword123!)
+        // + the archive's subjectId. The KeepExisting import must NOT touch
+        // that password (a CleanSlate import would have reset it to the
+        // archive's fresh one) — the CheckPasswordAsync assertion below
+        // witnesses the keep.
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct, password: bPassword);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-resident-001", "pt-resident", "pt-resident@maplewood.example",
+            [Roles.Member], ct);
+
+        // B's local group — a DIFFERENT id from the archive's group (so the
+        // archive's group is genuinely NEW for B, and B's local one is
+        // genuinely EXISTING). Two witnesses:
+        //   (1) keep — B's local group (id "b-local-group") survives intact.
+        //   (2) add — the archive's group (id planted.groupId) is NEW for B
+        //       and is added (present after, absent before).
+        const string bLocalGroupId = "b-local-group";
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Group { Id = bLocalGroupId, Name = "B's local group name", OwnerId = "pt-admin-001" });
+            await sb.SaveChangesAsync(ct);
+        }
+        // B does NOT yet hold the archive's group (the "add" witness target).
+        await using (var qb0 = storeB.QuerySession())
+        {
+            var preHold = await qb0.LoadAsync<Group>(planted.groupId, ct);
+            Assert.True(preHold is null,
+                "B must not pre-hold the archive's group (the add witness)");
+        }
+
+        // The import (KeepExisting — the checked box). A MERGE, not a replace.
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        // (1) keep — the existing account is intact: its LOCAL password
+        //     survives (a CleanSlate import would have reset it).
+        var adminB = await userManagerB.FindByIdAsync("pt-admin-001");
+        Assert.NotNull(adminB);
+        Assert.True(await userManagerB.CheckPasswordAsync(adminB, bPassword),
+            "KeepExisting must not reset the existing account's password");
+
+        await using (var q = storeB.QuerySession())
+        {
+            // (1) keep — B's local group survives intact (not wiped).
+            var localGroup = await q.LoadAsync<Group>(bLocalGroupId, ct);
+            Assert.Equal("B's local group name", localGroup!.Name);
+            Assert.Equal("pt-admin-001", localGroup.OwnerId);
+
+            // (2) add — the archive's group (NEW for B) is now present.
+            var addedGroup = await q.LoadAsync<Group>(planted.groupId, ct);
+            Assert.Equal("Maplewood Neighbors", addedGroup!.Name);
+            Assert.Equal("pt-admin-001", addedGroup.OwnerId);
+
+            // The group set is the union (B's local + the archive's) — both
+            // present, so the count is at least 2 (the archive carries
+            // exactly one group; B's local one is the extra).
+            var groupCount = await q.Query<Group>().CountAsync(ct);
+            Assert.True(groupCount >= 2,
+                $"KeepExisting should hold B's local group AND the archive's (got {groupCount})");
+        }
+    }
+
+    // ADR 0193 D3 (errata) — the business-key collision. The user's live 500:
+    // a KeepExisting import of a real instance's archive over another instance
+    // that already held the same logical entity. The collision is on the
+    // type's UNIQUE BUSINESS-KEY index (TranslationResource (Key, LanguageCode)),
+    // NOT the surrogate id — the two instances' rows for the same logical
+    // (Key, LanguageCode) carry DIFFERENT surrogate ids (two independent
+    // instances), so an id-only skip misses them and the Store collides on the
+    // unique index (23505 "Key (nav.home, en) already exists" — the exact log).
+    // The keep-existing skip must dedupe on the natural identity (surrogate id
+    // + the type's unique-index member set), so this import succeeds and keeps
+    // B's existing row intact. The regression: pre-fix this threw 23505.
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_BusinessKeyCollisionAcrossInstances_KeepsExisting()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — plant the representative instance, then ADD a
+        // TranslationResource row (the UI-string catalog shape the first-boot
+        // seeder writes on a real instance) and export. The archive now carries
+        // a (nav.home, en) row under A's own surrogate id.
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new TranslationResource
+            {
+                Id = "ar-a-nav-home",        // A's own surrogate id
+                Key = "nav.home",
+                LanguageCode = "en",
+                Text = "A's Home (the archive's copy)",
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a DIFFERENT instance that already holds the SAME
+        // (nav.home, en) business key under B's OWN surrogate id (the first-boot
+        // seeder's row), with different text. This is the cross-instance shape:
+        // same business key, different id. The KeepExisting import must keep B's
+        // row (the existing content is intact) and NOT collide on the unique
+        // (Key, LanguageCode) index.
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new TranslationResource
+            {
+                Id = "ar-b-nav-home",        // B's own surrogate id (≠ A's)
+                Key = "nav.home",            // same business key as A's
+                LanguageCode = "en",
+                Text = "B's Home (the existing row, kept intact)",
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        // The import (KeepExisting). Pre-fix: the archive's (nav.home, en) row
+        // (id ar-a-nav-home) is not in B's id set {ar-b-nav-home}, so it is not
+        // skipped → the Store hits the (Key, LanguageCode) unique index → 23505.
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed over a business-key collision " +
+            "(same Key/LanguageCode, different surrogate id) — failure set: " +
+            string.Join(", ", result.Failures));
+
+        // B's existing row is kept intact (the archive's copy was skipped):
+        // exactly ONE (nav.home, en) row, and it is B's text.
+        await using (var q = storeB.QuerySession())
+        {
+            var rows = await q.Query<TranslationResource>()
+                .Where(t => t.Key == "nav.home" && t.LanguageCode == "en")
+                .ToListAsync(ct);
+            Assert.True(rows.Count == 1,
+                "the (Key, LanguageCode) business key must be at-most-one after a " +
+                "KeepExisting import over a collision (the unique index) — got " +
+                rows.Count + " rows");
+            Assert.True(
+                rows[0].Text == "B's Home (the existing row, kept intact)"
+                && rows[0].Id == "ar-b-nav-home",
+                "the existing (Key, LanguageCode) row must be kept intact (B's text + " +
+                "B's id) — the archive's copy must have been skipped, not inserted; " +
+                $"got id={rows[0].Id} text={rows[0].Text}");
+        }
+    }
+
+    /// <summary>
+    /// ADR 0193 test helper — creates a principal (the archive's principal
+    /// shape: subjectId + username + email) + the role standing, ensuring the
+    /// elevated role rows exist first. The KeepExisting / CleanSlate collision
+    /// setups use this to give instance B its pre-existing accounts.
+    /// </summary>
+    private static async Task EnsurePrincipalWithRolesAsync(
+        UserManager<User> userManager,
+        RoleManager<IdentityRole> roleManager,
+        string id, string username, string email,
+        string[] roles, CancellationToken ct, string password = "ExistingPass123!")
+    {
+        foreach (var role in roles)
+        {
+            if (await roleManager.FindByNameAsync(role) is null)
+                await roleManager.CreateAsync(new IdentityRole(role));
+        }
+        var existing = await userManager.FindByIdAsync(id);
+        if (existing is null)
+        {
+            existing = new User
+            {
+                Id = id,
+                UserName = username,
+                Email = email,
+                NormalizedEmail = email.ToUpperInvariant(),
+            };
+            var created = await userManager.CreateAsync(existing, password);
+            if (!created.Succeeded)
+                throw new InvalidOperationException($"principal create failed for {id}: " +
+                    string.Join(", ", created.Errors.Select(e => e.Description)));
+        }
+        foreach (var role in roles)
+            await userManager.AddToRoleAsync(existing, role);
+    }
+
+    // ── The D9b no-secret pin — the C-M11·2 boundary, both halves ──────────
+
+    [Fact]
+    public async Task PortabilityNoSecret_ArchiveContainsNoCredentialMaterial()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // ── The type boundary (the C-M11·2 "structurally incapable of
+        //    traveling" pin): the PortabilityPrincipal POCO has no field
+        //    whose name carries a credential. ──
+        var secretFieldNames = new[]
+        {
+            "passwordhash",
+            "securitystamp",
+            "accesstoken",
+            "refreshtoken",
+            "recoverycode",
+            "signinsigninrecord",
+        };
+        var fieldNames = typeof(PortabilityPrincipal)
+            .GetProperties()
+            .Select(p => p.Name.ToLowerInvariant())
+            .ToList();
+        Assert.All(
+            secretFieldNames,
+            name => Assert.DoesNotContain(
+                name, fieldNames, StringComparer.Ordinal));
+
+        // ── The wire boundary (the C-M11·2 boundary on the archive): seed
+        //    a known password + a known security stamp on a principal, and
+        //    assert neither string appears in the exported archive bytes
+        //    (the byte-scan witness). ──
+        var (storeA, dbA, userManagerA, _, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+
+        const string knownPassword = "Zk9!s3cret-wire-b0undary-M11-U07-2026";
+        const string knownPrincipalId = "pt-nosecret-witness-001";
+        const string knownEmail = "pt-nosecret@maplewood.example";
+
+        var createResult = await userManagerA.CreateAsync(
+            new User
+            {
+                Id = knownPrincipalId,
+                UserName = "pt-nosecret",
+                Email = knownEmail,
+                NormalizedEmail = knownEmail.ToUpperInvariant(),
+            },
+            knownPassword);
+        if (!createResult.Succeeded)
+            throw new InvalidOperationException("no-secret witness principal create failed: " +
+                string.Join(", ", createResult.Errors.Select(e => e.Description)));
+        await userManagerA.UpdateSecurityStampAsync(
+            (await userManagerA.FindByIdAsync(knownPrincipalId))!);
+
+        // Plant a representative graph (the U02 export's doc loop needs at
+        // least one row per participating type — the §validate (b)
+        // per-type check requires the doc files to deserialize; the
+        // §validate (c) integrity loop checks references. Plant the
+        // minimal set: the Profile for the witness principal + one
+        // Component + one Post + the config block + the media object (the
+        // C-M11·3 wire witness is independent of the graph's shape).
+        await using (var seedSession = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            seedSession.Store(new LocaleSettings
+            {
+                Id = LocaleSettings.SingletonId,
+                DefaultLanguageCode = "en",
+                DefaultTimezone = "UTC",
+                DefaultDateFormat = DateFormat.FloorFormat,
+                IsSignupOpen = true,
+                NotifyAdminsOnSignup = true,
+                AnnouncementCommentsEnabled = true,
+                MessagingEnabled = true,
+            });
+            seedSession.Store(new LanguageCatalog
+            {
+                Id = "en",
+                NativeName = "English",
+                Enabled = true,
+                SortOrder = 0,
+            });
+            seedSession.Store(new Profile
+            {
+                SubjectId = knownPrincipalId,
+                DisplayName = "PT No-Secret Witness",
+                Verified = true,
+                Blocked = false,
+                Visibility = new Audience(),
+            });
+            seedSession.Store(new Component
+            {
+                Id = "pt-nosecret-component-001",
+                Name = "Maplewood",
+            });
+            seedSession.Store(new Post
+            {
+                Id = "pt-nosecret-post-001",
+                ComponentId = "pt-nosecret-component-001",
+                AuthorId = knownPrincipalId,
+                Title = "PT U07 no-secret witness post",
+                Body = "PT U07 — the no-secret witness post body.",
+                Audience = new Audience(),
+                LanguageCode = "en",
+                Created = DateTimeOffset.UtcNow,
+            });
+            await seedSession.SaveChangesAsync(ct);
+        }
+
+        // Export (the C-M11·2 boundary at the wire: the archive bytes are
+        // the witness — the PrincipalsExport's "the extractor never
+        // touches the credential columns" pin, observed at the wire).
+        var exportStream = await serviceA.ExportAsync(knownPrincipalId, PortabilityExportScope.Full, ct);
+        var exportBytes = await ReadAllBytesAsync(exportStream, ct);
+        Assert.NotEmpty(exportBytes);
+
+        var wire = Encoding.UTF8.GetString(exportBytes);
+        Assert.DoesNotContain(knownPassword, wire);
+
+        // Read back the seeded password hash + security stamp (the values
+        // the export must NOT have written into the archive).
+        var witnessUser = await Microsoft.EntityFrameworkCore
+            .EntityFrameworkQueryableExtensions
+            .FirstAsync(dbA.Users, u => u.Id == knownPrincipalId, ct);
+        Assert.False(string.IsNullOrEmpty(witnessUser.PasswordHash));
+        Assert.False(string.IsNullOrEmpty(witnessUser.SecurityStamp));
+        Assert.DoesNotContain(witnessUser.PasswordHash, wire);
+        Assert.DoesNotContain(witnessUser.SecurityStamp, wire);
+    }
+
+    // ── The D9c fail-closed pin — the C-M11·4 invariant ────────────────────
+
+    [Fact]
+    public async Task PortabilityFailClosed_RejectedArchiveWritesZeroRows()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Plant a valid representative instance on instance A (the D9a
+        // shape — the export produces a clean archive the U05 validator
+        // passes).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        var cleanExportStream = await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct);
+        await using var cleanBuffer = new MemoryStream();
+        await cleanExportStream.CopyToAsync(cleanBuffer, ct);
+        var cleanExportBytes = cleanBuffer.ToArray();
+        Assert.NotEmpty(cleanExportBytes);
+
+        // ── Leg 1 — the format (C-M11·1): a wrong format version rejects
+        //    (the short-circuit, the "format.unsupported" failure). ──
+        await AssertFailClosedAsync(
+            "kumunita/portability/999",
+            cleanExportBytes,
+            ct,
+            expectedFailure: "format.unsupported");
+
+        // ── Leg 2 — the media bytes (C-M11·3): a corrupted byte (a
+        //    one-byte flip in the first media object's payload) rejects
+        //    with the "media.mismatch:{id}" failure. ──
+        // The media object's id is the SHA-256 of the clean payload —
+        // the §validate check (d) computes the SHA of the (corrupted)
+        // bytes and compares it against the manifest's media entry's id
+        // (which is the clean payload's SHA). A mismatch is the
+        // "media.mismatch:{id}" closed failure.
+        // To corrupt a single byte, read the clean archive, find the
+        // first media/ entry, flip a byte, rewrite it, and assert the
+        // rejection + zero rows.
+        await AssertFailClosedOnCorruptedMediaAsync(
+            cleanExportBytes,
+            ct,
+            expectedFailurePrefix: "media.mismatch:");
+
+        // ── Leg 3 — the referential integrity (C-M11·4): a dangling
+        //    reference (the Group's OwnerId pointing at a principal that
+        //    is not in the archive's principals set) rejects with the
+        //    "ref.dangling:{Type}.{field}" failure. ──
+        // Read the clean archive, change the Group doc's OwnerId to a
+        // principal id not in the archive's principals, rewrite it, and
+        // assert the rejection + zero rows.
+        await AssertFailClosedOnDanglingReferenceAsync(
+            cleanExportBytes,
+            ct,
+            expectedFailurePrefix: "ref.dangling:");
+    }
+
+    // ── The D9c leg helpers — each leg: fresh instance + zero rows after
+    //    the rejection ──────────────────────────────────────────────────────
+
+    private async Task AssertFailClosedAsync(
+        string corruptManifestFormat,
+        byte[] cleanExportBytes,
+        CancellationToken ct,
+        string expectedFailure)
+    {
+        // Read the clean archive, rewrite it with the corrupted format,
+        // and hand it to a fresh instance's import.
+        var data = await KumunitaArchive.ReadAsync(
+            new MemoryStream(cleanExportBytes), ct);
+        data.Manifest!.Format = corruptManifestFormat;
+        var corruptedStream = new MemoryStream();
+        await KumunitaArchive.WriteAsync(
+            corruptedStream,
+            data.Manifest,
+            data.Docs,
+            data.Media,
+            data.Principals,
+            data.Config,
+            ct);
+        corruptedStream.Position = 0;
+
+        // A fresh instance — the C-M11·4 "fresh instance, zero writes"
+        // pin (a validate failure means the apply phase never runs).
+        var (storeB, dbB, _, _, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        corruptedStream.Position = 0;
+        var result = await serviceB.ImportAsync(
+            "pt-admin-001", corruptedStream, ct);
+        Assert.False(result.Ok);
+        Assert.Contains(expectedFailure, result.Failures);
+
+        // The zero-rows assertion (the C-M11·4 fail-closed pin — no
+        // content docs, no principals, no audit rows).
+        await AssertZeroRowsAsync(storeB, dbB, mediaStoreB, ct);
+    }
+
+    private async Task AssertFailClosedOnCorruptedMediaAsync(
+        byte[] cleanExportBytes,
+        CancellationToken ct,
+        string expectedFailurePrefix)
+    {
+        // Read the clean archive, flip a byte in the first media object's
+        // payload, rewrite it, and hand it to a fresh instance's import.
+        var data = await KumunitaArchive.ReadAsync(
+            new MemoryStream(cleanExportBytes), ct);
+
+        // The media object's id (the SHA-256 of the clean payload) — the
+        // §validate check (d) will compute the SHA of the (corrupted)
+        // bytes and compare against the manifest's media entry's id
+        // (the clean SHA). The flip guarantees a mismatch.
+        if (data.Media.Count == 0)
+            throw new InvalidOperationException(
+                "the clean export has no media bytes — the D9a plant should " +
+                "have planted a media object (the C-M11·3 content-addressed " +
+                "byte witness)");
+
+        var firstMediaId = data.Media.Keys.First();
+        var corrupted = data.Media[firstMediaId];
+        corrupted[0] ^= 0xFF; // flip the first byte — the SHA will differ
+        data.Media[firstMediaId] = corrupted;
+
+        var corruptedStream = new MemoryStream();
+        await KumunitaArchive.WriteAsync(
+            corruptedStream, data.Manifest!, data.Docs, data.Media,
+            data.Principals, data.Config, ct);
+        corruptedStream.Position = 0;
+
+        // A fresh instance — the C-M11·4 "fresh instance, zero writes"
+        // pin.
+        var (storeB, dbB, _, _, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        var result = await serviceB.ImportAsync(
+            "pt-admin-001", corruptedStream, ct);
+        Assert.False(result.Ok);
+        Assert.Contains(
+            result.Failures,
+            f => f.StartsWith(expectedFailurePrefix, StringComparison.Ordinal));
+
+        await AssertZeroRowsAsync(storeB, dbB, mediaStoreB, ct);
+    }
+
+    private async Task AssertFailClosedOnDanglingReferenceAsync(
+        byte[] cleanExportBytes,
+        CancellationToken ct,
+        string expectedFailurePrefix)
+    {
+        // Read the clean archive, change the Group doc's OwnerId to a
+        // principal id not in the archive's principals set, rewrite it,
+        // and hand it to a fresh instance's import.
+        var data = await KumunitaArchive.ReadAsync(
+            new MemoryStream(cleanExportBytes), ct);
+
+        var groupBytes = data.Docs["Group"];
+        var groupList = KumunitaArchive.FromJson<List<Group>>(groupBytes)
+            ?? throw new InvalidOperationException("Group doc is malformed");
+        var firstGroup = groupList.First();
+        firstGroup.OwnerId = "pt-dangling-reference-not-in-archive-001";
+        data.Docs["Group"] = KumunitaArchive.ToJson(groupList);
+
+        var corruptedStream = new MemoryStream();
+        await KumunitaArchive.WriteAsync(
+            corruptedStream, data.Manifest!, data.Docs, data.Media,
+            data.Principals, data.Config, ct);
+        corruptedStream.Position = 0;
+
+        // A fresh instance — the C-M11·4 "fresh instance, zero writes"
+        // pin.
+        var (storeB, dbB, _, _, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        var result = await serviceB.ImportAsync(
+            "pt-admin-001", corruptedStream, ct);
+        Assert.False(result.Ok);
+        Assert.Contains(
+            result.Failures,
+            f => f.StartsWith(expectedFailurePrefix, StringComparison.Ordinal));
+
+        await AssertZeroRowsAsync(storeB, dbB, mediaStoreB, ct);
+    }
+
+    // ── The zero-rows assertion — the C-M11·4 fail-closed pin's witness ──
+    // A validate failure means the apply phase never ran: the fresh
+    // instance has no content docs, no principals, no media bytes, no
+    // config rows, and no audit rows.
+
+    private async Task AssertZeroRowsAsync(
+        IDocumentStore store,
+        AppDbContext db,
+        IMediaStore mediaStore,
+        CancellationToken ct)
+    {
+        // No content docs (the 44 content doc types' tables are empty —
+        // the C-M11·4 fail-closed pin: a validate failure means the apply
+        // phase never ran).
+        await using (var q = store.QuerySession())
+        {
+            Assert.Equal(0, await Marten.QueryableExtensions.CountAsync(
+                q.Query<Profile>(), ct));
+            Assert.Equal(0, await Marten.QueryableExtensions.CountAsync(
+                q.Query<Component>(), ct));
+            Assert.Equal(0, await Marten.QueryableExtensions.CountAsync(
+                q.Query<Post>(), ct));
+            Assert.Equal(0, await Marten.QueryableExtensions.CountAsync(
+                q.Query<Page>(), ct));
+            Assert.Equal(0, await Marten.QueryableExtensions.CountAsync(
+                q.Query<AccessAudit>(), ct));
+        }
+
+        // No principals (the identity store is empty — the C-M11·2 import
+        // boundary's "zero writes on a rejected import" witness).
+        var userCount = await Microsoft.EntityFrameworkCore
+            .EntityFrameworkQueryableExtensions.CountAsync(db.Users, ct);
+        Assert.Equal(0, userCount);
+
+        // No media bytes (the volume is empty — the C-M11·3 byte witness).
+        // The LocalVolumeMediaStore's OpenReadAsync throws on a missing
+        // id — a fresh instance has no media objects to read.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            async () =>
+            {
+                using var stream = await mediaStore.OpenReadAsync(
+                    "pt-nonexistent-media-id", ct);
+            });
+    }
+
+    // ADR 0274 D1 — the KeepExisting tag merge. A tag the archive carries that
+    // the target already holds — same slug AND same default-language display
+    // name — is NOT stored as a second tag (the existing one is kept intact,
+    // never overwritten); the archive's content's tag references are re-pointed
+    // at the existing tag, and the archive's TagTranslation rows fold in as
+    // translations of the existing tag (one row per language — a language the
+    // existing tag already has is left untouched, never overwritten; a new one
+    // is added). This closes the duplicate-tag failure a KeepExisting import
+    // produced over a live instance (the natural-identity skip cannot see the
+    // Tag/TagTranslation pair: Tag has no unique index — C-TG·4 — and the
+    // TagTranslation (TagId, LanguageCode) unique index is keyed on the
+    // surrogate TagId, so it silently doubles).
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_MergesSameTagBySlugAndDefaultLanguageName()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance (the closed §inventory so
+        // the export's validate gate passes) + a tag (slug "recycling", base
+        // name "Recycling", default language en) + a TagTranslation (de) + the
+        // planted Post re-pointed at it.
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        var plantedA = await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        const string aTagId = "a-tag-recycling";
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            // Add fr to the catalog (the validate gate's ref.dangling check
+            // resolves every TagTranslation LanguageCode against the
+            // archive's catalog languages — the plant seeds only en/de).
+            sa.Store(new LanguageCatalog { Id = "fr", NativeName = "Français", Enabled = true, SortOrder = 2 });
+            sa.Store(new Tag { Id = aTagId, Slug = "recycling", Name = "Recycling", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            sa.Store(new TagTranslation { Id = "a-tagtr-de", TagId = aTagId, LanguageCode = "de", Name = "Recycling (A)", AuthorId = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            sa.Store(new TagTranslation { Id = "a-tagtr-fr", TagId = aTagId, LanguageCode = "fr", Name = "Recyclage (A)", AuthorId = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            // A Post that references the tag (the archive's content — its
+            // TagIds must be re-pointed at B's existing tag on import).
+            sa.Store(new Post { Id = "a-post-tagged", ComponentId = "pt-component-001", AuthorId = "pt-resident-001", TagIds = [aTagId], Created = DateTimeOffset.UtcNow });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — a MINIMAL target (the principals + the config + the SAME
+        // tag under B's OWN surrogate id — a cross-instance shape — with only
+        // the de translation; fr is new for B so the merge must add it). B does
+        // NOT re-plant A's content (the KeepExisting import adds A's content;
+        // B already holds the tag + its de translation).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        const string bTagId = "b-tag-recycling";
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Tag { Id = bTagId, Slug = "recycling", Name = "Recycling", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            sb.Store(new TagTranslation { Id = "b-tagtr-de", TagId = bTagId, LanguageCode = "de", Name = "Recycling (B — kept)", AuthorId = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            // The tag is MERGED: exactly ONE "recycling" tag, and it is B's
+            // existing one (kept intact — never overwritten, never a second).
+            var recyclingTags = await q.Query<Tag>().Where(t => t.Slug == "recycling").ToListAsync(ct);
+            Assert.True(recyclingTags.Count == 1,
+                "the same tag (slug + default-language name) must appear ONCE — " +
+                $"got {recyclingTags.Count}");
+            Assert.Equal(bTagId, recyclingTags[0].Id);
+            Assert.Equal("Recycling", recyclingTags[0].Name);
+
+            // The archive's tagged Post's tag reference is re-pointed at B's
+            // existing tag (so the archive's content lands on B's tag — not a
+            // second one).
+            var importedPost = await q.LoadAsync<Post>("a-post-tagged", ct);
+            Assert.NotNull(importedPost);
+            Assert.True(importedPost!.TagIds.Contains(bTagId),
+                "the archive's Post's tag reference must be re-pointed at B's existing tag");
+            Assert.True(!importedPost.TagIds.Contains(aTagId),
+                "the archive's tag id must NOT appear on the imported Post — " +
+                "its reference must be re-pointed at B's existing tag");
+
+            // The archive's TagTranslation rows fold in as translations of the
+            // EXISTING tag: the de row (B already had it) is kept intact
+            // (never overwritten), the fr row (new for B) is added.
+            var translations = await q.Query<TagTranslation>()
+                .Where(t => t.TagId == bTagId).ToListAsync(ct);
+            var de = translations.FirstOrDefault(t => t.LanguageCode == "de");
+            var fr = translations.FirstOrDefault(t => t.LanguageCode == "fr");
+            Assert.NotNull(de);
+            Assert.Equal("b-tagtr-de", de!.Id);
+            Assert.Equal("Recycling (B — kept)", de.Name); // B's row kept intact
+            Assert.NotNull(fr);
+            Assert.Equal("Recyclage (A)", fr!.Name);       // archive's fr added
+            Assert.True(!translations.Any(t => t.TagId == aTagId),
+                "the archive's tag id must NOT appear as a TagTranslation parent — " +
+                "the translations must fold into B's existing tag");
+        }
+    }
+
+    // ADR 0274 D2 — the keep-vs-add boundary. A tag the archive carries that
+    // the target already holds — same slug but a DIFFERENT default-language
+    // display name — is a DIFFERENT tag (the ADR 0044 D3 design: two names,
+    // two tags). It is stored as its own new tag, NOT merged (no false merge).
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_KepsTwoTagsWithSameSlugButDifferentDefaultLanguageName()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — a tag (slug "recycling", base name "Recycling — A").
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerA, roleManagerA,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new Tag { Id = "a-tag-recycling-x", Slug = "recycling", Name = "Recycling — A", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the same slug but a DIFFERENT default-language name
+        // ("Recycling — B").
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            "pt-admin-001", "pt-admin", "pt-admin@maplewood.example",
+            [Roles.GlobalAdmin], ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Tag { Id = "b-tag-recycling-x", Slug = "recycling", Name = "Recycling — B", LanguageCode = "en", CreatedBy = "pt-admin-001", Created = DateTimeOffset.UtcNow });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            // Two tags (same slug, different default-language name) — the
+            // archive's is stored as its own new tag, NOT merged (no false
+            // merge; B's existing one is kept intact).
+            var recyclingTags = await q.Query<Tag>().Where(t => t.Slug == "recycling").ToListAsync(ct);
+            Assert.True(recyclingTags.Count == 2,
+                "same slug + different default-language name = two tags (ADR 0044 D3) — " +
+                $"got {recyclingTags.Count}");
+            Assert.True(recyclingTags.Any(t => t.Id == "b-tag-recycling-x" && t.Name == "Recycling — B"),
+                "B's existing tag (the different default-language name) must be kept intact");
+            Assert.True(recyclingTags.Any(t => t.Id == "a-tag-recycling-x" && t.Name == "Recycling — A"),
+                "the archive's tag (the different default-language name) must be stored as its own new tag — NOT merged");
+        }
+    }
+
+    // ADR 0275 — the KeepExisting principal merge. A principal the archive
+    // carries that the target already holds — same EMAIL (the cross-instance
+    // identity; the archive's account id and the target's account id are
+    // DIFFERENT, the sample-seeder's random-subject shape) — is NOT stored as
+    // a second account/Profile (the existing profile is kept intact, the
+    // directory is not doubled); the archive's content's principal references
+    // are re-pointed at the existing account's id (so the archive's content
+    // lands on the target's account — not a dangling foreign subject id).
+    // This closes the duplicate-directory failure a KeepExisting import
+    // produced over a live instance (the natural-identity skip cannot see the
+    // Profile/Principal pair: Profile has no unique index — its identity is
+    // SubjectId, a cross-instance random id — so the archive's Profile for the
+    // same person silently lands as a second /directory entry).
+    [Fact]
+    public async Task PortabilityImport_KeepExisting_MergesSamePrincipalByEmail()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Instance A — the representative instance (the closed §inventory so
+        // the export's validate gate passes) + a DISTINCT resident (a new
+        // principal with its own id + email + Profile + a Post they authored).
+        var (storeA, _, userManagerA, roleManagerA, mediaStoreA, _, serviceA) =
+            await BootFullInstanceAsync(ct);
+        var plantedA = await PlantRepresentativeInstanceAsync(storeA, userManagerA, roleManagerA, mediaStoreA, ct);
+        const string aResidentId = "pt-resident-002";
+        const string residentEmail = "resident-two@maplewood.example";
+        await EnsurePrincipalWithRolesAsync(userManagerA, roleManagerA,
+            aResidentId, "pt-resident-two", residentEmail, [Roles.Member], ct);
+        await using (var sa = storeA.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sa.Store(new Profile
+            {
+                SubjectId = aResidentId,
+                DisplayName = "PT Resident Two (A)",
+                Verified = true,
+                Blocked = false,
+                Visibility = new Audience(),
+            });
+            // A Post authored by this principal (the archive's content — its
+            // AuthorId must be re-pointed at B's existing account on import).
+            sa.Store(new Post
+            {
+                Id = "a-post-merged-author",
+                ComponentId = "pt-component-001",
+                AuthorId = aResidentId,
+                Title = "PT ADR 0275 — authored by the merged resident",
+                Body = "PT ADR 0275 — the round-trip principal-merge author witness.",
+                Created = DateTimeOffset.UtcNow,
+            });
+            await sa.SaveChangesAsync(ct);
+        }
+        var exportBytes = await ReadAllBytesAsync(await serviceA.ExportAsync("pt-admin-001", PortabilityExportScope.Full, ct), ct);
+        Assert.NotEmpty(exportBytes);
+
+        // Instance B — the representative instance (so B already holds
+        // pt-admin-001 + pt-resident-001) + the SAME person as a DIFFERENT
+        // account (a new principal with a DIFFERENT id + the SAME email — the
+        // cross-instance sample-seeder shape — and B's OWN Profile for them).
+        var (storeB, _, userManagerB, roleManagerB, mediaStoreB, _, serviceB) =
+            await BootFullInstanceAsync(ct);
+        var plantedB = await PlantRepresentativeInstanceAsync(storeB, userManagerB, roleManagerB, mediaStoreB, ct);
+        const string bResidentId = "pt-resident-002-b";
+        await EnsurePrincipalWithRolesAsync(userManagerB, roleManagerB,
+            bResidentId, "pt-resident-two", residentEmail, [Roles.Member], ct);
+        await using (var sb = storeB.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            sb.Store(new Profile
+            {
+                SubjectId = bResidentId,
+                DisplayName = "PT Resident Two (B — kept)",
+                Verified = true,
+                Blocked = false,
+                Visibility = new Audience(),
+            });
+            await sb.SaveChangesAsync(ct);
+        }
+
+        var result = await serviceB.ImportAsync("pt-admin-001", new MemoryStream(exportBytes),
+            PortabilityImportMode.KeepExisting, ct);
+        Assert.True(result.Ok,
+            "the KeepExisting import should succeed — failure set: " +
+            string.Join(", ", result.Failures));
+
+        await using (var q = storeB.QuerySession())
+        {
+            // The person is NOT doubled on the directory: B's existing profile
+            // (kept intact — never overwritten, never a second one) is the
+            // profile for that email's person, and the archive's Profile row
+            // (a different SubjectId, same person) is NOT stored.
+            var bProfile = await q.LoadAsync<Profile>(bResidentId, ct);
+            Assert.NotNull(bProfile);
+            Assert.Equal("PT Resident Two (B — kept)", bProfile!.DisplayName);
+            Assert.True(!await q.Query<Profile>().AnyAsync(p => p.SubjectId == aResidentId, ct),
+                "the archive's Profile row for the merged person must NOT be stored — " +
+                "the directory must not be doubled (the existing profile is kept intact)");
+
+            // The archive's Post's author reference is re-pointed at B's
+            // existing account (so the archive's content lands on B's account
+            // — not a dangling foreign subject id).
+            var importedPost = await q.LoadAsync<Post>("a-post-merged-author", ct);
+            Assert.NotNull(importedPost);
+            Assert.Equal(bResidentId, importedPost!.AuthorId);
+            Assert.True(!importedPost.AuthorId.Equals(aResidentId, StringComparison.Ordinal),
+                "the archive's author id must NOT appear on the imported Post — " +
+                "its reference must be re-pointed at B's existing account");
+        }
+    }
+
+    // ── The stream helper — the MemoryStream → byte[] bridge (the export
+    //    stream is a forward-only MemoryStream — read it once into a buffer
+    //    to hand it to the import's stream seam). ─────────────────────────
+
+    private static async Task<byte[]> ReadAllBytesAsync(Stream source, CancellationToken ct)
+    {
+        await using var buffer = new MemoryStream();
+        await source.CopyToAsync(buffer, ct);
+        return buffer.ToArray();
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => null;
+    }
+}

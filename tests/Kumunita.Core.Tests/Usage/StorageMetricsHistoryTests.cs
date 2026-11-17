@@ -16,7 +16,7 @@ namespace Kumunita.Core.Tests.Usage;
 /// <c>FakeVolume</c> shape. The service is the code under test (U03/U04);
 /// these pin the *results* (the design doc §2.2 shapes), not the SQL emitted.
 /// </summary>
-public sealed class StorageMetricsHistoryTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class StorageMetricsHistoryTests(PostgresFixture fixture)
 {
     private static int _mediaCounter;
 

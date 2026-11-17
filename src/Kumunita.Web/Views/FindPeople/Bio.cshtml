@@ -27,9 +27,13 @@
         {
             @* M23 (ADR 0123 D4/F6) — the empty state: a blank query (the U03
                "no decision, no row" shape) is a valid result — no 404, no
-               error (D6: a match is a feed organizer, never a gate). *@
-            <div class="alert alert-info">
-                <kw-l key="profile.find.empty">No one matches — yet.</kw-l>
+               error (D6: a match is a feed organizer, never a gate). R30
+               (IMPROVE-UX) — the house .kmb-empty idiom (title + body + one
+               next action): browse the full directory instead of searching. *@
+            <div class="kmb-empty">
+                <p class="kmb-empty-title"><kw-l key="profile.find.empty_title">No one matches.</kw-l></p>
+                <p class="kmb-empty-body"><kw-l key="profile.find.empty">No one matches — yet.</kw-l></p>
+                <a class="btn btn-outline-secondary" href="/directory"><kw-l key="directory.title">Browse the directory</kw-l></a>
             </div>
         }
         else

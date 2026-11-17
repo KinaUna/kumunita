@@ -7,6 +7,7 @@
   "group_message.add_members": "Personen hinzuf\u00FCgen",
   "group_message.add_members.placeholder": "Bewohner ausw\u00E4hlen, die hinzugef\u00FCgt werden",
   "group_message.thread.empty": "Noch keine Nachrichten \u2014 fang die Unterhaltung an.",
+  "group_message.thread.empty_title": "Noch keine Gruppennachrichten.",
   "group_message.compose.placeholder": "Nachricht an die Gruppe schreiben\u2026",
   "group_message.compose.send": "Senden",
   "group_message.unread": "ungelesen",

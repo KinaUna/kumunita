@@ -486,9 +486,16 @@
 
                 @if (Model.Comments.Count == 0)
                 {
-                    <p class="text-body-tertiary mb-3">
-                        <kw-l key="announcements.comment_empty">No comments yet. Be the first to say something.</kw-l>
-                    </p>
+                    @* R33 (IMPROVE-UX) — the house .kmb-empty idiom (title + the
+                       existing body + one next action), anchored to the comment
+                       composer below (the R31 _TodoComments precedent). *@
+                    <div class="kmb-empty mb-3">
+                        <p class="kmb-empty-title"><kw-l key="announcements.comment_empty_title">No comments yet.</kw-l></p>
+                        <p class="kmb-empty-body">
+                            <kw-l key="announcements.comment_empty">No comments yet. Be the first to say something.</kw-l>
+                        </p>
+                        <a class="btn btn-primary" href="#ann-comment-body"><kw-l key="announcements.comment_reply">Comment</kw-l></a>
+                    </div>
                 }
                 else
                 {

@@ -51,7 +51,7 @@ namespace Kumunita.Core.Tests;
 /// </item>
 /// </list>
 /// </summary>
-public class UserInfoServiceGroupDeleteTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class UserInfoServiceGroupDeleteTests(PostgresFixture fixture)
 {
     // ── Test 1 — the delete is strong-consistency (C4) on every read lane ─
     [Fact]

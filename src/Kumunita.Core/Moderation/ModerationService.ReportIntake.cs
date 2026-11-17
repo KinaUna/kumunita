@@ -146,6 +146,15 @@ public partial class ModerationService
                 ct: default).ConfigureAwait(false);
         }
 
+        // IMPROVE-UX A05 (ADR 0303) — the report.queued routing emission:
+        // the component's standing moderators ∪ the GlobalAdmins (deduped),
+        // no content in the body, linkPath /moderation/{reportId}. Best-effort
+        // (a notification-lane failure must not block the filing commit).
+        // The report.filed-to-author emission above is **unchanged** (the
+        // 2026-09-25 disclosure-fix shape stands — the author still gets
+        // report.filed, never report.queued).
+        await EmitReportQueuedAsync(session, report, actorId).ConfigureAwait(false);
+
         // C3 — one SaveChangesAsync: the Report row and the AccessAudit
         // row commit atomically (no partial write; ADR 0006-C; §2.3
         // item 4).
@@ -271,6 +280,14 @@ public partial class ModerationService
                 body: null,
                 ct: default).ConfigureAwait(false);
         }
+
+        // IMPROVE-UX A05 (ADR 0303) — the report.queued routing emission:
+        // the component's standing moderators ∪ the GlobalAdmins (deduped; a
+        // null componentId → only the GlobalAdmin fallback reaches it, the
+        // C-M3b·4 "no fabricated component" shape), no content in the body,
+        // linkPath /moderation/{reportId}. Best-effort (a notification-lane
+        // failure must not block the filing commit).
+        await EmitReportQueuedAsync(session, report, actorId).ConfigureAwait(false);
 
         // C3 — one SaveChangesAsync (no partial write; ADR 0006-C).
         await session.SaveChangesAsync().ConfigureAwait(false);
@@ -417,6 +434,14 @@ public partial class ModerationService
                 body: null,
                 ct: default).ConfigureAwait(false);
         }
+
+        // IMPROVE-UX A05 (ADR 0303) — the report.queued routing emission:
+        // the parent post's component standing moderators ∪ the GlobalAdmins
+        // (deduped), no content in the body, linkPath /moderation/{reportId}.
+        // Best-effort (a notification-lane failure must not block the filing
+        // commit). The reply's component is carried from the parent post
+        // (report.ComponentId), same as the post-report lane.
+        await EmitReportQueuedAsync(session, report, actorId).ConfigureAwait(false);
 
         // C3 — one SaveChangesAsync (ADR 0006-C; §2.3 item 4).
         await session.SaveChangesAsync().ConfigureAwait(false);
@@ -644,15 +669,51 @@ public partial class ModerationService
     /// with <c>on = true</c> on success (the flag-flip — see
     /// <see cref="UnlockAsync"/>'s doc-comment for the "separate
     /// commit" note).
+    /// <para>
+    /// IMPROVE-UX R03 — the optional <paramref name="outcome"/> /
+    /// <paramref name="resolutionNote"/> pair (both <c>null</c> by
+    /// default — the pre-R03 call shape, the <c>ModerationController</c>'s
+    /// <c>ResolvePost</c> action, keeps compiling and behaving
+    /// unchanged). When supplied (the R04 web form will pass them; the
+    /// R07 notification body re-uses the stored note), the lane writes
+    /// the full resolution shape onto the <see cref="Report"/> row —
+    /// <see cref="Report.Outcome"/> + <see cref="Report.ResolutionNote"/>
+    /// + <see cref="Report.ResolvedAt"/> (UTC) + <see cref="Report.ResolvedBy"/>
+    /// (the <c>globalAdminId</c> parameter) — in the **same
+    /// transaction** as the lane's existing <c>AccessAudit</c> row,
+    /// which is **unchanged** (the R03 pin: same shape, same
+    /// <c>report.resolve</c> action / <c>report</c> target kind,
+    /// same <c>Allow</c> outcome — the unit tests assert the audit
+    /// row's field set is byte-identical to the pre-R03 lane's). The
+    /// <c>ResolutionNote</c> is trimmed and capped at 500 chars
+    /// (the D1 ≤500 pin); the cap is enforced here, in the lane, so
+    /// the Web form cannot bypass it (the same lane-enforces-shape
+    /// invariant the filing lane's <c>Reason</c> cap enforces). The
+    /// M6 <c>ReportResolved</c> notification emission is unchanged in
+    /// R03 (R07 re-wires the body + link; the <paramref
+    /// name="resolutionNote"/> is **not** yet in the body — that
+    /// flip is R07's scope, not this unit's).
+    /// </para>
     /// </summary>
     public async Task ResolveReportAsync(
         string reportId,
         string globalAdminId,
-        IDocumentSession session)
+        IDocumentSession session,
+        ReportOutcome? outcome = null,
+        string? resolutionNote = null)
     {
         if (string.IsNullOrEmpty(reportId))      throw new ArgumentException("A report id is required.",         nameof(reportId));
         if (string.IsNullOrEmpty(globalAdminId)) throw new ArgumentException("A GlobalAdmin actor id is required.", nameof(globalAdminId));
         if (session is null)                     throw new ArgumentNullException(nameof(session));
+
+        // IMPROVE-UX R03 — the ≤500-char cap (the D1 pin), enforced in
+        // the lane before the store (the Web form cannot bypass it).
+        // Whitespace-only notes are normalized to null (the "no note"
+        // shape — the same as the filing lane's reason handling); a
+        // note over 500 chars is a caller contract violation (the
+        // R04 form's own validation is the first line of defense;
+        // this is the second, the lane-enforces-shape invariant).
+        resolutionNote = ResolveReportNote(resolutionNote);
 
         var report = await session.LoadAsync<Report>(reportId).ConfigureAwait(false);
         if (report is null)
@@ -676,6 +737,111 @@ public partial class ModerationService
                     .ConfigureAwait(false);
 
             report.Status = "resolved";
+
+            // IMPROVE-UX R03 — the resolution shape (the D1 closed
+            // vocabulary + the ≤500-char note + the audit-shaped
+            // ResolvedAt/ResolvedBy pair). Written **only** when the
+            // caller supplied at least one of the two (the pre-R03
+            // no-outcome shape keeps the row's four resolution fields
+            // null — the "resolved with no outcome recorded" state,
+            // which the R04/R05 read paths treat as the legacy
+            // "just closed" shape). ResolvedAt is UTC (the same
+            // DateTimeOffset.UtcNow the AccessAudit row's At uses —
+            // the two are written in the same transaction, so a
+            // reader comparing them sees a consistent instant).
+            if (outcome is not null || resolutionNote is not null)
+            {
+                report.Outcome       = outcome;
+                report.ResolutionNote = resolutionNote;
+                report.ResolvedAt    = DateTimeOffset.UtcNow;
+                report.ResolvedBy    = globalAdminId;
+            }
+
+            // IMPROVE-UX A02 + A04 — the outcome-execution lane (the D6 "the
+            // outcome picker performs the action" promise; plan-improve-ux.md
+            // A02 / A04). The resolve form (R04) records the outcome on the
+            // Report row above; A02 makes that record **change something
+            // visible** for **post targets**: it re-derives the same action
+            // on the target post from the recorded outcome and runs it in the
+            // **caller's session** (the same `session` — the C3 same-
+            // transaction lane, ADR 0006-C), so the resolve + the hide/remove
+            // commit atomically with this lane's AccessAudit row (the A01 read
+            // branch is what makes the post actually disappear from feed/detail
+            // — A02 only writes the PostStatus; the reads were already A01's).
+            // A04 extends the same lane to **grouppost targets** (the closest
+            // copy — a `Post` doc with `GroupId` set, the ADR 0013 shape):
+            // the `FileReportTargetAsync` lane sets `PostId = string.Empty`
+            // and the target's id in `TargetId` (the ADR 0173 new-lane shape),
+            // so A04 adds a `grouppost` branch that uses `TargetId`.
+            //
+            // **Target-kind-aware guard** (A02 post/reply + A04 grouppost):
+            //   • post / reply  — `Report.PostId` is non-empty (the original
+            //     M3b / ADR 0023 shape) → use `PostId`.
+            //   • grouppost    — `Report.TargetKind == "grouppost"` and
+            //     `Report.TargetId` is non-empty (the ADR 0173 new-lane shape)
+            //     → use `TargetId`.
+            //   • event / project / board / todo — remain **records-only**
+            //     (A04's "the rest listed as follow-ups"):
+            //       - event   — no `PostStatus` field; a different doc shape
+            //                   (likely a `Visibility` flag, not a `PostStatus`
+            //                   flip) — filed, not built.
+            //       - project — same shape as event (a `Project` doc, not a
+            //                   `Post`).
+            //       - board   — a `KanbanBoard` doc; no `PostStatus` field.
+            //       - todo    — a `TodoItem` doc; no `PostStatus` field.
+            //
+            // `HidePostAsync` / `RemovePostAsync` each run their own
+            // `Moderate` decision + write their own `Action = Moderate` audit
+            // row (the M3b write-lane rows, `TargetId = the post id`) —
+            // **additional** rows in this same transaction, never a change to
+            // this lane's own `report.resolve` row (the R03 pin is intact).
+            // `NoAction` / `Other` are no-action / the explanation — no
+            // execution. `_posts` is the optional R05 seam (nullable, the
+            // CS1736 precedent); the same method's R07 emitter guards its
+            // optional seam the same way (`_notifications is not null && …`),
+            // so A02 degrades gracefully when it is absent (the pre-A02 R03
+            // tests wire `_posts` as null and resolve with Hidden/Removed —
+            // they stay green because the outcome is still recorded, just not
+            // executed). Production DI always wires the PostService, so the
+            // degrade is a test-only shape, never a production path.
+            //
+            // // TODO ❓ (A04 — group-scope moderation gate): a group post's
+            // `Post.ComponentId` is `string.Empty` (ADR 0013 G·2 lane
+            // exclusivity) and its `Audience` is empty (G·8). The
+            // `AuthorizationService.Decide` function has **no** group-scope
+            // moderation branch: branch 2 (Moderation) keys on
+            // `ComponentId` (which is empty → no match), and there is no
+            // `GlobalAdmin` branch (the role is enforced at the Web layer,
+            // not in the Core's `Decide`). A regular GlobalAdmin resolving a
+            // grouppost report with `Hidden` is **denied** at the Core's
+            // `CanAsync(Moderate)` gate — the report is not resolved, the
+            // group post is not hidden. Only a break-glass `AdminOverride`
+            // row (branch 3) or the author (branch 1, owner) passes. The
+            // standing-moderator shape (Option B, ADR 0003 SoD) is a
+            // follow-up: the `ModeratorAssignment` row would need to be read
+            // on the group's scope, not the community's. Filed, not built.
+            string? executionTargetId = null;
+            if (!string.IsNullOrEmpty(report.PostId))
+                executionTargetId = report.PostId;                                  // A02 post / reply shape
+            else if (report.TargetKind == "grouppost" && !string.IsNullOrEmpty(report.TargetId))
+                executionTargetId = report.TargetId;                                // A04 grouppost shape
+
+            if (outcome is (ReportOutcome.Hidden or ReportOutcome.Removed)
+                && _posts is not null
+                && executionTargetId is not null)
+            {
+                if (outcome == ReportOutcome.Hidden)
+                {
+                    await _posts.HidePostAsync(executionTargetId, globalAdminId, session)
+                        .ConfigureAwait(false);
+                }
+                else // outcome == ReportOutcome.Removed
+                {
+                    await _posts.RemovePostAsync(executionTargetId, globalAdminId, session)
+                        .ConfigureAwait(false);
+                }
+            }
+
             session.Store(report);
 
             session.Store(new AccessAudit
@@ -703,12 +869,21 @@ public partial class ModerationService
             // the single SaveChangesAsync below (C3).
             if (_notifications is not null && !string.IsNullOrWhiteSpace(report.ReporterId))
             {
+                // IMPROVE-UX R07 — the body is the **outcome** (a localized
+                // sentence from report.Outcome + the moderator's note verbatim),
+                // not the reporter's own reason (the E4 "the notification
+                // repeats the reporter's own reason" finding this unit fixes);
+                // the linkPath lands on the reporter's row on "My reports"
+                // (the R06 row anchor id="r-{ReportId}").
+                var body = await BuildReportResolvedBodyAsync(report).ConfigureAwait(false);
                 await _notifications.EmitAsync(
                     session,
                     recipientId: report.ReporterId,
                     kind: NotificationKinds.ReportResolved,
                     idempotencyKey: $"notification:report.resolved:{report.Id}:filed",
-                    body: Truncate(report.Reason),
+                    body: body,
+                    targetId: report.Id,
+                    linkPath: $"/reports/mine#r-{report.Id}",
                     ct: default).ConfigureAwait(false);
             }
         }
@@ -821,5 +996,118 @@ public partial class ModerationService
         return await _authz.CanAsync(
             actorId, AccessAction.Read, new PostToAuditableResource(post))
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// IMPROVE-UX A05 (ADR 0303) — the <c>report.queued</c> routing
+    /// emission: the filed report is routed to the component's **standing
+    /// moderators** (the <see cref="GetStandingModeratorsAsync"/> read seam,
+    /// here a direct <see cref="ModeratorAssignment"/> read on the caller's
+    /// session — the <c>report.assign</c> lane's own same-transaction shape,
+    /// the display names that seam resolves are not needed, the recipient is
+    /// the <c>UserId</c>) ∪ the **GlobalAdmin** fallback set (the ADR 0303
+    /// <see cref="Kumunita.Core.Identity.IIdentityService
+    /// .ListGlobalAdminsAsync"/> seam — the GlobalAdmins are the fallback
+    /// recipients when a component has no standing moderator, the A05 / E3
+    /// loop the standing-moderator-only half would leave open). The
+    /// recipient set is **deduped** (a standing moderator who is also a
+    /// GlobalAdmin gets one row, not two) and the **reporter is skipped**
+    /// (the self-report skip guard, mirrored from the
+    /// <c>report.filed</c>-to-author lane — a resident filing against their
+    /// own content is not their own standing moderator).
+    /// <para>
+    /// Each emission: <c>kind = report.queued</c>, <c>targetId = the report
+    /// id</c>, <c>linkPath = /moderation/{reportId}</c> (the scoped-read
+    /// route — the receiving moderator's <c>Read</c> decision on open still
+    /// applies; A05 routes a nudge, it does not grant standing — thin token,
+    /// fat authorization), <c>body = null</c> (the **no target content**
+    /// pin — the localized <c>notification.report.queued.subject</c> is the
+    /// row's text; no title, no body, no reporter's reason — the
+    /// 2026-09-25 disclosure-fix shape), per-recipient idempotency key
+    /// <c>notification:report.queued:{reportId}:{recipientId}</c> (the ADR
+    /// 0077 admin-fan-out shape — one row per recipient, a re-filing of the
+    /// same report does not re-emit).
+    /// </para>
+    /// <para>
+    /// **Best-effort** (the ADR 0077 <c>EmitAccountNotificationAsync</c>
+    /// shape): a notification-lane failure must not block the filing domain
+    /// write — the inbox row is the nudge, not the record. This service
+    /// carries no <c>ILogger</c> (predating the ADR 0077 logging shape), so
+    /// the failure is swallowed (the filing lane is the domain op and still
+    /// commits).
+    /// </para>
+    /// </summary>
+    private async Task EmitReportQueuedAsync(
+        IDocumentSession session,
+        Report report,
+        string reporterId)
+    {
+        if (_notifications is null)
+            return;   // not wired (test harness) — the filing still commits
+
+        try
+        {
+            // The recipient set (standing moderators ∪ GlobalAdmins, deduped).
+            var recipients = new HashSet<string>(StringComparer.Ordinal);
+
+            // Standing moderators for the report's component (the
+            // C-M3b·4 "no fabricated component" shape: a null componentId →
+            // an empty standing set — a group post / board / to-do outside a
+            // component has no standing-moderator scope, only the
+            // GlobalAdmin fallback reaches it). A direct read on the caller's
+            // session (the report.assign lane's same-transaction shape) rather
+            // than GetStandingModeratorsAsync (which opens its own session +
+            // resolves display names the routing does not need).
+            if (report.ComponentId is not null)
+            {
+                var standingIds = await session
+                    .Query<ModeratorAssignment>()
+                    .Where(a => a.ComponentId == report.ComponentId)
+                    .Select(a => a.UserId)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+                foreach (var id in standingIds)
+                    if (!string.IsNullOrEmpty(id))
+                        recipients.Add(id);
+            }
+
+            // The GlobalAdmin fallback set (the ADR 0303 seam — empty when the
+            // seam is unwired, a test harness that omits it routes the
+            // standing moderators only).
+            if (_identity is not null)
+            {
+                var admins = await _identity.ListGlobalAdminsAsync().ConfigureAwait(false);
+                foreach (var id in admins)
+                    if (!string.IsNullOrEmpty(id))
+                        recipients.Add(id);
+            }
+
+            // The self-report skip guard (mirrored from the report.filed-to-
+            // author lane): the reporter is never routed a nudge about their
+            // own filing.
+            if (!string.IsNullOrEmpty(reporterId))
+                recipients.Remove(reporterId);
+
+            foreach (var recipientId in recipients)
+            {
+                await _notifications.EmitAsync(
+                    session,
+                    recipientId: recipientId,
+                    kind: NotificationKinds.ReportQueued,
+                    idempotencyKey: $"notification:report.queued:{report.Id}:{recipientId}",
+                    body: null,
+                    targetId: report.Id,
+                    linkPath: $"/moderation/{report.Id}",
+                    ct: default).ConfigureAwait(false);
+            }
+        }
+        catch
+        {
+            // Best-effort (the ADR 0077 shape): a notification-lane failure
+            // must not block the filing domain write — the caller still runs
+            // its single SaveChangesAsync. This service carries no ILogger
+            // (predating the ADR 0077 logging shape), so the failure is
+            // swallowed here (the inbox row is the nudge, not the record).
+        }
     }
 }

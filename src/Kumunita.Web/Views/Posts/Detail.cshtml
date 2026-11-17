@@ -112,7 +112,13 @@
                         </div>
                     }
                 }
-                @if (Model.Post.DeletedAt is null)
+                @* A01 (IMPROVE-UX, the E1/E2 leak fix) — the detail lane
+                   renders the full body only while the post is live
+                   (not soft-deleted, not moderator-hidden/removed). A
+                   soft-deleted or hidden post reaches the <c>else</c>
+                   branch below, which renders the author-facing
+                   placeholder (the ADR 0024 / A01 placeholder shape). *@
+                @if (Model.Post.DeletedAt is null && Model.Post.Status == Kumunita.Core.Posts.PostStatus.Active)
                 {
                     @* TD (ADR 0027) — every language variant is rendered
                        server-side; the chip row is the selector. The post's toggle
@@ -362,7 +368,7 @@
                         </div>
                     </div>
                 }
-                else
+                else if (Model.Post.DeletedAt is not null)
                 {
                     @* ADR 0024 — the post is soft-deleted: the record is kept
                        (replies below remain visible), but the body is
@@ -371,6 +377,28 @@
                     <div class="mb-3">
                         <div class="alert alert-secondary mb-2" role="alert">
                             <kw-l key="posts.deleted_placeholder">This post has been deleted by its author.</kw-l>
+                        </div>
+                        <span class="text-muted small">
+                            @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
+                        </span>
+                    </div>
+                }
+                else
+                {
+                    @* A01 (IMPROVE-UX, the E1/E2 leak fix) — the post is
+                       moderator-hidden or removed (PostStatus.Hidden /
+                       .Removed): the body is replaced by the "hidden by a
+                       moderator" placeholder. Only the author (who sees a
+                       placeholder, the ADR 0024 author-sees-its-own-deleted
+                       precedent) or a moderator (the report lane's hide/
+                       remove/unhide lever) can reach the detail view of a
+                       hidden post — any other reader got the fail-closed
+                       403 / status page (the "403 on denied, 404 leaks which
+                       ids are real" pin). No chip row / swap on a hidden
+                       post (the TD7 "no swap on a non-live post" shape). *@
+                    <div class="mb-3">
+                        <div class="alert alert-secondary mb-2" role="alert">
+                            <kw-l key="posts.moderator_hidden_placeholder">This post has been hidden by a moderator.</kw-l>
                         </div>
                         <span class="text-muted small">
                             @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
@@ -451,11 +479,11 @@
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
-                                    <label class="form-label mb-1">
+                                    <label class="form-label mb-1" for="@($"post-trans-title-edit-{existing.LanguageCode}")">
                                         <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted small">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                     </label>
-                                    <input type="text" class="form-control mb-2" name="title" value="@existing.Title" />
-                                    <label class="form-label">
+                                    <input type="text" class="form-control mb-2" id="@($"post-trans-title-edit-{existing.LanguageCode}")" name="title" value="@existing.Title" />
+                                    <label class="form-label" for="@($"post-trans-body-edit-{existing.LanguageCode}")">
                                         <kw-l key="posts.translation_body_label">Body</kw-l>
                                     </label>
                                     @* RE U06 — image OFF (same RC gap as the
@@ -475,7 +503,7 @@
                                             <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
                                             <partial name="_RichEditorToggle" />
                                         </div>
-                                        <textarea class="form-control" name="body" rows="4" required placeholder="…" data-rich-editor>@existing.Body</textarea>
+                                        <textarea class="form-control" id="@($"post-trans-body-edit-{existing.LanguageCode}")" name="body" rows="4" required placeholder="…" data-rich-editor>@existing.Body</textarea>
                                         <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
                                     </div>
                                 </div>
@@ -510,11 +538,11 @@
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
-                                    <label class="form-label mb-1">
+                                    <label class="form-label mb-1" for="@($"post-trans-title-add-{lang.Code}")">
                                         <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted small">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                     </label>
-                                    <input type="text" class="form-control mb-2" name="title" value="@Model.Post.Title" />
-                                    <label class="form-label">
+                                    <input type="text" class="form-control mb-2" id="@($"post-trans-title-add-{lang.Code}")" name="title" value="@Model.Post.Title" />
+                                    <label class="form-label" for="@($"post-trans-body-add-{lang.Code}")">
                                         <kw-l key="posts.translation_body_label">Body</kw-l>
                                     </label>
                                     <div class="rc-editor">
@@ -532,7 +560,7 @@
                                             <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
                                             <partial name="_RichEditorToggle" />
                                         </div>
-                                        <textarea class="form-control" name="body" rows="4" required placeholder="…" data-rich-editor></textarea>
+                                        <textarea class="form-control" id="@($"post-trans-body-add-{lang.Code}")" name="body" rows="4" required placeholder="…" data-rich-editor></textarea>
                                         <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
                                     </div>
                                 </div>
@@ -557,7 +585,16 @@
 
         @if (Model.Replies.Count == 0)
         {
-            <p class="text-muted kmb-discussion"><kw-l key="posts.replies_empty">No replies yet. If you can see this post, you can reply to it.</kw-l></p>
+            @* R33 (IMPROVE-UX) — the house .kmb-empty idiom (title + the
+               existing body + one next action), anchored to the reply composer
+               below (the R31 _TodoComments precedent). *@
+            <div class="kmb-empty kmb-discussion">
+                <p class="kmb-empty-title"><kw-l key="posts.replies_empty_title">No replies yet.</kw-l></p>
+                <p class="kmb-empty-body">
+                    <kw-l key="posts.replies_empty">No replies yet. If you can see this post, you can reply to it.</kw-l>
+                </p>
+                <a class="btn btn-primary" href="#reply-body"><kw-l key="posts.reply_submit">Reply</kw-l></a>
+            </div>
         }
         else
         {

@@ -19,7 +19,7 @@ namespace Kumunita.Core.Tests.Events;
 /// <see cref="IEventService.ListPastAsync"/>); the group-events seam shares
 /// the identical <c>OrderByEventSort</c> helper.
 /// </summary>
-public class EventSortTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class EventSortTests(PostgresFixture fixture)
 {
     // ── 1 — EventUpcoming_SortSpecNull_CurrentOrderAsc (C-SORT·2 pin) ─────
     //

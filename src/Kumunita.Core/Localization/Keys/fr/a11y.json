@@ -37,5 +37,6 @@
   "a11y.search": "Recherche",
   "a11y.scope": "Port\u00E9e",
   "a11y.back_to_messages": "Retour aux messages",
-  "a11y.resident": "R\u00E9sident"
+  "a11y.resident": "R\u00E9sident",
+  "a11y.status_notice": "Avertissement d\u2019\u00E9tat de l\u2019instance"
 }

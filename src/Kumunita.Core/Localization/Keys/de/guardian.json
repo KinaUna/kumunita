@@ -140,5 +140,6 @@
   "guardian.messaging.restrict_confirm": "Messaging f\u00FCr dieses Kind einschr\u00E4nken? Es kann dann keine direkten Nachrichten mehr senden oder empfangen, unabh\u00E4ngig von seiner eigenen Opt-in.",
   "guardian.handover_confirm": "Dieses Konto an das Kind \u00FCbergeben? Damit l\u00F6st du deine Vormundschaft \u00FCber es auf.",
   "guardian.remove_myself_confirm": "Nimmst du deine Vormundstellung f\u00FCr dieses Kind zur\u00FCck? Du kannst das Konto danach nicht mehr verwalten. Es bleibt erhalten, und die \u00FCbrigen Vorm\u00FCnder bleiben dabei.",
-  "guardian.delete_child_confirm": "Dieses Kind-Konto dauerhaft l\u00F6schen? Damit werden Anmeldung, Profil und Mitgliedschaften entfernt \u2014 das kann nicht r\u00FCckg\u00E4ngig gemacht werden."
+  "guardian.delete_child_confirm": "Dieses Kind-Konto dauerhaft l\u00F6schen? Damit werden Anmeldung, Profil und Mitgliedschaften entfernt \u2014 das kann nicht r\u00FCckg\u00E4ngig gemacht werden.",
+  "guardian.subsection_empty_body": "Dieser Bereich ist leer \u2014 es gibt derzeit nichts, worauf du reagieren kannst."
 }

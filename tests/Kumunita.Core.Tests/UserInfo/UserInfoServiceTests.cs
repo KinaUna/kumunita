@@ -1,0 +1,1491 @@
+using Kumunita.Core;
+using Kumunita.Core.Authorization;
+using Kumunita.Core.Identity;
+using Kumunita.Core.UserInfo;
+using System.Linq;
+using Marten;
+using Marten.Services;
+using Xunit;
+
+namespace Kumunita.Core.Tests;
+
+/// <summary>
+/// Plan M1 step 4, implementation step 3 — the three read paths of
+/// <see cref="UserInfoService"/> (invariant C4 — strong consistency, live-row reads):
+/// <see cref="UserInfoService.GetProfileAsync"/>, <see cref="UserInfoService.GetGroupIdsAsync"/>,
+/// <see cref="UserInfoService.GetActiveGrantAsync"/>.
+/// <para>
+/// Each test hands itself a fresh scratch Postgres DB (<see cref="PostgresFixture.NewDatabaseAsync"/>)
+/// so no test clobbers another's catalog. The Marten store is bootstrapped with M0's
+/// <see cref="KumunitaFeature"/>, M1's hand-rolled <see cref="AuthorizationFeature"/>, and the
+/// M1 domain-document registrations (<see cref="CoreDocTypes.Configure"/>), then applied against the
+/// fresh DB via <c>ApplyAllConfiguredChangesToDatabaseAsync</c> — the same template the M0/M1 DDL
+/// tests use, extended with the document registrations the read paths need.
+/// </para>
+/// <para>
+/// The mutating write paths (<c>UpsertProfileAsync</c>, <c>CreateGroupAsync</c>, add/remove member,
+/// <c>GrantDelegationAsync</c>/<c>RevokeDelegationAsync</c>, <c>SeedComponentsAsync</c>,
+/// <c>SetComponentModeratorAccessAsync</c>) are now all implemented. Every *write* test drives the
+/// service's own methods (the single-<c>SaveChangesAsync</c> authority invariants C3/C4 depend on);
+/// the two *pure-read* tests (group membership C4 and active-grant selection) still fixture their
+/// input documents directly through a raw session, since those are testing the read half only.
+/// </para>
+/// </summary>
+public class UserInfoServiceTests(PostgresFixture fixture)
+{
+    // ── Test 1 — profile round-trip (plan test 1) ─────────────────────────
+    // Upsert a Profile with SubjectId/DisplayName/Verified/Visibility set, read it back
+    // through GetProfileAsync; assert every field survives the round-trip, including the
+    // Visibility.Mode and the grant list the audit/visibility rules lean on.
+
+    [Fact]
+    public async Task GetProfileAsync_RoundTrip_PreservesSubjectIdAndVisibility()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        var subjectId = "u-profile-1";
+        var profile = new Profile
+        {
+            SubjectId = subjectId,
+            DisplayName = "Ada Resident",
+            Verified = true,
+            // ADR 0001-B — author-controlled audience; a non-default (All + named grants) shape
+            // so the round-trip proves the nested Visibility document is stored readably.
+            Visibility = new Audience(
+                AudienceMode.All,
+                [new AudienceGrant(GrantKind.User, "u-author")]),
+        };
+
+        // Seeded through the service's own UpsertProfileAsync (implementation step 6, now
+        // implemented): patch is all-null, so the bootstrap record (profile) supplies every
+        // field — including the nested Visibility document — and the assertions below prove
+        // every field survives the round-trip.
+        await profileSettings.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
+
+        var read = await svc.GetProfileAsync(subjectId);
+
+        Assert.NotNull(read);
+        Assert.Equal(subjectId, read!.SubjectId);
+        Assert.Equal(profile.DisplayName, read.DisplayName);
+        Assert.Equal(profile.Verified, read.Verified);
+        Assert.Equal(profile.Visibility.Mode, read.Visibility.Mode);
+        var grants = read.Visibility.Grants;
+        Assert.Single(grants);
+        Assert.Equal(new AudienceGrant(GrantKind.User, "u-author"), grants[0]);
+
+        // Unknown subject -> null (the read path is a plain live-row probe, no default document).
+        var missing = await svc.GetProfileAsync("does-not-exist");
+        Assert.Null(missing);
+    }
+
+    // ── U3 — GetProfilesAsync candidate set (M2 design §2.1, F15) ──────────
+    // verifiedOnly=true filters to verified rows only; verifiedOnly=false returns
+    // every profile row. Crucially: NEITHER call appends an AccessAudit row (the
+    // C-M2·2 "candidate filter is not an access decision" pin at the unit level —
+    // the §4.3 filter lives in DirectoryService / here, never in IAuthorizationService,
+    // so the audit lane (invariant C3) is not touched by this read).
+
+    [Fact]
+    public async Task GetProfilesAsync_VerifiedOnly_Filters()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        // Three residents: two verified, one unverified.
+        const string verifiedA = "u-gp-a";
+        const string verifiedB = "u-gp-b";
+        const string unverifiedC = "u-gp-c";
+
+        foreach (var (subject, verified) in new[]
+        {
+            (verifiedA, true),
+            (verifiedB, true),
+            (unverifiedC, false),
+        })
+        {
+            var profile = new Profile
+            {
+                SubjectId = subject,
+                DisplayName = $"Resident {subject}",
+                Verified = verified,
+                Visibility = new Audience(),
+            };
+            await profileSettings.UpsertProfileAsync(profile, new ProfileUpdate(null, null, null, null, null));
+        }
+
+        // verifiedOnly: true → only the two verified residents.
+        var verifiedOnly = await profileSettings.GetProfilesAsync(verifiedOnly: true);
+        Assert.Equal(2, verifiedOnly.Count);
+        Assert.Contains(verifiedOnly, p => p.SubjectId == verifiedA);
+        Assert.Contains(verifiedOnly, p => p.SubjectId == verifiedB);
+        Assert.DoesNotContain(verifiedOnly, p => p.SubjectId == unverifiedC);
+
+        // verifiedOnly: false → every profile, including the unverified one.
+        var all = await profileSettings.GetProfilesAsync(verifiedOnly: false);
+        Assert.Equal(3, all.Count);
+        Assert.Contains(all, p => p.SubjectId == unverifiedC);
+
+        // C-M2·2 pin: the candidate filter is *not* an access decision — neither
+        // call above appends an AccessAudit row (invariant C3's lane is untouched).
+        await using (var session = store.QuerySession())
+        {
+            var audits = await session.Query<Authorization.AccessAudit>()
+                .ToListAsync(TestContext.Current.CancellationToken);
+            Assert.Empty(audits);
+        }
+    }
+
+    // ── U4 — GetComponentsAsync candidate set (M3 design §2.1 / §2.3, F9) ──
+    // enabledOnly=true filters to enabled components; enabledOnly=false returns
+    // every component. Crucially: NEITHER call appends an AccessAudit row — the
+    // C-M3·2 "candidate filter is not an access decision" pin at the unit
+    // level. Component.Id is the document identity (CoreDocTypes, conventional
+    // string), so two enabled + one disabled rows are planted directly through
+    // a write session.
+
+    [Fact]
+    public async Task GetComponentsAsync_CandidateFilterEmitsNoAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        // Two enabled components and one disabled, planted directly (Component.Id
+        // is the identity — distinct stable ids).
+        const string enabledA = "c-u4-a";
+        const string enabledB = "c-u4-b";
+        const string disabledC = "c-u4-c";
+
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            session.Store(new Component { Id = enabledA, Name = "Comp A", Enabled = true });
+            session.Store(new Component { Id = enabledB, Name = "Comp B", Enabled = true });
+            session.Store(new Component { Id = disabledC, Name = "Comp C", Enabled = false });
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        // enabledOnly: true → only the two enabled components.
+        var enabledOnly = await profileSettings.GetComponentsAsync(enabledOnly: true);
+        Assert.Equal(2, enabledOnly.Count);
+        Assert.Contains(enabledOnly, c => c.Id == enabledA);
+        Assert.Contains(enabledOnly, c => c.Id == enabledB);
+        Assert.DoesNotContain(enabledOnly, c => c.Id == disabledC);
+
+        // enabledOnly: false → every component, including the disabled one.
+        var all = await profileSettings.GetComponentsAsync(enabledOnly: false);
+        Assert.Equal(3, all.Count);
+        Assert.Contains(all, c => c.Id == disabledC);
+
+        // C-M3·2 pin: the candidate filter is *not* an access decision — neither
+        // call above appends an AccessAudit row. The seeded write session stored
+        // components, not an audit lane, so a global count of AccessAudit rows is
+        // expected to be exactly zero.
+        await using (var session = store.QuerySession())
+        {
+            var audits = await session.Query<Authorization.AccessAudit>()
+                .ToListAsync(TestContext.Current.CancellationToken);
+            Assert.Empty(audits);
+        }
+    }
+
+    [Fact]
+    public async Task CreateGroupAsync_CreatesGroupAndOwnerMembership()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        const string owner = "u-owner-2";
+        var group = await svc.CreateGroupAsync(owner, "Team X", "desc");
+
+        // Owner should be a member immediately
+        var groups = await svc.GetGroupIdsAsync(owner);
+        Assert.Contains(group.Id, groups);
+    }
+
+    [Fact]
+    public async Task AddAndRemoveGroupMember_UpdatesMembershipAndWritesAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        const string owner = "u-owner-3";
+        const string member = "u-member";
+
+        var group = await svc.CreateGroupAsync(owner, "Team Y", null);
+
+        // Add member (added by owner)
+        await svc.AddGroupMemberAsync(group.Id, member, owner);
+        var afterAdd = await svc.GetGroupIdsAsync(member);
+        Assert.Contains(group.Id, afterAdd);
+
+        // Check audit row written
+        await using (var session = store.QuerySession())
+        {
+            var audits = await session.Query<Authorization.AccessAudit>()
+                .Where(a => a.Action == "group.add-member" && a.TargetId == group.Id)
+                .ToListAsync(TestContext.Current.CancellationToken);
+            Assert.NotEmpty(audits);
+        }
+
+        // Remove member
+        await svc.RemoveGroupMemberAsync(group.Id, member, owner);
+        var afterRemove = await svc.GetGroupIdsAsync(member);
+        Assert.DoesNotContain(group.Id, afterRemove);
+
+        // Check remove audit
+        await using (var session = store.QuerySession())
+        {
+            var audits = await session.Query<Authorization.AccessAudit>()
+                .Where(a => a.Action == "group.remove-member" && a.TargetId == group.Id)
+                .ToListAsync(TestContext.Current.CancellationToken);
+            Assert.NotEmpty(audits);
+        }
+    }
+
+    // ── Test 2 — live group membership, invariant C4 (plan test 2) ────────
+    // Membership changes are live on the *very next* GetGroupIdsAsync call — no projection,
+    // no cache, no polling. Add O to A; the next call sees A. Remove O from A; the next
+    // call drops A.
+
+    [Fact]
+    public async Task GetGroupIdsAsync_LiveMembership_C4_StrongConsistency()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        const string o = "u-owner";
+        var a = new Group { Id = "g-a", Name = "A", OwnerId = o };
+        var b = new Group { Id = "g-b", Name = "B", OwnerId = o };
+
+        // A membership row for (A, O). Group is seeded too so the membership's GroupId is
+        // a live document (the read path only selects GroupId, but seeding it keeps the
+        // fixture honest against the real shape).
+        var membership = new GroupMembership { Id = "m-a-o", GroupId = a.Id, UserId = o, AddedBy = o };
+
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            session.Store(a);
+            session.Store(b);
+            session.Store(membership);
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        // After the save, the very next call sees O in exactly one group: A.
+        var afterAdd = await svc.GetGroupIdsAsync(o);
+        Assert.Contains(a.Id, afterAdd);
+        Assert.DoesNotContain(b.Id, afterAdd);
+        Assert.Single(afterAdd);
+
+        // Delete the membership row (RemoveGroupMemberAsync is step 5; not yet implemented —
+        // deletion is the strong-consistency primitive it relies on).
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            session.Delete<GroupMembership>(membership.Id);
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        // The very next call drops A: no cache, no polling, no projection — the live row is
+        // the truth (invariant C4).
+        var afterRemove = await svc.GetGroupIdsAsync(o);
+        Assert.Empty(afterRemove);
+    }
+
+    // ── Test 3 — active grant selection (plan test 3) ─────────────────────
+    // Three grants for delegate D1: one within [From, To] (active), one expired (past To),
+    // one revoked (RevokedBy set). GetActiveGrantAsync returns only the within-window one.
+    // A second delegate D2 with only an expired + a revoked grant gets null.
+
+    [Fact]
+    public async Task GetActiveGrantAsync_ReturnsOnlyTheActiveGrant()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        var now = DateTimeOffset.UtcNow;
+        const string owner = "u-owner";
+        const string d1 = "u-d1";
+        const string d2 = "u-d2";
+
+        // D1 — three grants for the same delegate; only the within-window one is active.
+        var active = new DelegationGrant
+        {
+            Id = "grant-active",
+            OwnerId = owner,
+            DelegateId = d1,
+            Scope = [AccessAction.Moderate.Id],
+            From = now.AddHours(-1),
+            To = now.AddHours(1),
+        };
+        var expired = new DelegationGrant
+        {
+            Id = "grant-expired",
+            OwnerId = owner,
+            DelegateId = d1,
+            Scope = [AccessAction.Moderate.Id],
+            From = now.AddDays(-30),
+            To = now.AddDays(-1), // strictly past -> not active for now
+        };
+        var revoked = new DelegationGrant
+        {
+            Id = "grant-revoked",
+            OwnerId = owner,
+            DelegateId = d1,
+            Scope = [AccessAction.Moderate.Id],
+            From = now.AddDays(-1),
+            To = now.AddDays(1), // within the window, but
+            RevokedBy = owner,  // revoked -> not active
+        };
+
+        // D2 — only an expired grant and a revoked grant; no active one.
+        var d2Expired = new DelegationGrant
+        {
+            Id = "grant-d2-expired",
+            OwnerId = owner,
+            DelegateId = d2,
+            Scope = [AccessAction.Moderate.Id],
+            From = now.AddDays(-30),
+            To = now.AddDays(-1),
+        };
+        var d2Revoked = new DelegationGrant
+        {
+            Id = "grant-d2-revoked",
+            OwnerId = owner,
+            DelegateId = d2,
+            Scope = [AccessAction.Moderate.Id],
+            From = now.AddDays(-1),
+            To = now.AddDays(1),
+            RevokedBy = owner,
+        };
+
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            session.Store(active);
+            session.Store(expired);
+            session.Store(revoked);
+            session.Store(d2Expired);
+            session.Store(d2Revoked);
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        // Sanity: the seeded documents themselves are consistent with the service's truth
+        // (IsActiveAt is the single source — same predicate the service calls).
+        Assert.True(active.IsActiveAt(d1, now));
+        Assert.False(expired.IsActiveAt(d1, now));
+        Assert.False(revoked.IsActiveAt(d1, now));
+
+        // The service picks the within-window grant for D1.
+        var d1Active = await svc.GetActiveGrantAsync(d1);
+        Assert.NotNull(d1Active);
+        Assert.Equal(active.Id, d1Active!.Id);
+
+        // For a delegate whose grants are all expired/revoked, the delegate has no active
+        // grant — they act as themselves (null).
+        var d2Active = await svc.GetActiveGrantAsync(d2);
+        Assert.Null(d2Active);
+    }
+
+    // ── shared bootstrap: fresh scratch DB + applied schema + document registrations ──
+
+    /// <summary>
+    /// Fresh scratch DB for the calling test, bootstrapped Marten store with M0 + M1 features
+    /// and the M1 domain documents, applied against the fresh catalog. The caller owns the
+    /// returned store's lifetime (typically a <c>using</c> block) — the scratch DB itself is
+    /// container-lifetime, so the caller does not dispose it.
+    /// </summary>
+    private async Task<IDocumentStore> BootStoreAsync()
+    {
+        var conn = await fixture.NewDatabaseAsync(TestContext.Current.CancellationToken);
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            CoreDocTypes.Configure(opts);
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
+            null, null, TestContext.Current.CancellationToken);
+        return store;
+    }
+
+    // ── Test 7 — delegation grant (plan test 7) ──────────────────────────
+    // Granting creates a live grant on the very next GetActiveGrantAsync call
+    // (invariant C4) and records the admin-action Audit row (Action
+    // "delegation.grant", ActorId = the grantor, TargetKind "delegation_grant",
+    // TargetId the new grant) in the same commit (invariant C3).
+
+    [Fact]
+    public async Task GrantDelegationAsync_CreatesLiveGrantAndAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        const string owner = "u-owner-grant";
+        const string delegatee = "u-delegate-grant";
+        var now = DateTimeOffset.UtcNow;
+        var scope = new[] { AccessAction.Moderate.Id };
+
+        var grant = await svc.GrantDelegationAsync(owner, delegatee, scope, now.AddHours(-1), now.AddHours(1));
+
+        // Shape survives the round-trip (id is freshly minted by the service).
+        Assert.Equal(owner, grant.OwnerId);
+        Assert.Equal(delegatee, grant.DelegateId);
+        Assert.Equal(scope, grant.Scope);
+        Assert.False(grant.To is null);
+
+        // Strong consistency (invariant C4) — the very next read sees it live
+        // as the delegate's active grant (invariant C2's "within window, not
+        // revoked" predicate, via the shared IsActiveAt truth).
+        var active = await svc.GetActiveGrantAsync(delegatee);
+        Assert.NotNull(active);
+        Assert.Equal(grant.Id, active!.Id);
+
+        // The granting account itself is unaffected — they act as themselves.
+        Assert.Null(await svc.GetActiveGrantAsync(owner));
+
+        // The audit row (always-on, invariant C3) is in the same commit as the
+        // grant: one row, targeting the new grant, via the grantor's standing.
+        await using (var session = store.QuerySession())
+        {
+            var audit = await session.Query<AccessAudit>()
+                .Where(a => a.Action == "delegation.grant" && a.TargetId == grant.Id)
+                .FirstOrDefaultAsync(TestContext.Current.CancellationToken);
+            Assert.NotNull(audit);
+            Assert.Equal(owner, audit!.ActorId);
+            Assert.Equal(grant.Id, audit.TargetId);
+            Assert.Equal(AccessVia.Owner, audit.Via);
+            Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+        }
+    }
+
+    // ── Test 8 — delegation revoke (plan test 8) ───────────────────────
+    // Revoking closes the grant (RevokedBy set, row kept) and the very next
+    // GetActiveGrantAsync call no longer returns it (invariant C4); the
+    // "delegation.revoke" Audit row is recorded in the same commit (C3) with
+    // Via per the derivation rule (Owner when the owner revokes, else Admin).
+
+    [Fact]
+    public async Task RevokeDelegationAsync_ClosesGrantAndWritesAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        const string owner = "u-owner-revoke";
+        const string delegatee = "u-delegate-revoke";
+        var now = DateTimeOffset.UtcNow;
+        var scope = new[] { AccessAction.Moderate.Id };
+
+        var grant = await svc.GrantDelegationAsync(owner, delegatee, scope, now.AddHours(-1), now.AddHours(1));
+
+        // Sanity: the grant is active before the revoke (invariant C2).
+        Assert.NotNull(await svc.GetActiveGrantAsync(delegatee));
+
+        // The owner revokes — Via must be Owner (the derivation rule).
+        await svc.RevokeDelegationAsync(grant.Id, owner);
+
+        // Strong consistency (invariant C4) — the loss is live on the very next
+        // call: the delegate no longer has an active grant.
+        Assert.Null(await svc.GetActiveGrantAsync(delegatee));
+
+        // The row is kept (history) and closed.
+        await using (var session = store.QuerySession())
+        {
+            var stored = await session.LoadAsync<DelegationGrant>(grant.Id, TestContext.Current.CancellationToken);
+            Assert.NotNull(stored);
+            Assert.Equal(owner, stored!.RevokedBy);
+
+            var audit = await session.Query<AccessAudit>()
+                .Where(a => a.Action == "delegation.revoke" && a.TargetId == grant.Id)
+                .FirstOrDefaultAsync(TestContext.Current.CancellationToken);
+            Assert.NotNull(audit);
+            Assert.Equal(owner, audit!.ActorId);
+            Assert.Equal(AccessVia.Owner, audit.Via);
+            Assert.Equal(owner, audit.EffectivePrincipalId);
+            Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+        }
+    }
+
+    // ── Test 9 — components seed (plan test 9) ───────────────────────────────
+    // The four default components (safety/maintenance/social/governance — id IS the stable
+    // key, per the stub/interface doc) all exist after the first SeedComponentsAsync call,
+    // each with ModeratorAccess = false (invariant C5's OFF-by-default). An idempotent
+    // re-run leaves the set at exactly four and does NOT touch an existing flag — only
+    // SetComponentModeratorAccessAsync flips it, so a deliberate ON survives a re-seed.
+
+    [Fact]
+    public async Task SeedComponentsAsync_CreatesFour_AllModeratorAccessFalse_IdempotentReRun()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        var seeded = await profileSettings.SeedComponentsAsync();
+
+        var ids = seeded.Select(c => c.Id).ToHashSet();
+        Assert.Equal(new[] { "safety", "maintenance", "social", "governance" }.ToHashSet(), ids);
+        // C5: every newly created component starts OFF (the default is the pinned row).
+        Assert.All(seeded, c => Assert.False(c.ModeratorAccess));
+
+        // An existing row's deliberate ON must survive a re-seed (C5's "only the flag path
+        // flips it" — re-seeding never resets it).
+        const string actor = "admin-seed";
+        await profileSettings.SetComponentModeratorAccessAsync("safety", true, actor);
+        await using (var session = store.QuerySession())
+        {
+            Assert.True((await session.LoadAsync<Component>("safety", TestContext.Current.CancellationToken))!.ModeratorAccess);
+        }
+
+        var reseeded = await profileSettings.SeedComponentsAsync();
+
+        Assert.Equal(4, reseeded.Count);
+        Assert.Contains(reseeded, c => c.Id == "safety" && c.ModeratorAccess);
+        Assert.All(reseeded.Where(c => c.Id != "safety"), c => Assert.False(c.ModeratorAccess));
+    }
+
+    // ── Test 10 — component moderator-access flip (plan test 10) ─────────────
+    // Flipping the flag on, then off, each appends its own "moderator-access" audit row
+    // (Via = Admin unambiguously — the interface doc pins this surface to a GlobalAdmin —
+    // Action "moderator-access", TargetKind "component", TargetId the component id,
+    // Outcome Allow) in the SAME commit as the flag change (C3 — flag and audit row are
+    // written together, so neither can commit without the other).
+
+    [Fact]
+    public async Task SetComponentModeratorAccessAsync_FlipsFlag_AuditViaAdminTargetComponent()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        await profileSettings.SeedComponentsAsync();
+
+        const string actor = "u-admin";
+        const string component = "social";
+
+        await profileSettings.SetComponentModeratorAccessAsync(component, true, actor);
+        await using (var session = store.QuerySession())
+        {
+            Assert.True((await session.LoadAsync<Component>(component, TestContext.Current.CancellationToken))!.ModeratorAccess);
+
+            var on = await session.Query<AccessAudit>()
+                .Where(a => a.Action == "moderator-access" && a.TargetId == component)
+                .FirstOrDefaultAsync(a => a.Via == AccessVia.Admin && a.ActorId == actor, TestContext.Current.CancellationToken);
+            Assert.NotNull(on);
+            Assert.Equal(component, on!.TargetId);
+            Assert.Equal("component", on.TargetKind);
+            Assert.Equal(AccessVia.Admin, on.Via);
+            Assert.Equal(actor, on.EffectivePrincipalId);
+            Assert.Equal(AccessOutcome.Allow, on.Outcome);
+        }
+
+        await profileSettings.SetComponentModeratorAccessAsync(component, false, actor);
+        await using (var session = store.QuerySession())
+        {
+            Assert.False((await session.LoadAsync<Component>(component, TestContext.Current.CancellationToken))!.ModeratorAccess);
+            Assert.Equal(2, await session.Query<AccessAudit>()
+                .Where(a => a.Action == "moderator-access" && a.TargetId == component)
+                .CountAsync(TestContext.Current.CancellationToken));
+        }
+    }
+
+    // ── Admin community management — add / edit / enable-disable ───────────
+    // These cover the /admin "communities" surface (the user-chosen ability
+    // for a GlobalAdmin to add a new community, edit one, or hide one). The
+    // shape mirrors the existing SetComponentModeratorAccessAsync tests:
+    // the Core method commits the domain row + an AccessAudit row in the
+    // same transaction (invariant C3), and reads see the change on the very
+    // next call (invariant C4).
+
+    // Test A1 — CreateCommunityAsync (admin add)
+    // Creates a new Component row (Enabled=true, ModeratorAccess=false — the
+    // C5 OFF-by-default; id is minted by the service, slug-ified name + a
+    // short hex suffix) and appends an AccessAudit row (action
+    // "community.add", targetKind "component", Via Admin, Outcome Allow).
+    // A fresh call lands at the end of the existing SortOrder sequence
+    // (one past the current maximum).
+
+    [Fact]
+    public async Task CreateCommunityAsync_CreatesRow_WithC5Defaults_AuditsCommunityAdd()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        const string actor = "admin-create";
+        var created = await communityService.CreateCommunityAsync("Greenridge", "A quiet corner community.", actor);
+
+        // Defaults the admin never has to type (C5: ModeratorAccess is OFF by
+        // default — only a deliberate flip sets it). Enabled is on by default,
+        // so the new community is immediately visible on the /community feed.
+        Assert.Equal("Greenridge", created.Name);
+        Assert.Equal("A quiet corner community.", created.Description);
+        Assert.True(created.Enabled);
+        Assert.False(created.ModeratorAccess);
+        Assert.False(string.IsNullOrWhiteSpace(created.Id));
+        // SortOrder: appended after any existing components (none seeded in
+        // this fresh DB), so 0 is the correct "first in the list" value.
+        Assert.Equal(0, created.SortOrder);
+
+        // Live read (invariant C4): the very next GetComponentsAsync call sees it.
+        var live = await profileSettings.GetComponentsAsync(enabledOnly: true);
+        Assert.Contains(live, c => c.Id == created.Id);
+
+        // The audit row (invariant C3): one "community.add" row targeting the
+        // new component, via Admin (the only path to this lane — the class
+        // surface is [Authorize(Roles=GlobalAdmin)]), outcome Allow.
+        await using var session = store.QuerySession();
+        var audit = await session.Query<AccessAudit>()
+            .Where(a => a.Action == "community.add" && a.TargetId == created.Id)
+            .FirstOrDefaultAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(audit);
+        Assert.Equal("community.add", audit!.Action);
+        Assert.Equal("component", audit.TargetKind);
+        Assert.Equal(AccessVia.Admin, audit.Via);
+        Assert.Equal(actor, audit.ActorId);
+        Assert.Equal(actor, audit.EffectivePrincipalId);
+        Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+    }
+
+    // Test A2 — CreateCommunityAsync requires a non-blank name (the form
+    // enforces [Required], the Core enforces it too — the "defense in depth at
+    // both layers" rule the other admin-action tests pin).
+
+    [Fact]
+    public async Task CreateCommunityAsync_RejectsBlankName()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            communityService.CreateCommunityAsync("   ", "desc", "admin"));
+    }
+
+    // Test A3 — UpdateCommunityAsync null-patch (admin edit)
+    // A null argument is "keep as-is"; a non-null one is applied. The form
+    // round-trips safely: untouched fields don't erase their stored value.
+    // Appends an AccessAudit "community.update" row (targetKind "component").
+
+    [Fact]
+    public async Task UpdateCommunityAsync_AppliesNonNull_LeavesNullFields_AuditsCommunityUpdate()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        const string actor = "admin-update";
+        var component = await communityService.CreateCommunityAsync("Old Name", "Old description", actor);
+
+        // Update: rename + change sort, but leave the stored description
+        // untouched (null patch field = keep as-is — the form's contract; an
+        // admin who doesn't know the current description can still rename the
+        // community without wiping what's there).
+        await communityService.UpdateCommunityAsync(
+            componentId: component.Id,
+            name: "New Name",
+            description: null,
+            sortOrder: 42,
+            moderatorAccess: null,
+            enabled: null,
+            actorId: actor);
+
+        await using var session = store.QuerySession();
+        var read = await session.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(read);
+        Assert.Equal("New Name", read!.Name);
+        Assert.Equal(42, read.SortOrder);
+        Assert.Equal("Old description", read.Description); // unchanged — the null patch is "keep"
+        Assert.True(read.Enabled);                          // unchanged
+        Assert.False(read.ModeratorAccess);                 // still OFF (C5)
+
+        var audit = await session.Query<AccessAudit>()
+            .Where(a => a.Action == "community.update" && a.TargetId == component.Id)
+            .FirstOrDefaultAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(audit);
+        Assert.Equal(AccessVia.Admin, audit!.Via);
+        Assert.Equal(actor, audit.ActorId);
+        Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+    }
+
+    // Test A4 — UpdateCommunityAsync flips a flag (moderator access / enabled)
+    // when the non-null argument is present. The form passes a non-null value
+    // for a checkbox the admin checked; passes null for one they didn't. This
+    // test proves the "non-null = set" half of the patch rule.
+
+    [Fact]
+    public async Task UpdateCommunityAsync_FlagsOnlyWhenArgumentIsNonNull()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        const string actor = "admin-flip";
+        var component = await communityService.CreateCommunityAsync("Flip", null, actor);
+
+        // Flip moderator access ON (the ADR 0003 standing; C5's deliberate
+        // ON) — and leave Enabled untouched.
+        await communityService.UpdateCommunityAsync(
+            componentId: component.Id,
+            name: null, description: null, sortOrder: null,
+            moderatorAccess: true, enabled: null, actorId: actor);
+
+        await using (var q1 = store.QuerySession())
+        {
+            var after = await q1.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken);
+            Assert.True(after!.ModeratorAccess);
+            Assert.True(after.Enabled); // unchanged
+        }
+
+        // Flip enabled OFF (the hide path; the user-chosen "remove") — and
+        // leave ModeratorAccess untouched.
+        await communityService.UpdateCommunityAsync(
+            componentId: component.Id,
+            name: null, description: null, sortOrder: null,
+            moderatorAccess: null, enabled: false, actorId: actor);
+
+        await using (var q2 = store.QuerySession())
+        {
+            var after = await q2.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken);
+            Assert.False(after!.Enabled);
+            Assert.True(after.ModeratorAccess); // unchanged
+        }
+
+        // Two audit rows (one per call); both "community.update".
+        await using var q3 = store.QuerySession();
+        Assert.Equal(2, await q3.Query<AccessAudit>()
+            .Where(a => a.Action == "community.update" && a.TargetId == component.Id)
+            .CountAsync(TestContext.Current.CancellationToken));
+    }
+
+    // Test A5 — UpdateCommunityAsync rejects an unknown id (the controller maps this to a
+    // TempData error; the Core is the single source of truth for "not found").
+
+    [Fact]
+    public async Task UpdateCommunityAsync_UnknownId_Throws()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            communityService.UpdateCommunityAsync("does-not-exist", "n", "d", 1, null, null, "admin"));
+    }
+
+    // Test A6 — SetCommunityEnabledAsync (admin hide / restore)
+    // Flips the Enabled flag with the action string reflecting the new state
+    // ("community.enable" / "community.disable") — the audit row is the
+    // always-on access-decision log, and the verb distinguishes "hide" from
+    // "restore", both of which are admin-visible events in the /admin/audit
+    // view.
+
+    [Fact]
+    public async Task SetCommunityEnabledAsync_FlipsFlag_AuditsEnableOrDisable()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        const string actor = "admin-toggle";
+        var component = await communityService.CreateCommunityAsync("Toggle", null, actor);
+        Assert.True(component.Enabled);
+
+        // Disable (the "remove a community" path the user chose — the hide, not the delete).
+        await communityService.SetCommunityEnabledAsync(component.Id, false, actor);
+        await using (var session = store.QuerySession())
+        {
+            Assert.False((await session.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken))!.Enabled);
+            Assert.Contains(await session.Query<AccessAudit>()
+                .Where(a => a.Action == "community.disable" && a.TargetId == component.Id && a.Via == AccessVia.Admin)
+                .ToListAsync(TestContext.Current.CancellationToken),
+                a => a.ActorId == actor);
+        }
+
+        // Re-enable (the restore path — the "the row + posts + assignments remain
+        // intact" guarantee). The next enabledOnly:true read sees it.
+        await communityService.SetCommunityEnabledAsync(component.Id, true, actor);
+        await using (var session = store.QuerySession())
+        {
+            Assert.True((await session.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken))!.Enabled);
+            Assert.Contains(await session.Query<AccessAudit>()
+                .Where(a => a.Action == "community.enable" && a.TargetId == component.Id && a.Via == AccessVia.Admin)
+                .ToListAsync(TestContext.Current.CancellationToken),
+                a => a.ActorId == actor);
+        }
+
+        // The component remains in the GetComponentsAsync(enabledOnly:true) set
+        // (it's back on) — the hide/restore round-trip preserves the row.
+        var visible = await profileSettings.GetComponentsAsync(enabledOnly: true);
+        Assert.Contains(visible, c => c.Id == component.Id);
+    }
+
+    // Test A7 — SeedComponentsAsync idempotency with an admin-added community
+    // The seed lane (first boot) is idempotent by seed id (safety,
+    // maintenance, social, governance). An admin-created community has a
+    // slug+suffix id and is NOT touched by a re-seed: the seed lane's
+    // upsert-by-id only creates the four known ids, never creates or
+    // mutates rows with other ids. The admin-created community's fields
+    // (including a deliberate ON flag from UpdateCommunityAsync) survive
+    // the re-seed — a warm re-run of the bootstrap must never clobber
+    // admin state.
+
+    [Fact]
+    public async Task SeedComponentsAsync_ReRun_LeavesAdminCreatedCommunityUntouched_FlagsIncluded()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        // First-boot seed (the four known defaults).
+        await profileSettings.SeedComponentsAsync();
+
+        // An admin adds a community and explicitly enables standing moderator
+        // access (C5's intentional ON).
+        var adminRow = await communityService.CreateCommunityAsync("Admin's Garden", null, "admin");
+        await communityService.UpdateCommunityAsync(
+            componentId: adminRow.Id,
+            name: null, description: null, sortOrder: null,
+            moderatorAccess: true, enabled: null, actorId: "admin");
+
+        // Warm re-seed (the rare outer-gate bypass) — the four seeds are
+        // idempotent and the admin row is untouched (including its flag).
+        await profileSettings.SeedComponentsAsync();
+
+        await using var session = store.QuerySession();
+        var adminAfter = await session.LoadAsync<Component>(adminRow.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(adminAfter);
+        Assert.Equal("Admin's Garden", adminAfter!.Name);
+        Assert.True(adminAfter.ModeratorAccess); // the intentional ON survived the re-seed
+        Assert.True(adminAfter.Enabled);
+
+        // The four seeded ids remain (and their ModeratorAccess defaults are
+        // still OFF — only the flag path may flip them, so a re-seed never
+        // resets an intentional ON either).
+        var all = await session.Query<Component>().ToListAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(5, all.Count);
+        Assert.Equal(new[] { "safety", "maintenance", "social", "governance" }.ToHashSet(),
+            all.Where(c => !c.Id.StartsWith("admin")).Select(c => c.Id).ToHashSet());
+    }
+
+    // ── Test 11 — profile upsert (plan test 11) ────────────────────────────────
+    // Create-when-absent: a fresh SubjectId produces a row built from the `profile`
+    // argument's base fields (DisplayName/Email/Verified/Visibility). A subsequent upsert
+    // with a patch that sets DisplayName and leaves Email null takes the patch's value on
+    // DisplayName and leaves the stored Email untouched (the "non-null patch field takes
+    // priority; null patch field leaves the current value" rule from the step-4 doc's risk
+    // note).
+
+    [Fact]
+    public async Task UpsertProfileAsync_CreatesWhenAbsent_LeavesNullPatchFieldsUntouched()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+
+        var subject = "u-upsert";
+        var bootstrap = new Profile
+        {
+            SubjectId = subject,
+            DisplayName = "First Name",
+            Email = "first@example.com",
+            Verified = true,
+            Visibility = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, subject)]),
+        };
+        await profileSettings.UpsertProfileAsync(bootstrap, new ProfileUpdate(null, null, null, null, null));
+
+        var created = await svc.GetProfileAsync(subject);
+        Assert.NotNull(created);
+        Assert.Equal(bootstrap.DisplayName, created!.DisplayName);
+        Assert.Equal(bootstrap.Email, created!.Email);
+        Assert.True(created.Verified);
+
+        // A patch that sets DisplayName and leaves Email null updates only DisplayName.
+        await profileSettings.UpsertProfileAsync(
+            bootstrap, // identity/context; patch's non-null fields take priority
+            new ProfileUpdate("Second Name", null, null, null, null));
+
+        var read = await svc.GetProfileAsync(subject);
+        Assert.NotNull(read);
+        Assert.Equal("Second Name", read!.DisplayName);
+        Assert.Equal(bootstrap.Email, read!.Email);
+    }
+
+    // ── Community membership — the posting-right write/read lanes ───
+    // The ComponentMembership row is a *posting right* (distinct from
+    // the moderator-scope ModeratorAssignment — see the doc comment on
+    // the ComponentMembership type in Component.cs, and the
+    // SetCommunityMembershipAsync / ClearCommunityMembershipAsync /
+    // GetCommunityIdsAsync trio on IUserInfoService). The write lanes
+    // are admin-action audited (via:Admin, C3); the read lane is a
+    // candidate read (no audit row — same pin as GetGroupIdsAsync).
+
+    [Fact]
+    public async Task SetCommunityMembership_SetsRow_And_AuditsCommunityAddMember()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string admin  = "u-mem-admin";
+        const string target = "u-mem-target";
+        const string comp   = "c-mem-a";
+
+        await Plant(store, new Component { Id = comp, Name = "X", Enabled = true });
+
+        await svc.SetCommunityMembershipAsync(comp, target, admin);
+
+        var ids = await svc.GetCommunityIdsAsync(target);
+        Assert.Contains(comp, ids);
+
+        var mem = await LoadMembership(store, comp, target);
+        Assert.NotNull(mem);
+        Assert.Equal(admin, mem.AddedBy);
+        Assert.Equal(comp, mem.ComponentId);
+        Assert.Equal(target, mem.UserId);
+
+        var audits = await AuditsFor(store, actor: admin, action: "community.add-member");
+        Assert.Single(audits, a => a.TargetKind == "component" && a.TargetId == comp);
+    }
+
+    [Fact]
+    public async Task SetCommunityMembership_ReAddIsIdempotent_OneRow_AuditsTwice()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string admin  = "u-mem-admin2";
+        const string target = "u-mem-target2";
+        const string comp   = "c-mem-b";
+
+        await Plant(store, new Component { Id = comp, Name = "Y", Enabled = true });
+
+        await svc.SetCommunityMembershipAsync(comp, target, admin);
+        await svc.SetCommunityMembershipAsync(comp, target, admin); // re-add — no duplicate
+
+        // Business-key invariant: the DB unique index would reject a second row;
+        // we verify our Upsert logic doesn't try to insert twice.
+        await using var session = store.QuerySession();
+        var count = await session.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == comp && m.UserId == target)
+            .CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, count);
+
+        // Two add audit rows (one per admin action).
+        var audits = await AuditsFor(store, actor: admin, action: "community.add-member");
+        Assert.Equal(2, audits.Count(a => a.TargetKind == "component" && a.TargetId == comp));
+    }
+
+    [Fact]
+    public async Task ClearCommunityMembership_RemovesRow_LiveOnNextRead_And_AuditsCommunityRemoveMember()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string admin  = "u-mem-admin3";
+        const string target = "u-mem-target3";
+        const string comp   = "c-mem-c";
+
+        await Plant(store, new Component { Id = comp, Name = "Z", Enabled = true });
+
+        await svc.SetCommunityMembershipAsync(comp, target, admin);
+        var before = await svc.GetCommunityIdsAsync(target);
+        Assert.Contains(comp, before);
+
+        await svc.ClearCommunityMembershipAsync(comp, target, admin);
+
+        // Strong consistency — live on the very next call (invariant C4).
+        var after = await svc.GetCommunityIdsAsync(target);
+        Assert.DoesNotContain(comp, after);
+
+        var audits = await AuditsFor(store, actor: admin, action: "community.remove-member");
+        Assert.Single(audits, a => a.TargetKind == "component" && a.TargetId == comp);
+    }
+
+    [Fact]
+    public async Task ClearCommunityMembership_NoOp_NoThrow_WhenAbsent()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string admin  = "u-mem-admin4";
+        const string target = "u-mem-target4";
+        const string comp   = "c-mem-d";
+
+        await Plant(store, new Component { Id = comp, Name = "W", Enabled = true });
+
+        // No membership row exists — Clear must not throw (an admin "unchecking"
+        // a row that was never there is a no-op).
+        await svc.ClearCommunityMembershipAsync(comp, target, admin);
+
+        // Even a no-op still leaves an audit row (the admin action happened —
+        // an intent to remove; the row may have been absent, but the action
+        // itself is still audited).
+        await using var s = store.QuerySession();
+        var rows = await s.Query<AccessAudit>()
+            .Where(a => a.ActorId == admin && a.Action == "community.remove-member" && a.TargetId == comp)
+            .ToListAsync(TestContext.Current.CancellationToken);
+        Assert.Single(rows);
+    }
+
+    [Fact]
+    public async Task GetCommunityIdsAsync_ReturnsMultipleMembershipsInIsolation()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string admin  = "u-mem-admin5";
+        const string target = "u-mem-target5";
+        const string c1 = "c-mem-e";
+        const string c2 = "c-mem-f";
+        const string c3 = "c-mem-g";
+
+        await Plant(store, new Component { Id = c1, Name = "1", Enabled = true });
+        await Plant(store, new Component { Id = c2, Name = "2", Enabled = true });
+        await Plant(store, new Component { Id = c3, Name = "3", Enabled = true });
+
+        await svc.SetCommunityMembershipAsync(c1, target, admin);
+        await svc.SetCommunityMembershipAsync(c2, target, admin);
+
+        var ids = await svc.GetCommunityIdsAsync(target);
+        Assert.Equal(2, ids.Count);
+        Assert.Contains(c1, ids);
+        Assert.Contains(c2, ids);
+        Assert.DoesNotContain(c3, ids);
+    }
+
+    // ── ADR 0012 — mandatory + moderator-managed optional communities ──────
+
+    private static IReadOnlySet<string> RoleSet(params string[] roles)
+    {
+        var s = new HashSet<string>(roles);
+        return s.AsReadOnly();
+    }
+
+    [Fact]
+    public async Task SetCommunityMandatory_Admin_TogglesFlag_AndAuditsVerbs()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-mand-admin";
+        await Plant(store, new Component { Id = comp, Name = "Mand", Enabled = true });
+
+        await svc.SetCommunityMandatoryAsync(comp, true, "a-admin", RoleSet(Roles.GlobalAdmin));
+        Assert.True((await profileSettings.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
+        var mandatoryAudit = (await AuditsFor(store, "a-admin", "community.set-mandatory"))
+            .Single(a => a.TargetKind == "component" && a.TargetId == comp);
+        Assert.Equal(AccessVia.Admin, mandatoryAudit.Via); // admin-only lane → never Moderator
+
+        await svc.SetCommunityMandatoryAsync(comp, false, "a-admin", RoleSet(Roles.GlobalAdmin));
+        Assert.False((await profileSettings.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
+        Assert.Single(await AuditsFor(store, "a-admin", "community.set-optional"), a => a.TargetId == comp);
+    }
+
+    [Fact]
+    public async Task SetCommunityMandatory_ComponentModerator_UnauthorizedAccess()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-mand-mod";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true });
+        const string mod = "mod-mod";
+
+        // Product decision under test: the community's own moderator manages
+        // its *members*, but the mandatory/optional toggle is the admin's
+        // call — standing is not enough for this lane.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.SetCommunityMandatoryAsync(comp, true, mod,
+                RoleSet(Roles.Moderator, Roles.ModeratorComponent(comp))));
+
+        // No side effects of the refusal: flag untouched, no audit row at all.
+        Assert.False((await profileSettings.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
+        Assert.Empty(await AuditsFor(store, mod, "community.set-mandatory"));
+    }
+    [Fact]
+    public async Task SetCommunityMandatory_PlainMember_UnauthorizedAccess()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-mand-mbr";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.SetCommunityMandatoryAsync(comp, true, "u-member", RoleSet(Roles.Member)));
+    }
+
+    [Fact]
+    public async Task GetCommunityIdsAsync_Union_EncompassesEnabledMandatory_DropsWhenToggledOff()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string mand = "c-union-mand";
+        await Plant(store, new Component { Id = mand, Name = "M", Enabled = true, Mandatory = true });
+
+        Assert.Contains(mand, await svc.GetCommunityIdsAsync("u-union-none")); // no explicit row
+
+        await svc.SetCommunityMandatoryAsync(mand, false, "a-admin", RoleSet(Roles.GlobalAdmin));
+        Assert.DoesNotContain(mand, await svc.GetCommunityIdsAsync("u-union-none"));
+    }
+
+    [Fact]
+    public async Task GetCommunityIdsAsync_ExcludesDisabledMandatoryCommunity()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-union-disabled";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = false, Mandatory = true });
+
+        Assert.DoesNotContain(comp, await svc.GetCommunityIdsAsync("u-anyone"));
+    }
+
+    [Fact]
+    public async Task AddCommunityMember_AdminAndModerator_PersistRows_AndAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-add";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+
+        await svc.AddCommunityMemberAsync(comp, "u-a", "a-admin", RoleSet(Roles.GlobalAdmin));
+        Assert.Equal("u-a", (await LoadMembership(store, comp, "u-a")).UserId);
+        Assert.Single(await AuditsFor(store, "a-admin", "community.add-member"), a => a.TargetId == comp);
+
+        await svc.AddCommunityMemberAsync(comp, "u-b", "mod-add",
+            RoleSet(Roles.Moderator, Roles.ModeratorComponent(comp)));
+        Assert.Equal("u-b", (await LoadMembership(store, comp, "u-b")).UserId);
+        var audits = await AuditsFor(store, "mod-add", "community.add-member");
+        Assert.Single(audits);
+        Assert.Equal(AccessVia.Moderator, audits[0].Via);
+    }
+
+    [Fact]
+    public async Task AddCommunityMember_PlainMember_UnauthorizedAccess()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-add-mbr";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.AddCommunityMemberAsync(comp, "u-a", "u-member", RoleSet(Roles.Member)));
+    }
+
+    [Fact]
+    public async Task RemoveCommunityMember_Mandatory_Refuses_LeavesRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-rm-mand";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true, Mandatory = true });
+        await Plant(store, new ComponentMembership { Id = "m-rm", ComponentId = comp, UserId = "u-t" });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.RemoveCommunityMemberAsync(comp, "u-t", "a-admin", RoleSet(Roles.GlobalAdmin)));
+        Assert.Equal("u-t", (await LoadMembership(store, comp, "u-t")).UserId);
+    }
+
+    [Fact]
+    public async Task RemoveCommunityMember_Optional_DeletesRow_AndAudits()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-rm-opt";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        await Plant(store, new ComponentMembership { Id = "m-rm2", ComponentId = comp, UserId = "u-t" });
+
+        await svc.RemoveCommunityMemberAsync(comp, "u-t", "a-admin", RoleSet(Roles.GlobalAdmin));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => { await LoadMembership(store, comp, "u-t"); });
+        Assert.Single(await AuditsFor(store, "a-admin", "community.remove-member"), a => a.TargetId == comp);
+    }
+
+    [Fact]
+    public async Task ClearCommunityMembership_Mandatory_SkipsDelete_AuditsNothing()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-clear-mand";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true, Mandatory = true });
+        await Plant(store, new ComponentMembership { Id = "m-clear", ComponentId = comp, UserId = "u-t" });
+
+        await svc.ClearCommunityMembershipAsync(comp, "u-t", "a-admin"); // frozen admin lane
+
+        Assert.Equal("u-t", (await LoadMembership(store, comp, "u-t")).UserId);
+        Assert.Empty(await AuditsFor(store, "a-admin", "community.remove-member"));
+    }
+
+    [Fact]
+    public async Task ClearCommunityMembership_SelfLeaveShape_AuditsTheMemberAsActor()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-selfleave";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        const string actor = "u-self";
+        await Plant(store, new ComponentMembership { Id = "m-self", ComponentId = comp, UserId = actor });
+
+        await svc.ClearCommunityMembershipAsync(comp, actor, actor); // userId == actorId → self-lane
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => { await LoadMembership(store, comp, actor); });
+        var audits = await AuditsFor(store, actor, "community.remove-member");
+        Assert.Single(audits);
+        Assert.Equal(AccessVia.Admin, audits[0].Via); // self-leave reuses the frozen lane → Via Admin
+    }
+
+    [Fact]
+    public async Task GetCommunityMembersAsync_ReturnsExplicitRows_ForCommunityOnly()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-members";
+        const string other = "c-members-other";
+        await Plant(store, new Component { Id = comp, Name = "A", Enabled = true });
+        await Plant(store, new Component { Id = other, Name = "B", Enabled = true });
+        await Plant(store, new ComponentMembership { Id = "m-1", ComponentId = comp, UserId = "u-a" });
+        await Plant(store, new ComponentMembership { Id = "m-2", ComponentId = comp, UserId = "u-b" });
+        await Plant(store, new ComponentMembership { Id = "m-3", ComponentId = other, UserId = "u-x" });
+
+        var rows = await communityService.GetCommunityMembersAsync(comp);
+
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, r => r.UserId == "u-a");
+        Assert.Contains(rows, r => r.UserId == "u-b");
+        Assert.DoesNotContain(rows, r => r.UserId == "u-x");
+    }
+
+    // ── Guardian community block-and-hide (the per-child ceiling, the
+    //    MessagingRestricted precedent carried to communities) ─────────────
+
+    [Fact]
+    public async Task GetEffectiveCommunityIds_ExcludesGuardianBlockedCommunity()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-block-excl";
+        const string child = "u-block-child";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        await Plant(store, new ComponentMembership { Id = "m-block-excl", ComponentId = comp, UserId = child });
+        await Plant(store, new Profile
+        {
+            SubjectId = child, DisplayName = "Child", Verified = true, Blocked = false,
+            Visibility = new Audience(), BlockedCommunityIds = [comp]
+        });
+
+        // The RAW read still carries the child's actual membership (the
+        // guardian's own curation + the /admin diff read through this).
+        Assert.Contains(comp, await svc.GetCommunityIdsAsync(child));
+
+        // But the EFFECTIVE set (the child's own access surface) excludes it.
+        var effective = await svc.GetEffectiveCommunityIdsAsync(child);
+        Assert.DoesNotContain(comp, effective);
+    }
+
+    [Fact]
+    public async Task GetEffectiveCommunityIds_HidesMandatoryCommunityForBlockedChild()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string mand = "c-block-mand";
+        const string child = "u-block-mand-child";
+        await Plant(store, new Component { Id = mand, Name = "M", Enabled = true, Mandatory = true });
+        await Plant(store, new Profile
+        {
+            SubjectId = child, DisplayName = "Child", Verified = true, Blocked = false,
+            Visibility = new Audience(), BlockedCommunityIds = [mand]
+        });
+
+        // ADR 0012 — the mandatory community is an implicit member in the RAW
+        // read (it cannot be removed), and the removal lane would refuse / skip.
+        Assert.Contains(mand, await svc.GetCommunityIdsAsync(child));
+
+        // But "block" bypasses "cannot remove": the mandatory community drops
+        // out of the child's effective (access) set.
+        var effective = await svc.GetEffectiveCommunityIdsAsync(child);
+        Assert.DoesNotContain(mand, effective);
+    }
+
+    [Fact]
+    public async Task SetChildCommunityBlock_TogglesEffectiveSet_AndAuditsViaGuardian()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-block-toggle";
+        const string child = "u-block-toggle-child";
+        const string guardian = "u-block-toggle-guardian";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        await Plant(store, new ComponentMembership { Id = "m-block-toggle", ComponentId = comp, UserId = child });
+        await Plant(store, new Profile
+        {
+            SubjectId = child, DisplayName = "Child", Verified = true, Blocked = false,
+            Visibility = new Audience(), BlockedCommunityIds = []
+        });
+        await guardianService.CreateGuardianLinkAsync(child, guardian);
+
+        // Block — the community leaves the effective set, the raw read keeps it.
+        await guardianService.SetChildCommunityBlockAsync(child, comp, true, guardian);
+        Assert.DoesNotContain(comp, await svc.GetEffectiveCommunityIdsAsync(child));
+        Assert.Contains(comp, await svc.GetCommunityIdsAsync(child));
+        Assert.Contains(comp, (await svc.GetProfileAsync(child))!.BlockedCommunityIds);
+        var blockRow = (await AuditsFor(store, guardian, "guardian.community_block")).Single(a => a.TargetId == comp);
+        Assert.Equal(AccessVia.Guardian, blockRow.Via);
+        Assert.Equal(guardian, blockRow.ActorId);
+
+        // Unblock — the effective set is restored (full access again).
+        await guardianService.SetChildCommunityBlockAsync(child, comp, false, guardian);
+        Assert.Contains(comp, await svc.GetEffectiveCommunityIdsAsync(child));
+        Assert.DoesNotContain(comp, (await svc.GetProfileAsync(child))!.BlockedCommunityIds);
+        var unblockRow = (await AuditsFor(store, guardian, "guardian.community_unblock")).Single(a => a.TargetId == comp);
+        Assert.Equal(AccessVia.Guardian, unblockRow.Via);
+    }
+
+    [Fact]
+    public async Task SetChildCommunityBlock_NonGuardian_Unauthorized()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        var communityService = new CommunityMembershipService(store);
+        var guardianService = new GuardianService(store);
+        var profileSettings = new ProfileSettingsService(store);
+        const string comp = "c-block-nonguardian";
+        const string child = "u-block-nonguardian-child";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        await Plant(store, new Profile
+        {
+            SubjectId = child, DisplayName = "Child", Verified = true, Blocked = false,
+            Visibility = new Audience(), BlockedCommunityIds = []
+        });
+
+        // No active guardian link for (guardian, child) → the standing gate
+        // fires (the GU deny-by-default shape). The write never happens.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => guardianService.SetChildCommunityBlockAsync(child, comp, true, "u-stranger"));
+        Assert.Empty((await svc.GetProfileAsync(child))!.BlockedCommunityIds);
+    }
+
+    // ── Shared helpers for the membership tests ──────────────────
+
+    private static async Task Plant(IDocumentStore store, object document)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var w = store.OpenSession(new SessionOptions());
+        w.Store(document);
+        await w.SaveChangesAsync(ct);
+    }
+
+    private static async Task<ComponentMembership> LoadMembership(IDocumentStore store, string componentId, string userId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await s.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId && m.UserId == userId)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new InvalidOperationException("Membership row missing (should be set by the test).");
+    }
+
+    private static async Task<IReadOnlyList<AccessAudit>> AuditsFor(IDocumentStore store, string actor, string action)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await s.Query<AccessAudit>()
+            .Where(a => a.ActorId == actor && a.Action == action)
+            .ToListAsync(ct);
+    }
+}

@@ -1,0 +1,60 @@
+@model Kumunita.Web.Models.InviteViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@{
+    ViewData["Title"] = "Invite a neighbour";
+}
+
+<div class="mb-2"><a href="/account" class="btn btn-link p-0">&larr; <kw-l key="nav.account">Account</kw-l></a></div>
+
+<h1 class="mt-2"><kw-l key="account.invite_title">Invite a neighbour</kw-l></h1>
+
+<p class="text-muted">
+    <kw-l key="account.invite_lede">Invite a neighbour to join the community. The invitation is a one-time link that opens sign-up for that address (even while sign-up is closed) and expires after 7 days. The invitation is sent as an email carrying the link.</kw-l>
+</p>
+
+@if (!Model.MayInvite)
+{
+    @* The Off floor (the A11 rule's MayInvite = false posture) — the
+       surface is absent, not a 403 (the A12 card: "the resident surface
+       is hidden and its seam refuses"). The account-menu entry is the
+       primary visibility gate; this is the belt-and-suspenders on the
+       surface itself (a direct-URL access while the mode is Off). *@
+    <div class="alert alert-secondary">
+        <kw-l key="account.invite_off">Resident invitations are not enabled for this community. Please contact a GlobalAdmin.</kw-l>
+    </div>
+}
+else
+{
+    @* IMPROVE-UX A12 (ADR 0304 D6 c) — the OnWithApproval mode's
+       "pending approval" notice: the resident knows their invitation is
+       not yet usable, the admin approval queue is the A12 admin lane.
+       The A11 rule's RequiresApproval flag is the ledger (the row lands
+       PendingApproval, not Pending — the ADR 0304 D6 c shape). *@
+    @if (Model.RequiresApproval)
+    {
+        <div class="alert alert-info">
+            <kw-l key="account.invite_pending_approval">Your invitation is pending approval. A GlobalAdmin will review it before it becomes usable.</kw-l>
+        </div>
+    }
+
+    <div class="card mb-4" style="max-width: 480px;">
+        <div class="card-body">
+            <form method="post" action="@Url.Action("Invite", "Account")" class="mt-2">
+                @Html.AntiForgeryToken()
+                <label for="invite-email" class="form-label small">
+                    <kw-l key="account.invite_email_label">Email address</kw-l>
+                </label>
+                <input type="email" class="form-control" name="Email" id="invite-email"
+                       placeholder="neighbour@example.com" required value="@Model.Email" />
+                <div class="form-text">
+                    <kw-l key="account.invite_email_hint">The neighbour's email address. They get a one-time sign-up link by email.</kw-l>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">
+                    <kw-l key="account.invite_button">Invite</kw-l>
+                </button>
+            </form>
+        </div>
+    </div>
+}

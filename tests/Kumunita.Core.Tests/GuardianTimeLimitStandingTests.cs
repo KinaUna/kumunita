@@ -40,7 +40,7 @@ namespace Kumunita.Core.Tests;
 /// contract; a different name is a drift pause, not a silent rename.
 /// </para>
 /// </summary>
-public class GuardianTimeLimitStandingTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GuardianTimeLimitStandingTests(PostgresFixture fixture)
 {
     // ── F5 / C-M28·4 · C-M28·7 — the gate is deny-by-default ─────────────────
     // A non-guardian, non-admin (no active link, no GlobalAdmin standing)

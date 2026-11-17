@@ -1,0 +1,171 @@
+@model Kumunita.Web.Controllers.ReportsMineController.ReportsMineViewModel
+@using Kumunita.Core.Posts
+@{
+    ViewData["Title"] = "My reports";
+}
+
+<h1><kw-l key="reports.title">My reports</kw-l></h1>
+
+@if (!Model.HasAny)
+{
+    @* The E16 "one next action" empty-state shape (the Groups/Index.cshtml
+       kmb-empty precedent) — one friendly line, not a blank page, not
+       an error. *@
+    <div class="kmb-empty">
+        <p class="kmb-empty-title"><kw-l key="reports.empty">No reports yet — when you report a post or an issue, the outcome lands here.</kw-l></p>
+    </div>
+}
+else
+{
+    @* ── Section 1: content reports (R05 MyReportRow rows) ────────────── *@
+    @if (Model.Reports.Count > 0)
+    {
+        <section class="mb-4">
+            <h2><kw-l key="reports.reports_section">Content reports</kw-l></h2>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th><kw-l key="reports.th_target">Reported</kw-l></th>
+                            <th><kw-l key="reports.th_status">Status</kw-l></th>
+                            <th><kw-l key="reports.th_outcome">Outcome</kw-l></th>
+                            <th><kw-l key="reports.th_filed">Filed</kw-l></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.Reports)
+                        {
+                            // R07 / R08 anchor — the ReportResolved
+                            // notification (R07) links to
+                            // /reports/mine#r-{ReportId}; the anchor is
+                            // here so the follow-on unit doesn't have to
+                            // refactor.
+                            <tr id="r-@r.ReportId">
+                                @* TargetTitle is null when the reporter
+                                   can no longer read the target (the R05
+                                   "no longer visible" shape) — render the
+                                   localized fallback, not a link. *@
+                                <td>
+                                    @if (r.TargetTitle is not null)
+                                    {
+                                        <span class="fw-semibold">@r.TargetTitle</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted"><kw-l key="reports.target_unavailable">(no longer available)</kw-l></span>
+                                    }
+                                </td>
+                                @* Closed status set — the four literals
+                                   filed / assigned / unlocked / resolved
+                                   the R05 seam emits. Map to a localized
+                                   label via the reports.status.{status}
+                                   key (the house dynamic-key idiom — the
+                                   Bookmarks/Index.cshtml bm.list.kind.@kind
+                                   precedent). *@
+                                <td>
+                                    <span class="badge text-bg-secondary">
+                                        <kw-l key="reports.status.@r.Status">@r.Status</kw-l>
+                                    </span>
+                                </td>
+                                @* Outcome — the R03 four-value enum
+                                   NoAction / Hidden / Removed / Other.
+                                   When null the report has not been
+                                   resolved yet; render the localized
+                                   "no outcome recorded" shape (the
+                                   reports.no_outcome key). *@
+                                <td>
+                                    @if (r.Outcome is { } outcome)
+                                    {
+                                        var outcomeKey = outcome switch
+                                        {
+                                            ReportOutcome.NoAction => "reports.outcome_noaction",
+                                            ReportOutcome.Hidden => "reports.outcome_hidden",
+                                            ReportOutcome.Removed => "reports.outcome_removed",
+                                            ReportOutcome.Other => "reports.outcome_other",
+                                            _ => "reports.outcome_other"
+                                        };
+                                        var outcomeFallback = outcome.ToString();
+                                        <kw-l key="@outcomeKey">@outcomeFallback</kw-l>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted"><kw-l key="reports.no_outcome">No outcome recorded yet</kw-l></span>
+                                    }
+                                </td>
+                                <td>
+                                    <kw-dt dt="@r.At" format="g"></kw-dt>
+                                </td>
+                            </tr>
+                            @* The ResolutionNote — verbatim, when present.
+                               Rendered as a sub-row under the main row so
+                               the table stays one-row-per-report. *@
+                            @if (!string.IsNullOrEmpty(r.ResolutionNote))
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-muted small pt-0">
+                                        <kw-l key="reports.th_note">Note</kw-l>: @r.ResolutionNote
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+
+    @* ── Section 2: platform issues (R05 ErrorReport docs) ────────────── *@
+    @if (Model.Issues.Count > 0)
+    {
+        <section class="mb-4">
+            <h2><kw-l key="reports.issues_section">Issues</kw-l></h2>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th><kw-l key="reports.th_description">Description</kw-l></th>
+                            <th><kw-l key="reports.th_status">Status</kw-l></th>
+                            <th><kw-l key="reports.th_filed">Filed</kw-l></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var issue in Model.Issues)
+                        {
+                            // R08 anchor — the issue.resolved notification
+                            // (R08) links to /reports/mine#i-{Id}.
+                            <tr id="i-@issue.Id">
+                                <td>
+                                    <span class="fw-semibold">@issue.Description</span>
+                                </td>
+                                @* Closed TriageStatus set — new / triaged
+                                   / resolved (the R05 seam's literal
+                                   strings, ADR 0155 D2 + M32 D1). Map to
+                                   a localized label via the
+                                   reports.issue_status.{status} key. *@
+                                <td>
+                                    <span class="badge text-bg-secondary">
+                                        <kw-l key="reports.issue_status.@issue.TriageStatus">@issue.TriageStatus</kw-l>
+                                    </span>
+                                </td>
+                                <td>
+                                    <kw-dt dt="@issue.Created" format="g"></kw-dt>
+                                </td>
+                            </tr>
+                            @* The ResolutionNote — verbatim, when present
+                               (the M32 "what was done" field, rendered
+                               as a sub-row under the main row). *@
+                            @if (!string.IsNullOrEmpty(issue.ResolutionNote))
+                            {
+                                <tr>
+                                    <td colspan="3" class="text-muted small pt-0">
+                                        <kw-l key="reports.th_note">Note</kw-l>: @issue.ResolutionNote
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+}

@@ -122,6 +122,98 @@ public partial class IdentityService(
         return new ThinPrincipal(user.Id ?? subjectId, user.ExternalId, verified, roles);
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> ListGlobalAdminsAsync()
+    {
+        // ADR 0303 (IMPROVE-UX A05) — the GlobalAdmin enumeration read seam.
+        // The GetUsersInRoleAsync shape (the EmitAccountNotificationAsync
+        // precedent, ADR 0077), userId projection only (no PII), null-safe
+        // (an account with no Id is skipped — the ADR 0077 fan-out guard).
+        var admins = await userManager
+            .GetUsersInRoleAsync(Roles.GlobalAdmin).ConfigureAwait(false);
+        var ids = new List<string>(admins.Count);
+        foreach (var a in admins)
+        {
+            var id = a?.Id ?? string.Empty;
+            if (id.Length > 0)
+                ids.Add(id);
+        }
+        return ids;
+    }
+
+    /// <inheritdoc />
+    public async Task RequestStorageQuotaIncreaseAsync(string subjectId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(subjectId);
+
+        // IMPROVE-UX A14 — the "request more space" notify is **best-effort**
+        // (the ADR 0077 D5 posture, the <c>EmitAccountNotificationAsync</c>
+        // shape): the request "was made" is the durable fact (the resident's
+        // confirmed action, the Web's flash), and a missing emitter, a fresh
+        // instance with no GlobalAdmin, or an emit error is swallowed + logged
+        // — the request never fails because the notification lane is
+        // unavailable. No audit row (a notify is not an access decision — the
+        // A12 <see cref="IInvitationService.ApproveAsync"/> notify precedent).
+        // The ADR 0077 <c>NotifyAdminsOnSignup</c> gate does NOT apply: that
+        // flag gates the signup-lane notify; this is a distinct loop (the
+        // storage-request nudge), so it is always on for a GlobalAdmin.
+        try
+        {
+            if (notifications is null)
+                return;                                          // not wired (a test harness) — the request still stands
+
+            // The GlobalAdmin enumeration read (the <c>EmitAccountNotificationAsync</c>
+            // <c>GetUsersInRoleAsync</c> shape) — a no-op for a fresh instance
+            // (nothing to notify, not a noise path).
+            var admins = (await userManager
+                .GetUsersInRoleAsync(Roles.GlobalAdmin).ConfigureAwait(false)).ToList();
+            if (admins.Count == 0)
+                return;                                          // no GlobalAdmin (a fresh instance) — nothing to notify
+
+            // The body carries the requesting resident (so the admin knows
+            // *who* is asking) — the display name, then the email, then the
+            // raw id as the floor (a profileless account still identifies
+            // itself). Resolved through <see cref="IUserInfoService"/>
+            // (the ADR 0006 §D seam — the Identity module owns the read).
+            var profile = await userInfo.GetProfileAsync(subjectId).ConfigureAwait(false);
+            var who = !string.IsNullOrWhiteSpace(profile?.DisplayName) ? profile!.DisplayName
+                    : !string.IsNullOrWhiteSpace(profile?.Email) ? profile!.Email!
+                    : subjectId;
+
+            // F10 — a stable, content-derived key per recipient: a repeat
+            // request by the same resident does not re-flood the same admin
+            // (EmitAsync dedups by key alone — the recipient is a parameter,
+            // so the admin id is part of the key; the ADR 0077 per-admin
+            // fan-out shape).
+            await using var session = documentStore.OpenSession(new SessionOptions());
+            foreach (var admin in admins)
+            {
+                var adminId = admin?.Id ?? string.Empty;
+                if (adminId.Length == 0)
+                    continue;
+                await notifications.EmitAsync(
+                    session,
+                    recipientId: adminId,
+                    kind: Notifications.NotificationKinds.StorageRequest,
+                    idempotencyKey: $"notification:{Notifications.NotificationKinds.StorageRequest}:{subjectId}:{adminId}",
+                    body: who,
+                    linkPath: $"/admin/accounts/{subjectId}",
+                    ct: ct).ConfigureAwait(false);
+            }
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Best-effort (D5): the request must not fail because the
+            // notification lane is unavailable — log and let the resident's
+            // confirmed action stand. The inbox row is the nudge, not the
+            // record.
+            logger.LogWarning(ex,
+                "IMPROVE-UX A14 — the storage-quota request for {SubjectId} was not notified to the GlobalAdmins.",
+                subjectId);
+        }
+    }
+
     // ── Signup + verification (the one designed handoff: the verification
     //    email, single-send; the only outward-seam exit) ─────────────────────
 
@@ -495,7 +587,15 @@ public partial class IdentityService(
         ExpiresAt = now.AddDays(verificationOptions.Value.TtlDays)
     };
 
-    private static Authorization.AccessAudit AuditRow(
+    /// <summary>
+    /// The single <c>AccessAudit</c> row shape the whole <c>Identity</c>
+    /// context writes (the "one summary" shape, the ADR 0142 D5 / 0301 D1
+    /// precedent). <c>internal</c> so the ADR 0301 (IMPROVE-UX R11)
+    /// <see cref="DeletionScheduler"/> sibling shares the SAME implementation
+    /// rather than duplicating the field mapping in a second file (the
+    /// <see cref="Sha256Hex"/> "internal so the sibling shares it" precedent).
+    /// </summary>
+    internal static Authorization.AccessAudit AuditRow(
         DateTimeOffset at, string actorId, string effective, string action,
         string targetKind, string targetId, Authorization.AccessVia via,
         Authorization.AccessOutcome outcome) => new()

@@ -31,7 +31,7 @@ namespace Kumunita.Core.Tests;
 /// guest lane does not touch (only <c>documentStore</c> is the real one).
 /// </para>
 /// </summary>
-public class GuestAccessSeamTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class GuestAccessSeamTests(PostgresFixture fixture)
 {
     // ── GATE-3 — the allowance write lane is single + audited ─────────────
 

@@ -32,8 +32,15 @@
         <div class="airy-ann-list">
             @if (Model.Rows.Count == 0)
             {
-                <div class="p-4 text-muted">
-                    <kw-l key="documents.deleted_empty">No deleted documents.</kw-l>
+                @* R32 (IMPROVE-UX) — the house .kmb-empty idiom; the body is the
+                   existing documents.deleted_empty sentence and the action is
+                   the view's own back link to the documents list. *@
+                <div class="kmb-empty">
+                    <p class="kmb-empty-title"><kw-l key="documents.deleted_empty_title">No deleted documents.</kw-l></p>
+                    <p class="kmb-empty-body">
+                        <kw-l key="documents.deleted_empty">No deleted documents.</kw-l>
+                    </p>
+                    <a class="btn btn-outline-secondary" href="/documents"><kw-l key="documents.title">Documents</kw-l></a>
                 </div>
             }
             @foreach (var row in Model.Rows)

@@ -35,7 +35,7 @@ namespace Kumunita.Core.Tests.TagPeople;
 /// <i>opposite</i> of the Postgres null-placement U7 pinned.
 /// </para>
 /// </summary>
-public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class TagPeopleSortTests(PostgresFixture fixture)
 {
     // ════════════════════════════ TAG POSTS (row 14) ═════════════════════
 

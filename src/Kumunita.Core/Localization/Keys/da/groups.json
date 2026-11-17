@@ -121,5 +121,7 @@
   "groups.edit_language_hint": "Det sprog, du skriver dette indl\u00E6g p\u00E5. Det er kun en markering \u2014 det overs\u00E6ttes ikke \u2014 og holder teksten findbar senere og giver en l\u00E6ser mulighed for at tilf\u00F8je deres egen sprogversion, hvis de \u00F8nsker det.",
   "groups.edit_submit": "Gem \u00E6ndringer",
   "groups.edit_cancel": "Annuller",
-  "groups.confirm_delete": "Slet denne gruppe? Dette fjerner gruppen, dens medlemmer og dens ventende invitationer, og det kan ikke fortrydes."
+  "groups.confirm_delete": "Slet denne gruppe? Dette fjerner gruppen, dens medlemmer og dens ventende invitationer, og det kan ikke fortrydes.",
+  "groups.posts_empty_title": "Ingen indl\u00E6g endnu.",
+  "groups.events_empty_title": "Ingen arrangementer endnu."
 }

@@ -2,6 +2,7 @@
   "search.nav": "Recherche",
   "search.title": "Recherche",
   "search.placeholder": "Rechercher dans les publications, \u00E9v\u00E9nements, pages, annonces, projets, tableaux, t\u00E2ches, inventaire, documents et personnes\u2026",
+  "search.empty_title": "Aucun r\u00E9sultat.",
   "search.no-results": "Aucun r\u00E9sultat pour",
   "search.section.posts": "Publications",
   "search.section.events": "\u00C9v\u00E9nements",

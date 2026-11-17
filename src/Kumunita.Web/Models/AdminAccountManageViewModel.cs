@@ -39,4 +39,54 @@ public sealed class AdminAccountManageViewModel
     /// (membership rows that currently 404 on the feed). A convenience for the
     /// view's "disabled communities this account still posts to" note.</summary>
     public IReadOnlyList<string> DisabledCommunityIds { get; init; } = [];
+
+    // ── IMPROVE-UX A15 — the per-resident storage quota override card ────────
+    // The admin half of the storage loop (A14's "request more space" nudge
+    // points here): the effective per-user quota for this resident (override
+    // ?? global, the C-UP·5 sentinel resolved), their current usage, and a
+    // set/clear control. The effective quota + the override are the two values
+    // the view renders; the form is a blank-clears / 0-unlimited / MiB-cap
+    // input (the AdminStorageController.Save value semantics).
+
+    /// <summary>A15 — the resident's current per-user-quota override in bytes,
+    /// or <c>null</c> when no override is set (the <c>override ?? global</c>
+    /// fallback signal — distinct from <c>0</c>, the per-resident
+    /// unlimited). Drives the view's "no override (uses the community
+    /// default)" note and the form's pre-fill.</summary>
+    public long? QuotaOverrideBytes { get; init; }
+
+    /// <summary>A15 — the resident's **effective** per-user quota in bytes
+    /// (override ?? global). <c>0</c> = unlimited for this resident (the
+    /// C-UP·5 sentinel preserved per-resident).</summary>
+    public long EffectiveQuotaBytes { get; init; }
+
+    /// <summary>A15 — true when the resident's effective per-user quota is
+    /// <c>0</c> (unlimited). Drives the "Unlimited" label in the card.</summary>
+    public bool EffectiveQuotaUnlimited { get; init; }
+
+    /// <summary>A15 — the resident's current used bytes (the C-SM·7
+    /// <c>Σ SizeBytes WHERE CreatedById == subject</c> read).</summary>
+    public long UsedBytes { get; init; }
+
+    /// <summary>A15 — the community-wide per-user quota in bytes (the global
+    /// the override falls back to; <c>0</c> = unlimited). Shown so the admin
+    /// sees what "clear the override" means for this resident.</summary>
+    public long GlobalQuotaBytes { get; init; }
+
+    /// <summary>A15 — the override pre-filled as a MiB string for the form
+    /// input (blank when no override is set — clearing returns the resident to
+    /// the community default; <c>"0"</c> when the override is the per-resident
+    /// unlimited sentinel). Pure display; the controller parses on save.</summary>
+    public string QuotaOverrideInput { get; init; } = string.Empty;
+
+    /// <summary>A15 — human-readable (IEC units) of <see cref="UsedBytes"/>.</summary>
+    public string UsedHuman { get; init; } = string.Empty;
+
+    /// <summary>A15 — human-readable of the effective quota — "Unlimited" when
+    /// <see cref="EffectiveQuotaUnlimited"/>.</summary>
+    public string EffectiveQuotaHuman { get; init; } = string.Empty;
+
+    /// <summary>A15 — human-readable of the community-wide quota — "Unlimited"
+    /// when it is <c>0</c>.</summary>
+    public string GlobalQuotaHuman { get; init; } = string.Empty;
 }

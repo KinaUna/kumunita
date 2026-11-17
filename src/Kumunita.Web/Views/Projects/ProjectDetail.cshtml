@@ -342,18 +342,18 @@
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="mb-3">
-                                                        <label class="form-label">
+                                                        <label class="form-label" for="@($"proj-trans-edit-title-{existing.LanguageCode}")">
                                                             @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
                                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                                         </label>
-                                                        <input class="form-control" type="text" name="title" value="@existing.Title" />
+                                                        <input class="form-control" type="text" id="@($"proj-trans-edit-title-{existing.LanguageCode}")" name="title" value="@existing.Title" />
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">
+                                                        <label class="form-label" for="@($"proj-trans-edit-body-{existing.LanguageCode}")">
                                                             <kw-l key="posts.translation_body_label">Body</kw-l>
                                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                                         </label>
-                                                        <textarea class="form-control" name="body" rows="4" placeholder="…">@existing.Body</textarea>
+                                                        <textarea class="form-control" id="@($"proj-trans-edit-body-{existing.LanguageCode}")" name="body" rows="4" placeholder="…">@existing.Body</textarea>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer">
@@ -387,14 +387,14 @@
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="mb-3">
-                                                        <label class="form-label">
+                                                        <label class="form-label" for="@($"proj-trans-add-title-{lang.Code}")">
                                                             @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
                                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                                         </label>
-                                                        <input class="form-control" type="text" name="title" value="@Model.Title" />
+                                                        <input class="form-control" type="text" id="@($"proj-trans-add-title-{lang.Code}")" name="title" value="@Model.Title" />
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">
+                                                        <label class="form-label" for="@($"proj-trans-add-body-{lang.Code}")">
                                                             <kw-l key="posts.translation_body_label">Body</kw-l>
                                                             <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                                         </label>
@@ -407,7 +407,7 @@
                                                                 <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
                                                                 <partial name="_RichEditorToggle" />
                                                             </div>
-                                                            <textarea class="form-control" name="body" rows="4" placeholder="…" data-rich-editor></textarea>
+                                                            <textarea class="form-control" id="@($"proj-trans-add-body-{lang.Code}")" name="body" rows="4" placeholder="…" data-rich-editor></textarea>
                                                             <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
                                                         </div>
                                                     </div>
@@ -502,8 +502,14 @@
             <h2><kw-l key="pl.project.todos_heading">To-dos in this project</kw-l></h2>
             @if (Model.Todos.Count == 0)
             {
-                <div class="kanban-board-empty p-4 text-muted border rounded">
-                    <kw-l key="pl.project.todos_empty">No to-dos are in this project yet.</kw-l>
+                @* R31 (IMPROVE-UX) — the house .kmb-empty idiom: title + the
+                   existing body sentence + the page's New-to-do action. *@
+                <div class="kmb-empty">
+                    <p class="kmb-empty-title"><kw-l key="pl.project.todos_empty_title">No to-dos in this project yet.</kw-l></p>
+                    <p class="kmb-empty-body">
+                        <kw-l key="pl.project.todos_empty">No to-dos are in this project yet.</kw-l>
+                    </p>
+                    <a class="btn btn-primary" href="/projects/todos/new"><kw-l key="projects.todo.new">New to-do</kw-l></a>
                 </div>
             }
             else
@@ -550,8 +556,14 @@
             <h2><kw-l key="pl.project.boards_heading">Boards in this project</kw-l></h2>
             @if (Model.Boards.Count == 0)
             {
-                <div class="kanban-board-empty p-4 text-muted border rounded">
-                    <kw-l key="pl.project.boards_empty">No boards are in this project yet.</kw-l>
+                @* R31 (IMPROVE-UX) — the house .kmb-empty idiom: title + the
+                   existing body sentence + the page's New-board action. *@
+                <div class="kmb-empty">
+                    <p class="kmb-empty-title"><kw-l key="pl.project.boards_empty_title">No boards in this project yet.</kw-l></p>
+                    <p class="kmb-empty-body">
+                        <kw-l key="pl.project.boards_empty">No boards are in this project yet.</kw-l>
+                    </p>
+                    <a class="btn btn-primary" href="/projects/boards/new"><kw-l key="projects.board.new">New board</kw-l></a>
                 </div>
             }
             else

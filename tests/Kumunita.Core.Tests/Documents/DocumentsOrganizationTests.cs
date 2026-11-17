@@ -38,7 +38,7 @@ namespace Kumunita.Core.Tests.Documents;
 ///   </item>
 /// </list>
 /// </summary>
-public class DocumentsOrganizationTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class DocumentsOrganizationTests(PostgresFixture fixture)
 {
     // ── 1 — Tag lane: UploadAsync with TagSlugs resolves to TagIds ─────────
 

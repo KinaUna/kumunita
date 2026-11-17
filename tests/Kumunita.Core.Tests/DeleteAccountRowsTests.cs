@@ -47,7 +47,7 @@ namespace Kumunita.Core.Tests;
 /// and are never logged.</para>
 /// </para>
 /// </summary>
-public sealed class DeleteAccountRowsTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class DeleteAccountRowsTests(PostgresFixture fixture)
 {
     // ── S2/E2 pinned tests (design §2.3, verbatim names) ───────────────────
 

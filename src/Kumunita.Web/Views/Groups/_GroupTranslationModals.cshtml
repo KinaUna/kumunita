@@ -26,18 +26,18 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">
+                            <label class="form-label" for="@($"group-trans-edit-name-{existing.LanguageCode}")">
                                 @Model.LangName(existing.LanguageCode) <kw-l key="groups.translation_name_label">Name</kw-l>
                                 <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
                             </label>
-                            <input class="form-control" type="text" name="name" value="@existing.Name" />
+                            <input class="form-control" type="text" id="@($"group-trans-edit-name-{existing.LanguageCode}")" name="name" value="@existing.Name" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">
+                            <label class="form-label" for="@($"group-trans-edit-desc-{existing.LanguageCode}")">
                                 <kw-l key="groups.translation_desc_label">Description</kw-l>
                                 <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
                             </label>
-                            <textarea class="form-control" name="description" rows="4" placeholder="…">@existing.Description</textarea>
+                            <textarea class="form-control" id="@($"group-trans-edit-desc-{existing.LanguageCode}")" name="description" rows="4" placeholder="…">@existing.Description</textarea>
                         </div>
                         <div class="form-text">
                             <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>
@@ -74,18 +74,18 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">
+                            <label class="form-label" for="@($"group-trans-add-name-{lang.Code}")">
                                 @Model.LangName(lang.Code) <kw-l key="groups.translation_name_label">Name</kw-l>
                                 <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
                             </label>
-                            <input class="form-control" type="text" name="name" value="@Model.Model.Name" />
+                            <input class="form-control" type="text" id="@($"group-trans-add-name-{lang.Code}")" name="name" value="@Model.Model.Name" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">
+                            <label class="form-label" for="@($"group-trans-add-desc-{lang.Code}")">
                                 <kw-l key="groups.translation_desc_label">Description</kw-l>
                                 <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
                             </label>
-                            <textarea class="form-control" name="description" rows="4" placeholder="…">@Model.Model.Description</textarea>
+                            <textarea class="form-control" id="@($"group-trans-add-desc-{lang.Code}")" name="description" rows="4" placeholder="…">@Model.Model.Description</textarea>
                         </div>
                         <div class="form-text">
                             <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>

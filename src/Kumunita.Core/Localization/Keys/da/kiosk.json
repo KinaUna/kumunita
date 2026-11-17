@@ -67,5 +67,19 @@
   "kiosk.settings.remove_entry": "Fjern",
   "kiosk.settings.entry_heading": "Punkt {0}",
   "kiosk.settings.empty": "Ingen punkter endnu. Brug \u201ETilf\u00F8j punkt\u201C for at s\u00E6tte noget p\u00E5 din kiosk.",
-  "kiosk.settings.calendar_all": "Alle f\u00E6llesskaber"
+  "kiosk.settings.calendar_all": "Alle f\u00E6llesskaber",
+  "kiosk.settings.shared_heading": "Delt link",
+  "kiosk.settings.shared_intro": "Et delt link lader alle, der har det, se din kiosk-display uden at logge ind. Kun elementer, der er synlige for hele f\u00E6llesskabet, vises (private elementer springes over). Linket kan tilbagetr\u00E6des; n\u00E5r det er tilbagetr\u00E6kt, kan det ikke g\u00E5ldes igen.",
+  "kiosk.settings.link_created": "Dit delte link er klar. Kopi\u00E9r det nu \u2014 det vises ikke igen.",
+  "kiosk.settings.token_label": "Delt link",
+  "kiosk.settings.copy": "Kopi\u00E9r",
+  "kiosk.settings.copied": "Kopi\u00E9ret",
+  "kiosk.settings.create_link": "Opret link",
+  "kiosk.settings.col_created": "Oprettet",
+  "kiosk.settings.col_last_used": "Sidst brugt",
+  "kiosk.settings.col_actions": "Handlinger",
+  "kiosk.settings.never_used": "Aldrig",
+  "kiosk.settings.revoke_confirm": "Tilbagetr\u00E6k dette delte link? Det holder straks op med at virke og kan ikke fortrydes.",
+  "kiosk.settings.revoke": "Tilbagetr\u00E6k",
+  "kiosk.settings.shared_empty": "Ingen delte links endnu. Brug \u201EOpret link\u201C for at lave et til en v\u00E6gsk\u00E9rm eller et f\u00E6lles display."
 }

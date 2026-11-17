@@ -2,6 +2,7 @@
   "blog.draft_title": "Un brouillon \u2014 vous seul pouvez le voir jusqu\u2019\u00E0 sa publication.",
   "blog.new_page": "Nouvelle page de blog",
   "blog.empty_own": "Tu n\u0027as pas encore de pages de blog. Cr\u00E9e la premi\u00E8re \u2014 elle devient la racine de ton blog, et tu peux en imbriquer d\u0027autres sous elle.",
+  "blog.empty_title": "Pas encore de pages de blog.",
   "blog.empty_other": "Cet habitant n\u0027a pas encore de pages de blog.",
   "blog.draft": "Brouillon"
 }

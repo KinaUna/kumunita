@@ -31,7 +31,7 @@ namespace Kumunita.Core.Tests;
 /// authenticated, not audience-restricted reads).
 /// </para>
 /// </summary>
-public class DocumentServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public class DocumentServiceTests(PostgresFixture fixture)
 {
     // ── 1 — GATE-4 / C-M21·3 — feed: one CanSeeAsync over the candidate set ─
     //

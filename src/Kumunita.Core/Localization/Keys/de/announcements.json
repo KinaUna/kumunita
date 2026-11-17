@@ -54,5 +54,6 @@
   "announcements.comment_submit": "Kommentieren",
   "announcements.comment_audience_note": "Kommentare sind nur f\u00FCr angemeldete Anwohner:innen sichtbar \u2014 auch bei einer \u00F6ffentlichen Ank\u00FCndigung \u2014 und folgen dem eigenen Publikum dieser Ank\u00FCndigung (eine an eine Community gerichtete ist deren Anwohner:innen sichtbar).",
   "announcements.comment_audience_note_label": "Wer sieht Kommentare?",
-  "announcements.delete_confirm": "Diese Ank\u00FCndigung l\u00F6schen? Das kann nicht r\u00FCckg\u00E4ngig gemacht werden."
+  "announcements.delete_confirm": "Diese Ank\u00FCndigung l\u00F6schen? Das kann nicht r\u00FCckg\u00E4ngig gemacht werden.",
+  "announcements.comment_empty_title": "Noch keine Kommentare."
 }

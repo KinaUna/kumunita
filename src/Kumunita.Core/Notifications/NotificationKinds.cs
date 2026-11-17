@@ -52,6 +52,96 @@ public static class NotificationKinds
     /// <summary>A report the resident filed (or was assigned to) was resolved (wired, U04).</summary>
     public const string ReportResolved = "report.resolved";
 
+    /// <summary>
+    /// IMPROVE-UX A05 (ADR 0303) — a report was <b>filed</b> and routed to
+    /// the component's standing moderators + the <c>GlobalAdmin</c>s (an
+    /// <b>admin-lane</b> kind — the recipients are the standing moderators /
+    /// GlobalAdmins, not the reporter; the ADR 0077 <c>account.signup</c> /
+    /// <c>account.verified</c> admin-lane precedent, which also trail the
+    /// resident-facing kinds in <see cref="Known"/>). One row per recipient
+    /// (the standing moderators ∪ the GlobalAdmins, deduped), **no target
+    /// content in the body** (the 2026-09-25 disclosure-fix shape — the
+    /// localized template alone is the signal; the reporter's free-text
+    /// reason is never forwarded), <c>linkPath = /moderation/{reportId}</c>
+    /// (the scoped-read route — the receiving moderator's <c>Read</c>
+    /// decision on open still applies; A05 routes a nudge, it does not grant
+    /// standing). Emitter: the three
+    /// <see cref="Kumunita.Core.Moderation.ModerationService"/> filing lanes
+    /// (the per-recipient idempotency key
+    /// <c>notification:report.queued:{reportId}:{recipientId}</c>, the ADR
+    /// 0077 admin-fan-out shape — one row per recipient, a re-filing of the
+    /// same report does not re-emit).
+    /// </summary>
+    public const string ReportQueued = "report.queued";
+
+    /// <summary>
+    /// IMPROVE-UX R08 (ADR 0300) — a platform-issue report
+    /// (<see cref="ErrorReports.ErrorReport"/>) filed by a signed-in resident
+    /// was resolved. The recipient is the filer
+    /// (<see cref="ErrorReports.ErrorReport.SubjectId"/>). Resident-facing,
+    /// opt-OUT default (not in <see cref="OptInKinds"/>). Emitter:
+    /// <see cref="ErrorReports.ErrorReportService
+    /// .MarkResolvedAsync"/> (the idempotency key
+    /// <c>notification:issue.resolved:{reportId}</c>, <c>LinkPath =
+    /// /reports/mine#i-{reportId}</c>, <c>targetId = reportId</c>).
+    /// </summary>
+    public const string IssueResolved = "issue.resolved";
+
+    /// <summary>
+    /// IMPROVE-UX A10 (ADR 0304) — an invitation's <see
+    /// cref="Kumunita.Core.Identity.IInvitationService
+    /// .AcceptAsync"/> lane completed (the invited person accepted the
+    /// invitation link and their account was created). The recipient is the
+    /// <b>inviter</b> (<see cref="Kumunita.Core.Identity.Invitation
+    /// .InviterSubjectId"/>), not the accepted person. Resident-facing
+    /// (the inviter is a resident — an admin in A09's admin-invite case, or
+    /// a neighbour once A11/A12 ship the resident self-invite lane), so it is
+    /// NOT gated by the instance <c>NotifyAdminsOnSignup</c> flag (unlike
+    /// <see cref="AccountSignup"/>) and it is NOT a re-emit of the
+    /// admin-lane <c>account.signup</c> row (that already fires on
+    /// <see cref="Kumunita.Core.Identity.IIdentityService.RegisterAsync"/>,
+    /// which <see cref="Kumunita.Core.Identity.InvitationService
+    /// .AcceptAsync"/> runs in step 3 — an inviter who is also a
+    /// GlobalAdmin gets two distinct rows, two distinct kinds, two distinct
+    /// meanings). Best-effort (the <see cref="Kumunita.Core.Identity
+    /// .IdentityService"/> <c>EmitAccountNotificationAsync</c> D5 posture —
+    /// a missing emitter / an emit error is swallowed + logged; the
+    /// <c>invitation.accept</c> audit row is the durable record). Emitter:
+    /// <see cref="Kumunita.Core.Identity.InvitationService.AcceptAsync"/>
+    /// step 4 (the <see cref="Kumunita.Core.Identity.InvitationService
+    /// .AcceptPresentedAsync"/> path funnels into it, so one emission point
+    /// covers both the hash-based and the presented-token seams). One row
+    /// per (invitation, inviter) — the stable idempotency key
+    /// <c>notification:invitation.accepted:{invitationId}</c>
+    /// (the <c>EmitAccountNotificationAsync</c> F10 shape — a re-accept of
+    /// the same invitation is impossible anyway, the single-use pin, but
+    /// the key is content-derived regardless).
+    /// </summary>
+    public const string InvitationAccepted = "invitation.accepted";
+
+    /// <summary>
+    /// IMPROVE-UX A12 (ADR 0304 D6 c) — the resident's pending invitation
+    /// was **approved** by a GlobalAdmin (the
+    /// <see cref="ResidentInviteSetting.OnWithApproval"/> mode): the row
+    /// transitioned <see cref
+    /// "Kumunita.Core.Identity.EmailInvitationStatus.PendingApproval"/> →
+    /// <see cref="Kumunita.Core.Identity.EmailInvitationStatus.Pending"/>
+    /// (the <see cref
+    /// "Kumunita.Core.Identity.IInvitationService.ApproveAsync"/> lane),
+    /// and the resident inviter hears back that their invitation is now
+    /// usable (the A08 <c>?invite=</c> sign-up gate accepts it). The
+    /// <see cref="InvitationAccepted"/> precedent (A10) — the resident-
+    /// facing nudge, the body carries the invited email (no PII beyond the
+    /// already-invited address), the linkPath
+    /// <c>/account/invite</c> (the A12 resident surface). Emitter:
+    /// <see cref="Kumunita.Core.Identity.InvitationService.ApproveAsync"/>
+    /// (best-effort, the D5 posture — the <c>invitation.approve</c> audit
+    /// row is the durable record). One row per (invitation, inviter) — the
+    /// stable idempotency key
+    /// <c>notification:invitation.approved:{invitationId}</c>.
+    /// </summary>
+    public const string InvitationApproved = "invitation.approved";
+
     /// <summary>A to-do was assigned to the resident (person-only; wired, U04).</summary>
     public const string TodoAssign = "todo.assign";
 
@@ -73,6 +163,63 @@ public static class NotificationKinds
     /// the instance <c>NotifyAdminsOnSignup</c> flag). One of the thirteen kinds.
     /// </summary>
     public const string AccountVerified = "account.verified";
+
+    /// <summary>
+    /// IMPROVE-UX A14 — a resident **requested** a higher per-user storage
+    /// quota (the "My storage" page's "Request more space" button; the
+    /// <c>account.storage_remaining_note</c> promise now has a seam). An
+    /// <b>admin-lane</b> kind — the recipient is a <c>GlobalAdmin</c>, not
+    /// the requesting resident (the <see cref="AccountSignup"/> /
+    /// <see cref="AccountVerified"/> / <see cref="ReportQueued"/>
+    /// admin-lane precedent, which also trail the resident-facing kinds in
+    /// <see cref="Known"/>). Emitter:
+    /// <see cref="Kumunita.Core.Identity.IIdentityService
+    /// .RequestStorageQuotaIncreaseAsync"/> (best-effort, the ADR 0077 D5
+    /// posture — the request being made is the durable fact; a notify-lane
+    /// failure is swallowed + logged, and a fresh instance with no GlobalAdmin
+    /// is a no-op). One row per GlobalAdmin (the per-recipient idempotency
+    /// key <c>notification:storage.request:{subjectId}:{adminId}</c>, the
+    /// ADR 0077 fan-out shape — a repeat request does not re-flood the same
+    /// admin); the body carries the requesting resident (display name /
+    /// email — the admin knows *who* is asking), <c>LinkPath =
+    /// /admin/accounts/{subjectId}</c> (the account-detail surface the A15
+    /// per-resident quota override will extend).
+    /// </summary>
+    public const string StorageRequest = "storage.request";
+
+    /// <summary>
+    /// IMPROVE-UX O04 (D8) — a T4 mail-alarm breach (<see
+    /// cref="MailAlarmsService.EvaluateAsync"/>'s
+    /// <see cref="MailAlarmThresholdPolicy.Build"/> returned a non-null
+    /// <see cref="AlertEvent"/>) is announced to the <c>GlobalAdmin</c>s. An
+    /// <b>admin-lane</b> kind — the recipients are the <c>GlobalAdmin</c>s,
+    /// not a resident (the <see cref="StorageRequest"/> / <see
+    /// cref="AccountSignup"/> / <see cref="AccountVerified"/> admin-lane
+    /// precedent, which also trail the resident-facing kinds in
+    /// <see cref="Known"/>). The D8 decision (E10): a mail-alarm breach
+    /// reaches the operator over the existing e-mail channel
+    /// (<see cref="Kumunita.Core.IAlertSink"/> → <c>SupportEmailAlertSink</c>)
+    /// <b>and</b> a second, independent inbox channel — because the very SMTP
+    /// relay that failed may be what tripped the alarm (the E10 / D8 concern:
+    /// "SMTP may be what failed, so e-mail is unreliable"). Always-on
+    /// (NOT in <see cref="OptInKinds"/> — the resident cannot toggle an
+    /// admin-lane kind off). Emitter: the
+    /// <c>Kumunita.Web.SideEffects.MailAlarmsHandler.Handle</c> Web layer
+    /// (the best-effort A14 / ADR 0077 D5 posture — a missing emitter, a
+    /// fresh instance with no GlobalAdmin, or an emit error is swallowed +
+    /// logged; the e-mail leg is the existing channel, this is the additive
+    /// inbox leg). One row per GlobalAdmin (the per-recipient idempotency key
+    /// <c>notification:ops.alarm:{fireMinute}:{adminId}</c> — stable per
+    /// fire-minute, the "still broken, still loud" re-fire semantics; the T4
+    /// gate re-fires every tick while breached, and the key dedupes within the
+    /// same minute so a persistent breach yields one row per 1-h tick); the
+    /// body carries the <see cref="AlertEvent.Subject"/> (counts + threshold,
+    /// **no PII** — the suppressed e-mails stay in the DB, the
+    /// <see cref="Kumunita.Core.Identity.SuppressedAddress"/> document),
+    /// <c>LinkPath = /admin/status</c> (the O02 page, where the full row set
+    /// is rendered).
+    /// </summary>
+    public const string OpsAlarm = "ops.alarm";
 
     // ── ADR 0084 — per-target subscription kinds ─────────────────────────
 
@@ -340,17 +487,34 @@ public static class NotificationKinds
     /// <summary>
     /// The ordered, closed kind set (for the settings toggles + the <c>kw-l</c>
     /// key table). Order is the settings page's canonical display order.
-    /// The two admin-lane kinds (<c>account.signup</c> / <c>account.verified</c>,
-    /// ADR 0077) are appended last — they are a separate lane (the recipient is a
-    /// GlobalAdmin, not the resident whose inbox the resident-facing kinds serve),
-    /// so they trail the resident-facing kinds.
+    /// The admin-lane kinds (<c>account.signup</c> / <c>account.verified</c>,
+    /// ADR 0077, and <c>storage.request</c>, IMPROVE-UX A14) are appended
+    /// last — they are a separate lane (the recipient is a GlobalAdmin, not
+    /// the resident whose inbox the resident-facing kinds serve), so they
+    /// trail the resident-facing kinds.
     /// </summary>
     public static IReadOnlyList<string> Known { get; } =
     [
         PostReply, PostMention, GroupPost, GroupAdded, GroupInvite,
         EventRsvp, EventReminder,
-        ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
-        AccountSignup, AccountVerified,
+        ReportFiled, ReportAssigned, ReportResolved, ReportQueued,
+        IssueResolved, InvitationAccepted, InvitationApproved, TodoAssign,
+        // The two admin-lane kinds (account.signup / account.verified, ADR
+        // 0077) are appended last — they are a separate lane (the recipient is a
+        // GlobalAdmin, not the resident whose inbox the resident-facing kinds
+        // serve), so they trail the resident-facing kinds. ReportQueued
+        // (ADR 0303) is also an admin-lane kind (its recipients are the standing
+        // moderators / GlobalAdmins, not the reporter) but it sits with the
+        // report cluster (report.filed / report.assigned / report.resolved) it
+        // belongs to semantically — the report cluster is the moderator-facing
+        // loop A05 closes, distinct from the signup-lane pair. StorageRequest
+        // (IMPROVE-UX A14) joins the signup-lane pair as a third admin-lane
+        // kind (the resident's storage-quota request, recipient a GlobalAdmin).
+        // OpsAlarm (IMPROVE-UX O04) is the fourth admin-lane kind: the T4
+        // mail-alarm breach announcement to the GlobalAdmins (the D8 second
+        // channel — the E10 "SMTP may be what failed, so email is unreliable"
+        // fix).
+        AccountSignup, AccountVerified, StorageRequest, OpsAlarm,
         Announcement, CommunityPost, PageChild, MessageNew,
         // M36 (ADR 0165, M36·3) — the six sibling mention kinds (the reserved
         // post.mention is already at the top of this set). Resident-facing,
