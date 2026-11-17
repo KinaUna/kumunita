@@ -1268,39 +1268,60 @@ moves it to the archive.
 - **Files:** **1** — this handoff note (a section appended). **No** ADR, **no**
   code change, **no** `devx-check.ps1` / `devx-baseline.json` edit, **no** gate
   loosened, **no** doc "fixed." Run-and-record only.
-- **PRECONDITION — BLOCKER, recorded and handed off (not absorbed):** **DX34 is
-  not landed.** Verified at session start (2026-11-17, `development` @
-  `e02eec86` = **DX33**): `git log --oneline -1` is DX33; `devx-check` is at
-  **13 rules** (not 14 — the `tracked-artifacts` rule 14 is absent);
-  `git ls-files` still shows **4** tracked `*.out` (`tests/coretest.out`,
-  `tests/coretest2.out`, `tests/webtest.out`, `tests/parity.out`);
-  `dx34-prompt.md` exists (untracked) but its work (`git rm` the four,
-  `.gitignore` + `*.out`/`*.trx`, rule 14, baseline 4 → 0) is **not** in
-  history. The brief's stop clause and DoD #7 both bind: DX35 **records the
-  blocker and hands off** — it does **not** perform DX34's three deliverables
-  inside DX35 (that would break the one-unit-per-commit contract). **The
-  "tracked artifacts 4 → 0" row below is therefore `pending DX34`, not 0.**
-- **The happy-path full-loop exit is NOT the outcome of this unit.** The
-  precondition gate is the first named check and it failed, so the unit stops
-  there (brief: "stop and say so"). Recorded **this session** (2026-11-17, not
-  the 2026-11-16 snapshot): `devx-check` **PASS, 13 rules, exit 0** (the one
-  step DX35 can assert green); `devx-report.ps1` numbers (below); `docs` FAIL,
-  `code` FAIL, `improve-check` FAIL, `web` FAIL (the pre-existing reds,
-  **listed** with their one-line reason and **not** fixed). Carried from the
-  DX08–DX33 handoffs (not re-run this session): `build` PASS, `tsc` PASS,
-  `core` PASS (~178 s, the slow step).
+- **Precondition now MET (DX34 landed):** the prior DX35 pass (commit
+  `36607050`) recorded DX34 as the missing blocker. **DX34 has since landed** —
+  verified this session (2026-11-17, `development` @ `379f8528` = **DX34**):
+  `git log --oneline -1` is DX34; `devx-check` is at **14 rules, PASS, exit 0**
+  (rule 14 `tracked-artifacts` green: **0 ≤ 0**); `git ls-files` shows **0**
+  tracked `*.out`/`*.log`/`*.trx`; `dx34-prompt.md` is now reachable (in the
+  orphan set). The "tracked artifacts 4 → 0" row is therefore **0 (met)**, not
+  `pending DX34`.
+- **The full loop was RUN this session** (`pwsh tools/check.ps1`, 2026-11-17;
+  per-step summary, captured verbatim):
+
+  | step   | seconds | result | note |
+  |---|---|---|---|
+  | build  | 3     | PASS   | |
+  | tsc    | 0.3   | PASS   | |
+  | web    | 23.3  | FAIL   | 1480 total, **19 failed** (2 product + 17 environmental — see below) |
+  | core   | 182.9 | FAIL   | 2052 total, **9 failed** (all environmental — see below) |
+  | docs   | 10.3  | FAIL   | the pre-existing set, **listed** below |
+  | code   | 9.5   | FAIL   | the Roslyn ratchet, **listed** below |
+  | devx   | 5.1   | **PASS** | **14 rules, exit 0** (the one step DX35 asserts green) |
+
+  Overall **exit 1** for the FAIL steps. **Do not read `web`/`core` FAIL as
+  product reds:** the 26 socket failures are the **sandbox port-bind quirk**
+  (below); the only genuine product `web` red is the 2
+  `SecGate.DataClassCoverageTests` (the brief's expected known-red).
+- **DRIFT from the brief's expected exit — recorded, not chased.** The brief
+  expected `core` **PASS** and `web` FAIL "only on the `SecGate` known-reds."
+  In this sandbox `core` FAILs (9) and `web` FAILs (17 more) because
+  **`SmtpHealthCheckTests` (core, 9) and `StatusPageGateTests` (web, 17) each
+  bind a `TcpListener` to reserve a port, and the agent sandbox CANNOT bind a
+  new localhost port** — the documented quirk in
+  `docs/dev/agent-environment-quirks.md` / the `env-docker-ts7-and-portbind`
+  repo note: a `python3 socket.bind(('127.0.0.1', N))` returns
+  `[Errno 98] Address already in use` even on a port `ss -ltn` shows free
+  (**re-verified this session**: binds to 47123 and 48222 both failed with
+  `Errno 98`). All 26 failures share the identical
+  `System.Net.Sockets.SocketException : Address already in use` at
+  `TcpListener.Start`. **These are environmental, not product reds — they pass
+  in CI / a real host, and they are not in scope for DX35 to fix.** The brief's
+  "core PASS" is therefore not reproducible in this sandbox; the honest record
+  is core FAIL (environmental).
 - **`devx-report.ps1` (source of truth, 2026-11-17, quoted not re-derived):**
   IClassFixture Core **1** / Web **0**; test files all **413** / root **142** /
   lane **0**; lane-code lines **12 231** / names **0**; ADRs total **307** /
-  unreachable **0**; tracked `*.out`/`*.log`/`*.trx` **4** (→ **0** once DX34
-  lands); `AGENTS.md` **1 999** token proxy.
+  unreachable **0**; tracked `*.out`/`*.log`/`*.trx` **0** (DX34 landed);
+  `AGENTS.md` **1 999** token proxy.
 - **The honest before→after table** (floors cited from the DX handoffs, not the
-  plan's 2026-11-09 projection):
-  - Core suite **392 → 178 s** — honest floor; the 90 s target is not met
-    (per-class `CREATE DATABASE` + execution is the cost, not the removed
-    container startups). Cite DX08.
-  - Web suite **63 → 22.8 s** — honest floor ~22–24 s; the 20 s target is just
-    missed (most Web tests are NSubstitute-only). Cite DX09.
+  plan's 2026-11-09 projection; the two seconds rows use this session's live
+  run):
+  - Core suite **392 → 178 s** (182.9 s this run) — honest floor; the 90 s
+    target is not met (per-class `CREATE DATABASE` + execution is the cost, not
+    the removed container startups). Cite DX08.
+  - Web suite **63 → 22.8 s** (23.3 s this run) — honest floor ~22–24 s; the
+    20 s target is just missed (most Web tests are NSubstitute-only). Cite DX09.
   - CI on the merge path **0 % → 100 %** — all five jobs
     (`test`/`docs`/`code`/`e2e`/`devx`) run on `release` push+PR (verified in
     `ci.yml`), `guard-main.yml` fails a non-`release` PR into `main` (verified
@@ -1314,8 +1335,8 @@ moves it to the archive.
     cross-cutting `_Shared/` tests (Core 78 + Web 64); the 0 target is not met,
     floor recorded per D2 DoD. Cite DX25–DX30.
   - lane-named test files **17 → 0** (rule 10). Cite DX23.
-  - tracked `*.out`/`*.log`/`*.trx` **4 → pending DX34** (rule 14 is **not**
-    landed; the 4 are still tracked — see Blocker). Cite DX34.
+  - tracked `*.out`/`*.log`/`*.trx` **4 → 0** (rule 14 landed at DX34; the
+    honest before→after row is now **met**). Cite DX34.
   - ADRs unreachable by link **104 → 0** (report E12). Cite DX22.
   - lane codes **3 391 → 12 231** — a **shrink-only floor, not "≤ 3 391"**;
     the plan's 3 391 was an unpinned-regex measurement and the candidate
@@ -1332,9 +1353,13 @@ moves it to the archive.
     `Identity→Authorization:AccessAudit` 4 > 3, `Web→Identity:Roles` 43 > 39).
   - `improve-check` gate `b` FAIL — ADR index drift, missing `0305`/`0306`
     (307 on disk, 305 index rows).
-  - `web` FAIL — `SecGate.DataClassCoverageTests` known-red (documented in the
-    test's XML summary as prior-unit drift: `Delete`/`Pseudonymize` rows not in
-    any eraser seam; the gate is the pin, not the place to fix).
+  - `web` FAIL (product) — `SecGate.DataClassCoverageTests` known-red
+    (documented in the test's XML summary as prior-unit drift:
+    `Delete`/`Pseudonymize` rows not in any eraser seam; the gate is the pin,
+    not the place to fix).
+  - `web`/`core` FAIL (environmental) — the 26 socket-bind failures above
+    (`StatusPageGateTests` 17 + `SmtpHealthCheckTests` 9); the sandbox port-bind
+    quirk, **not** product reds, **not** fixable from DX35.
 - **`-Only docs` reds pre-existing and unchanged** (front-matter **17**, ADR
   >250 **1**, broken links **21**, orphans **33** — incl. this brief; archive
   **50**; `improve-check` gate `b` `0305`/`0306`). This handoff section adds
@@ -1346,6 +1371,11 @@ moves it to the archive.
   runnable in the sandbox).
 - **Cite:** ADR **0307**; the plan body's "0300" is a stale number (consistent
   with the DX04–DX34 handoffs).
-- **Handoff / next:** **DX34 is the missing precondition — carry DX34, then
-  re-run DX35** (DX35 does not absorb DX34; the tracked-artifacts row and
-  `devx-check`'s 14th rule become true only after DX34's commit lands).
+- **Handoff / next:** **DX35 complete** — the full loop is run, the
+  `devx` step is green (**PASS, 14 rules, exit 0**), the honest table (incl.
+  the now-met "tracked artifacts 4 → 0") and the pre-existing + environmental
+  reds are recorded with reasons. **DX36** (cold start) is next and depends on
+  none of the reds; **DX37** (close flip) depends on DX36 passing every line.
+  The environmental socket failures are a sandbox property — they will be
+  green in CI (DX36's `devx`/gate probes do not bind ports, so they are
+  unaffected).
