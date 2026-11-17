@@ -107,8 +107,8 @@ $ruleCount = 1
 # must be a subset of the server-scoped allowlist. The allowlist is exactly one file
 # (the DX06 triage, ADR 0171 — AppRoleCannotDropSchemaTests does catalog-level
 # CREATE ROLE / CREATE DATABASE … OWNER and must keep its own private container).
-# Source of truth for the allowlist: docs/plans-milestones/in-progress/improve-devx-
-# handoff-notes.md (## DX06). obj/ and bin/ are excluded (build artifacts). An
+# Source of truth for the allowlist: docs/archive/lanes/improve-devx/
+# improve-devx-handoff-notes.md (## DX06). obj/ and bin/ are excluded (build artifacts). An
 # empty set is a valid subset (the allowlist file may legitimately stop declaring
 # the pattern in the future); the rule fails only when a file *outside* the
 # allowlist still declares it.
